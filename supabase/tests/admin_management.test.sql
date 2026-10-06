@@ -58,8 +58,10 @@
 --     deactivated admin keeps their identity, keeps writing, keeps reading.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(40);
+SELECT plan(41);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Two businesses, an owner, two co-admins, a stranger admin, a parent ──────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -73,23 +75,23 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','ca000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','coadmin-owner@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Owner Olivia","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','coadmin-owner@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Owner Olivia","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','ca000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','coadmin-pure@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Pure Percy","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','coadmin-pure@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Pure Percy","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','ca000000-0000-0000-0000-0000000000a3',
-   'authenticated','authenticated','coadmin-coachadmin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Coachadmin Cora","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-000000000001","is_coach":true}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','coadmin-coachadmin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Coachadmin Cora","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-000000000001","is_coach":true}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','cb000000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','coadmin-other-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Other Otto","role":"tenant_admin","tenant_id":"cb000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','coadmin-other-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Other Otto","role":"tenant_admin","tenant_id":"cb000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','ca000000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','coadmin-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','coadmin-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','ca000000-0000-0000-0000-0000000000e1',
-   'authenticated','authenticated','coadmin-platform@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Platform Pat","role":"platform_admin"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','coadmin-platform@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Platform Pat","role":"platform_admin"}', app_now(), app_now(), '', '', '', '');
 
 -- ============================================================
 -- 1. OWNERSHIP CLAIM + THE EVERY-SIGNUP CONTROL
@@ -146,7 +148,7 @@ SELECT throws_ok(
 -- peer's profile row at all, so the write matches nothing rather than
 -- tripping guard_profiles_privileges. The outcome is what is pinned: the
 -- peer is still active. (The guard itself is pinned by roles_permissions.)
-UPDATE profiles SET admin_disabled_at = now()
+UPDATE profiles SET admin_disabled_at = app_now()
  WHERE id = 'ca000000-0000-0000-0000-0000000000a3';
 SELECT is(
   (SELECT count(*)::int FROM profiles

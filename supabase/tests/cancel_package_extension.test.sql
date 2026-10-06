@@ -10,6 +10,8 @@
 -- package's NOMINAL window for coverage — so the package starts today, 10 weeks
 -- (nominal end today+70). Class A runs on TODAY's weekday, so today+7/+14/+21/+28
 -- are all lesson days; Class Z runs on tomorrow's, and today+8 is its lesson day.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 --
 -- MEASURED (§7.25): against the schema at 20260821000700 this file dies at the
 -- baseline (parent_packages.cancel_extension_days does not exist). With the column
@@ -19,8 +21,10 @@
 -- holiday reconcile clobbers the cancel extension out of expires_on.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(17);
+SELECT plan(18);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixture ─────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code, holiday_extension_days) VALUES
@@ -31,22 +35,22 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','ca100000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','cpx-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cpx-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"CPX Admin","role":"tenant_admin","is_coach":true,"tenant_id":"ca000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ca200000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','cpx-parent1@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cpx-parent1@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}','{"full_name":"CPX Parent1","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ca200000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','cpx-parent2@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cpx-parent2@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}','{"full_name":"CPX Parent2","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ca200000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','cpx-parent3@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cpx-parent3@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}','{"full_name":"CPX Parent3","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'ca000000-0000-0000-0000-000000000001'
@@ -74,13 +78,13 @@ SELECT x.id, co.id, x.title, x.dow::day_of_week, '00:00', '00:01', (SELECT l.id 
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 CROSS JOIN (VALUES
   ('ca400000-0000-0000-0000-00000000000a'::uuid, 'Class A',
-   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg())::int + 1]),
+   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM '2026-09-15'::date)::int + 1]),
   -- Class A2 also runs TODAY's weekday: a SECOND lesson on the same dates, used to
   -- prove an unrelated same-date cancel does not perturb Class A's snapshot (§ finding 1).
   ('ca400000-0000-0000-0000-00000000000c'::uuid, 'Class A2',
-   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg())::int + 1]),
+   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM '2026-09-15'::date)::int + 1]),
   ('ca400000-0000-0000-0000-00000000000f'::uuid, 'Class Z',
-   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg() + 1)::int + 1])
+   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM '2026-09-16'::date)::int + 1])
 ) AS x(id, title, dow)
 WHERE pr.email = 'cpx-admin@test.local';
 
@@ -109,9 +113,9 @@ JOIN (VALUES
 -- Kid1a/Kid1b in Class A from today. Kid3 in Class A too, but its package is
 -- PENDING (the late-activation case). Kid2 is enrolled nowhere yet (snapshot case).
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at) VALUES
-  ('ca500000-0000-0000-0000-0000000000a1','ca400000-0000-0000-0000-00000000000a', true, today_sg()),
-  ('ca500000-0000-0000-0000-0000000000a2','ca400000-0000-0000-0000-00000000000a', true, today_sg()),
-  ('ca500000-0000-0000-0000-0000000000c1','ca400000-0000-0000-0000-00000000000a', true, today_sg());
+  ('ca500000-0000-0000-0000-0000000000a1','ca400000-0000-0000-0000-00000000000a', true, '2026-09-15'::date),
+  ('ca500000-0000-0000-0000-0000000000a2','ca400000-0000-0000-0000-00000000000a', true, '2026-09-15'::date),
+  ('ca500000-0000-0000-0000-0000000000c1','ca400000-0000-0000-0000-00000000000a', true, '2026-09-15'::date);
 
 -- All-classes (category NULL) products, 10 weeks. P1/P2 active, start today, so
 -- their nominal window is [today, today+70). P3 is PENDING (not yet confirmed).
@@ -121,11 +125,11 @@ INSERT INTO package_products (id, tenant_id, name, lesson_count, rate_per_lesson
   ('ca600000-0000-0000-0000-000000000003','ca000000-0000-0000-0000-000000000001','P3 20', 20, 30.00, 10);
 INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status, start_date)
 SELECT 'ca700000-0000-0000-0000-000000000001','ca000000-0000-0000-0000-000000000001',
-       p.id,'ca600000-0000-0000-0000-000000000001','active', today_sg()
+       p.id,'ca600000-0000-0000-0000-000000000001','active', '2026-09-15'::date
 FROM parents p JOIN profiles pr ON pr.id=p.profile_id WHERE pr.email='cpx-parent1@test.local';
 INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status, start_date)
 SELECT 'ca700000-0000-0000-0000-000000000002','ca000000-0000-0000-0000-000000000001',
-       p.id,'ca600000-0000-0000-0000-000000000002','active', today_sg()
+       p.id,'ca600000-0000-0000-0000-000000000002','active', '2026-09-15'::date
 FROM parents p JOIN profiles pr ON pr.id=p.profile_id WHERE pr.email='cpx-parent2@test.local';
 INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status)
 SELECT 'ca700000-0000-0000-0000-000000000003','ca000000-0000-0000-0000-000000000001',
@@ -139,19 +143,19 @@ FROM parents p JOIN profiles pr ON pr.id=p.profile_id WHERE pr.email='cpx-parent
 SELECT is(
   (SELECT expires_on::text || '/' || cancel_extension_days::text
      FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
-  (today_sg() + 70)::text || '/0',
+  ('2026-11-24'::date)::text || '/0',
   '1. baseline P1: expiry is the nominal end, cancel accumulator 0');
 
 -- ── 2-4. Cancel today+7 ⇒ +7, deduped across the two siblings to ONE row ─────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT isnt(cancel_lesson('ca400000-0000-0000-0000-00000000000a', today_sg() + 7, 'rain'),
+SELECT isnt(cancel_lesson('ca400000-0000-0000-0000-00000000000a', '2026-09-22'::date, 'rain'),
   NULL, '2-pre. admin cancels today+7');
 RESET ROLE;
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
   7, '2. a cancel covered by the package ⇒ +7 days');
 SELECT is((SELECT expires_on FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
-  today_sg() + 77, '3. expiry pushed 7 days');
+  '2026-12-01'::date, '3. expiry pushed 7 days');
 SELECT is((SELECT count(*)::int FROM package_cancel_extensions WHERE parent_package_id='ca700000-0000-0000-0000-000000000001'),
   1, '4. two siblings sharing one package on ONE cancelled lesson ⇒ exactly ONE state row (dedup per lesson)');
 
@@ -159,21 +163,21 @@ SELECT is((SELECT count(*)::int FROM package_cancel_extensions WHERE parent_pack
 -- Mark today+14 a holiday: holiday_extension_days becomes 7, and the holiday
 -- reconcile must preserve the +7 cancel extension already in expires_on.
 INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
-VALUES ('ca000000-0000-0000-0000-000000000001', today_sg() + 14, 'CPX Holiday');
+VALUES ('ca000000-0000-0000-0000-000000000001', '2026-09-29'::date, 'CPX Holiday');
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT mark_day_holiday('ca000000-0000-0000-0000-000000000001', today_sg() + 14);
+SELECT mark_day_holiday('ca000000-0000-0000-0000-000000000001', '2026-09-29'::date);
 RESET ROLE;
 SELECT is(
   (SELECT holiday_extension_days::text || '/' || cancel_extension_days::text || '/' || expires_on::text
      FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
-  '7/7/' || (today_sg() + 84)::text,
+  '7/7/' || ('2026-12-08'::date)::text,
   '5. holiday (+7) and cancel (+7) SUM in expires_on — neither reconcile clobbers the other');
 
 -- ── 6. A second distinct cancelled date accumulates (+7 more = 14) ───────────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', today_sg() + 21, 'coach away');
+SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', '2026-10-06'::date, 'coach away');
 RESET ROLE;
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
   14, '6. a second distinct cancelled date ⇒ +7 more (per-date accumulation)');
@@ -181,7 +185,7 @@ SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-
 -- ── 7. NO CASCADE: a cancel OUTSIDE the nominal window draws no package ───────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', today_sg() + 77, 'rain');  -- >= today+70
+SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', '2026-12-01'::date, 'rain');  -- >= today+70
 RESET ROLE;
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
   14, '7. a cancel after the nominal end extends nothing (no cascade)');
@@ -189,17 +193,17 @@ SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-
 -- ── 8. REVERSAL is exact: restore today+21 ⇒ back to 7 ───────────────────────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT restore_lesson('ca400000-0000-0000-0000-00000000000a', today_sg() + 21);
+SELECT restore_lesson('ca400000-0000-0000-0000-00000000000a', '2026-10-06'::date);
 RESET ROLE;
 SELECT is((SELECT cancel_extension_days::text || '/' || expires_on::text
              FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
-  '7/' || (today_sg() + 84)::text, '8. restoring a cancelled lesson retracts exactly its days (holiday +7 remains)');
+  '7/' || ('2026-12-08'::date)::text, '8. restoring a cancelled lesson retracts exactly its days (holiday +7 remains)');
 
 -- ── 9. CONFIGURABLE: raise to 10, a NEW cancel adds 10 ───────────────────────
 UPDATE tenants SET holiday_extension_days = 10 WHERE id='ca000000-0000-0000-0000-000000000001';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', today_sg() + 28, 'rain');
+SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', '2026-10-13'::date, 'rain');
 RESET ROLE;
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
   17, '9. a new cancel uses the CURRENT setting (7 already applied + 10 = 17)');
@@ -210,7 +214,7 @@ SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-
 UPDATE tenants SET holiday_extension_days = 0 WHERE id='ca000000-0000-0000-0000-000000000001';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT restore_lesson('ca400000-0000-0000-0000-00000000000a', today_sg() + 7);
+SELECT restore_lesson('ca400000-0000-0000-0000-00000000000a', '2026-09-22'::date);
 RESET ROLE;
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
   10, '10. restoring a row applied at 7 removes 7 even after the setting changed to 0');
@@ -218,13 +222,13 @@ SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-
 -- ── 11. CONFIG 0 writes no state row ─────────────────────────────────────────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', today_sg() + 35, 'rain');
+SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', '2026-10-20'::date, 'rain');
 RESET ROLE;
 SELECT is(
   (SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001')::text
   || '/' ||
   (SELECT count(*)::text FROM package_cancel_extensions
-     WHERE parent_package_id='ca700000-0000-0000-0000-000000000001' AND session_date = today_sg() + 35),
+     WHERE parent_package_id='ca700000-0000-0000-0000-000000000001' AND session_date = '2026-10-20'::date),
   '10/0', '11. a cancel under a 0-day setting extends nothing and writes no state row');
 
 -- ── 12-13. SNAPSHOT (the coverage decision): a LATE joiner is not retro-extended
@@ -234,13 +238,13 @@ SELECT is(
 UPDATE tenants SET holiday_extension_days = 7 WHERE id='ca000000-0000-0000-0000-000000000001';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000f', today_sg() + 8, 'rain');
+SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000f', '2026-09-23'::date, 'rain');
 RESET ROLE;
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000002'),
   0, '12. cancelling a lesson with NO covered enrolment extends nothing');
 
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-VALUES ('ca500000-0000-0000-0000-0000000000b1','ca400000-0000-0000-0000-00000000000f', true, today_sg());
+VALUES ('ca500000-0000-0000-0000-0000000000b1','ca400000-0000-0000-0000-00000000000f', true, '2026-09-15'::date);
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000002'),
   0, '13. a family enrolling AFTER the cancel is NOT retro-extended (snapshot — no enrolment trigger)');
 
@@ -251,10 +255,10 @@ SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-
 -- enrolment and retro-extend P2; the per-LESSON reconcile touches only A2, so P2
 -- stays 0. (This is the red-first assertion for the snapshot redesign.)
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-VALUES ('ca500000-0000-0000-0000-0000000000b1','ca400000-0000-0000-0000-00000000000a', true, today_sg());
+VALUES ('ca500000-0000-0000-0000-0000000000b1','ca400000-0000-0000-0000-00000000000a', true, '2026-09-15'::date);
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000c', today_sg() + 28, 'rain');
+SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000c', '2026-10-13'::date, 'rain');
 RESET ROLE;
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000002'),
   0, '14. FINDING 1: an unrelated same-date cancel does NOT retro-extend a late joiner in another already-cancelled class');
@@ -264,7 +268,7 @@ SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-
 -- guard_session_date does not fire on DELETE, so a raw delete is reachable; the
 -- AFTER DELETE trigger must retract or the +10 strands forever.
 DELETE FROM lesson_sessions
- WHERE class_id = 'ca400000-0000-0000-0000-00000000000a' AND session_date = today_sg() + 28;
+ WHERE class_id = 'ca400000-0000-0000-0000-00000000000a' AND session_date = '2026-10-13'::date;
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000001'),
   0, '15. deleting a cancelled session raw retracts its extension (the DELETE arm)');
 
@@ -274,7 +278,7 @@ SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-
 -- afterwards — nothing re-fires the lesson's reconcile, so P3 gets nothing.
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', today_sg() + 42, 'rain');
+SELECT cancel_lesson('ca400000-0000-0000-0000-00000000000a', '2026-10-27'::date, 'rain');
 RESET ROLE;
 UPDATE parent_packages SET status = 'active' WHERE id = 'ca700000-0000-0000-0000-000000000003';
 SELECT is((SELECT cancel_extension_days FROM parent_packages WHERE id='ca700000-0000-0000-0000-000000000003'),

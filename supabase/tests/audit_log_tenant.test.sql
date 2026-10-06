@@ -12,7 +12,9 @@
 -- unknown-entity_type insert succeeded instead of raising (§7.25).
 
 BEGIN;
-SELECT plan(8);
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
+SELECT plan(9);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ══ Fixture: two businesses, so a wrong derivation shows up as the WRONG
 --    tenant rather than merely a null one. ═══════════════════════════════════
@@ -25,9 +27,9 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','a0d17000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','admin-a@audit.test','x',NOW(),'{}','{}',NOW(),NOW(),'','','',''),
+   'authenticated','authenticated','admin-a@audit.test','x',app_now(),'{}','{}',app_now(),app_now(),'','','',''),
   ('00000000-0000-0000-0000-000000000000','a0d17000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','coach-a@audit.test','x',NOW(),'{}','{}',NOW(),NOW(),'','','','');
+   'authenticated','authenticated','coach-a@audit.test','x',app_now(),'{}','{}',app_now(),app_now(),'','','','');
 
 UPDATE profiles SET role = 'tenant_admin', tenant_id = 'a0d17000-0000-0000-0000-000000000001'
  WHERE id = 'a0d17000-0000-0000-0000-0000000000a1';
@@ -138,7 +140,7 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"a0d17000-0000-0000-0000-0000000000a1"
 
 SELECT lives_ok(
   $$ SELECT schedule_extra_lesson('a0d17000-0000-0000-0000-0000000000b1',
-                                  (CURRENT_DATE + 7), 'audit test') $$,
+                                  '2026-09-22'::date, 'audit test') $$,
   'schedule_extra_lesson still runs');
 
 RESET ROLE;

@@ -33,6 +33,8 @@
 -- relative to now(), so a fixed date would mean something different next month.
 -- Every date derives from ONE anchor. The tenant is created now and has never
 -- sealed, so its markable_floor() is the calendar rule — the 1st of last month.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 --
 -- METHOD (§7.16): every client probe runs inside this explicit transaction with
 -- SET LOCAL ROLE. Outside one, SET LOCAL ROLE is a no-op, the session stays
@@ -41,8 +43,10 @@
 -- raises after writing is not a gate.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(23);
+SELECT plan(24);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── The dates, from one anchor ──────────────────────────────────────────────
 --   d_floor    1st of last month     the business's markable_floor()
@@ -52,38 +56,36 @@ SELECT plan(23);
 --   d_future   today + 7 days        a lesson that has not happened yet
 -- Classes run on d_past's weekday, so d_past and d_ancient are both real lesson
 -- dates and only the rule under test can be doing the refusing.
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE cd AS
 SELECT
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month')::date                                  AS d_floor,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month' + INTERVAL '7 days')::date              AS d_past,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month' - INTERVAL '70 days')::date             AS d_ancient,
-  ((now() AT TIME ZONE 'Asia/Singapore') + INTERVAL '7 days')::date AS d_future;
+  '2026-08-01'::date AS d_floor,
+  '2026-08-08'::date AS d_past,
+  '2026-05-23'::date AS d_ancient,
+  '2026-09-22'::date AS d_future;
 GRANT SELECT ON cd TO PUBLIC;
 
 -- Both businesses first: handle_new_user() resolves a profile's tenant from the
 -- JWT metadata, so an admin whose business does not exist yet fails the FK.
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('79777777-0000-0000-0000-000000000001','cdx','CDX Business','SWIM-CDXA', now()),
-  ('79777777-0000-0000-0000-000000000002','cdy','CDY Other Business','SWIM-CDYA', now());
+  ('79777777-0000-0000-0000-000000000001','cdx','CDX Business','SWIM-CDXA', app_now()),
+  ('79777777-0000-0000-0000-000000000002','cdy','CDY Other Business','SWIM-CDYA', app_now());
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','79100000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','cdx-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CDX Admin","role":"tenant_admin","tenant_id":"79777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','cdx-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CDX Admin","role":"tenant_admin","tenant_id":"79777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','79100000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','cdx-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CDX Coach","role":"coach","tenant_id":"79777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','cdx-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CDX Coach","role":"coach","tenant_id":"79777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   -- A second business's admin. Deactivation is tenant-scoped, and "any signed-in
   -- admin" is not the same permission as "this business's admin".
   ('00000000-0000-0000-0000-000000000000','79100000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','cdx-outsider@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CDX Outsider","role":"tenant_admin","tenant_id":"79777777-0000-0000-0000-000000000002"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','cdx-outsider@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CDX Outsider","role":"tenant_admin","tenant_id":"79777777-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
@@ -288,7 +290,7 @@ SELECT throws_ok(
 -- nothing to do with what is under test.
 RESET ROLE;
 UPDATE trial_bookings
-   SET cancelled_at = now(), cancelled_by = '79100000-0000-0000-0000-0000000000a1'
+   SET cancelled_at = app_now(), cancelled_by = '79100000-0000-0000-0000-0000000000a1'
  WHERE class_id = '79777777-1111-0000-0000-000000000004';
 SET LOCAL ROLE authenticated;
 

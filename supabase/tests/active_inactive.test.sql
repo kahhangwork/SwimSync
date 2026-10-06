@@ -7,8 +7,10 @@
 -- Its own tenants, so nothing here depends on another fixture's state.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(20);
+SELECT plan(21);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('89000000-0000-0000-0000-000000000001','act-a','Active Swim A','SWIM-ACTA'),
@@ -19,14 +21,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','7a000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','act-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Act Admin","role":"tenant_admin","tenant_id":"89000000-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
+   'authenticated','authenticated','act-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Act Admin","role":"tenant_admin","tenant_id":"89000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7a000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','act-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Act Coach","role":"coach","tenant_id":"89000000-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
+   'authenticated','authenticated','act-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Act Coach","role":"coach","tenant_id":"89000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7a000000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','act-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Act Parent","role":"parent"}', now(), now(), '','','','');
+   'authenticated','authenticated','act-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Act Parent","role":"parent"}', app_now(), app_now(), '','','','');
 
 -- Two children at business A, one at business B — same family. This is the
 -- case the whole per-business model exists for.

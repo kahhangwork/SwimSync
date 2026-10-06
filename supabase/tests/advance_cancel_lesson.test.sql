@@ -19,6 +19,8 @@
 -- a never-sealed tenant's markable_floor (the 1st of last month, ≥ 28 days
 -- back). Class A runs on TODAY's weekday; Class B on tomorrow's, so "a day
 -- the class does not meet" is expressible without a fixed calendar.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 --
 -- METHOD (§7.16): every role probe runs inside this transaction with SET LOCAL
 -- ROLE — outside one it is a no-op and every refusal "passes". Each refusal
@@ -32,8 +34,10 @@
 -- / unmark_day_holiday bodies, their assertions go red on the counts named.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(37);
+SELECT plan(38);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixture ─────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -44,14 +48,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','ac100000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','acl-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','acl-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"ACL Admin","role":"tenant_admin","is_coach":true,"tenant_id":"ac000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ac200000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','acl-stranger@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','acl-stranger@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}','{"full_name":"ACL Stranger","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO class_categories (id, tenant_id, name) VALUES
   ('ac300000-0000-0000-0000-000000000001','ac000000-0000-0000-0000-000000000001','G');
@@ -75,9 +79,9 @@ SELECT x.id, co.id, x.title, x.dow::day_of_week, '00:00', '00:01', (SELECT l.id 
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 CROSS JOIN (VALUES
   ('ac400000-0000-0000-0000-000000000001'::uuid, 'Class A',
-   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg())::int + 1]),
+   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM '2026-09-15'::date)::int + 1]),
   ('ac400000-0000-0000-0000-000000000002'::uuid, 'Class B',
-   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg() + 1)::int + 1])
+   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM '2026-09-16'::date)::int + 1])
 ) AS x(id, title, dow)
 WHERE pr.email = 'acl-admin@test.local';
 
@@ -90,93 +94,93 @@ INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id
 -- The kid's enrolment OPENS on d_past, so the only pattern dates they are
 -- expected at inside the window are d_past and today.
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-VALUES ('ac500000-0000-0000-0000-000000000001','ac400000-0000-0000-0000-000000000001', true, today_sg() - 7);
+VALUES ('ac500000-0000-0000-0000-000000000001','ac400000-0000-0000-0000-000000000001', true, '2026-09-08'::date);
 
 -- A live TRIAL guest on Class A at d_fut — the RISK 3 fixture.
 INSERT INTO trial_bookings (id, tenant_id, student_id, class_id, session_date, category_id, booked_by)
 VALUES ('ac600000-0000-0000-0000-000000000001','ac000000-0000-0000-0000-000000000001',
         'ac500000-0000-0000-0000-000000000002','ac400000-0000-0000-0000-000000000001',
-        today_sg() + 7, 'ac300000-0000-0000-0000-000000000001','ac100000-0000-0000-0000-000000000001');
+        '2026-09-22'::date, 'ac300000-0000-0000-0000-000000000001','ac100000-0000-0000-0000-000000000001');
 
 -- ── 1. Authz: a non-admin cannot cancel ──────────────────────────────────────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac200000-0000-0000-0000-000000000002","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 7, 'rain') $$,
+  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date, 'rain') $$,
   '%admin may cancel%', '1. a stranger cannot cancel a lesson');
 
 -- ── 2-5. The admin's refusals (RISK 2, and nothing-to-cancel) ───────────────
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg() - 7, 'rain') $$,
+  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-08'::date, 'rain') $$,
   '%has not happened yet%', '2. RISK 2: a PAST lesson cannot be advance-cancelled');
 SELECT throws_like(
-  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg(), 'rain') $$,
+  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-15'::date, 'rain') $$,
   '%has not happened yet%', '3. RISK 2: TODAY cannot be advance-cancelled (the coach''s mark is that path)');
 SELECT throws_like(
-  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 7, '  ') $$,
+  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date, '  ') $$,
   '%reason is required%', '4. a reason is required');
 SELECT throws_like(
-  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000002', today_sg() + 7, 'rain') $$,
+  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000002', '2026-09-22'::date, 'rain') $$,
   '%runs on%', '5. a day the class does not meet has nothing to cancel');
 
 -- ── 6. RISK 3: live guests are NAMED and refused ─────────────────────────────
 SELECT throws_like(
-  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 7, 'rain') $$,
+  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date, 'rain') $$,
   '%guests booked: ACL Guest (trial)%', '6. RISK 3: a date holding a live trial guest is refused, naming the child');
 RESET ROLE;
 SELECT is((SELECT count(*)::int FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001'),
   0, '7. …and every refusal above wrote NO session row');
 
 -- Admin moves the guest (cancels the booking), then cancels the lesson.
-UPDATE trial_bookings SET cancelled_at = now(), cancelled_by = 'ac100000-0000-0000-0000-000000000001'
+UPDATE trial_bookings SET cancelled_at = app_now(), cancelled_by = 'ac100000-0000-0000-0000-000000000001'
  WHERE id = 'ac600000-0000-0000-0000-000000000001';
 
 -- ── 8-10. The cancel lands; idempotent ───────────────────────────────────────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT isnt(cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 7, ' rain forecast '),
+SELECT isnt(cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date, ' rain forecast '),
   NULL, '8. the admin cancels a future lesson');
 SELECT is(
-  (SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 7, 'again')),
-  (SELECT id FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() + 7),
+  (SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date, 'again')),
+  (SELECT id FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-22'::date),
   '9. cancelling twice is idempotent — same session id, no error');
 RESET ROLE;
 SELECT is(
   (SELECT status::text || ':' || (cancelled_at IS NOT NULL)::text || ':' || cancellation_reason || ':'
           || (cancelled_by = 'ac100000-0000-0000-0000-000000000001')::text
-     FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() + 7),
+     FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-22'::date),
   'cancelled:true:rain forecast:true',
   '10. the row carries status=cancelled, cancelled_at, the trimmed reason (first call''s) and the actor');
 SELECT is((SELECT count(*)::int FROM audit_log WHERE action = 'lesson_cancelled'
-             AND entity_id = (SELECT id FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() + 7)),
+             AND entity_id = (SELECT id FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-22'::date)),
   1, '11. exactly one lesson_cancelled audit row (the idempotent repeat wrote none)');
 
 -- ── 12-13. RISK 3 symmetric: nothing books INTO a cancelled date ─────────────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT book_trial('ac400000-0000-0000-0000-000000000001', today_sg() + 7, 'ac500000-0000-0000-0000-000000000002') $$,
+  $$ SELECT book_trial('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date, 'ac500000-0000-0000-0000-000000000002') $$,
   '%has been cancelled%', '12. RISK 3: book_trial refuses a cancelled (class, date)');
 SELECT throws_like(
-  $$ SELECT schedule_extra_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 7, 'cover') $$,
+  $$ SELECT schedule_extra_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date, 'cover') $$,
   '%was cancelled%', '13. RISK 3: schedule_extra_lesson refuses to schedule over a cancellation');
 
 -- ── 14-15. RISK 4 (future): a raw attendance INSERT is refused by the trigger ─
 SELECT throws_like(
   $$ INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
      SELECT id, 'ac500000-0000-0000-0000-000000000001', 'present', 'ac100000-0000-0000-0000-000000000001'
-       FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() + 7 $$,
+       FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-22'::date $$,
   '%cancelled by your business%', '14. RISK 4: a raw INSERT on a cancelled session is refused, and the message says WHY (not "not happened yet")');
 
 -- ── 16. The client cannot clear the flag (guard_session_date) ────────────────
 SELECT throws_like(
   $$ UPDATE lesson_sessions SET cancelled_at = NULL, cancelled_by = NULL, cancellation_reason = NULL, status = 'scheduled'
-      WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() + 7 $$,
+      WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-22'::date $$,
   '%cancelled or restored by your business%', '15. a client (even the admin, raw) cannot clear the cancel columns');
 SELECT throws_like(
   $$ INSERT INTO lesson_sessions (class_id, session_date, status, cancelled_at, cancellation_reason)
-     VALUES ('ac400000-0000-0000-0000-000000000001', today_sg() + 21, 'cancelled', now(), 'self-service') $$,
+     VALUES ('ac400000-0000-0000-0000-000000000001', '2026-10-06'::date, 'cancelled', app_now(), 'self-service') $$,
   '%cancelled or restored by your business%', '16. a client cannot self-authorise a cancellation on INSERT');
 RESET ROLE;
 SELECT is((SELECT count(*)::int FROM attendance a JOIN lesson_sessions ls ON ls.id = a.lesson_session_id
@@ -186,10 +190,10 @@ SELECT is((SELECT count(*)::int FROM attendance a JOIN lesson_sessions ls ON ls.
 -- ── 18. The CHECK keeps status and cancelled_at coherent, even for a superuser ─
 SELECT throws_ok(
   $$ UPDATE lesson_sessions SET status = 'scheduled'
-      WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() + 7 $$,
+      WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-22'::date $$,
   '23514', NULL, '18. status cannot drift from cancelled_at — the CHECK refuses even a superuser');
-UPDATE lesson_sessions SET session_date = today_sg() - 7
- WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() + 7;
+UPDATE lesson_sessions SET session_date = '2026-09-08'::date
+ WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-22'::date;
 -- ^ the cancelled session is now IN THE PAST — the stale-coach-screen shape.
 --   Moved as the superuser (guard_session_date exempts postgres); cancel_lesson
 --   itself can never create this, which is the point: the engine and the
@@ -203,7 +207,7 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001"
 SELECT throws_like(
   $$ INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
      SELECT id, 'ac500000-0000-0000-0000-000000000001', 'present', 'ac100000-0000-0000-0000-000000000001'
-       FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() - 7 $$,
+       FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-08'::date $$,
   '%cancelled by your business%', '19. RISK 4: a PAST cancelled session (stale screen / deep link / raw POST) still refuses a new mark');
 
 -- ── 20-21. The two SQL copies of "owed a mark" skip the cancelled date ───────
@@ -214,7 +218,7 @@ SELECT throws_like(
 -- set, which is what tenant_unmarked_lesson_count's can_admin_tenant gate reads.
 RESET ROLE;
 SELECT is(class_unmarked_lesson_dates('ac400000-0000-0000-0000-000000000001'),
-  ARRAY[today_sg()]::date[], '20. class_unmarked_lesson_dates skips the cancelled date (today remains)');
+  ARRAY['2026-09-15'::date]::date[], '20. class_unmarked_lesson_dates skips the cancelled date (today remains)');
 -- Today's lesson is owed only once it has ENDED (end_time <= now in SGT), and
 -- Class A ends 00:01 — so between 00:00 and 00:01 SGT it is not owed yet and
 -- the right count is 0, not 1 (§7.260: CI at 00:00:53 went red on this). The
@@ -223,7 +227,7 @@ SELECT is(class_unmarked_lesson_dates('ac400000-0000-0000-0000-000000000001'),
 -- is unchanged at any hour: the cancelled d_past adds nothing — without the
 -- fix the count is one higher than this expectation.
 SELECT is(tenant_unmarked_lesson_count('ac000000-0000-0000-0000-000000000001'),
-  (SELECT CASE WHEN c.end_time <= (now() AT TIME ZONE 'Asia/Singapore')::time THEN 1 ELSE 0 END
+  (SELECT CASE WHEN c.end_time <= (app_now() AT TIME ZONE 'Asia/Singapore')::time THEN 1 ELSE 0 END
      FROM classes c WHERE c.id = 'ac400000-0000-0000-0000-000000000001'),
   '21. tenant_unmarked_lesson_count skips the cancelled date (today counts once it has ended)');
 
@@ -231,20 +235,20 @@ SELECT is(tenant_unmarked_lesson_count('ac000000-0000-0000-0000-000000000001'),
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac200000-0000-0000-0000-000000000002","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT restore_lesson('ac400000-0000-0000-0000-000000000001', today_sg() - 7) $$,
+  $$ SELECT restore_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-08'::date) $$,
   '%admin may restore%', '22. a stranger cannot restore a lesson');
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT restore_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 7) $$,
+  $$ SELECT restore_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date) $$,
   '%no cancelled lesson%', '23. restoring a date that is not cancelled is refused');
 RESET ROLE;
 -- Seal the month the cancelled lesson sits in.
 INSERT INTO billing_periods (tenant_id, billing_month, invoices_issued)
-VALUES ('ac000000-0000-0000-0000-000000000001', to_char(today_sg() - 7, 'YYYY-MM'), 0);
+VALUES ('ac000000-0000-0000-0000-000000000001', to_char('2026-09-08'::date, 'YYYY-MM'), 0);
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT restore_lesson('ac400000-0000-0000-0000-000000000001', today_sg() - 7) $$,
+  $$ SELECT restore_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-08'::date) $$,
   '%already been billed%', '24. RISK 2: restoring INTO a sealed month is refused (§11.6)');
 RESET ROLE;
 DELETE FROM billing_periods WHERE tenant_id = 'ac000000-0000-0000-0000-000000000001';
@@ -252,54 +256,54 @@ DELETE FROM billing_periods WHERE tenant_id = 'ac000000-0000-0000-0000-000000000
 -- ── 25-28. restore lands, and the lesson is a lesson again ───────────────────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT isnt(restore_lesson('ac400000-0000-0000-0000-000000000001', today_sg() - 7),
+SELECT isnt(restore_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-08'::date),
   NULL, '25. the admin restores the cancelled lesson');
 RESET ROLE;
 SELECT is(class_unmarked_lesson_dates('ac400000-0000-0000-0000-000000000001'),
-  ARRAY[today_sg() - 7, today_sg()]::date[], '26. …and it is owed a mark again');
+  ARRAY['2026-09-08'::date, '2026-09-15'::date]::date[], '26. …and it is owed a mark again');
 SET LOCAL ROLE authenticated;
 SELECT lives_ok(
   $$ INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
      SELECT id, 'ac500000-0000-0000-0000-000000000001', 'present', 'ac100000-0000-0000-0000-000000000001'
-       FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() - 7 $$,
+       FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-08'::date $$,
   '27. …and can be marked again (the trigger no longer refuses)');
 RESET ROLE;
 SELECT is(
   (SELECT status::text || ':' || (cancelled_at IS NULL)::text || ':' || (cancellation_reason IS NULL)::text || ':' || (cancelled_by IS NULL)::text
-     FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() - 7),
+     FROM lesson_sessions WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-08'::date),
   'scheduled:true:true:true', '28. the restored row is a plain scheduled session');
 SELECT is((SELECT count(*)::int FROM audit_log WHERE action = 'lesson_restored'), 1, '29. one lesson_restored audit row');
 
 -- ── 30. A MARKED session cannot be cancelled (RISK 2) ────────────────────────
 -- The restored d_past session now has a 'present' row. Give it a future date as
 -- the superuser so only the attendance refusal can fire.
-UPDATE lesson_sessions SET session_date = today_sg() + 7
- WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() - 7;
+UPDATE lesson_sessions SET session_date = '2026-09-22'::date
+ WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-08'::date;
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 7, 'rain') $$,
+  $$ SELECT cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-22'::date, 'rain') $$,
   '%already been recorded%', '30. RISK 2: a session with attendance rows (a lesson that RAN) cannot be cancelled');
 RESET ROLE;
 
 -- ── 31-33. The holiday void leaves a cancelled lesson alone ──────────────────
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT isnt(cancel_lesson('ac400000-0000-0000-0000-000000000001', today_sg() + 14, 'pool closed'),
+SELECT isnt(cancel_lesson('ac400000-0000-0000-0000-000000000001', '2026-09-29'::date, 'pool closed'),
   NULL, '31. a second future lesson is cancelled');
 RESET ROLE;
 INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
-VALUES ('ac000000-0000-0000-0000-000000000001', today_sg() + 14, 'ACL Holiday');
+VALUES ('ac000000-0000-0000-0000-000000000001', '2026-09-29'::date, 'ACL Holiday');
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT is(mark_day_holiday('ac000000-0000-0000-0000-000000000001', today_sg() + 14),
+SELECT is(mark_day_holiday('ac000000-0000-0000-0000-000000000001', '2026-09-29'::date),
   0, '32. mark_day_holiday voids nothing on a cancelled lesson (old body: 1 — the kid)');
-SELECT is(unmark_day_holiday('ac000000-0000-0000-0000-000000000001', today_sg() + 14),
+SELECT is(unmark_day_holiday('ac000000-0000-0000-0000-000000000001', '2026-09-29'::date),
   0, '33-pre. unmark removes no holiday rows');
 RESET ROLE;
 SELECT is(
   (SELECT (cancelled_at IS NOT NULL)::text FROM lesson_sessions
-     WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = today_sg() + 14),
+     WHERE class_id = 'ac400000-0000-0000-0000-000000000001' AND session_date = '2026-09-29'::date),
   'true', '33. …and unmark_day_holiday did NOT delete the cancelled session (old body deleted it)');
 
 -- ── 35. A lesson of a RETIRED class cannot be restored ──────────────────────
@@ -308,14 +312,14 @@ SELECT is(
 -- guests, nothing owed). Restore must refuse — the class is invisible (§7.109).
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT isnt(cancel_lesson('ac400000-0000-0000-0000-000000000002', today_sg() + 8, 'rain'),
+SELECT isnt(cancel_lesson('ac400000-0000-0000-0000-000000000002', '2026-09-23'::date, 'rain'),
   NULL, '35-pre. Class B''s next lesson is cancelled');
 RESET ROLE;
-UPDATE classes SET is_active = false, deactivated_at = now() WHERE id = 'ac400000-0000-0000-0000-000000000002';
+UPDATE classes SET is_active = false, deactivated_at = app_now() WHERE id = 'ac400000-0000-0000-0000-000000000002';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ac100000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT restore_lesson('ac400000-0000-0000-0000-000000000002', today_sg() + 8) $$,
+  $$ SELECT restore_lesson('ac400000-0000-0000-0000-000000000002', '2026-09-23'::date) $$,
   '%no longer running%', '35. restoring a lesson of a RETIRED class is refused (reactivate the class first)');
 RESET ROLE;
 

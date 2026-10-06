@@ -28,33 +28,36 @@
 -- also assert NOTHING WAS WRITTEN.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(12);
+SELECT plan(13);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Dates from one anchor (§7.33). Classes run on d_past's weekday, so d_past
 --    is a real lesson date inside the window and d_future has not happened. ────
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 CREATE TEMP TABLE rg AS
 SELECT
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month')::date                                  AS d_floor,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month' + INTERVAL '7 days')::date              AS d_past,
-  ((now() AT TIME ZONE 'Asia/Singapore') + INTERVAL '7 days')::date AS d_future;
+  '2026-08-01'::date AS d_floor,
+  '2026-08-08'::date AS d_past,
+  '2026-09-22'::date AS d_future;
 GRANT SELECT ON rg TO PUBLIC;
 
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('7b777777-0000-0000-0000-000000000001','rgx','RGX Business','SWIM-RGXA', now());
+  ('7b777777-0000-0000-0000-000000000001','rgx','RGX Business','SWIM-RGXA', app_now());
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','7b100000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','rgx-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"RGX Admin","role":"tenant_admin","tenant_id":"7b777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','rgx-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"RGX Admin","role":"tenant_admin","tenant_id":"7b777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','7b100000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','rgx-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"RGX Coach","role":"coach","tenant_id":"7b777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','rgx-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"RGX Coach","role":"coach","tenant_id":"7b777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT '7b777777-0000-0000-0000-000000000001', 'Default Group'
@@ -127,7 +130,7 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"7b100000-0000-0000-0000-0000000000a1"
 -- refuse it. The admin owns the tenant, so classes_write lets the row through to
 -- the BEFORE trigger, which raises.
 SELECT throws_ok(
-  $$ UPDATE classes SET is_active = false, deactivated_at = now()
+  $$ UPDATE classes SET is_active = false, deactivated_at = app_now()
       WHERE id = '7b777777-1111-0000-0000-000000000001' $$,
   'P0001',
   NULL,
@@ -139,7 +142,7 @@ SELECT ok(
 
 -- ══ 3-4. Same for a future guest booking (refusal 2) ════════════════════════
 SELECT throws_ok(
-  $$ UPDATE classes SET is_active = false, deactivated_at = now()
+  $$ UPDATE classes SET is_active = false, deactivated_at = app_now()
       WHERE id = '7b777777-1111-0000-0000-000000000004' $$,
   'P0001',
   NULL,
@@ -164,7 +167,7 @@ SELECT lives_ok(
 -- UPDATE (date supplied) commits. This is the §7.112 partner: it proves 1 and 3
 -- are the retirement refusals firing, not the trigger refusing everything.
 SELECT lives_ok(
-  $$ UPDATE classes SET is_active = false, deactivated_at = now()
+  $$ UPDATE classes SET is_active = false, deactivated_at = app_now()
       WHERE id = '7b777777-1111-0000-0000-00000000000e' $$,
   'a raw retire of an EMPTY class succeeds — the guard blocks unsafe retires, not all of them');
 
@@ -185,7 +188,7 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"7b100000-0000-0000-0000-0000000000a1","role":"authenticated"}';
 
 SELECT throws_ok(
-  $$ UPDATE classes SET deactivated_at = now() + interval '1 day'
+  $$ UPDATE classes SET deactivated_at = app_now() + interval '1 day'
       WHERE id = '7b777777-1111-0000-0000-00000000000e' $$,
   'P0001',
   NULL,
@@ -216,7 +219,7 @@ SELECT lives_ok(
 RESET ROLE;
 SET LOCAL "request.jwt.claims" TO '';
 SELECT lives_ok(
-  $$ UPDATE classes SET is_active = false, deactivated_at = now()
+  $$ UPDATE classes SET is_active = false, deactivated_at = app_now()
       WHERE id = '7b777777-1111-0000-0000-000000000001' $$,
   'a no-user (superuser/service_role) context is exempt — auth.uid() is the trust boundary');
 

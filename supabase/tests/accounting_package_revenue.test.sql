@@ -31,34 +31,37 @@
 --   (run 2026-09-27; bodies restored and diffed back to the migration's afterwards)
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(17);
+SELECT plan(18);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE f AS
 SELECT
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '2 month','YYYY-MM') AS mP,
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month','YYYY-MM') AS mM,
-  date_trunc('month',(now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date AS mM1,
-  date_trunc('month',(now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '2 month')::date AS mP1;
+  '2026-07'::text    AS mp,
+  '2026-08'::text    AS mm,
+  '2026-08-01'::date AS mm1,
+  '2026-07-01'::date AS mp1;
 GRANT SELECT ON f TO PUBLIC;
 
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('87c00000-0000-0000-0000-0000000000a0','pkrev-a','PkgRev Business A','SWIM-PKRA', now()),
-  ('87c00000-0000-0000-0000-0000000000b0','pkrev-b','PkgRev Business B','SWIM-PKRB', now());
+  ('87c00000-0000-0000-0000-0000000000a0','pkrev-a','PkgRev Business A','SWIM-PKRA', app_now()),
+  ('87c00000-0000-0000-0000-0000000000b0','pkrev-b','PkgRev Business B','SWIM-PKRB', app_now());
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','87c10000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','pkrev-owner-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"PkgRev Owner A","role":"tenant_admin","tenant_id":"87c00000-0000-0000-0000-0000000000a0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','pkrev-owner-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"PkgRev Owner A","role":"tenant_admin","tenant_id":"87c00000-0000-0000-0000-0000000000a0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','87c10000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','pkrev-owner-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"PkgRev Owner B","role":"tenant_admin","tenant_id":"87c00000-0000-0000-0000-0000000000b0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','pkrev-owner-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"PkgRev Owner B","role":"tenant_admin","tenant_id":"87c00000-0000-0000-0000-0000000000b0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','87c10000-0000-0000-0000-00000000009f',
-   'authenticated','authenticated','pkrev-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"PkgRev Parent","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','pkrev-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"PkgRev Parent","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, t FROM parents p,
@@ -170,10 +173,10 @@ UPDATE parent_packages SET status = 'active', confirmed_at = TIMESTAMPTZ '2020-0
  WHERE id = '87c40000-0000-0000-0000-000000000009';
 RESET ROLE;
 
-SELECT is((SELECT confirmed_at FROM parent_packages WHERE id = '87c40000-0000-0000-0000-000000000008'), now(),
-  'INSERT-as-active by an authenticated caller: confirmed_at is pinned to now(), not the supplied 2020 date');
-SELECT is((SELECT confirmed_at FROM parent_packages WHERE id = '87c40000-0000-0000-0000-000000000009'), now(),
-  'pending→active by an authenticated caller: confirmed_at is pinned to now(), not the supplied 2020 date');
+SELECT is((SELECT confirmed_at FROM parent_packages WHERE id = '87c40000-0000-0000-0000-000000000008'), app_now(),
+  'INSERT-as-active by an authenticated caller: confirmed_at is pinned to app_now(), not the supplied 2020 date');
+SELECT is((SELECT confirmed_at FROM parent_packages WHERE id = '87c40000-0000-0000-0000-000000000009'), app_now(),
+  'pending→active by an authenticated caller: confirmed_at is pinned to app_now(), not the supplied 2020 date');
 
 -- 11. The audit arm U2's refund RPCs rely on (§7.297).
 SELECT is(audit_log_tenant_of('parent_package', '87c40000-0000-0000-0000-000000000001'),

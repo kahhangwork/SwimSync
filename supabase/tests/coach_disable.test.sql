@@ -63,8 +63,10 @@
 --     self-reactivation. That cascade is the self-rescue path the gate closes.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(55);
+SELECT plan(56);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixture ──────────────────────────────────────────────────────────────────
 -- Tenant A: owner-admin-who-coaches OA, co-admin CA, target coach T,
@@ -78,23 +80,23 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','d15a0000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','cd-owner@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Owner Odele","role":"tenant_admin","tenant_id":"d15a0000-0000-0000-0000-000000000001","is_coach":true}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','cd-owner@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Owner Odele","role":"tenant_admin","tenant_id":"d15a0000-0000-0000-0000-000000000001","is_coach":true}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','d15a0000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','cd-coadmin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Coadmin Chris","role":"tenant_admin","tenant_id":"d15a0000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','cd-coadmin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Coadmin Chris","role":"tenant_admin","tenant_id":"d15a0000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','d15a0000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','cd-target@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Target Tara","role":"coach","tenant_id":"d15a0000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','cd-target@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Target Tara","role":"coach","tenant_id":"d15a0000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','d15a0000-0000-0000-0000-0000000000c2',
-   'authenticated','authenticated','cd-replacement@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Replacement Rae","role":"coach","tenant_id":"d15a0000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','cd-replacement@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Replacement Rae","role":"coach","tenant_id":"d15a0000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','d15a0000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','cd-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','cd-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','d15b0000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','cd-solo-owner@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Solo Sam","role":"tenant_admin","tenant_id":"d15b0000-0000-0000-0000-000000000001","is_coach":true}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','cd-solo-owner@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Solo Sam","role":"tenant_admin","tenant_id":"d15b0000-0000-0000-0000-000000000001","is_coach":true}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
@@ -125,7 +127,7 @@ SELECT 'd15a0000-0000-0000-0000-000000000012', c.id, 'Replacement Lane', 'saturd
          WHERE cc.tenant_id = c.tenant_id AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = 'd15a0000-0000-0000-0000-0000000000c2';
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, is_active, deactivated_at, category_id)
-SELECT 'd15a0000-0000-0000-0000-000000000013', c.id, 'Retired Lane', 'saturday','13:00','14:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40, FALSE, now(),
+SELECT 'd15a0000-0000-0000-0000-000000000013', c.id, 'Retired Lane', 'saturday','13:00','14:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40, FALSE, app_now(),
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = c.tenant_id AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = 'd15a0000-0000-0000-0000-0000000000c1';
@@ -184,7 +186,7 @@ INSERT INTO lesson_sessions (id, class_id, session_date, status) VALUES
   ('d15a0000-0000-0000-0000-000000000032','d15a0000-0000-0000-0000-000000000011','2026-08-01','completed'),
   ('d15a0000-0000-0000-0000-000000000033','d15a0000-0000-0000-0000-000000000012','2026-08-08','completed'),
   ('d15a0000-0000-0000-0000-000000000034','d15a0000-0000-0000-0000-000000000012',
-   today_sg() + (((12 - EXTRACT(DOW FROM today_sg())::int) % 7) + 1),'scheduled');
+   '2026-09-15'::date + (((12 - EXTRACT(DOW FROM '2026-09-15'::date)::int) % 7) + 1),'scheduled');
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 SELECT ls.id,'d15a0000-0000-0000-0000-000000000021','present','d15a0000-0000-0000-0000-0000000000c1'
   FROM lesson_sessions ls WHERE ls.id IN
@@ -370,7 +372,7 @@ SELECT is(
 SELECT is(
   (SELECT COUNT(*)::int FROM class_rates r
     WHERE r.class_id='d15a0000-0000-0000-0000-000000000011'
-      AND r.effective_from = today_sg()
+      AND r.effective_from = '2026-09-15'::date
       AND r.price_per_lesson = 40
       AND r.paid_coach_id = (SELECT id FROM coaches WHERE profile_id='d15a0000-0000-0000-0000-0000000000c2')),
   1, 'the handover wrote the effective-dated class_rates row (wage history preserved)');
@@ -386,7 +388,7 @@ SELECT is(
   (SELECT COUNT(*)::int FROM class_shadow_coaches s
     WHERE s.coach_id=(SELECT id FROM coaches WHERE profile_id='d15a0000-0000-0000-0000-0000000000c1')
       AND s.class_id='d15a0000-0000-0000-0000-000000000012'
-      AND s.effective_to = today_sg()
+      AND s.effective_to = '2026-09-15'::date
       AND s.ended_by = 'd15a0000-0000-0000-0000-0000000000a2'),
   1, 'the shadow assignment is end-dated today by the disabling admin, and KEPT');
 
@@ -530,7 +532,7 @@ SELECT is(
      JOIN classes c ON c.id = ls.class_id
      JOIN student_class_enrolments e ON e.class_id = ls.class_id AND e.is_active
     WHERE c.tenant_id = 'd15a0000-0000-0000-0000-000000000001'
-      AND ls.session_date BETWEEN '2026-08-01' AND today_sg()
+      AND ls.session_date BETWEEN '2026-08-01' AND '2026-09-15'::date
       AND NOT EXISTS (SELECT 1 FROM attendance a
                        WHERE a.lesson_session_id = ls.id AND a.student_id = e.student_id)),
   0, '⚠ RISK 8: once the admin marks, August holds no unmarked (student, lesson) pair');
@@ -629,7 +631,7 @@ RESET ROLE;
 -- THE SEAL: a PAID payout for the CURRENT month. From here, set_class_terms
 -- refuses any reassignment and class_shadow_guard any shadow write.
 INSERT INTO coach_payouts (tenant_id, coach_id, period_month, gross_amount, status, paid_at)
-SELECT 'd15a0000-0000-0000-0000-000000000001', c.id, to_char(today_sg(),'YYYY-MM'), 25.00, 'paid', now()
+SELECT 'd15a0000-0000-0000-0000-000000000001', c.id, to_char('2026-09-15'::date,'YYYY-MM'), 25.00, 'paid', app_now()
   FROM coaches c WHERE c.profile_id='d15a0000-0000-0000-0000-0000000000c2';
 
 SET LOCAL ROLE authenticated;
@@ -642,7 +644,7 @@ SELECT throws_ok(
   'P0001',
   format('cannot change terms from %s — a coach payout for %s or later has already '
          'been paid. The correction will surface as an adjustment instead.',
-         today_sg(), to_char(today_sg(),'YYYY-MM')),
+         '2026-09-15'::date, to_char('2026-09-15'::date,'YYYY-MM')),
   '⚠ RISK 7b: a PAID current-month payout aborts the disable, surfacing set_class_terms''s own message');
 
 SELECT ok(

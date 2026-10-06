@@ -21,6 +21,8 @@
 -- this runs. The anchor is computed with the SGT expression written out in
 -- full rather than by calling today_sg(), so a bug in that function cannot
 -- move the fixture to match itself; test 1 pins the function separately.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 --
 -- METHOD (gotcha §7.16): every probe runs inside this explicit transaction
 -- with SET LOCAL ROLE. Outside one, SET LOCAL ROLE is a no-op, the session
@@ -29,8 +31,10 @@
 -- gate that raises after writing is not a gate.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(31);
+SELECT plan(32);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── The four dates, from one anchor ─────────────────────────────────────────
 --   d_in       three days ago            in window, on the class's weekday
@@ -42,14 +46,14 @@ SELECT plan(31);
 -- (the 1st of last month, evaluated on the last day of this one). Keeping it a
 -- whole number of weeks holds the weekday constant, so tests 3 and 4 isolate
 -- the window rule from the weekday rule instead of tripping both at once.
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE w AS
 SELECT
-  ((now() AT TIME ZONE 'Asia/Singapore')::date - 3)       AS d_in,
-  ((now() AT TIME ZONE 'Asia/Singapore')::date - 3 - 140) AS d_old,
-  ((now() AT TIME ZONE 'Asia/Singapore')::date - 3 + 7)   AS d_future,
-  ((now() AT TIME ZONE 'Asia/Singapore')::date - 2)       AS d_wrongday,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month')::date                          AS d_floor;
+  '2026-09-12'::date AS d_in,
+  '2026-04-25'::date AS d_old,
+  '2026-09-19'::date AS d_future,
+  '2026-09-13'::date AS d_wrongday,
+  '2026-08-01'::date AS d_floor;
 GRANT SELECT ON w TO PUBLIC;
 
 -- ── Two businesses, so the tenant boundary can be probed ────────────────────
@@ -62,17 +66,17 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','77100000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','win-admin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WINDOW Admin A","role":"tenant_admin","tenant_id":"77777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','win-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WINDOW Admin A","role":"tenant_admin","tenant_id":"77777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','77100000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','win-admin-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WINDOW Admin B","role":"tenant_admin","tenant_id":"77777777-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','win-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WINDOW Admin B","role":"tenant_admin","tenant_id":"77777777-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','77100000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','win-coach-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WINDOW Coach A","role":"coach","tenant_id":"77777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','win-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WINDOW Coach A","role":"coach","tenant_id":"77777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','77100000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','win-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WINDOW Parent","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','win-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WINDOW Parent","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t

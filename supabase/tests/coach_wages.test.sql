@@ -5,8 +5,10 @@
 -- draft/freeze lifecycle, and cross-coach payout isolation.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(36);
+SELECT plan(37);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code, rain_pays_coach)
 VALUES ('88888888-0000-0000-0000-000000000001','wages','Wages Swim','SWIM-WAGE', FALSE);
@@ -16,14 +18,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','77000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','wage-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Wage Admin","role":"tenant_admin","tenant_id":"88888888-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','wage-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Wage Admin","role":"tenant_admin","tenant_id":"88888888-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','77000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','wage-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Wage Coach","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','wage-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Wage Coach","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','77000000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','wage-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Wage Parent","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','wage-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Wage Parent","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 -- A 90-minute class, so pro-rata is actually exercised (60 would hide it).
 -- classes.category_id is NOT NULL (20260725000400). A test creates its own
@@ -213,10 +215,10 @@ SELECT is(
 -- changes the answer for an earlier month.
 RESET ROLE;
 INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
-SELECT c.id, 90.00, 60, '2026-10-01' FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000002';  -- date-literal-ok: superuser insert; coach_rate_on reads it by lesson date, no clock
+SELECT c.id, 90.00, 60, '2026-10-01' FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000002';
 
 INSERT INTO lesson_sessions (id, class_id, session_date, status)
-VALUES ('44000000-0000-0000-0000-00000000000f','66000000-0000-0000-0000-000000000001','2026-11-07','completed');  -- date-literal-ok: superuser insert; guard_session_date skips non-authenticated
+VALUES ('44000000-0000-0000-0000-00000000000f','66000000-0000-0000-0000-000000000001','2026-11-07','completed');
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 VALUES ('44000000-0000-0000-0000-00000000000f','55000000-0000-0000-0000-000000000001','present','77000000-0000-0000-0000-000000000002');
 
@@ -246,8 +248,8 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','77000000-0000-0000-0000-000000000004',
-   'authenticated','authenticated','wage-coach-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Wage Coach B","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000001"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','wage-coach-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Wage Coach B","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
 SELECT c.id, 20.00, 60, '2026-01-01' FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000004';
@@ -256,15 +258,15 @@ SELECT c.id, 20.00, 60, '2026-01-01' FROM coaches c WHERE c.profile_id='77000000
 -- them too — that is what a real handover does, and it is exactly what used to
 -- drag the history along.
 INSERT INTO class_rates (class_id, price_per_lesson, paid_coach_id, effective_from)
-SELECT '66000000-0000-0000-0000-000000000001', 40.00, c.id, '2026-12-15'  -- date-literal-ok: superuser insert; only sync_class_display_price reads today_sg(), its column is never asserted
+SELECT '66000000-0000-0000-0000-000000000001', 40.00, c.id, '2026-12-15'
   FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000004';
 UPDATE classes SET coach_id = (SELECT id FROM coaches WHERE profile_id='77000000-0000-0000-0000-000000000004')
  WHERE id='66000000-0000-0000-0000-000000000001';
 
 -- One lesson each side of the handover.
 INSERT INTO lesson_sessions (id, class_id, session_date, status) VALUES
-  ('44000000-0000-0000-0000-0000000000b1','66000000-0000-0000-0000-000000000001','2026-12-05','completed'),  -- date-literal-ok: superuser insert; guard_session_date skips non-authenticated
-  ('44000000-0000-0000-0000-0000000000b2','66000000-0000-0000-0000-000000000001','2026-12-19','completed');  -- date-literal-ok: superuser insert; guard_session_date skips non-authenticated
+  ('44000000-0000-0000-0000-0000000000b1','66000000-0000-0000-0000-000000000001','2026-12-05','completed'),
+  ('44000000-0000-0000-0000-0000000000b2','66000000-0000-0000-0000-000000000001','2026-12-19','completed');
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
   ('44000000-0000-0000-0000-0000000000b1','55000000-0000-0000-0000-000000000001','present','77000000-0000-0000-0000-000000000002'),
   ('44000000-0000-0000-0000-0000000000b2','55000000-0000-0000-0000-000000000001','present','77000000-0000-0000-0000-000000000002');
@@ -278,7 +280,7 @@ SELECT is((SELECT amount FROM session_pay_amount('44000000-0000-0000-0000-000000
 
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"77000000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2026-12');  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2026-12');
 
 -- Asserted on THIS PERIOD'S OWN lessons (is_adjustment = FALSE) rather than
 -- gross_amount: gross also carries adjustments from earlier frozen months,
@@ -287,7 +289,7 @@ SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','202
 SELECT is(
   (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i
      JOIN coach_payouts p ON p.id=i.payout_id JOIN coaches c ON c.id=p.coach_id
-    WHERE p.period_month='2026-12' AND NOT i.is_adjustment  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+    WHERE p.period_month='2026-12' AND NOT i.is_adjustment
       AND c.profile_id='77000000-0000-0000-0000-000000000002'),
   135.00,
   'the OUTGOING coach is still paid for the lesson they taught before handing over'
@@ -295,7 +297,7 @@ SELECT is(
 SELECT is(
   (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i
      JOIN coach_payouts p ON p.id=i.payout_id JOIN coaches c ON c.id=p.coach_id
-    WHERE p.period_month='2026-12' AND NOT i.is_adjustment  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+    WHERE p.period_month='2026-12' AND NOT i.is_adjustment
       AND c.profile_id='77000000-0000-0000-0000-000000000004'),
   30.00,
   'the INCOMING coach is paid only for lessons from the handover date onward'
@@ -304,7 +306,7 @@ SELECT is(
 -- ── A frozen payout must not move, and must not spawn adjustments ──────────
 SELECT lives_ok(
   $$ SELECT mark_payout_paid((SELECT p.id FROM coach_payouts p JOIN coaches c ON c.id=p.coach_id
-       WHERE p.period_month='2026-12' AND c.profile_id='77000000-0000-0000-0000-000000000002')) $$,  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+       WHERE p.period_month='2026-12' AND c.profile_id='77000000-0000-0000-0000-000000000002')) $$,
   'the outgoing coach''s December payout can be marked paid'
 );
 
@@ -312,29 +314,29 @@ SELECT lives_ok(
 -- December under the old engine. The paid record must be untouched.
 RESET ROLE;
 INSERT INTO class_rates (class_id, price_per_lesson, paid_coach_id, effective_from)
-SELECT '66000000-0000-0000-0000-000000000001', 40.00, c.id, '2027-01-05'  -- date-literal-ok: superuser insert; only sync_class_display_price reads today_sg(), its column is never asserted
+SELECT '66000000-0000-0000-0000-000000000001', 40.00, c.id, '2027-01-05'
   FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000002';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"77000000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-01');  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-01');
 
 SELECT is(
   (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i
      JOIN coach_payouts p ON p.id=i.payout_id JOIN coaches c ON c.id=p.coach_id
-    WHERE p.period_month='2026-12' AND NOT i.is_adjustment  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+    WHERE p.period_month='2026-12' AND NOT i.is_adjustment
       AND c.profile_id='77000000-0000-0000-0000-000000000002'),
   135.00,
   'the FROZEN December payout is unchanged after a later handover'
 );
 SELECT is(
   (SELECT p.status FROM coach_payouts p JOIN coaches c ON c.id=p.coach_id
-    WHERE p.period_month='2026-12' AND c.profile_id='77000000-0000-0000-0000-000000000002')::TEXT,  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+    WHERE p.period_month='2026-12' AND c.profile_id='77000000-0000-0000-0000-000000000002')::TEXT,
   'paid',
   'and is still frozen'
 );
 SELECT is(
   (SELECT COUNT(*)::INT FROM coach_payout_items i JOIN coach_payouts p ON p.id=i.payout_id
-    WHERE p.period_month='2027-01' AND i.is_adjustment  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+    WHERE p.period_month='2027-01' AND i.is_adjustment
       AND i.lesson_session_id IN ('44000000-0000-0000-0000-0000000000b1',
                                   '44000000-0000-0000-0000-0000000000b2')),
   0,
@@ -351,14 +353,14 @@ SELECT '66000000-0000-0000-0000-000000000009', c.id, 'Rateless', 'sunday','10:00
            AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000002';
 INSERT INTO lesson_sessions (id, class_id, session_date, status)
-VALUES ('44000000-0000-0000-0000-0000000000c1','66000000-0000-0000-0000-000000000009','2027-02-07','completed');  -- date-literal-ok: superuser insert; guard_session_date skips non-authenticated
+VALUES ('44000000-0000-0000-0000-0000000000c1','66000000-0000-0000-0000-000000000009','2027-02-07','completed');
 -- Break the invariant the floor-dated backfill guarantees.
 DELETE FROM class_rates WHERE class_id='66000000-0000-0000-0000-000000000009';
 
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"77000000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_ok(
-  $$ SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-02') $$,  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+  $$ SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-02') $$,
   NULL,
   NULL,
   'payroll refuses outright rather than silently dropping a lesson with no terms'
@@ -402,7 +404,7 @@ UPDATE attendance SET status='present'
  WHERE lesson_session_id='44000000-0000-0000-0000-00000000000b';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"77000000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-03');  -- date-literal-ok: payroll period; generate_coach_payouts reads no clock (audited 2026-10-01)
+SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-03');
 
 SELECT is(
   (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i

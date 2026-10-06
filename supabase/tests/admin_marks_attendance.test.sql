@@ -11,17 +11,21 @@
 -- Refusals are throws_ok with the DB's own SQLSTATE, never a lives_ok of the
 -- happy path alone. Dates derive from today_sg() (see attendance_window.test.sql
 -- for the four-date shape). Rolls back.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(22);
+SELECT plan(23);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 CREATE TEMP TABLE w AS
 SELECT
-  ((now() AT TIME ZONE 'Asia/Singapore')::date - 3)       AS d_in,
-  ((now() AT TIME ZONE 'Asia/Singapore')::date - 3 - 140) AS d_old,
-  ((now() AT TIME ZONE 'Asia/Singapore')::date - 3 + 7)   AS d_future,
-  ((now() AT TIME ZONE 'Asia/Singapore')::date - 2)       AS d_wrongday;
+  ('2026-09-12'::date)       AS d_in,
+  ('2026-04-25'::date) AS d_old,
+  ('2026-09-19'::date)   AS d_future,
+  ('2026-09-13'::date)       AS d_wrongday;
 GRANT SELECT ON w TO PUBLIC;
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -34,28 +38,28 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   -- PURE admin of A (no is_coach → no coaches row)
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','ama-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','ama-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"AMA Admin A","role":"tenant_admin","tenant_id":"aa000000-0000-0000-0000-0000000000a1"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   -- the coach who owns the class
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','ama-coach-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','ama-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"AMA Coach A","role":"coach","tenant_id":"aa000000-0000-0000-0000-0000000000a1"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   -- admin of ANOTHER business
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','ama-admin-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','ama-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"AMA Admin B","role":"tenant_admin","tenant_id":"aa000000-0000-0000-0000-0000000000a2"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   -- a parent, for the billed-lesson fixture
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','ama-parent@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','ama-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"AMA Parent","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 SELECT is((SELECT count(*)::int FROM coaches co JOIN profiles p ON p.id = co.profile_id
             WHERE p.email = 'ama-admin-a@test.local'),
@@ -90,7 +94,7 @@ INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, 'a5000000-0000-0000-0000-0000000000a1'
 FROM parents p WHERE p.profile_id = 'ab000000-0000-0000-0000-0000000000d1';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-VALUES ('a5000000-0000-0000-0000-0000000000a1','af000000-0000-0000-0000-0000000000a1', TRUE, now() - INTERVAL '200 days');
+VALUES ('a5000000-0000-0000-0000-0000000000a1','af000000-0000-0000-0000-0000000000a1', TRUE, app_now() - INTERVAL '200 days');
 
 -- A BILLED lesson far in the past (fixture as postgres): present, invoiced.
 INSERT INTO lesson_sessions (id, class_id, session_date, status)

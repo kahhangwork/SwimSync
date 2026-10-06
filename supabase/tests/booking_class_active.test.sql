@@ -35,6 +35,8 @@
 -- WHY THE DATES ARE COMPUTED, NOT HARDCODED (§7.33): the rules under test are
 -- relative to now(). Every date derives from ONE anchor, and the class weekday
 -- is derived FROM the date so the weekday refusal can never be what fires.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 --
 -- METHOD (§7.16): every client probe runs inside this explicit transaction with
 -- SET LOCAL ROLE. Outside one, SET LOCAL ROLE is a no-op, the session stays
@@ -43,8 +45,10 @@
 -- raises after writing is not a gate.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(14);
+SELECT plan(15);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── The dates, from one anchor ──────────────────────────────────────────────
 --   d_future   today + 7 days    comfortably above markable_floor(), and not yet
@@ -65,24 +69,26 @@ SELECT plan(14);
 -- valid; with the guard deleted it stays GREEN while only the throws_ok flips.
 -- (`schedule_extra_lesson()` needs no such split — it is idempotent by
 -- ON CONFLICT DO NOTHING, so its partner survives the sabotage run unaided.)
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE bca AS
-SELECT ((now() AT TIME ZONE 'Asia/Singapore') + INTERVAL '7 days')::date  AS d_future,
-       ((now() AT TIME ZONE 'Asia/Singapore') + INTERVAL '14 days')::date AS d_future2;
+SELECT
+  '2026-09-22'::date AS d_future,
+  '2026-09-29'::date AS d_future2;
 GRANT SELECT ON bca TO PUBLIC;
 
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('7a777777-0000-0000-0000-000000000001','bca','BCA Business','SWIM-BCAA', now());
+  ('7a777777-0000-0000-0000-000000000001','bca','BCA Business','SWIM-BCAA', app_now());
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','7a100000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','bca-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"BCA Admin","role":"tenant_admin","tenant_id":"7a777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','bca-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"BCA Admin","role":"tenant_admin","tenant_id":"7a777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','7a100000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','bca-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"BCA Coach","role":"coach","tenant_id":"7a777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','bca-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"BCA Coach","role":"coach","tenant_id":"7a777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
