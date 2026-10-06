@@ -56,6 +56,9 @@ count_app() {
       # @ts-ignore / @ts-expect-error / @ts-nocheck LIVE in comments: count them on the
       # raw text, before comments are stripped (the first G6 never counted them).
       $n++ while $src =~ m{//\s*\@ts-(?:ignore|expect-error|nocheck)\b|/\*\s*\@ts-(?:ignore|expect-error|nocheck)\b}g;
+      # Rule 4 reads module SPECIFIERS, which are strings: keep a copy from BEFORE the
+      # string blanking below (blanking first made value imports invisible — review).
+      my $raw = $src;
       # Strip comments and the CONTENT of '…' / "…" strings in ONE left-to-right pass,
       # so a `//` inside a string ("https://…" as any) is not taken for a comment.
       # Template literals are kept whole: code inside ${…} still counts.
@@ -65,8 +68,8 @@ count_app() {
       my $pat = qr/as\s+unknown\s+as\b|Record<\s*string\s*,\s*any\s*>|\btype\s+\w+(?:<[^>=]*>)?\s*=\s*any\b|\bas\s+any\b|:\s*any\b|<\s*any\b|,\s*any\s*[>,\]]|[|&]\s*any\b|\bany\[\]/;
       $n++ while $src =~ /$pat/g;
       my @bad;
-      push @bad, $1 while $src =~ /((?:import|export)\s+(?!type\b)[^;]*?\bfrom\s*["\x27][^"\x27]*database\.types["\x27])/gs;
-      push @bad, $1 while $src =~ /((?:import\s*\(|require\s*\(|import\s+)["\x27][^"\x27]*database\.types["\x27])/g;
+      push @bad, $1 while $raw =~ /((?:import|export)\s+(?!type\b)[^;]*?\bfrom\s*["\x27][^"\x27]*database\.types["\x27])/gs;
+      push @bad, $1 while $raw =~ /((?:import\s*\(|require\s*\(|import\s+)["\x27][^"\x27]*database\.types["\x27])/g;
       my $b = join(" | ", map { my $s = $_; $s =~ s/\s+/ /g; $s } @bad);
       print "$f\t$n\t$ex\t$b\n";
     ')

@@ -21,7 +21,7 @@
 #     its sibling on RN-web; `x.ts` beside `x/index.ts` changes what `./x` means),
 #     EXCEPT: lib/database.overrides.ts (allow-listed), or a pure-type module — it
 #     transpiles to nothing, has no platform extension, and shadows no sibling;
-#   - ignored: test files (*.test.ts[x]), *.md, .db-any-allowance,
+#   - ignored: test files (*.test.ts[x]), *.d.ts, *.md, .db-any-allowance,
 #     lib/database.types.ts (type-only by G6's `import type` rule; G5 checks it), and
 #     everything outside the two apps and supabase/.
 #
@@ -50,7 +50,8 @@ while IFS=$'\t' read -r status path; do
     *) continue ;;
   esac
   app=${path%%/*}; rel=${path#*/}
-  if is_test "$path" || [[ "$path" == *.md || "$rel" == .db-any-allowance || "$rel" == lib/database.types.ts ]]; then
+  # *.d.ts declares types only and is never emitted.
+  if is_test "$path" || [[ "$path" == *.md || "$path" == *.d.ts || "$rel" == .db-any-allowance || "$rel" == lib/database.types.ts ]]; then
     continue
   fi
   if [[ "$path" =~ \.tsx?$ ]]; then

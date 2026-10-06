@@ -159,6 +159,12 @@ export type UserRole = Enums<"user_role">;
 export type Assert<T extends true> = T;
 export type Extends<A, B> = [A] extends [B] ? true : false;
 
+// Both consts MUST stay `as const`: without it their names widen to `string`, and
+// every param of a listed function / every column of a listed table silently becomes
+// nullable / optional. These fail to compile if that happens (independent review).
+type _NoWidenArgs = Assert<string extends NullableArgs[keyof NullableArgs][number] ? false : true>;
+type _NoWidenFilled = Assert<string extends TriggerFilled[keyof TriggerFilled][number] ? false : true>;
+
 /**
  * Narrow a `jsonb` RPC result to its hand-written interface. `source` is the SQL
  * function's name, so every narrowing is greppable back to the function that

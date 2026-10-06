@@ -12,8 +12,9 @@
 //   1. A ParenthesizedExpression is compared as its inner expression. Precedence lives
 //      in the tree shape, so `(a + b) * c` and `a + b * c` still differ; `(a?.b).c` and
 //      `a?.b.c` still differ (the optional-chain flag is compared).
-//   2. `fromJson(x, "<sql_fn>")`, where `fromJson` is imported from a module ending in
-//      `database.overrides`, is compared as `x`, and that import specifier is ignored —
+//   2. `fromJson(x, "<sql_fn>")`, where `fromJson` is imported from a specifier that
+//      RESOLVES to that app's lib/database.overrides (and no other binding of the name
+//      exists in the file), is compared as `x`, and that import specifier is ignored —
 //      ONLY after this run has proven `fromJson` is the identity (`return value;`) in
 //      the head version of that app's lib/database.overrides.ts. It is the plan's single
 //      permitted narrowing of a `Json` RPC result (Wave 8 RISK 8); without this, every
@@ -82,6 +83,13 @@ function fromJsonIsIdentity(app) {
   const p = `${app}/lib/database.overrides.ts`;
   const text = show(head, p);
   let ok = false;
+  // Metro resolves a platform variant FIRST on that platform; only the .ts is proven.
+  const variant = ["web", "native", "ios", "android"].some((pl) =>
+    ["ts", "tsx", "js"].some((ext) => show(head, `${app}/lib/database.overrides.${pl}.${ext}`) != null));
+  if (variant) {
+    identityByApp.set(app, false);
+    return false;
+  }
   if (text != null) {
     const sf = ts.createSourceFile("o.js", transpile(ts, text, p), ts.ScriptTarget.ESNext, true, ts.ScriptKind.JS);
     for (const st of sf.statements) {

@@ -111,7 +111,9 @@ for f in "${FILES[@]}"; do
   done <<<"$out"
 
   tout=$(entries_of "$f" TRIGGER_FILLED_COLUMNS)
-  [[ "$tout" == "!NOBLOCK" ]] && tout=""   # optional block
+  if [[ "$tout" == "!NOBLOCK" ]]; then   # dropping it (or its `as const`) silently widens nothing-or-everything
+    echo "✗ $rel: no \`export const TRIGGER_FILLED_COLUMNS = { … } as const\` block" >&2; exit 2
+  fi
   if [[ "$tout" == "!UNPARSED" ]]; then
     echo "✗ $rel: TRIGGER_FILLED_COLUMNS holds something other than \`table: [\"col\", …],\` entries — this check cannot see it" >&2
     bad=1; tout=""

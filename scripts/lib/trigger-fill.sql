@@ -7,7 +7,11 @@
 -- Only an ENABLED ('O'/'A' — not disabled, not replica-only) BEFORE INSERT ROW
 -- trigger with NO `WHEN (…)` clause qualifies. This proves an assignment exists, not
 -- that it is unconditional (an IF TG_OP = 'UPDATE' branch would still match) — the
--- overrides entry's citation of the body is the real proof.
+-- overrides entry's citation of the body is the real proof. Known false GREENs, all
+-- needing a deliberate edit: `:= (NULL)`, `:= CAST(NULL …)`, text inside E'…\'…' or
+-- $tag$…$tag$ strings, nested /* /* */ */ comments. Known false REDs: `NEW.c = 1`
+-- (kept red: an IF's `=` comparison looks the same), `'--'` inside a string earlier on
+-- the line. Fix the entry or the trigger, never this file, when one bites.
 with c as (
   select regexp_replace(regexp_replace(regexp_replace(p.prosrc,
            '/\*.*?\*/', ' ', 'g'),
@@ -25,6 +29,6 @@ select case
               and a.attname = :'col') then 'nullable'
   when exists (select 1 from c
                 where c.src ~* ('(^|[^a-z_.])new\.' || :'col' || '\s*:=\s*(?!\s|null\M)')
-                   or c.src ~* ('into\s+(new\.[a-z_]+\s*,\s*)*new\.' || :'col' || '([^a-z_]|$)'))
+                   or c.src ~* ('into\s+(strict\s+)?(new\.[a-z_]+\s*,\s*)*new\.' || :'col' || '([^a-z_]|$)'))
     then 'ok'
   else 'no-trigger' end;
