@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # G6 compares the allowance with the push's base commit
 
       # Every UI fixture seeds the ONE local database that all worktrees share,
       # and /session-close forbids `supabase db reset` as cleanup. A fixture with
@@ -66,6 +68,23 @@ jobs:
       - name: No edge function takes the UTC date of a timestamp (G3)
         run: scripts/check-functions-sg-date.sh
 
+      # Wave 8: both apps carry the SAME generated Database types (they share no
+      # package). A one-sided edit or regen is a lie in one app.
+      - name: Both apps' database.types.ts are byte-identical
+        run: cmp SwimSyncApp/lib/database.types.ts SwimSyncAdmin/lib/database.types.ts
+
+      # Wave 8: the `any` ratchet. Every file's `any`-family count equals its
+      # allowance; no allowance rises above the push's base; database.types is
+      # imported with `import type` only (its runtime Constants must not bundle).
+      - name: The any-ratchet holds (G6)
+        env:
+          G6_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -z "$G6_BASE" || "$G6_BASE" =~ ^0+$ ]] || ! git cat-file -e "$G6_BASE^{commit}" 2>/dev/null; then
+            export G6_BASE=HEAD~1
+          fi
+          scripts/check-db-any.sh
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:
@@ -90,6 +109,13 @@ jobs:
       # applies supabase/migrations/*, and seeds supabase/seed.sql.
       - name: Start Supabase stack
         run: supabase start
+
+      # Wave 8 G5: the committed Database types match the migrations (regenerated
+      # here and diffed against both apps), and every NULLABLE_RPC_ARGS override
+      # names a real, non-STRICT function and real params. Runs AFTER Vercel has
+      # deployed a push, so the real gate is running it locally before the push.
+      - name: Database types match the schema (G5)
+        run: scripts/check-db-types.sh
 
       # pgTAP: triggers, RLS isolation, constraints, §11 edge cases.
       - name: DB tests (pgTAP)
@@ -139,6 +165,50 @@ jobs:
       - name: Stop Supabase stack
         if: always()
         run: supabase stop
+
+  # Wave 8 (§7.348): a `types(…)` commit is RUNTIME-IDENTICAL, proven per commit by
+  # transpiling every changed app file at C~1 and C with that app's own TypeScript.
+  # Anything else must be labelled `fix(…)` (Bug-ledger row, failing-first test).
+  runtime-identity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            SwimSyncApp/package-lock.json
+            SwimSyncAdmin/package-lock.json
+
+      - name: Install deps (each app's own TypeScript)
+        run: |
+          (cd SwimSyncApp && npm ci)
+          (cd SwimSyncAdmin && npm ci)
+
+      - name: Every types(…) commit is runtime-identical
+        env:
+          RANGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          RANGE_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ -z "$RANGE_BASE" || "$RANGE_BASE" =~ ^0+$ ]] || ! git cat-file -e "$RANGE_BASE^{commit}" 2>/dev/null; then
+            RANGE_BASE="$RANGE_HEAD~1"
+          fi
+          rc=0; n=0
+          while read -r sha subject; do
+            [[ "$subject" =~ ^types\( ]] || continue
+            n=$((n + 1))
+            echo "::group::$sha $subject"
+            scripts/check-runtime-identical.sh "$sha~1" "$sha" || rc=1
+            echo "::endgroup::"
+          done < <(git log --no-merges --format='%H %s' "$RANGE_BASE..$RANGE_HEAD")
+          echo "checked $n types(…) commit(s) in $RANGE_BASE..$RANGE_HEAD"
+          exit $rc
 
   frontend-tests:
     runs-on: ubuntu-latest
