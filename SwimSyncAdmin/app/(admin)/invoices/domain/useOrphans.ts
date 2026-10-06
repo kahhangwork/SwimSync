@@ -3,6 +3,7 @@ import type { OrphanLine } from "../types";
 import * as repo from "../dao/invoices.repo";
 import * as rpc from "../dao/invoices.rpc";
 import { settlementPayload } from "./settlementPayload";
+import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
 
 /** The standing orphan-lesson report (Wave 4): lessons recorded into an
  *  already-BILLED month. A STANDING section, not a modal — the failure mode is
@@ -43,8 +44,14 @@ export function useOrphans(tenantId: string | null) {
       data: { user },
     } = await repo.getUser();
 
-    // `recordedBy: user?.id!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-    // Signed out → the key is dropped → NOT NULL/RLS refuses → setOrphanError shows it.
+    // Signed out: say so and send nothing — never a settlement with no
+    // recorded_by for the database to refuse (Wave 8).
+    if (!user) {
+      setOrphanSettling(null);
+      setOrphanError(NO_TENANT_MESSAGE);
+      return;
+    }
+
     const { error } = await repo.insertSettlement(
       settlementPayload({
         tenantId,
@@ -52,7 +59,7 @@ export function useOrphans(tenantId: string | null) {
         settledThrough: line.latest_session_date,
         kind,
         amount,
-        recordedBy: user?.id!,
+        recordedBy: user.id,
       })
     );
 
