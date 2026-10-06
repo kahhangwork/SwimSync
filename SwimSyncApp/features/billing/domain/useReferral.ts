@@ -34,7 +34,7 @@ export function useReferral() {
       if (cancelled) return;
 
       setMemberships(
-        ((mRes.data as any[]) ?? []).map((m) => {
+        (mRes.data ?? []).map((m) => {
           const t = Array.isArray(m.tenants) ? m.tenants[0] : m.tenants;
           return {
             id: m.id,
@@ -47,13 +47,13 @@ export function useReferral() {
       );
 
       const counts: Record<string, number> = {};
-      for (const r of ((rwRes.data as any[]) ?? [])) {
+      for (const r of (rwRes.data ?? [])) {
         if (r.status === "available") counts[r.tenant_id] = (counts[r.tenant_id] ?? 0) + 1;
       }
       setRewardsByTenant(counts);
 
       setReferrals(
-        ((refRes.data as any[]) ?? []).map((r) => ({
+        (refRes.data ?? []).map((r) => ({
           tenant_id: r.tenant_id,
           business_name: r.business_name,
           referee_first_name: r.referee_first_name ?? null,

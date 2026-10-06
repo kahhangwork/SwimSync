@@ -6,6 +6,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { DataOf } from "@/lib/database.overrides";
 
 export const claimInvoicePaid = (invoiceId: string) =>
   supabase.rpc("claim_invoice_paid", {
@@ -23,3 +24,7 @@ export const fetchMyReferrals = () => supabase.rpc("my_referrals");
 // platform admin; anyone else is refused (42501).
 export const fetchPackageUsage = (packageId: string) =>
   supabase.rpc("package_usage", { p_package: packageId });
+
+// ── Row types (Wave 8) — set-returning RPCs, typed rows (not jsonb) ──────────
+export type LiveBalanceRow = DataOf<typeof fetchLiveBalances>[number];
+export type MyReferralRow = DataOf<typeof fetchMyReferrals>[number];

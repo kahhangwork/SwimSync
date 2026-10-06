@@ -112,7 +112,7 @@ export function useBilling() {
     setInvoices(invoicesOf(invoicesRes.data));
     setCreditNotes(creditNotesRes.data ?? []);
 
-    setPackages(packagesOf(packagesRes.data, liveRes.data as any[]));
+    setPackages(packagesOf(packagesRes.data, liveRes.data));
 
     // A FAILED products fetch and "this business sells nothing" render
     // IDENTICALLY — `?? []` collapses both to an empty Buy-a-package list with

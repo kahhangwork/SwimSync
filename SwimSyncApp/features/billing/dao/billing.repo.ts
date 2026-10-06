@@ -6,6 +6,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 
 type Session = { id: string };
 
@@ -88,3 +89,12 @@ export const fetchReferralMemberships = () =>
 
 export const fetchReferralRewards = () =>
   supabase.from("referral_rewards").select("tenant_id, status");
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// `tenants` / `class_categories` are LEFT to-one embeds: an object, or null when RLS
+// hides it or the FK is empty (§7.344). The Array.isArray normalisers in
+// domain/billingFormat stay (R2).
+export type InvoiceListRow = RlsNullable<DataOf<typeof fetchInvoices>[number], "tenants">;
+export type PackageListRow = RlsNullable<DataOf<typeof fetchPackages>[number], "tenants" | "class_categories">;
+export type ProductListRow = RlsNullable<DataOf<typeof fetchProducts>[number], "tenants" | "class_categories">;
+export type MembershipRow = RlsNullable<DataOf<typeof fetchReferralMemberships>[number], "tenants">;

@@ -2,14 +2,15 @@
 // Billing tab's mappings already did when they moved out of the route file.
 // §7.25's prove-it-red rule does not apply — there is no fix, only a move. Each
 // guarded line was mutated once and a named case went red (playbook §5).
-import {
-  formatBillingMonth,
-  formatDate,
-  capitalize,
-  invoicesOf,
-  packagesOf,
-  productsOf,
-} from "./billingFormat";
+import { formatBillingMonth, formatDate, capitalize } from "./billingFormat";
+import * as F from "./billingFormat";
+
+// Loose fixtures on purpose (Wave 8): string amounts, null/array embeds pin every
+// Number() and normaliser the typed rows no longer admit.
+const loose = <A extends unknown[], R>(fn: (...a: A) => R) => fn as unknown as (...a: any[]) => R;
+const invoicesOf = loose(F.invoicesOf);
+const packagesOf = loose(F.packagesOf);
+const productsOf = loose(F.productsOf);
 
 describe("billingFormat (characterisation)", () => {
   it("formatBillingMonth: 'YYYY-MM' -> long month + year", () => {

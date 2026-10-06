@@ -9,6 +9,8 @@
 // "fix" it with a timeZone option: it is correct in every zone.
 import { formatSgStamp } from "@/lib/lessonDates";
 import type { Invoice, ParentPackage, PackageProduct } from "../types";
+import type { InvoiceListRow, PackageListRow, ProductListRow } from "../dao/billing.repo";
+import type { LiveBalanceRow } from "../dao/billing.rpc";
 
 export function formatBillingMonth(ym: string): string {
   const [year, month] = ym.split("-");
@@ -28,8 +30,8 @@ export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, " ");
 }
 
-export function invoicesOf(rows: any[] | null): Invoice[] {
-  return (rows ?? []).map((inv: any) => {
+export function invoicesOf(rows: InvoiceListRow[] | null): Invoice[] {
+  return (rows ?? []).map((inv) => {
     const t = Array.isArray(inv.tenants) ? inv.tenants[0] : inv.tenants;
     return {
       ...inv,
@@ -44,11 +46,11 @@ export function invoicesOf(rows: any[] | null): Invoice[] {
 
 /** LIVE numbers come from package_live_balances(), keyed by package id — never
  *  recomputed here (the RPC is the single derivation). */
-export function packagesOf(rows: any[] | null, liveRows: any[] | null): ParentPackage[] {
-  const liveById = new Map<string, any>(
-    ((liveRows as any[]) ?? []).map((r) => [r.parent_package_id, r])
+export function packagesOf(rows: PackageListRow[] | null, liveRows: LiveBalanceRow[] | null): ParentPackage[] {
+  const liveById = new Map<string, LiveBalanceRow>(
+    (liveRows ?? []).map((r) => [r.parent_package_id, r])
   );
-  return (rows ?? []).map((p: any) => {
+  return (rows ?? []).map((p) => {
     const t = Array.isArray(p.tenants) ? p.tenants[0] : p.tenants;
     const c = Array.isArray(p.class_categories)
       ? p.class_categories[0]
@@ -64,7 +66,9 @@ export function packagesOf(rows: any[] | null, liveRows: any[] | null): ParentPa
       total_value: Number(p.total_value),
       amount_payable: Number(p.amount_payable),
       discount_amount: Number(p.discount_amount),
-      status: p.status,
+      // census: ui-cast (Wave 8) — the column is `text`, but CHECK (status = ANY
+      // ('pending','active','cancelled')) holds it to exactly ParentPackage's union.
+      status: p.status as ParentPackage["status"],
       offered_by: p.offered_by ?? null,
       expires_on: p.expires_on,
       live_lessons_remaining: live ? Number(live.live_lessons_remaining) : null,
@@ -75,8 +79,8 @@ export function packagesOf(rows: any[] | null, liveRows: any[] | null): ParentPa
   });
 }
 
-export function productsOf(rows: any[] | null): PackageProduct[] {
-  return (rows ?? []).map((p: any) => {
+export function productsOf(rows: ProductListRow[] | null): PackageProduct[] {
+  return (rows ?? []).map((p) => {
     const t = Array.isArray(p.tenants) ? p.tenants[0] : p.tenants;
     const c = Array.isArray(p.class_categories)
       ? p.class_categories[0]
