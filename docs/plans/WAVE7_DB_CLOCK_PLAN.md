@@ -429,9 +429,9 @@ proof — the lane2 batch precondition (zero unconverted functions) is the gate.
 | `sessions_i_am_main_on` | n |  |  | student_class_enrolments | 2 |
 | `skill_progress` | n |  |  | student_class_enrolments | 2 |
 | `stranger_isolation` | y | today_sg |  | student_class_enrolments | 2 |
-| `student_claims` | y |  |  |  | 1 |
+| `student_claims` | n (was y: text-scan false positive — only superuser fixture inserts, which the guards skip; pin-shift +3mo stays green, lane2 T3, verified by lane1) |  |  |  | 1 |
 | `student_identity` | n |  |  |  | 1 |
-| `student_merge` | y |  |  |  | 1 |
+| `student_merge` | n (was y: text-scan false positive — only superuser fixture inserts, which the guards skip; pin-shift +3mo stays green, lane2 T3, verified by lane1) |  |  |  | 1 |
 | `student_package_coverage` | n |  | student_package_coverage | parent_packages student_class_enrolments | 2 |
 | `student_tenant_pin` | n |  |  | reassign_student_tenant | 2 |
 | `students_audit` | n |  |  |  | 1 |
@@ -443,7 +443,7 @@ proof — the lane2 batch precondition (zero unconverted functions) is the gate.
 | `tenant_suspension` | y | disable_coach | platform_tenant_overview | parent_packages credit_notes student_class_enrolments | 2 |
 | `tenant_unmarked_lesson_count` | y | today_sg markable_floor | tenant_unmarked_lesson_count | student_class_enrolments | 2 |
 | `trial_onboarding` | y | session_window_start markable_floor book_trial |  | student_class_enrolments | 2 |
-| `unbilled_sealed_lessons` | y |  |  |  | 1 |
+| `unbilled_sealed_lessons` | n (was y: text-scan false positive — only superuser fixture inserts, which the guards skip; pin-shift +3mo stays green, lane2 T3, verified by lane1) |  |  |  | 1 |
 | `void_credit_note` | y |  |  | credit_notes student_class_enrolments | 2 |
 
 
