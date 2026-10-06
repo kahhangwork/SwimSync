@@ -59,7 +59,8 @@ nullable fields (TS2769); `profiles.role` union wider than the app's `Role` type
 (`roster.rpc.ts:26`); `contact.repo.ts:13/20/30/39` pass a possibly-`undefined` id into a filter (**candidate bug #1**).
 
 ⚠ RISK 10 MITIGATION — baseline step: before F0, record `npx tsc --noEmit --incremental false` wall time in each app
-here: App ___ s · Admin ___ s, and that `cd SwimSyncAdmin && npm run build` passes on `main`.
+here: App **3.9** s · Admin **5.8** s, and that `cd SwimSyncAdmin && npm run build` passes on `main`. **Filled 2026-10-06
+(`45b8bc8`): build passes.**
 
 ## The rules this wave obeys
 
@@ -129,7 +130,9 @@ here: App ___ s · Admin ___ s, and that `cd SwimSyncAdmin && npm run build` pas
    change. The pin is bumped deliberately, together with a regen.
    - ⚠ RISK 6 MITIGATION: **before pinning,** read the CLI version CI actually installed on its last green run
      (`gh run view <latest green ci.yml run> --log`, Install Supabase CLI step / `supabase --version`). Write it here:
-     CI ran ___. If it is newer than local: upgrade local to it, regenerate, and pin THAT. **Prohibition: never pin CI
+     CI ran **v2.119.0** (filled 2026-10-06: run `37423287251`, 06:21Z; the log does not print the version, so it is
+     the newest stable supabase/cli release at that moment — v2.119.0, published 2026-09-30T21:35Z. Newer than local
+     2.109.1 → local upgraded to 2.119.0 via brew, pin = 2.119.0). If it is newer than local: upgrade local to it, regenerate, and pin THAT. **Prohibition: never pin CI
      below what it last ran green on.**
    - The pin is its **own commit**, pushed alone; assertion: the full `backend-tests` job is green on the pin (pgTAP,
      both HTTP checks, Deno ×2, fixture roundtrip) BEFORE G5 is added. Red there = a CLI-version regression, not a
@@ -174,7 +177,8 @@ here: App ___ s · Admin ___ s, and that `cd SwimSyncAdmin && npm run build` pas
    - ⚠ RISK 4 MITIGATION — **overrides may WIDEN, never narrow away a value the DB can hold.** For `Role`: widen the
      app's `Role` / `LandingRole` to the generated `user_role` enum (which includes `superadmin`); do NOT narrow the
      generated type to the app's union. Before deciding, run bare
-     `scripts/prod-query-ro.sh "select role, count(*) from profiles group by 1"` and record the counts here: ___.
+     `scripts/prod-query-ro.sh "select role, count(*) from profiles group by 1"` and record the counts here: **parent 12 · coach 3 · platform_admin 1 · tenant_admin 4 · superadmin 0** (prod,
+     2026-10-06).
      Assertion: `landingFor` returns its existing "unrecognised role" result for `superadmin`, unchanged — a unit test
      pins that before the change and passes after.
 6. **Fix the 48 spike errors.** Each one is classified in the plan's **Bug ledger** below as *type-only* or *bug*.
