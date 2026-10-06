@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.overrides";
 import type { AdminArea } from "@/lib/permissions";
 
 /**
@@ -30,15 +31,15 @@ export type GateResult =
       tenantId: string;
       ownerProfileId: string | null;
       isOwner: boolean;
-      adminClient: SupabaseClient;
-      callerClient: SupabaseClient;
+      adminClient: SupabaseClient<Database>;
+      callerClient: SupabaseClient<Database>;
     };
 
 async function gate(req: NextRequest): Promise<GateResult> {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.replace("Bearer ", "") ?? "";
 
-  const callerClient = createClient(
+  const callerClient = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
@@ -177,7 +178,7 @@ export const BAN_FOREVER = "876000h";
 /** Is this profile a PURE admin (no coaches row)? Pure admins are the only
  *  ones banned on deactivation and the only ones hard-deletable. */
 export async function isPureAdmin(
-  adminClient: SupabaseClient,
+  adminClient: SupabaseClient<Database>,
   profileId: string
 ): Promise<boolean> {
   const { data } = await adminClient

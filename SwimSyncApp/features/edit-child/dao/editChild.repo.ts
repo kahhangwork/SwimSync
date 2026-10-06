@@ -4,6 +4,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { Enums } from "@/lib/database.overrides";
 
 export const fetchChildForEdit = (id: string) =>
   supabase
@@ -15,7 +16,7 @@ export const fetchChildForEdit = (id: string) =>
 export type ChildEdit = {
   full_name: string;
   date_of_birth: string;
-  gender: string;
+  gender: Enums<"gender_type">;
   notes: string | null;
 };
 

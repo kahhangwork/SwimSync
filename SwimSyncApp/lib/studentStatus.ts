@@ -9,18 +9,17 @@
 //
 // DUPLICATED byte-for-byte in SwimSyncApp/lib/studentStatus.ts, deliberately:
 // there is no shared package (separate npm projects, different bundlers) — the
-// same rationale as lib/lessonDates.ts. It has no imports, so drift is cheap
-// to spot with `diff`. EDIT BOTH.
+// same rationale as lib/lessonDates.ts. Its only imports are TYPE imports of
+// paths both apps have (erased at build), so drift is still cheap to spot with
+// `diff`. EDIT BOTH.
 
-/** Minimal shape of a supabase-js client — avoids importing either app's.
- *  `rpc()` returns a thenable query builder rather than a bare Promise, so the
- *  result is typed as awaitable rather than as Promise. */
-type RpcClient = {
-  rpc: (
-    fn: string,
-    args: Record<string, unknown>
-  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
-};
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./database.overrides";
+
+/** The one method these helpers use, from the caller's client — each app's own,
+ *  typed with its generated `Database` (Wave 8), so a renamed function or param
+ *  is a compile error here too. */
+type RpcClient = Pick<SupabaseClient<Database>, "rpc">;
 
 export type FamilyChild = {
   student_id: string;

@@ -45,7 +45,7 @@ export function useAttendanceSave(input: {
     setSaveMsg(null);
     const entries: SaveEntry[] = roster
       .filter((r) => draft[r.studentId] !== null && draft[r.studentId] !== undefined)
-      .map((r) => ({ studentId: r.studentId, status: draft[r.studentId] as string, prevStatus: r.prev }));
+      .map((r) => ({ studentId: r.studentId, status: draft[r.studentId] as DbStatus, prevStatus: r.prev }));
     const res = await saveAdminAttendance({ deps: supabaseSaveDeps(), classId, date, actorProfileId: actorId, knownSessionId: sessionId, entries });
     setSaving(false);
     if (res.ok) {

@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.overrides";
 
 /**
  * Mint the server-side proof that a staff auth user is invited
@@ -17,7 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * request leaves nothing that needs cleaning up.
  */
 export async function mintStaffInvitation(
-  adminClient: SupabaseClient,
+  adminClient: SupabaseClient<Database>,
   invite: {
     email: string;
     role: "coach" | "tenant_admin";

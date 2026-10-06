@@ -82,7 +82,7 @@ export function loadFutureLiveTrial(studentId: string, todaySg: string) {
 
 /** A new effective-dated ROW, never an update (§7.3). */
 export function insertTrialRate(row: {
-  tenant_id: string | null;
+  tenant_id: string;
   category_id: string;
   rate: number;
   effective_from: string;

@@ -48,14 +48,17 @@ export function useUnclaimed() {
 
     const { data: student } = await repo.fetchStudentTenant(u.student_id);
 
+    // `!` (Wave 8): non-null for a signed-in admin with a real student row — this
+    // page's gate. Otherwise the insert is refused (NOT NULL / RLS) and the error
+    // is shown in the modal below, as before.
     const { error } = await repo.insertSettlement(
       settlementPayload({
-        tenantId: student?.tenant_id,
+        tenantId: student?.tenant_id!,
         studentId: u.student_id,
         settledThrough: u.latest_session_date,
         kind,
         amount,
-        recordedBy: user?.id,
+        recordedBy: user?.id!,
       })
     );
 

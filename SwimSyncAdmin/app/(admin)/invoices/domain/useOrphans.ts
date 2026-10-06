@@ -43,6 +43,9 @@ export function useOrphans(tenantId: string | null) {
       data: { user },
     } = await repo.getUser();
 
+    // `!` (Wave 8): non-null for a signed-in admin — this
+    // page's gate. Otherwise the insert is refused (NOT NULL / RLS) and the error
+    // is shown in the modal below, as before.
     const { error } = await repo.insertSettlement(
       settlementPayload({
         tenantId,
@@ -50,7 +53,7 @@ export function useOrphans(tenantId: string | null) {
         settledThrough: line.latest_session_date,
         kind,
         amount,
-        recordedBy: user?.id,
+        recordedBy: user?.id!,
       })
     );
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.overrides";
 import { sendInviteEmail } from "@/lib/inviteEmail";
 import { mintStaffInvitation } from "@/lib/staffInvitation";
 
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
   const token = authHeader?.replace("Bearer ", "") ?? "";
 
   // The caller's own client. Used for BOTH the identity check and the RPC.
-  const callerClient = createClient(
+  const callerClient = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }

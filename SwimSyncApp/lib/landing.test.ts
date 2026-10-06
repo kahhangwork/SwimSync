@@ -41,6 +41,13 @@ describe("landingFor", () => {
     );
   });
 
+  // Wave 8 (RISK 4): the store's role widened to the generated `user_role` enum,
+  // which still carries the retired `superadmin`. No mobile home for it — the
+  // same refusal as any unknown role, pinned before the widening and after.
+  it("refuses the retired superadmin role like any unknown role", () => {
+    expect(refusal(landingFor("superadmin", false))).toContain("Unrecognised");
+  });
+
   it("still refuses a genuinely unknown role", () => {
     expect(refusal(landingFor("something_else", false))).toContain(
       "Unrecognised"

@@ -39,17 +39,19 @@
 // conditional keys. If a future column is genuinely per-student-optional, send
 // it explicitly as `null` for the others rather than omitting it. See §7.67.
 
+import type { Enums } from "./database.overrides";
+
 /** A status already resolved to its database value. */
 export type AttendanceRowInput = {
   studentId: string;
-  /** e.g. "present" | "absent" | "cancelled_rain" — validated by the caller. */
-  status: string;
+  /** e.g. "present" | "absent" | "cancelled_rain" — the generated enum (Wave 8). */
+  status: Enums<"attendance_status">;
 };
 
 export type AttendanceRow = {
   lesson_session_id: string;
   student_id: string;
-  status: string;
+  status: Enums<"attendance_status">;
   marked_by: string;
   last_edited_by: string;
 };

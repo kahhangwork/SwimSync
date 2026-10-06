@@ -23,7 +23,9 @@ export function usePackageSettings() {
 
   async function loadPackages() {
     const { data: userRes } = await repo.getCurrentUser();
-    const { data: prof } = await repo.fetchTenantPackageSettings(userRes.user?.id);
+    // `!` (Wave 8): non-null for a signed-in admin — this page's gate. Signed out,
+    // the read 400s, `prof` is null and the defaults above stay, as before.
+    const { data: prof } = await repo.fetchTenantPackageSettings(userRes.user?.id!);
     setTenantId((prof as any)?.tenant_id ?? null);
     const stored = (prof as any)?.tenants?.low_package_lessons;
     if (stored !== null && stored !== undefined) setThreshold(String(stored));

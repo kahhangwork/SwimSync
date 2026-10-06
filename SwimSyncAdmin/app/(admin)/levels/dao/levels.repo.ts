@@ -20,7 +20,7 @@ export function getAuthUser() {
   return supabase.auth.getUser();
 }
 
-export function profileTenant(userId: string | undefined) {
+export function profileTenant(userId: string) {
   return supabase
     .from("profiles")
     .select("tenant_id")
@@ -35,7 +35,7 @@ export function updateLevel(id: string, payload: LevelPayload) {
   return supabase.from("tenant_levels").update(payload).eq("id", id);
 }
 
-export function insertLevel(row: LevelPayload & { tenant_id: unknown }) {
+export function insertLevel(row: LevelPayload & { tenant_id: string }) {
   return supabase.from("tenant_levels").insert(row);
 }
 
@@ -51,7 +51,7 @@ export function loadGradeScale() {
     .order("rank");
 }
 
-export function insertGrade(row: { label: string; rank: number; tenant_id: unknown }) {
+export function insertGrade(row: { label: string; rank: number; tenant_id: string }) {
   return supabase.from("skill_grade_levels").insert(row);
 }
 

@@ -100,9 +100,11 @@ export function useLevels() {
           ...payload,
           // The caller's own business. RLS refuses any other value anyway; this
           // is what makes the insert satisfy the WITH CHECK in the first place.
+          // `!` (Wave 8): non-null for a signed-in tenant admin — this page's gate;
+          // otherwise the insert is refused and "Could not save" is shown below.
           tenant_id: (
-            await repo.profileTenant((await repo.getAuthUser()).data.user?.id)
-          ).data?.tenant_id,
+            await repo.profileTenant((await repo.getAuthUser()).data.user?.id!)
+          ).data?.tenant_id!,
         });
 
     setBusy(false);
@@ -152,9 +154,11 @@ export function useLevels() {
       rank: nextRank(gradeScale),
       // The caller's own business — RLS refuses any other value; this is what
       // satisfies the WITH CHECK (same pattern as the level insert).
+      // `!` (Wave 8): as in save() — non-null for a signed-in tenant admin;
+      // otherwise the insert is refused and "Could not add that grade." is shown.
       tenant_id: (
-        await repo.profileTenant((await repo.getAuthUser()).data.user?.id)
-      ).data?.tenant_id,
+        await repo.profileTenant((await repo.getAuthUser()).data.user?.id!)
+      ).data?.tenant_id!,
     });
     setScaleBusy(false);
     if (err) {

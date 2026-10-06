@@ -69,7 +69,9 @@ export function useProductForm({ setBusy, reload }: Shared) {
       // Override present ⇒ its own type + value; absent ⇒ NULL/NULL = inherit.
       referral_discount_type: pRefOverride ? pRefType : null,
       referral_discount_value: pRefOverride ? Number(pRefValue) : null,
-      tenant_id: await rpc.myTenantId(),
+      // `!` (Wave 8): non-null for a signed-in tenant admin — this page's gate;
+      // otherwise the insert is refused and "Could not create the package." shows.
+      tenant_id: (await rpc.myTenantId())!,
     });
     setBusy(false);
     if (err) {

@@ -22,7 +22,9 @@ export function useCategories({ setBusy, setError, reload }: Shared) {
     setBusy(true);
     const { error: err } = await repo.insertCategory({
       name: trimmed,
-      tenant_id: await rpc.myTenantId(),
+      // `!` (Wave 8): non-null for a signed-in tenant admin — this page's gate;
+      // otherwise the insert is refused and "Could not add that category." shows.
+      tenant_id: (await rpc.myTenantId())!,
     });
     setBusy(false);
     if (err) {

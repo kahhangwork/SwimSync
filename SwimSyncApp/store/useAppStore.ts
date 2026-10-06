@@ -1,9 +1,12 @@
 import { create } from "zustand";
+import type { UserRole } from "@/lib/database.overrides";
 
 // `tenant_admin` appears here because a PRIVATE COACH holds it: they administer
 // their own tenant AND teach in it. The app routes on the `coaches` row
-// existing, not on this value alone.
-type Role = "parent" | "coach" | "tenant_admin" | "platform_admin" | null;
+// existing, not on this value alone. Every value `profiles.role` can hold
+// (the generated enum, incl. the retired `superadmin`) — widened, never narrowed
+// (Wave 8 RISK 4): landingFor() refuses the roles with no mobile home.
+type Role = UserRole | null;
 
 interface UserSession {
   id: string;

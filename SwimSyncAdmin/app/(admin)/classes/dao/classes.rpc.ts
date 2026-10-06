@@ -3,13 +3,15 @@
 // nothing. The RPCs enforce the real rules (admin-gating, effective-dating,
 // the retire refusals); this layer must not pre-empt, default, or reshape them.
 //
-// ⚠ RISK 1 — THE ADMIN CLIENT IS UNTYPED. `lib/supabase.ts` is `createClient(`
-// with no `Database` generic, so `supabase.rpc(name, {…})` takes `any`: a
-// dropped, renamed or DEFAULTED key typechecks clean and silently mis-bills or
-// mis-pays. Every wrapper below therefore takes an explicit args type with all
-// keys REQUIRED (nullable where the server accepts null, never optional), so
-// the compiler — not a driver seven stages later — catches a missing key.
+// ⚠ RISK 1 — REQUIRED KEYS. Until Wave 8 the admin client was untyped, so a
+// dropped, renamed or DEFAULTED key typechecked clean and silently mis-billed or
+// mis-paid. The client is now typed with the generated `Database`, but generated
+// Args make every DEFAULTed param OPTIONAL (§7.345) — so every wrapper below keeps
+// its explicit args type with all keys REQUIRED (nullable where the server accepts
+// null, never optional), and an `_Check` asserts it still fits the generated Args:
+// a renamed param is a compile error, a dropped key is too.
 import { supabase } from "@/lib/supabase";
+import type { Assert, Enums, Extends, Rpc } from "@/lib/database.overrides";
 
 // Fire-and-forget from the roster load: a failed RPC only means no chips.
 export function studentPackageCoverage() {
@@ -21,6 +23,7 @@ export type AssignClassShadowArgs = {
   p_coach_id: string;
   p_effective_from: string | null;
 };
+type _CheckAssignClassShadowArgs = Assert<Extends<AssignClassShadowArgs, Rpc<"assign_class_shadow">["Args"]>>;
 export function assignClassShadow(args: AssignClassShadowArgs) {
   return supabase.rpc("assign_class_shadow", args);
 }
@@ -34,6 +37,7 @@ export type EndClassShadowArgs = {
   p_coach_id: string;
   p_effective_to: string | null;
 };
+type _CheckEndClassShadowArgs = Assert<Extends<EndClassShadowArgs, Rpc<"end_class_shadow">["Args"]>>;
 export function endClassShadow(args: EndClassShadowArgs) {
   return supabase.rpc("end_class_shadow", args);
 }
@@ -51,7 +55,7 @@ export function endClassShadow(args: EndClassShadowArgs) {
 export type SetClassTermsArgs = {
   p_class_id: string;
   p_title: string;
-  p_day_of_week: string;
+  p_day_of_week: Enums<"day_of_week">;
   p_start_time: string;
   p_end_time: string;
   p_location_name: string;
@@ -62,6 +66,7 @@ export type SetClassTermsArgs = {
   p_location_address: string | null;
   p_location_id: string;
 };
+type _CheckSetClassTermsArgs = Assert<Extends<SetClassTermsArgs, Rpc<"set_class_terms">["Args"]>>;
 export function setClassTerms(args: SetClassTermsArgs) {
   return supabase.rpc("set_class_terms", args);
 }
@@ -71,6 +76,7 @@ export type ScheduleExtraLessonArgs = {
   p_date: string;
   p_reason: string;
 };
+type _CheckScheduleExtraLessonArgs = Assert<Extends<ScheduleExtraLessonArgs, Rpc<"schedule_extra_lesson">["Args"]>>;
 export function scheduleExtraLesson(args: ScheduleExtraLessonArgs) {
   return supabase.rpc("schedule_extra_lesson", args);
 }
@@ -80,6 +86,7 @@ export type CancelLessonArgs = {
   p_date: string;
   p_reason: string;
 };
+type _CheckCancelLessonArgs = Assert<Extends<CancelLessonArgs, Rpc<"cancel_lesson">["Args"]>>;
 export function cancelLesson(args: CancelLessonArgs) {
   return supabase.rpc("cancel_lesson", args);
 }

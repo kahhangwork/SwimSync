@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.overrides";
 
 // Manual, on-demand invoice generation triggered from the admin panel.
 // Verifies the caller administers a tenant, then invokes the generate-invoices
@@ -16,7 +17,7 @@ import { createClient } from "@supabase/supabase-js";
 export async function POST(req: NextRequest) {
   // ── Verify caller is an authenticated superadmin ──────────────────────────
   const token = req.headers.get("authorization")?.replace("Bearer ", "") ?? "";
-  const callerClient = createClient(
+  const callerClient = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
   // the database as the caller. This closes the gap where the role check alone
   // admitted a DEACTIVATED admin: has_admin_area() is false for one.
   if (isTenantAdmin) {
-    const asCaller = createClient(
+    const asCaller = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       { global: { headers: { Authorization: `Bearer ${token}` } } }

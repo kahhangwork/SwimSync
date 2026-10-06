@@ -4,6 +4,7 @@ import { formLocationOptions } from "./locationOptions";
 import * as repo from "../dao/classes.repo";
 import * as rpc from "../dao/classes.rpc";
 import type { ClassRow, LocationOpt } from "../types";
+import type { Enums } from "@/lib/database.overrides";
 
 /**
  * The create/edit class form. Takes the list's `load` so a save is proven by a
@@ -20,7 +21,7 @@ export function useClassForm(load: () => Promise<void>) {
 
   const [title, setTitle] = useState("");
   const [coachId, setCoachId] = useState("");
-  const [day, setDay] = useState("");
+  const [day, setDay] = useState<Enums<"day_of_week"> | "">("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [locationId, setLocationId] = useState("");
@@ -189,7 +190,9 @@ export function useClassForm(load: () => Promise<void>) {
       // ONE statement for all three non-terms fields: one failure mode, one
       // "Saved, but…" message, no third partial-save state.
       const { error: catErr } = await repo.updateClassMeta(editingId, {
-        category_id: categoryId || null,
+        // `!`: handleSubmit returned above when !categoryId, so this is never
+        // null — and category_id is NOT NULL (the generated Update type says so).
+        category_id: (categoryId || null)!,
         capacity: capacityValue,
         colour,
       });

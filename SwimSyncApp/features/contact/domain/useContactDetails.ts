@@ -77,12 +77,16 @@ export function useContactDetails() {
     }
 
     setSaving(true);
+    // `!` names its guard (Wave 8 ledger row #1, reclassified type-only): Save exists
+    // only once `ready`, and the load sets `ready` only after reading with a real
+    // session id. Reached without one, PostgREST 400s (22P02) and the toast below
+    // says so — pinned by useContactDetails.test.ts.
     const [{ error }, { error: profErr }] = await Promise.all([
-      updateParentAddress(session?.id, {
+      updateParentAddress(session?.id!, {
         address: address.trim() || null,
         postal_code: postal.trim() || null,
       }),
-      updateProfileContact(session?.id, {
+      updateProfileContact(session?.id!, {
         full_name: fullName.trim(),
         phone: phone.trim() || null,
       }),

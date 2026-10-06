@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.overrides";
 
 // Re-send ONE invoice email, from the Billing months card's "may not have
 // arrived" list (docs/plans/CRASH_SAFE_EMAIL_CLAIM_PLAN.md §2, §3.2).
@@ -23,7 +24,7 @@ import { createClient } from "@supabase/supabase-js";
 // fresh. The function handles that; nothing here does.
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "") ?? "";
-  const anonClient = createClient(
+  const anonClient = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No such invoice" }, { status: 404 });
   }
 
-  const callerClient = createClient(
+  const callerClient = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }

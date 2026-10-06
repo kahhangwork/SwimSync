@@ -78,8 +78,10 @@ export function useLocationForm({ locations, setBusy, setError, load }: Deps) {
       ({ error: err } = await updateLocation(editing.id, payload));
     } else {
       const { data: auth } = await getAuthUser();
-      const { data: profile } = await loadProfileTenantId(auth.user?.id);
-      ({ error: err } = await insertLocation(payload, profile?.tenant_id));
+      // `!` (Wave 8): non-null for a signed-in tenant admin — this page's gate.
+      // Otherwise RLS refuses the insert and the error below is shown (see the dao).
+      const { data: profile } = await loadProfileTenantId(auth.user?.id!);
+      ({ error: err } = await insertLocation(payload, profile?.tenant_id!));
     }
 
     setBusy(false);

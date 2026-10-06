@@ -6,6 +6,7 @@ import { DAYS } from "../constants";
 import { capitalize } from "../domain/classRows";
 import type { useClassForm } from "../domain/useClassForm";
 import type { Coach } from "../types";
+import type { Enums } from "@/lib/database.overrides";
 
 /**
  * Create / edit a class. Takes the useClassForm hook's state as one prop
@@ -94,7 +95,8 @@ export function ClassFormModal({
           </label>
           <select
             value={day}
-            onChange={(e) => setDay(e.target.value)}
+            // The options are DAYS (the day_of_week enum) and the "" placeholder.
+            onChange={(e) => setDay(e.target.value as Enums<"day_of_week"> | "")}
             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
           >
             <option value="">— Choose a day —</option>

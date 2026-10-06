@@ -186,7 +186,7 @@ export const countConvertedReferrals = (parentId: string) =>
 
 /** !tenant_id disambiguates: tenants also references profiles via
  *  owner_profile_id (20260806000100), so a bare embed is refused. */
-export const fetchTenantPackageSettings = (userId: string | undefined) =>
+export const fetchTenantPackageSettings = (userId: string) =>
   supabase
     .from("profiles")
     .select(

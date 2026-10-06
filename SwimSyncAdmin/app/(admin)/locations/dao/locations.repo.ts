@@ -9,7 +9,7 @@ export function getAuthUser() {
   return supabase.auth.getUser();
 }
 
-export function loadProfileTenantId(userId: string | undefined) {
+export function loadProfileTenantId(userId: string) {
   return supabase.from("profiles").select("tenant_id").eq("id", userId).single();
 }
 
@@ -38,9 +38,10 @@ export function updateLocation(id: string, payload: LocationPayload) {
 
 export function insertLocation(
   payload: LocationPayload,
-  // May be undefined if the profile lookup failed — passed through exactly as
-  // the page did it, so RLS refuses it and the caller shows its usual message.
-  tenantId: string | undefined
+  // Typed non-null (Wave 8); the caller asserts it. If the profile lookup failed
+  // it is still passed through exactly as the page did it, so RLS refuses it and
+  // the caller shows its usual message.
+  tenantId: string
 ) {
   return supabase.from("locations").insert({
     ...payload,

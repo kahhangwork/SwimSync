@@ -256,7 +256,9 @@ export function useTrials() {
     // A new effective-dated ROW, never an update. Changing the price must not
     // re-value trials already taught (§7.3).
     const { error } = await repo.insertTrialRate({
-      tenant_id: tenantId,
+      // `!` (Wave 8): the rate editor renders only after loadAll() resolved this
+      // admin's tenant; were it null the insert is refused and the error shows.
+      tenant_id: tenantId!,
       category_id: categoryId,
       rate: value,
       effective_from: todayInSg(),

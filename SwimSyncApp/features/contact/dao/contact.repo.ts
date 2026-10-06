@@ -6,14 +6,14 @@
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
 
-export const fetchParentAddress = (profileId: string | undefined) =>
+export const fetchParentAddress = (profileId: string) =>
   supabase
     .from("parents")
     .select("address, postal_code")
     .eq("profile_id", profileId)
     .single();
 
-export const fetchProfileContact = (profileId: string | undefined) =>
+export const fetchProfileContact = (profileId: string) =>
   supabase
     .from("profiles")
     .select("full_name, phone")
@@ -21,7 +21,7 @@ export const fetchProfileContact = (profileId: string | undefined) =>
     .single();
 
 export const updateParentAddress = (
-  profileId: string | undefined,
+  profileId: string,
   fields: { address: string | null; postal_code: string | null }
 ) =>
   supabase
@@ -30,7 +30,7 @@ export const updateParentAddress = (
     .eq("profile_id", profileId);
 
 export const updateProfileContact = (
-  profileId: string | undefined,
+  profileId: string,
   fields: { full_name: string; phone: string | null }
 ) =>
   supabase

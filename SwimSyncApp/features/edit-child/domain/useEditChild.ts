@@ -9,6 +9,7 @@ import { useCallback, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useAppStore } from "@/store/useAppStore";
 import { fetchChildForEdit, updateChild } from "../dao/editChild.repo";
+import type { Enums } from "@/lib/database.overrides";
 
 export function useEditChild() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -68,7 +69,9 @@ export function useEditChild() {
     const { error } = await updateChild(id, {
       full_name: name.trim(),
       date_of_birth: dob.trim(),
-      gender: gender.toLowerCase(),
+      // The picker offers only GENDER_OPTIONS, and a loaded value is the enum
+      // capitalised — so lower-cased it is always a `gender_type`.
+      gender: gender.toLowerCase() as Enums<"gender_type">,
       notes: notes.trim() || null,
     });
     setLoading(false);

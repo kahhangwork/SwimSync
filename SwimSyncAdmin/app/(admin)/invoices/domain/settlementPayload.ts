@@ -16,7 +16,7 @@ export function settlementPayload(args: {
   settledThrough: string;
   kind: "paid_outside" | "written_off";
   amount: number | null;
-  recordedBy: string | undefined;
+  recordedBy: string;
 }) {
   const paid = args.kind === "paid_outside";
   return {

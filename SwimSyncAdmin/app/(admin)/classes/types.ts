@@ -1,9 +1,11 @@
+import type { Enums } from "@/lib/database.overrides";
+
 export type ClassRow = {
   id: string;
   title: string;
   coach_id: string;
   coach_name: string;
-  day_of_week: string;
+  day_of_week: Enums<"day_of_week">;
   start_time: string;
   end_time: string;
   /** The location's name, read from the joined `locations` entity (not the

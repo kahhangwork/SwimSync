@@ -4,6 +4,7 @@
 // reads must not change by one character. Mapping lives in domain/classRows.ts;
 // orchestration (Promise.all, the clock) lives in the hooks.
 import { supabase } from "@/lib/supabase";
+import type { TablesInsert } from "@/lib/database.overrides";
 import { ROW_LIMIT } from "../constants";
 
 // ⚠ RETIRED CLASSES ARE LOADED, AND THAT IS LOAD-BEARING, NOT COSMETIC.
@@ -101,7 +102,7 @@ export function loadShadows(classId: string) {
 // Create a class — a plain insert (the seed trigger gives it floor-dated terms).
 // The caller passes the whole row including `is_active: true`; the dao adds
 // nothing. Editing goes through set_class_terms (classes.rpc.ts), never here.
-export function insertClass(row: Record<string, unknown>) {
+export function insertClass(row: TablesInsert<"classes">) {
   return supabase.from("classes").insert(row);
 }
 
@@ -110,7 +111,7 @@ export function insertClass(row: Record<string, unknown>) {
 // ONE statement for all three: one failure mode, one "Saved, but…" message.
 export function updateClassMeta(
   id: string,
-  fields: { category_id: string | null; capacity: number | null; colour: string | null }
+  fields: { category_id: string; capacity: number | null; colour: string | null }
 ) {
   return supabase.from("classes").update(fields).eq("id", id);
 }

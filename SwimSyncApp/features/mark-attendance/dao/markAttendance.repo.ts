@@ -4,6 +4,7 @@
 // one character. Query text is byte-identical to the route it came from (checked by
 // script, terminals included — .single() vs .maybeSingle() changes a branch).
 import { supabase } from "@/lib/supabase";
+import type { TablesInsert } from "@/lib/database.overrides";
 import type { buildAttendanceRows } from "@/lib/attendancePayload";
 
 // ── load() ──────────────────────────────────────────────────────────────
@@ -113,5 +114,5 @@ export const upsertAbsences = (
               { onConflict: "lesson_session_id,coach_id" }
             );
 
-export const insertAuditLog = (row: Record<string, unknown>) =>
+export const insertAuditLog = (row: TablesInsert<"audit_log">) =>
   supabase.from("audit_log").insert(row);

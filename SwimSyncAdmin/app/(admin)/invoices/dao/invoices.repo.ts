@@ -5,6 +5,7 @@
 // helpers only — never React, never ui/, never @/components.
 
 import { supabase } from "@/lib/supabase";
+import type { TablesInsert } from "@/lib/database.overrides";
 import { ilikeContains } from "@/lib/tableSearch";
 import { ROW_LIMIT } from "../constants";
 import type { SearchField } from "../types";
@@ -109,7 +110,7 @@ export const fetchAttendance = (sessionIds: string[]) =>
 export const fetchStudentTenant = (studentId: string) =>
   supabase.from("students").select("tenant_id").eq("id", studentId).single();
 
-export const insertSettlement = (payload: Record<string, unknown>) =>
+export const insertSettlement = (payload: TablesInsert<"student_settlements">) =>
   supabase.from("student_settlements").insert(payload);
 
 export const fetchPendingDebits = (tenantId: string) =>

@@ -8,6 +8,7 @@
 // unchanged into Stage 3, where it becomes myTenantId() (RISK 6).
 
 import { supabase } from "@/lib/supabase";
+import type { TablesInsert } from "@/lib/database.overrides";
 import { ROW_LIMIT } from "../constants";
 
 // ── Reads (the load() Promise.all + the tenant settings row) ─────────────────
@@ -82,7 +83,7 @@ export const loadChildren = () =>
 
 // ── Category writes ──────────────────────────────────────────────────────────
 
-export const insertCategory = (row: { name: string; tenant_id: unknown }) =>
+export const insertCategory = (row: { name: string; tenant_id: string }) =>
   supabase.from("class_categories").insert(row);
 
 export const deleteCategory = (id: string) =>
@@ -123,7 +124,7 @@ export const updatePackageExpiryDays = (tenantId: string, value: number) =>
 
 // ── Product writes ───────────────────────────────────────────────────────────
 
-export const insertProduct = (row: Record<string, unknown>) =>
+export const insertProduct = (row: TablesInsert<"package_products">) =>
   supabase.from("package_products").insert(row);
 
 export const updateProductActive = (id: string, active: boolean) =>
@@ -133,7 +134,7 @@ export const updateProductActive = (id: string, active: boolean) =>
 
 // Returns the new id: a sale is inserted already active, and the backdated
 // check (Wave 6 D5) needs the package to preview against.
-export const insertPurchase = (row: Record<string, unknown>) =>
+export const insertPurchase = (row: TablesInsert<"parent_packages">) =>
   supabase.from("parent_packages").insert(row).select("id").single();
 
 // WHERE status='pending' makes a double-click (or two admins) collapse to

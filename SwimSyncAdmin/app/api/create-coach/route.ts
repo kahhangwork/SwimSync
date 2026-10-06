@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.overrides";
 import { mintStaffInvitation } from "@/lib/staffInvitation";
 
 export async function POST(req: NextRequest) {
@@ -8,7 +9,7 @@ export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.replace("Bearer ", "") ?? "";
 
-  const callerClient = createClient(
+  const callerClient = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
   // P9 (roles, 2026-09-27): adding a coach is an Operations: Edit act, asked of
   // the database as the caller. Also closes the gap where the role check alone
   // admitted a DEACTIVATED admin: has_admin_area() is false for one.
-  const asCaller = createClient(
+  const asCaller = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
@@ -74,7 +75,9 @@ export async function POST(req: NextRequest) {
   const invitation = await mintStaffInvitation(adminClient, {
     email,
     role: "coach",
-    tenantId: profile!.tenant_id,
+    // `!` (Wave 8): has_admin_area() returned true above, which it never does for a
+    // NULL tenant (is_tenant_admin opens `p_tenant_id IS NOT NULL`).
+    tenantId: profile!.tenant_id!,
     createdBy: userData.user.id,
   });
   if (!invitation.ok) {

@@ -78,7 +78,7 @@ export async function saveExtensionDays(tenant: string, clamped: number): Promis
 
 /** Insert one holiday. Returns the error code (for the 23505 message) or null. */
 export async function insertHoliday(
-  tenant: string | null,
+  tenant: string,
   date: string,
   name: string
 ): Promise<{ code: string | null; error: string | null }> {
@@ -95,7 +95,7 @@ export async function deleteHoliday(id: string): Promise<string | null> {
 
 /** Upsert imported rows. Returns [added, errorMessage]. */
 export async function upsertHolidays(
-  rows: { tenant_id: string | null; holiday_date: string; name: string }[]
+  rows: { tenant_id: string; holiday_date: string; name: string }[]
 ): Promise<{ count: number | null; error: string | null }> {
   const { error, count } = await supabase
     .from("tenant_public_holidays")

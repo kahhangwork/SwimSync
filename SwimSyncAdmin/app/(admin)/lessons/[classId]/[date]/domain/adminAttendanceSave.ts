@@ -41,11 +41,12 @@
 import { buildAttendanceRows, type AttendanceRow } from "@/lib/attendancePayload";
 import { attendanceSaveErrorMessage } from "@/lib/attendanceSaveError";
 import { mayHaveIssuedCreditNote } from "@/lib/creditNoteEmail";
+import type { Enums, Json } from "@/lib/database.overrides";
 
 export type SaveEntry = {
   studentId: string;
   /** The DB status to save, e.g. "present" | "absent" | … | "holiday". */
-  status: string;
+  status: Enums<"attendance_status">;
   /** The status as loaded (null = no row yet). Decides whether the row is sent. */
   prevStatus: string | null;
 };
@@ -61,7 +62,7 @@ export type SaveDeps = {
     action: string;
     entity_type: string;
     entity_id: string;
-    new_value: Record<string, unknown>;
+    new_value: Json;
   }): Promise<{ error: SaveError | null }>;
   notifyCreditNote(sessionId: string): Promise<void>;
 };
