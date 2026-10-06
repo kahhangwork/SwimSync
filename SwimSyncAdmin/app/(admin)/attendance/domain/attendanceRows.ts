@@ -1,16 +1,23 @@
 import type { LessonAttribution, LessonRef } from "@/lib/lessonAttribution";
 import type { AttendanceRow, MakeupClass, RawAttendanceRow } from "../types";
+import type {
+  AttendanceSelectRow,
+  FilterClassRow,
+  FilterCoachRow,
+  MakeupClassRow,
+  MakeupEnrolRow,
+} from "../dao/attendance.repo";
 
 // Pure mappings for the Attendance page, lifted verbatim from the page's loaders
 // so the embed-flattening, lesson de-duplication, money-axis fold and client
 // filters can be characterised alone.
 
-export function mapFilterCoaches(rows: unknown[]): { id: string; full_name: string }[] {
-  return (rows as any[]).map((c) => ({ id: c.id, full_name: c.profiles?.full_name ?? "Unknown" }));
+export function mapFilterCoaches(rows: FilterCoachRow[]): { id: string; full_name: string }[] {
+  return rows.map((c) => ({ id: c.id, full_name: c.profiles?.full_name ?? "Unknown" }));
 }
 
-export function mapFilterClasses(rows: unknown[]): { id: string; label: string }[] {
-  return (rows as any[]).map((c) => ({
+export function mapFilterClasses(rows: FilterClassRow[]): { id: string; label: string }[] {
+  return rows.map((c) => ({
     id: c.id,
     label: c.is_active ? c.title : `${c.title} (inactive)`,
   }));
@@ -18,8 +25,8 @@ export function mapFilterClasses(rows: unknown[]): { id: string; label: string }
 
 /** Flatten the make-up seed data into the class list + enrolment lookups. */
 export function mapMakeupData(
-  classRows: unknown[],
-  enrolRows: unknown[]
+  classRows: MakeupClassRow[],
+  enrolRows: MakeupEnrolRow[]
 ): {
   makeupClasses: MakeupClass[];
   enrolmentSet: Set<string>;
@@ -27,7 +34,7 @@ export function mapMakeupData(
 } {
   const set = new Set<string>();
   const byStudent = new Map<string, Set<string>>();
-  for (const e of enrolRows as any[]) {
+  for (const e of enrolRows) {
     const sid = e.student_id as string;
     const cid = e.class_id as string;
     set.add(`${sid}:${cid}`);
@@ -39,8 +46,8 @@ export function mapMakeupData(
 }
 
 /** Flatten the attendance embed into raw rows (pre-attribution). */
-export function mapAttendanceRows(data: unknown[]): RawAttendanceRow[] {
-  return (data as any[]).map((a) => ({
+export function mapAttendanceRows(data: AttendanceSelectRow[]): RawAttendanceRow[] {
+  return data.map((a) => ({
     id: a.id,
     student_id: a.students?.id ?? "",
     student_name: a.students?.full_name ?? "—",

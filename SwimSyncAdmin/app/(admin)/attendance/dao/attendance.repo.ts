@@ -16,18 +16,25 @@ import type {
 } from "@/lib/lessonAttribution";
 import { ROW_LIMIT } from "../constants";
 
+// The rows the mapped reads return, typed from each select. The attendance
+// read's embeds are all `!inner` (an inner join drops the row rather than
+// nulling the embed), so they are not widened; the domain keeps its `?.` anyway.
+type Rows<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
+export type FilterCoachRow = Rows<typeof loadFilterOptions>["coachRows"][number];
+export type FilterClassRow = Rows<typeof loadFilterOptions>["classRows"][number];
+export type MakeupClassRow = Rows<typeof loadMakeupData>["classRows"][number];
+export type MakeupEnrolRow = Rows<typeof loadMakeupData>["enrolRows"][number];
+export type AttendanceSelectRow = NonNullable<Rows<typeof loadAttendanceRows>["data"]>[number];
+
 /** Payment-method coverage (RPC). */
 export async function loadPackageCoverage(): Promise<unknown[]> {
   const { data } = await supabase.rpc("student_package_coverage");
   return data ?? [];
 }
 
-/** Coach + class dropdown options. Inactive classes are included and labelled. */
-export async function loadFilterOptions(): Promise<{
-  coachRows: unknown[];
-  classRows: unknown[];
-  error: string | null;
-}> {
+/** Coach + class dropdown options. Inactive classes are included and labelled.
+ *  Return type inferred, so each row is typed from its select (Wave 8). */
+export async function loadFilterOptions() {
   const [{ data: coachData, error: coachErr }, { data: classData, error: classErr }] =
     await Promise.all([
       supabase.from("coaches").select("id, profiles(full_name)"),
@@ -40,8 +47,9 @@ export async function loadFilterOptions(): Promise<{
   };
 }
 
-/** Make-up seed data: every class (incl. inactive) + every active enrolment. */
-export async function loadMakeupData(): Promise<{ classRows: unknown[]; enrolRows: unknown[] }> {
+/** Make-up seed data: every class (incl. inactive) + every active enrolment.
+ *  Return type inferred, so each row is typed from its select (Wave 8). */
+export async function loadMakeupData() {
   const [{ data: cls }, { data: enrol }] = await Promise.all([
     supabase
       .from("classes")
@@ -60,7 +68,7 @@ export async function loadAttendanceRows(opts: {
   dateFrom: string;
   dateTo: string;
   term: string;
-}): Promise<{ data: unknown[] | null; error: string | null }> {
+}) {
   let query = supabase
     .from("attendance")
     .select(

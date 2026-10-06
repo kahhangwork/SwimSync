@@ -19,7 +19,7 @@ describe("mapAttendanceRows", () => {
       { id: "a1", status: "present", students: { id: "s1", full_name: "Amy" }, lesson_sessions: { id: "L1", session_date: "2026-08-01", classes: { id: "c1", title: "Dolphins" } } },
       { id: "a2", status: "absent", students: null, lesson_sessions: null },
     ];
-    const out = mapAttendanceRows(data);
+    const out = mapAttendanceRows(data as any); // fixture rows include hidden (null) embeds: pin the `?.` fallbacks
     expect(out[0]).toEqual({ id: "a1", student_id: "s1", student_name: "Amy", class_id: "c1", class_title: "Dolphins", session_date: "2026-08-01", status: "present", lesson_session_id: "L1" });
     expect(out[1].student_name).toBe("—");
     expect(out[1].class_title).toBe("—");
