@@ -27,7 +27,7 @@ app/(admin)/levels/domain/levelRows.ts 4
 app/(admin)/locations/domain/useLocations.ts 3
 app/(admin)/makeups/domain/makeupRows.ts 13
 app/(admin)/makeups/domain/useMakeups.ts 3
-app/(admin)/packages/domain/packageRows.ts 13
+app/(admin)/packages/domain/packageRows.ts 16
 app/(admin)/packages/domain/useGenerateOffers.ts 1
 app/(admin)/packages/domain/usePackageList.ts 7
 app/(admin)/parents/domain/parentsRows.ts 4

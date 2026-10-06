@@ -7,8 +7,10 @@
 #
 # THE RULE, over every tracked-or-new non-test .ts/.tsx under SwimSyncApp/ and
 # SwimSyncAdmin/ (not lib/database.types.ts; tests = *.test.ts[x] and */testing/*):
-#   1. Count, outside comments: `as any`, `: any`, `any[]`, `<any>`,
-#      `Record<string, any>`, `as unknown as`, `@ts-ignore`, `@ts-expect-error`.
+#   1. Count, outside comments and string contents: `as any`, `: any`, `any[]`,
+#      `any` as a generic or union member (`<any>`, `Map<string, any>`, `| any`),
+#      `type X = any`, `Record<string, any>`, `as unknown as`, `@ts-ignore`,
+#      `@ts-expect-error`, `@ts-nocheck`.
 #      EXEMPT: one line per lib/database.overrides.ts carrying `// g6-exempt: fromJson`
 #      (the single permitted cast, RISK 8). A second marked line in a file fails.
 #   2. Each file's count must EQUAL its line in <app>/.db-any-allowance (`path count`,
@@ -49,16 +51,19 @@ count_app() {
       local $/; my $src = <$h>; close $h;
       my $is_ov = ($f eq "lib/database.overrides.ts");
       my ($n, $ex) = (0, 0);
-      for my $line (split /\n/, $src) {
-        if ($is_ov && $line =~ m{//\s*g6-exempt:\s*fromJson\b}) { $ex++; next; }
-        $line =~ s{//.*$}{};                           # line comment (and anything after //)
-        $n++ while $line =~ /as\s+unknown\s+as\b|\@ts-ignore|\@ts-expect-error|Record<\s*string\s*,\s*any\s*>|\bas\s+any\b|:\s*any\b|\bany\[\]|<any>/g;
-      }
-      # Block comments: subtract what the line pass counted inside them.
-      while ($src =~ m{/\*(.*?)\*/}gs) {
-        my $c = $1; $c =~ s{//.*$}{}mg;
-        $n-- while $c =~ /as\s+unknown\s+as\b|\@ts-ignore|\@ts-expect-error|Record<\s*string\s*,\s*any\s*>|\bas\s+any\b|:\s*any\b|\bany\[\]|<any>/g;
-      }
+      # The single fromJson cast: one marked line, in the overrides file only.
+      if ($is_ov) { $ex++ while $src =~ s{^[^\n]*//\s*g6-exempt:\s*fromJson\b[^\n]*$}{}m; }
+      # @ts-ignore / @ts-expect-error / @ts-nocheck LIVE in comments: count them on the
+      # raw text, before comments are stripped (the first G6 never counted them).
+      $n++ while $src =~ m{//\s*\@ts-(?:ignore|expect-error|nocheck)\b|/\*\s*\@ts-(?:ignore|expect-error|nocheck)\b}g;
+      # Strip comments and the CONTENT of '…' / "…" strings in ONE left-to-right pass,
+      # so a `//` inside a string ("https://…" as any) is not taken for a comment.
+      # Template literals are kept whole: code inside ${…} still counts.
+      $src =~ s{("(?:[^"\\\n]|\\.)*")|(\x27(?:[^\x27\\\n]|\\.)*\x27)|(`(?:[^`\\]|\\.)*`)|(//[^\n]*)|(/\*.*?\*/)}{
+        defined $1 ? q("") : defined $2 ? q(\x27\x27) : defined $3 ? $3 : defined $4 ? "" : ($5 =~ tr/\n//) x "\n"
+      }gse;
+      my $pat = qr/as\s+unknown\s+as\b|Record<\s*string\s*,\s*any\s*>|\btype\s+\w+(?:<[^>=]*>)?\s*=\s*any\b|\bas\s+any\b|:\s*any\b|<\s*any\b|,\s*any\s*[>,\]]|[|&]\s*any\b|\bany\[\]/;
+      $n++ while $src =~ /$pat/g;
       my @bad;
       push @bad, $1 while $src =~ /((?:import|export)\s+(?!type\b)[^;]*?\bfrom\s*["\x27][^"\x27]*database\.types["\x27])/gs;
       push @bad, $1 while $src =~ /((?:import\s*\(|require\s*\(|import\s+)["\x27][^"\x27]*database\.types["\x27])/g;

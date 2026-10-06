@@ -3,7 +3,7 @@
 app/(coach)/classes/[id]/attendance.tsx 1
 app/(parent)/profile/index.tsx 2
 features/add-child/domain/useAddChild.ts 1
-features/billing/domain/billingFormat.ts 8
+features/billing/domain/billingFormat.ts 9
 features/billing/domain/useBilling.ts 1
 features/billing/domain/useReferral.ts 3
 features/child-profile/domain/childFormat.ts 17
