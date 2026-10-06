@@ -114,7 +114,7 @@ export function useGenerateOffers({
       return;
     }
     const rows: CandidateRow[] = await Promise.all(
-      ((data as any[]) ?? []).map(async (r) => {
+      (data ?? []).map(async (r) => {
         const suggested =
           r.suggested_product_id ??
           pickOfferProduct(

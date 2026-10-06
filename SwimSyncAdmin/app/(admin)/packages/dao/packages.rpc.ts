@@ -17,6 +17,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { todayInSg } from "@/lib/lessonDates";
+import type { DataOf } from "@/lib/database.overrides";
 
 /** The caller's own business id. Every insert payload stamps tenant_id from
  *  here; RLS scopes reads without it. */
@@ -33,6 +34,7 @@ export async function myTenantId(): Promise<string | null> {
 
 /** Live balances by package id — the RPC's number, never recomputed above. */
 export const liveBalances = () => supabase.rpc("package_live_balances");
+export type LiveBalanceRow = DataOf<typeof liveBalances>[number];
 
 // Pre-fill a start date from the smart default. ⚠ RISK 7: this is only a
 // suggestion — any failure falls back to today, never blocks the flow.
@@ -88,6 +90,7 @@ export const createPackageOffer = (
   });
 
 export const renewalCandidates = () => supabase.rpc("package_renewal_candidates");
+export type RenewalCandidateRow = DataOf<typeof renewalCandidates>[number];
 
 /** Fire a package-emails Edge Function call. Returns the promise WITHOUT a
  *  catch — the caller keeps its own `.catch(() => {})`, because these are all

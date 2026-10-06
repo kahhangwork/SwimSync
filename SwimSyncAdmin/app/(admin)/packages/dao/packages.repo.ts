@@ -8,8 +8,32 @@
 // unchanged into Stage 3, where it becomes myTenantId() (RISK 6).
 
 import { supabase } from "@/lib/supabase";
-import type { TablesInsert } from "@/lib/database.overrides";
+import type { DataOf, RlsNullable, TablesInsert } from "@/lib/database.overrides";
 import { ROW_LIMIT } from "../constants";
+
+// ── The rows each read returns ───────────────────────────────────────────────
+// Every to-one embed is widened to `| null` — RLS nulls a hidden embed whatever
+// the generated type says (§7.344) — and domain/packageRows.ts keeps its `?.` /
+// `??` / normaliser on each.
+export type CategoryRow = DataOf<typeof loadCategories>[number];
+export type ProductRow = RlsNullable<DataOf<typeof loadProducts>[number], "class_categories">;
+type PurchaseSelected = DataOf<typeof loadPurchases>[number];
+type ParentEmbed = RlsNullable<NonNullable<PurchaseSelected["parents"]>, "profiles">;
+export type PurchaseRow = RlsNullable<
+  Omit<PurchaseSelected, "parents"> & { parents: ParentEmbed | null },
+  "class_categories"
+>;
+export type RefundRow = DataOf<typeof loadRefunds>[number];
+type ParentOptionSelected = DataOf<typeof loadParentOptions>[number];
+export type ParentOptionRow = {
+  parents: RlsNullable<NonNullable<ParentOptionSelected["parents"]>, "profiles"> | null;
+};
+type ChildSelected = DataOf<typeof loadChildren>[number];
+type ChildStudent = NonNullable<ChildSelected["students"]>;
+/** `students` also typed as an array: childrenByParent keeps its Array.isArray normaliser. */
+export type ChildRow = Omit<ChildSelected, "students"> & {
+  students: ChildStudent | ChildStudent[] | null;
+};
 
 // ── Reads (the load() Promise.all + the tenant settings row) ─────────────────
 

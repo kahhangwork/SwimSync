@@ -5,9 +5,18 @@
 
 import { matchesAnyField } from "@/lib/tableSearch";
 import type { Category, Product, Purchase, ParentOption, LiveRefund } from "../types";
+import type {
+  CategoryRow,
+  ChildRow,
+  ParentOptionRow,
+  ProductRow,
+  PurchaseRow,
+  RefundRow,
+} from "../dao/packages.repo";
+import type { LiveBalanceRow } from "../dao/packages.rpc";
 
-export function mapCategories(rows: any[] | null): Category[] {
-  return (rows ?? []).map((c: any) => ({
+export function mapCategories(rows: CategoryRow[] | null): Category[] {
+  return (rows ?? []).map((c) => ({
     id: c.id,
     name: c.name,
     class_count: (c.classes ?? []).length,
@@ -16,8 +25,8 @@ export function mapCategories(rows: any[] | null): Category[] {
   }));
 }
 
-export function mapProducts(rows: any[] | null): Product[] {
-  return (rows ?? []).map((p: any) => ({
+export function mapProducts(rows: ProductRow[] | null): Product[] {
+  return (rows ?? []).map((p) => ({
     id: p.id,
     name: p.name,
     category_id: p.category_id,
@@ -27,13 +36,13 @@ export function mapProducts(rows: any[] | null): Product[] {
     validity_weeks: p.validity_weeks,
     is_active: p.is_active,
     holder_count: (p.parent_packages ?? []).filter(
-      (x: any) => x.status !== "cancelled"
+      (x) => x.status !== "cancelled"
     ).length,
   }));
 }
 
 // parent_id → "Ali, Bo" (active children only).
-export function childrenByParent(rows: any[] | null): Map<string, string[]> {
+export function childrenByParent(rows: ChildRow[] | null): Map<string, string[]> {
   const map = new Map<string, string[]>();
   for (const r of rows ?? []) {
     const s = Array.isArray(r.students) ? r.students[0] : r.students;
@@ -46,18 +55,18 @@ export function childrenByParent(rows: any[] | null): Map<string, string[]> {
 }
 
 // Live balances by package id — the RPC's number, never recomputed here.
-export function liveBalancesById(rows: any[] | null): Map<string, any> {
-  return new Map<string, any>(
-    (rows ?? []).map((r: any) => [r.parent_package_id, r])
+export function liveBalancesById(rows: LiveBalanceRow[] | null): Map<string, LiveBalanceRow> {
+  return new Map<string, LiveBalanceRow>(
+    (rows ?? []).map((r) => [r.parent_package_id, r])
   );
 }
 
 export function mapPurchases(
-  rows: any[] | null,
-  liveById: Map<string, any>,
+  rows: PurchaseRow[] | null,
+  liveById: Map<string, LiveBalanceRow>,
   childrenMap: Map<string, string[]>
 ): Purchase[] {
-  return (rows ?? []).map((p: any) => ({
+  return (rows ?? []).map((p) => ({
     id: p.id,
     parent_id: p.parent_id,
     parent_name:
@@ -72,11 +81,12 @@ export function mapPurchases(
     amount_payable: Number(p.amount_payable),
     discount_amount: Number(p.discount_amount),
     value_remaining: Number(p.value_remaining),
+    // `!` ×2: guarded by the `liveById.has(p.id)` beside each.
     live_value_remaining: liveById.has(p.id)
-      ? Number(liveById.get(p.id).live_value_remaining)
+      ? Number(liveById.get(p.id)!.live_value_remaining)
       : null,
     live_lessons_remaining: liveById.has(p.id)
-      ? Number(liveById.get(p.id).live_lessons_remaining)
+      ? Number(liveById.get(p.id)!.live_lessons_remaining)
       : null,
     status: p.status,
     confirmed_at: p.confirmed_at ?? null,
@@ -96,14 +106,14 @@ export function mapPurchases(
   }));
 }
 
-export function mapParents(rows: any[] | null): ParentOption[] {
+export function mapParents(rows: ParentOptionRow[] | null): ParentOption[] {
   return (rows ?? [])
-    .map((r: any) => ({
+    .map((r) => ({
       id: r.parents?.id,
       name:
         r.parents?.profiles?.full_name ?? r.parents?.profiles?.email ?? "",
     }))
-    .filter((p: ParentOption) => p.id);
+    .filter((p) => p.id) as ParentOption[]; // census: ui-cast (Wave 8) — the filter drops the RLS-hidden parents (id undefined); TS does not narrow through it
 }
 
 // ── Derived buckets over the loaded purchases ────────────────────────────────
@@ -140,7 +150,7 @@ export const activeProducts = (products: Product[]): Product[] =>
 
 // ── Refunds (PACKAGE_REVENUE_REFUNDS_PLAN.md U2) ─────────────────────────────
 
-export function refundsByPackage(rows: any[] | null): Map<string, LiveRefund> {
+export function refundsByPackage(rows: RefundRow[] | null): Map<string, LiveRefund> {
   const m = new Map<string, LiveRefund>();
   for (const r of rows ?? []) {
     m.set(r.parent_package_id, {

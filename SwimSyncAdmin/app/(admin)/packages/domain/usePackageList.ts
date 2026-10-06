@@ -103,15 +103,15 @@ export function usePackageList() {
       setError("Couldn't load the package catalogue — please reload the page.");
     }
 
-    const childMap = childrenByParent(childRes.data as any[]);
-    setCategories(mapCategories(catRes.data as any[]));
-    setProducts(mapProducts(prodRes.data as any[]));
+    const childMap = childrenByParent(childRes.data);
+    setCategories(mapCategories(catRes.data));
+    setProducts(mapProducts(prodRes.data));
     setCapped((purRes.data ?? []).length >= ROW_LIMIT);
-    const liveById = liveBalancesById(liveRes.data as any[]);
-    setPurchases(mapPurchases(purRes.data as any[], liveById, childMap));
-    setParents(mapParents(ptRes.data as any[]));
+    const liveById = liveBalancesById(liveRes.data);
+    setPurchases(mapPurchases(purRes.data, liveById, childMap));
+    setParents(mapParents(ptRes.data));
     if (refRes.error) console.error("package_refunds fetch failed", refRes.error);
-    setRefunds(refRes.error ? null : refundsByPackage(refRes.data as any[]));
+    setRefunds(refRes.error ? null : refundsByPackage(refRes.data));
 
     setLoading(false);
   }

@@ -25,7 +25,7 @@ describe("mapCategories", () => {
   it("counts classes from the embedded array and defaults nulls", () => {
     const [c] = mapCategories([
       { id: "c1", name: "Squad", classes: [{ id: "x" }, { id: "y" }] },
-    ]);
+    ] as any); // partial row: pins the null defaults
     expect(c).toMatchObject({
       id: "c1",
       name: "Squad",
@@ -57,7 +57,7 @@ describe("mapProducts", () => {
           { id: "c", status: "pending" },
         ],
       },
-    ]);
+    ] as any); // numeric as a string: pins the Number() coercion
     expect(p.category_name).toBe("Squad");
     expect(p.rate_per_lesson).toBe(35.5);
     expect(p.holder_count).toBe(2); // active + pending, NOT cancelled
@@ -71,7 +71,7 @@ describe("childrenByParent", () => {
       { parent_id: "p1", students: [{ full_name: "Bo", is_active: true }] },
       { parent_id: "p1", students: { full_name: "Cy", is_active: false } },
       { parent_id: "p2", students: { full_name: null, is_active: true } },
-    ]);
+    ] as any); // a null name: pins the skip
     expect(map.get("p1")).toEqual(["Ali", "Bo"]);
     expect(map.has("p2")).toBe(false);
   });
@@ -91,12 +91,12 @@ describe("mapPurchases", () => {
     status: "active",
     product_id: "prod1",
     requested_at: "2026-09-01",
-  };
+  } as any; // partial row, numerics as strings: pins the fallbacks and Number()
 
   it("takes live balances from the RPC map, null when absent, and joins children", () => {
     const live = liveBalancesById([
       { parent_package_id: "pp1", live_value_remaining: "200", live_lessons_remaining: "6" },
-    ]);
+    ] as any);
     const kids = childrenByParent([
       { parent_id: "p1", students: { full_name: "Ali", is_active: true } },
     ]);
@@ -136,7 +136,7 @@ describe("mapParents", () => {
     const out = mapParents([
       { parents: { id: "p1", profiles: { full_name: "Mum" } } },
       { parents: null },
-    ]);
+    ] as any);
     expect(out).toEqual([{ id: "p1", name: "Mum" }]);
   });
 });
@@ -220,7 +220,7 @@ describe("refundState", () => {
     expect(refundState(base, null, true)).toBe("none");
   });
   it("refundsByPackage keys live refunds by package, numbers as numbers", () => {
-    const m = refundsByPackage([{ id: "r1", parent_package_id: "k1", amount: "100.00", refunded_on: "2026-09-20", note: null }]);
+    const m = refundsByPackage([{ id: "r1", parent_package_id: "k1", amount: "100.00", refunded_on: "2026-09-20", note: null }] as any);
     expect(m.get("k1")).toEqual({ id: "r1", parent_package_id: "k1", amount: 100, refunded_on: "2026-09-20", note: null });
   });
 });
