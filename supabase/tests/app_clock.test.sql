@@ -19,7 +19,7 @@
 -- become authenticator (§7.333), so any assertion here would be vacuous. It is proven over a real login by
 -- supabase/tests/http/app_clock_locks.sh.
 BEGIN;
-SELECT plan(25);
+SELECT plan(26);
 
 -- ---- 1. The flag row (lock 1's switch) is present: seed.sql ran, or M1's hand insert did (§7.334) ----------
 SELECT is((SELECT count(*)::int FROM private.clock_override_enabled), 1,
@@ -102,12 +102,28 @@ SELECT is_empty($$
     FROM pg_proc p, unnest(ARRAY['anon','authenticated','service_role']) r
    WHERE p.pronamespace = 'public'::regnamespace
      AND NOT p.prosecdef
+     AND p.prorettype <> 'trigger'::regtype   -- not callable directly; the trigger-writer check below covers them
      AND p.proname NOT IN ('app_now', 'app_today')
      AND p.prosrc ~ '(app_now|app_today|today_sg|session_window_start)\('
      AND has_function_privilege(r, p.oid, 'EXECUTE')
      AND NOT (has_function_privilege(r, 'public.app_now()', 'EXECUTE')
               AND has_function_privilege(r, 'public.app_today()', 'EXECUTE'))
 $$, 'every role that can call an invoker function reading the clock can call app_now() and app_today()');
+
+-- A SECURITY INVOKER trigger function runs as the role WRITING the table (EXECUTE on a trigger function is not
+-- checked at fire time), so every role that can INSERT/UPDATE a table whose invoker trigger reads the clock must
+-- hold app_now() — enforce_parent_package_lifecycle on parent_packages since M3.
+SELECT is_empty($$
+  SELECT tg.tgrelid::regclass, r
+    FROM pg_trigger tg
+    JOIN pg_proc p ON p.oid = tg.tgfoid
+   CROSS JOIN unnest(ARRAY['anon','authenticated','service_role']) r
+   WHERE NOT tg.tgisinternal
+     AND NOT p.prosecdef
+     AND p.prosrc ~ '(app_now|app_today|today_sg|session_window_start)\('
+     AND (has_table_privilege(r, tg.tgrelid, 'INSERT') OR has_table_privilege(r, tg.tgrelid, 'UPDATE'))
+     AND NOT has_function_privilege(r, 'public.app_now()', 'EXECUTE')
+$$, 'every role that can write a table whose invoker trigger reads the clock can call app_now()');
 
 -- A column DEFAULT app_now() runs as the INSERTING role: every role that may insert must be able to call it.
 SELECT is_empty($$
