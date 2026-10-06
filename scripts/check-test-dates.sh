@@ -27,6 +27,13 @@
 # future-booking checks), so an annotation must come from reading every function
 # on the path with pg_get_functiondef (§7.40), not from an experiment alone.
 #
+# PINNED pgTAP FILES ARE SKIPPED (Wave 7, G4). A file that pins the clock with
+# set_config('swimsync.now', …) reads app_now()/app_today(), so its literals are
+# relative to the pin and cannot expire. "Pinned" is decided by G1's predicate,
+# pgtap_pinned in scripts/lib/pgtap-pin.sh, and by nothing else (plan RISK 9): a
+# pin in a comment, with `false`, before BEGIN, or without the 'clock pinned'
+# assertion does not pass it, so such a file is still scanned here.
+#
 # BLIND SPOTS — it is a text scan:
 #   - dates built by concatenation ('2026-' || '09') or make_date();
 #   - dates in double quotes inside a single-quoted JSON string;
@@ -45,6 +52,8 @@
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/pgtap-pin.sh
+source "$ROOT/scripts/lib/pgtap-pin.sh"
 
 # The 1st of the month before YYYY-MM. 10# because "08"/"09" are invalid octal —
 # without it bash errors in August and September only.
@@ -95,11 +104,12 @@ else
   FILES=("$ROOT"/supabase/tests/*.sql "$ROOT"/.claude/skills/run-ui-playwright/drivers/fixtures-*.sql)
 fi
 
-P=0; F=0; L=0; E=0; hits=""
+P=0; F=0; L=0; E=0; K=0; hits=""
 for f in "${FILES[@]}"; do
   [[ -f "$f" ]] || { echo "✗ no such file: $f" >&2; exit 2; }
   case "$f" in
-    *supabase/tests/*) P=$((P + 1)) ;;
+    *supabase/tests/*) P=$((P + 1))
+      if pgtap_pinned "$f"; then K=$((K + 1)); continue; fi ;;
     *) F=$((F + 1)) ;;
   esac
   # Lines carrying a marker WITH a reason.
@@ -122,7 +132,7 @@ for f in "${FILES[@]}"; do
   done <<< "$matches"
 done
 
-echo "scanned $P pgTAP + $F fixture files, $L literals, $E exemptions, floor $FLOOR"
+echo "scanned $P pgTAP ($K clock-pinned, skipped) + $F fixture files, $L literals, $E exemptions, floor $FLOOR"
 
 # A guard that scanned nothing passes vacuously — refuse that (a broken glob,
 # path or regex on the CI runner must fail, not go green).
