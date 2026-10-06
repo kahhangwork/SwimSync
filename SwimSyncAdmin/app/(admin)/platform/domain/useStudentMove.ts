@@ -98,14 +98,14 @@ async function handleMove(studentId: string, tenantId: string) {
     // A failed link read must fail TOWARD prompting: skipping it silently
     // would drop the warning in exactly the case we cannot verify.
     if (linkErr) checkFailed = true;
-    const parentIds = (links ?? []).map((l: any) => l.parent_id);
+    const parentIds = (links ?? []).map((l) => l.parent_id);
     if (!checkFailed && parentIds.length > 0) {
       const { data: bal, error: balErr } = await familyCreditAt(
         oldTenantId,
         parentIds
       );
       if (balErr) checkFailed = true;
-      else credit = totalFamilyCredit((bal ?? []) as any[]);
+      else credit = totalFamilyCredit(bal ?? []);
     }
   }
 

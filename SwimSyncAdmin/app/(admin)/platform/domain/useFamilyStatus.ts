@@ -40,7 +40,7 @@ export function useFamilyStatus() {
       setFamMessage(`Could not search families: ${error.message}`);
       return;
     }
-    const matching = (data ?? []) as any[];
+    const matching = data ?? [];
 
     const { data: kids, error: kidsErr } = await childrenOfParents(
       matching.map((r) => r.parent_id)

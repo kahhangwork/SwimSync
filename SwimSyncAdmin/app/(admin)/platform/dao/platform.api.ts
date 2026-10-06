@@ -20,7 +20,7 @@ import { supabase } from "@/lib/supabase";
 export async function postAs(
   path: string,
   body: unknown
-): Promise<{ res: Response; json: any }> {
+): Promise<{ res: Response; json: any }> { // db-any-ok: api-json
   const { data: sess } = await supabase.auth.getSession();
   const res = await fetch(path, {
     method: "POST",

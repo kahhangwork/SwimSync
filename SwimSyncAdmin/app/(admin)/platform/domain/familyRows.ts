@@ -8,6 +8,7 @@
 
 import { ROW_LIMIT } from "../constants";
 import type { FamilyStatusRow } from "../types";
+import type { FamilyChildRow, FamilyMembershipRow } from "../dao/platform.repo";
 
 /**
  * One row per (parent, business) membership, each carrying only that business's
@@ -25,8 +26,8 @@ import type { FamilyStatusRow } from "../types";
  * whole table.
  */
 export function buildFamilyRows(
-  memberships: readonly any[],
-  kids: readonly any[] | null
+  memberships: readonly FamilyMembershipRow[],
+  kids: readonly FamilyChildRow[] | null
 ): FamilyStatusRow[] {
   return memberships.map((r) => ({
     parent_name: r.parents?.profiles?.full_name ?? "—",
@@ -34,8 +35,10 @@ export function buildFamilyRows(
     tenant_name: r.tenants?.display_name ?? "—",
     family_active: r.is_active,
     children: (kids ?? [])
-      .filter((k: any) => k.parent_id === r.parent_id && k.students?.tenant_id === r.tenant_id)
-      .map((k: any) => ({ full_name: k.students.full_name, is_active: k.students.is_active })),
+      .filter((k) => k.parent_id === r.parent_id && k.students?.tenant_id === r.tenant_id)
+      // `!`: guarded by the filter above — for a hidden (null) student
+      // `k.students?.tenant_id` is undefined, which never equals r.tenant_id.
+      .map((k) => ({ full_name: k.students!.full_name, is_active: k.students!.is_active })),
   }));
 }
 

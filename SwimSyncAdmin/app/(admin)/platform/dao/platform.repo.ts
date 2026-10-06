@@ -13,6 +13,14 @@
 import { supabase } from "@/lib/supabase";
 import { ilikeContains, orIlike } from "@/lib/tableSearch";
 import { ROW_LIMIT } from "../constants";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The rows family status reads. The LEFT to-one embeds (`tenants`, `students`)
+// are widened to `| null` — RLS nulls a hidden embed whatever the generated type
+// says (§7.344). `parents!inner(profiles!inner(…))` is an INNER join: a hidden
+// parent drops the row instead, so it is not widened.
+export type FamilyMembershipRow = RlsNullable<DataOf<typeof searchFamilyMemberships>[number], "tenants">;
+export type FamilyChildRow = RlsNullable<DataOf<typeof childrenOfParents>[number], "students">;
 
 /** The signed-in user, for the platform-admin gate. */
 export function currentUser() {
