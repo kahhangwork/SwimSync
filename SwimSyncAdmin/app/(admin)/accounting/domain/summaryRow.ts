@@ -1,12 +1,13 @@
 import type { WagesState } from "./accounting";
 import type { Summary } from "../types";
+import type { AccountingSummaryRow } from "../dao/accounting.rpc";
 
 const num = (v: unknown): number | null =>
   v === null || v === undefined ? null : Number(v);
 
 /** One accounting_summary row -> the page's Summary (numeric strings -> numbers,
  *  null kept null so a withheld figure stays withheld). No row -> null. */
-export function toSummary(row: any): Summary | null {
+export function toSummary(row: AccountingSummaryRow | undefined): Summary | null {
   return row
     ? {
         revenue: num(row.revenue),
