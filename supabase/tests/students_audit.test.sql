@@ -27,8 +27,10 @@
 --     migration fails `supabase db push` against production instead.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(11);
+SELECT plan(12);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ══ Fixture — its own business, so nothing here depends on another test's
 --    state and no other test's rows can be mistaken for this one's. ═════════
@@ -40,14 +42,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','adb00000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','aud-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','aud-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Audit Admin","role":"tenant_admin","tenant_id":"adb00000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','adb00000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','aud-parent@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','aud-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}', '{"full_name":"Audit Parent","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO tenant_levels (id, tenant_id, label, sort_order)
 VALUES ('adb00000-0000-0000-0000-0000000000e1','adb00000-0000-0000-0000-000000000001','Seahorse',1);

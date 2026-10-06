@@ -28,8 +28,10 @@
 -- proves the fix did not simply break onboarding.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(9);
+SELECT plan(10);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── One business, one real family, one stranger ─────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -40,14 +42,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','2f000000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','forg-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Forgery Admin","role":"tenant_admin","tenant_id":"1f000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','forg-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Forgery Admin","role":"tenant_admin","tenant_id":"1f000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','2f000000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','forg-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Real Parent","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','forg-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Real Parent","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','2f000000-0000-0000-0000-0000000000e1',
-   'authenticated','authenticated','forg-stranger@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Mallory Stranger","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','forg-stranger@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Mallory Stranger","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 -- The real family: a child, linked to the real parent, at the business.
 INSERT INTO students (id, full_name, date_of_birth, tenant_id) VALUES

@@ -7,8 +7,10 @@
 -- Its own users, so nothing here depends on another fixture's state.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(8);
+SELECT plan(9);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 SELECT has_column('public','parents','address',     'parents.address exists');
 SELECT has_column('public','parents','postal_code', 'parents.postal_code exists');
@@ -24,11 +26,11 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','7f000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','addr-one@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}', '{"full_name":"Addr One","role":"parent"}', now(), now(), '','','',''),
+   'authenticated','authenticated','addr-one@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}', '{"full_name":"Addr One","role":"parent"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7f000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','addr-two@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}', '{"full_name":"Addr Two","role":"parent"}', now(), now(), '','','','');
+   'authenticated','authenticated','addr-two@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}', '{"full_name":"Addr Two","role":"parent"}', app_now(), app_now(), '','','','');
 
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"7f000000-0000-0000-0000-000000000001","role":"authenticated"}';

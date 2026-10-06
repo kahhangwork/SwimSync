@@ -8,8 +8,10 @@
 -- Its own tenants, so nothing here depends on another fixture's state.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(9);
+SELECT plan(10);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- The check that would have caught three previously-shipped leaks.
 SELECT ok(
@@ -26,15 +28,15 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','7e000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','lvl-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','lvl-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Lvl Admin A","role":"tenant_admin","tenant_id":"8e000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7e000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','lvl-admin-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','lvl-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Lvl Admin B","role":"tenant_admin","tenant_id":"8e000000-0000-0000-0000-000000000002"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO tenant_levels (id, tenant_id, label, sort_order) VALUES
   ('9e000000-0000-0000-0000-000000000001','8e000000-0000-0000-0000-000000000001','Seahorse', 1),

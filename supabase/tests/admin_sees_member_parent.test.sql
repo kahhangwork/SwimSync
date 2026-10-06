@@ -15,8 +15,10 @@
 -- (A's admin sees 0 parents for P, and no name for P or R).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(8);
+SELECT plan(9);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('1c000000-0000-0000-0000-00000000000a','member-a','Member School A','SWIM-MEMA'),
@@ -26,8 +28,8 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 SELECT '00000000-0000-0000-0000-000000000000', u.id::uuid, 'authenticated','authenticated',
-       u.email, crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', u.meta::jsonb,
-       now(), now(), '', '', '', ''
+       u.email, crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', u.meta::jsonb,
+       app_now(), app_now(), '', '', '', ''
   FROM (VALUES
     ('2c000000-0000-0000-0000-0000000000a1','mem-admin-a@test.local',
      '{"full_name":"Admin A","role":"tenant_admin","tenant_id":"1c000000-0000-0000-0000-00000000000a"}'),
@@ -99,7 +101,7 @@ SELECT is(
 
 -- ── A suspended: its admin loses the arm (is_tenant_admin refuses) ──────────
 RESET ROLE;
-UPDATE tenants SET suspended_at = now() WHERE id = '1c000000-0000-0000-0000-00000000000a';
+UPDATE tenants SET suspended_at = app_now() WHERE id = '1c000000-0000-0000-0000-00000000000a';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"2c000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
 SELECT is(

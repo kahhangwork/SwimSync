@@ -10,8 +10,10 @@
 -- owner transfer; audit rows (P10); RLS on the new tables; grants. Rolled back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(54);
+SELECT plan(55);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixture ─────────────────────────────────────────────────────────────────
 -- T1: owner O (first admin → owner), co-admin C (no role in metadata →
@@ -26,8 +28,8 @@ CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB)
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
     updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000', p_id, 'authenticated', 'authenticated',
-    p_email, crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', p_meta,
-    now(), now(), '', '', '', '') $$ LANGUAGE sql;
+    p_email, crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', p_meta,
+    app_now(), app_now(), '', '', '', '') $$ LANGUAGE sql;
 
 SELECT pg_temp.mkuser('f0000000-0000-0000-0000-0000000000a1', 'tap-rl-owner@test.local',
   '{"full_name":"RL Owner","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000f1"}');
@@ -113,12 +115,12 @@ SELECT is((SELECT count(*)::int FROM my_admin_permissions('99999999-0000-0000-00
   0, 'my_admin_permissions: a coach gets nothing');
 RESET ROLE;
 
-UPDATE profiles SET admin_disabled_at = now() WHERE id = 'f0000000-0000-0000-0000-0000000000c1';
+UPDATE profiles SET admin_disabled_at = app_now() WHERE id = 'f0000000-0000-0000-0000-0000000000c1';
 SET LOCAL ROLE authenticated;
 SELECT ok(NOT pg_temp.can('f0000000-0000-0000-0000-0000000000c1', 'billing', 'view'), 'a deactivated co-admin passes nothing');
 RESET ROLE;
 UPDATE profiles SET admin_disabled_at = NULL WHERE id = 'f0000000-0000-0000-0000-0000000000c1';
-UPDATE tenants SET suspended_at = now() WHERE id = '99999999-0000-0000-0000-0000000000f1';
+UPDATE tenants SET suspended_at = app_now() WHERE id = '99999999-0000-0000-0000-0000000000f1';
 SET LOCAL ROLE authenticated;
 SELECT ok(NOT pg_temp.can('f0000000-0000-0000-0000-0000000000a1', 'operations', 'view'), 'a suspended business: even the owner passes nothing');
 RESET ROLE;

@@ -17,26 +17,28 @@
 -- run_payouts / draft / final — is constructed exactly.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(38);
+SELECT plan(39);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
--- ── Months + dates, from one SGT anchor ─────────────────────────────────────
+-- ── Months + dates, literals relative to the pinned clock (2026-09-15) ──────
 --   mM   two months ago   SEALED (tenant A) — the main figures month
 --   mM2  last month        SEALED (tenant A + tenant B)
 --   mU   this month        NEVER sealed — the unsealed-refusal case
 CREATE TEMP TABLE f AS
 SELECT
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '2 month','YYYY-MM') AS mM,
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month','YYYY-MM') AS mM2,
-  to_char((now() AT TIME ZONE 'Asia/Singapore'),'YYYY-MM')                       AS mU,
-  (date_trunc('month',(now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '2 month') + INTERVAL '7 days')::date AS dM,
-  (date_trunc('month',(now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month') + INTERVAL '7 days')::date AS dM2;
+  '2026-07'::text           AS mM,
+  '2026-08'::text           AS mM2,
+  '2026-09'::text           AS mU,
+  '2026-07-08'::date        AS dM,
+  '2026-08-08'::date        AS dM2;
 GRANT SELECT ON f TO PUBLIC;
 
 -- ── Two businesses ──────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('85000000-0000-0000-0000-0000000000a0','accta','Acct Business A','SWIM-ACTA', now()),
-  ('85000000-0000-0000-0000-0000000000b0','acctb','Acct Business B','SWIM-ACTB', now());
+  ('85000000-0000-0000-0000-0000000000a0','accta','Acct Business A','SWIM-ACTA', app_now()),
+  ('85000000-0000-0000-0000-0000000000b0','acctb','Acct Business B','SWIM-ACTB', app_now());
 
 -- Tenant A's OWNER must be the first tenant_admin inserted for A (handle_new_user
 -- claims ownership only while owner_profile_id IS NULL) — so insert the owner in
@@ -46,37 +48,37 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','acct-owner-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct Owner A","role":"tenant_admin","tenant_id":"85000000-0000-0000-0000-0000000000a0"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','acct-owner-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct Owner A","role":"tenant_admin","tenant_id":"85000000-0000-0000-0000-0000000000a0"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','acct-coadmin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct CoAdmin A","role":"tenant_admin","tenant_id":"85000000-0000-0000-0000-0000000000a0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','acct-coadmin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct CoAdmin A","role":"tenant_admin","tenant_id":"85000000-0000-0000-0000-0000000000a0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','acct-owner-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct Owner B","role":"tenant_admin","tenant_id":"85000000-0000-0000-0000-0000000000b0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','acct-owner-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct Owner B","role":"tenant_admin","tenant_id":"85000000-0000-0000-0000-0000000000b0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-000000000ca1',
-   'authenticated','authenticated','acct-coach-a1@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct Coach A1","role":"coach","tenant_id":"85000000-0000-0000-0000-0000000000a0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','acct-coach-a1@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct Coach A1","role":"coach","tenant_id":"85000000-0000-0000-0000-0000000000a0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-000000000ca2',
-   'authenticated','authenticated','acct-coach-a2@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct Coach A2","role":"coach","tenant_id":"85000000-0000-0000-0000-0000000000a0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','acct-coach-a2@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct Coach A2","role":"coach","tenant_id":"85000000-0000-0000-0000-0000000000a0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-0000000000cb',
-   'authenticated','authenticated','acct-coach-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct Coach B","role":"coach","tenant_id":"85000000-0000-0000-0000-0000000000b0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','acct-coach-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct Coach B","role":"coach","tenant_id":"85000000-0000-0000-0000-0000000000b0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-00000000009f',
-   'authenticated','authenticated','acct-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct Parent","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','acct-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct Parent","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-00000000009e',
-   'authenticated','authenticated','acct-parent2@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct Parent 2","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','acct-parent2@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct Parent 2","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','85100000-0000-0000-0000-0000000000da',
-   'authenticated','authenticated','acct-platform@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Acct Platform","role":"platform_admin"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','acct-platform@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Acct Platform","role":"platform_admin"}', app_now(), app_now(), '', '', '', '');
 
 -- Coaches A1, A2 are RATED; coach B is NOT (a private coach — prod's shape).
 INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
@@ -169,7 +171,7 @@ SELECT v.id,'85000000-0000-0000-0000-0000000000a0','85500000-0000-0000-0000-0000
        v.through,'paid_outside',v.amt,'85100000-0000-0000-0000-0000000000a1',v.rev,v.revby
 FROM f, (VALUES
   ('85900000-0000-0000-0000-000000000001'::UUID,(SELECT dM  FROM f), 40.00, NULL::timestamptz, NULL::uuid),
-  ('85900000-0000-0000-0000-000000000002'::UUID,(SELECT dM  FROM f),999.00, now(), '85100000-0000-0000-0000-0000000000a1'::uuid),
+  ('85900000-0000-0000-0000-000000000002'::UUID,(SELECT dM  FROM f),999.00, app_now(), '85100000-0000-0000-0000-0000000000a1'::uuid),
   ('85900000-0000-0000-0000-000000000003'::UUID,(SELECT dM2 FROM f), 25.00, NULL::timestamptz, NULL::uuid)
 ) AS v(id, through, amt, rev, revby);
 

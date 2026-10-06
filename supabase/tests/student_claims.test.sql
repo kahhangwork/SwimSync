@@ -31,8 +31,10 @@
 -- that must fail.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(49);
+SELECT plan(50);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -44,26 +46,26 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','c1000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','claim-admin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CLAIM Admin A","role":"tenant_admin","tenant_id":"c1a11111-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','claim-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CLAIM Admin A","role":"tenant_admin","tenant_id":"c1a11111-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','c1000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','claim-admin-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CLAIM Admin B","role":"tenant_admin","tenant_id":"c1a11111-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','claim-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CLAIM Admin B","role":"tenant_admin","tenant_id":"c1a11111-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','c1000000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','claim-coach-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CLAIM Coach A","role":"coach","tenant_id":"c1a11111-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','claim-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CLAIM Coach A","role":"coach","tenant_id":"c1a11111-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   -- P1: joined A, and their registered phone matches Ethan's contact number.
   ('00000000-0000-0000-0000-000000000000','c1000000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','claim-p1@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CLAIM Parent One","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','claim-p1@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CLAIM Parent One","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   -- P2: joined A, NO phone. Every name-only assertion belongs to this parent.
   ('00000000-0000-0000-0000-000000000000','c1000000-0000-0000-0000-0000000000d2',
-   'authenticated','authenticated','claim-p2@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CLAIM Parent Two","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','claim-p2@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CLAIM Parent Two","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   -- P3: joined NOTHING. The tenant-boundary probe.
   ('00000000-0000-0000-0000-000000000000','c1000000-0000-0000-0000-0000000000d3',
-   'authenticated','authenticated','claim-p3@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"CLAIM Parent Three","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','claim-p3@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"CLAIM Parent Three","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 -- ⚠ WITH THE COUNTRY CODE, DELIBERATELY. The child's number below is stored
 -- WITHOUT it — which is exactly how these two get written in real life, the

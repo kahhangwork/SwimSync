@@ -13,7 +13,7 @@
 -- window — the same shape as the real trigger case (July billed on 2 August,
 -- July still markable). All orphan dates live in that one sealed month; the
 -- unsealed-exclusion case uses the 1st of THIS month, which is never in the
--- future on any run date (§7.33 — every date derives from the SGT clock).
+-- future: the clock is pinned (Wave 7) and every date is a literal relative to it.
 --
 -- METHOD (§7.16): probes run inside this transaction under SET LOCAL ROLE with
 -- JWT claims; fixture writes happen as superuser between probes via RESET ROLE
@@ -21,10 +21,12 @@
 -- insert freely — the same exemption the engine relies on).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(18);
+SELECT plan(19);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
--- ── The dates, from one anchor ──────────────────────────────────────────────
+-- ── The dates, literals relative to the pinned clock (2026-09-15) ───────────
 --   m_seal  last month, 'YYYY-MM'   the month tenant A has SEALED
 --   d0      1st of last month       a BILLED lesson date (invoice_items row)
 --   d1      d0 + 7                  orphan date, shared by three students
@@ -32,41 +34,37 @@ SELECT plan(18);
 --   dN      1st of THIS month       unsealed-month lesson; never in the future
 CREATE TEMP TABLE f AS
 SELECT
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month',
-          'YYYY-MM')                                               AS m_seal,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month')::date                                   AS d0,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month' + INTERVAL '7 days')::date               AS d1,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month' + INTERVAL '14 days')::date              AS d2,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')))::date AS dN;
+  '2026-08'::text           AS m_seal,
+  '2026-08-01'::date        AS d0,
+  '2026-08-08'::date        AS d1,
+  '2026-08-15'::date        AS d2,
+  '2026-09-01'::date        AS dN;
 GRANT SELECT ON f TO PUBLIC;
 
 -- ── Two businesses: A seals a month; B seals nothing ────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('84777777-0000-0000-0000-000000000001','wv4a','WV4 Business A','SWIM-WV4A', now()),
-  ('84777777-0000-0000-0000-000000000002','wv4b','WV4 Business B','SWIM-WV4B', now());
+  ('84777777-0000-0000-0000-000000000001','wv4a','WV4 Business A','SWIM-WV4A', app_now()),
+  ('84777777-0000-0000-0000-000000000002','wv4b','WV4 Business B','SWIM-WV4B', app_now());
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','84100000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','wv4-admin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WV4 Admin A","role":"tenant_admin","tenant_id":"84777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','wv4-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WV4 Admin A","role":"tenant_admin","tenant_id":"84777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','84100000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','wv4-coach-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WV4 Coach A","role":"coach","tenant_id":"84777777-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','wv4-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WV4 Coach A","role":"coach","tenant_id":"84777777-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','84100000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','wv4-admin-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WV4 Admin B","role":"tenant_admin","tenant_id":"84777777-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','wv4-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WV4 Admin B","role":"tenant_admin","tenant_id":"84777777-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','84100000-0000-0000-0000-0000000000c2',
-   'authenticated','authenticated','wv4-coach-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WV4 Coach B","role":"coach","tenant_id":"84777777-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','wv4-coach-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WV4 Coach B","role":"coach","tenant_id":"84777777-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','84100000-0000-0000-0000-000000000091',
-   'authenticated','authenticated','wv4-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"WV4 Parent","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','wv4-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"WV4 Parent","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
@@ -264,7 +262,7 @@ SELECT is(
 RESET ROLE;
 UPDATE student_settlements
    SET settled_through = (SELECT d2 FROM f),
-       reversed_at = now(), reversed_by = '84100000-0000-0000-0000-0000000000a1'
+       reversed_at = app_now(), reversed_by = '84100000-0000-0000-0000-0000000000a1'
  WHERE id = '84700000-0000-0000-0000-000000000001';
 
 SET LOCAL ROLE authenticated;

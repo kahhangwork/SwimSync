@@ -3,8 +3,10 @@
 -- policies. Self-contained; own tenants; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(8);
+SELECT plan(9);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('ca000000-0000-0000-0000-000000000001','hol-a','Holiday A','SWIM-HOLA'),
@@ -15,20 +17,20 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','hol-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','hol-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Hol Admin A","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','hol-admin-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','hol-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Hol Admin B","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-000000000002"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ce000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','hol-parent-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','hol-parent-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Hol Parent A","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'ca000000-0000-0000-0000-000000000001'
