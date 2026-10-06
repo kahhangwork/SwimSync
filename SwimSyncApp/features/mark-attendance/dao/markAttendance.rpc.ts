@@ -6,6 +6,7 @@
 // and session_shadow_coaches() are gated on the same predicates as the writes — and
 // nothing here may re-implement, pre-filter or second-guess them.
 import { supabase } from "@/lib/supabase";
+import type { DataOf } from "@/lib/database.overrides";
 import { fetchMarkableFloor } from "@/lib/markableFloor";
 import { fetchIsMainOnSession } from "@/lib/sessionMainCoach";
 import { notifyCreditNoteEmails } from "@/lib/creditNoteEmail";
@@ -30,3 +31,6 @@ export const isMainOnSession = (sid: string) => fetchIsMainOnSession(sid);
 // The credit-note email trigger (edge function `credit-note-emails`), bound so the
 // save hook never holds the client. Strictly equivalent to the route's call.
 export const notifyCreditNotes = (sid: string) => notifyCreditNoteEmails(supabase, sid);
+
+// Row type (Wave 8) — session_shadow_coaches is set-returning (typed rows, not jsonb).
+export type ShadowCoachRow = DataOf<typeof sessionShadowCoaches>[number];

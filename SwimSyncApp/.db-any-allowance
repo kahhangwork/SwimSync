@@ -8,8 +8,6 @@ features/coach-pay/domain/useMyPay.ts 2
 features/coach-settings/domain/useCoachSettings.ts 1
 features/coach-settings/ui/MenuItem.tsx 1
 features/coach-settings/ui/Row.tsx 1
-features/mark-attendance/domain/attendanceRows.ts 10
-features/mark-attendance/domain/useAttendanceLoad.ts 2
 features/parent-attendance/ui/HistoryList.tsx 1
 features/paynow/domain/embeddedTenant.ts 1
 features/roster/domain/rosterRows.ts 34

@@ -2,14 +2,15 @@
 // half of the marking screen's load() as it was inline on the route. §7.25's
 // prove-it-red rule does not apply — there is no fix, only a move. The eight
 // named cases are the plan's §6 Stage 2 ASSERTIONS.
-import {
-  cancelledBlock,
-  enrolledOn,
-  guestRows,
-  initialAttendance,
-  loadedStatusesOf,
-  shadowRows,
-} from "./attendanceRows";
+import { cancelledBlock, loadedStatusesOf } from "./attendanceRows";
+import * as F from "./attendanceRows";
+
+// Loose fixtures on purpose (Wave 8): partial rows and null fields pin the fallbacks.
+const loose = <A extends unknown[], R>(fn: (...a: A) => R) => fn as unknown as (...a: any[]) => R;
+const enrolledOn = loose(F.enrolledOn);
+const guestRows = loose(F.guestRows);
+const initialAttendance = loose(F.initialAttendance);
+const shadowRows = loose(F.shadowRows);
 
 const enr = (id: string, enrolled_at: string, unenrolled_at: string | null = null) => ({
   enrolled_at,

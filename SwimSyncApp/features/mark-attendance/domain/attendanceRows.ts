@@ -6,6 +6,8 @@ import { toSgDate } from "@/lib/lessonDates";
 import type { MarkableCheck } from "@/lib/attendanceWindow";
 import type { AttState, DBStatus, StudentRow } from "../types";
 import { formatDate, fromDBStatus, toDBStatus } from "./attendanceStatus";
+import type { AttendanceLoadRow, EnrolmentRow, GuestBookingRow } from "../dao/markAttendance.repo";
+import type { ShadowCoachRow } from "../dao/markAttendance.rpc";
 
 // ── THE ROSTER FOR A DATE IS THE ROSTER AS IT WAS ON THAT DATE ──────────
 // This used to filter on `is_active` alone, with no reference to `date` at
@@ -17,14 +19,14 @@ import { formatDate, fromDBStatus, toDBStatus } from "./attendanceStatus";
 // Both ends inclusive, matching EnrolmentSpan: a trial walk-in's enrolment
 // opens and closes on its own date, and an exclusive end would drop them
 // from the very screen that is marking them.
-export function enrolledOn(enrolments: any[] | null | undefined, date: string): StudentRow[] {
+export function enrolledOn(enrolments: EnrolmentRow[] | null | undefined, date: string): StudentRow[] {
   return (enrolments ?? [])
-    .filter((e: any) => {
+    .filter((e) => {
       const from = toSgDate(e.enrolled_at);
       const until = e.unenrolled_at ? toSgDate(e.unenrolled_at) : null;
       return from <= date && (until === null || date <= until);
     })
-    .map((e: any) => ({
+    .map((e) => ({
       id: e.students.id,
       full_name: e.students.full_name,
     }));
@@ -34,24 +36,28 @@ export function enrolledOn(enrolments: any[] | null | undefined, date: string): 
  *  attendance, trial-booking or make-up-booking row, a null join dropped. The
  *  route called this chain inline three times; it is one function now, still
  *  called three times, in the same order. */
-export function guestRows(rows: any[] | null | undefined): StudentRow[] {
+export function guestRows(
+  rows: (AttendanceLoadRow | GuestBookingRow)[] | null | undefined
+): StudentRow[] {
   return (rows ?? [])
-    .map((a: any) => a.students)
+    .map((a) => a.students)
     .filter(Boolean)
-    .map((s: any) => ({ id: s.id, full_name: s.full_name }));
+    // census: ui-cast (Wave 8) — `s!`: `.filter(Boolean)` above drops the null embeds;
+    // TS does not narrow through Boolean.
+    .map((s) => ({ id: s!.id, full_name: s!.full_name }));
 }
 
 // Pre-fill attendance from existing records (or default to present)
 export function initialAttendance(
   roster: readonly StudentRow[],
-  attData: any[] | null | undefined,
+  attData: AttendanceLoadRow[] | null | undefined,
   sid: string | null
 ): Record<string, AttState> {
   const initAtt: Record<string, AttState> = {};
   if (sid) {
     for (const student of roster) {
       const existing = (attData ?? []).find(
-        (a: any) => a.student_id === student.id
+        (a) => a.student_id === student.id
       );
       if (existing) {
         const parsed = fromDBStatus(existing.status as DBStatus);
@@ -84,9 +90,9 @@ export function loadedStatusesOf(
 
 /** session_shadow_coaches() rows -> the Coaches present list, pre-ticked. */
 export function shadowRows(
-  shadowRoster: any[] | null | undefined
+  shadowRoster: ShadowCoachRow[] | null | undefined
 ): { coach_id: string; name: string; present: boolean }[] {
-  return (shadowRoster ?? []).map((r: any) => ({
+  return (shadowRoster ?? []).map((r) => ({
     coach_id: r.coach_id,
     name: r.full_name ?? "Unknown coach",
     present: !r.absent,

@@ -17,6 +17,7 @@ import type { ResolvedSession } from "@/lib/attendanceSession";
 import { todayInSg, type DayOfWeek } from "@/lib/lessonDates";
 import { lessonRole, canMark, type LessonRole } from "@/lib/coachRoster";
 import type { AttState, DBStatus, StudentRow } from "../types";
+import type { AttendanceLoadRow } from "../dao/markAttendance.repo";
 import {
   cancelledBlock,
   enrolledOn,
@@ -141,7 +142,7 @@ export function useAttendanceLoad(id: string, date: string) {
     // database trigger (guard_attendance_date, 20260821000700) refuses the
     // write whatever this screen shows, so a stale screen cannot mark it.
     if (existingSession?.cancelled_at) {
-      const reason = (existingSession as any).cancellation_reason as string | null;
+      const reason = existingSession.cancellation_reason as string | null;
       // ⚠ cls.title, NOT the `classTitle` state: setClassTitle above has not
       // re-rendered yet, so the state is the PREVIOUS lesson's title — "" on a
       // cold open ("cancelled this lesson"), the OLD class on a change in place.
@@ -262,7 +263,7 @@ export function useAttendanceLoad(id: string, date: string) {
     // screen that just marked them. See lib/attendanceRoster.ts.
     const { data: attData } = sid
       ? await loadAttendance(sid)
-      : { data: [] as any[] };
+      : { data: [] as AttendanceLoadRow[] };
 
     // Children booked for a TRIAL on this date. They are not enrolled — a trial
     // is a visit, not a standing arrangement — so without this they would never

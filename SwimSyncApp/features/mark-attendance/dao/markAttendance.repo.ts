@@ -4,7 +4,7 @@
 // one character. Query text is byte-identical to the route it came from (checked by
 // script, terminals included — .single() vs .maybeSingle() changes a branch).
 import { supabase } from "@/lib/supabase";
-import type { TablesInsert } from "@/lib/database.overrides";
+import type { DataOf, RlsNullable, TablesInsert } from "@/lib/database.overrides";
 import type { buildAttendanceRows } from "@/lib/attendancePayload";
 
 // ── load() ──────────────────────────────────────────────────────────────
@@ -116,3 +116,17 @@ export const upsertAbsences = (
 
 export const insertAuditLog = (row: TablesInsert<"audit_log">) =>
   supabase.from("audit_log").insert(row);
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// `students` on an enrolment is typed non-null ON PURPOSE, and that rests on a policy
+// proof, not on the generator: since 20261006000600, students_select admits a coach
+// through coach_taught_student() for exactly the classes enrolments_select admits
+// them to (owned or rostered, active or closed) — so a visible enrolment always
+// embeds its student. Before that migration a removed child embedded `null` and the
+// marking screen crashed (Bug-ledger row #2). The guest reads (attendance/bookings)
+// keep RlsNullable — guestRows already drops a null.
+export type EnrolmentRow = DataOf<typeof loadClass>["student_class_enrolments"][number];
+export type AttendanceLoadRow = RlsNullable<DataOf<typeof loadAttendance>[number], "students">;
+export type GuestBookingRow =
+  | RlsNullable<DataOf<typeof loadTrialBookings>[number], "students">
+  | RlsNullable<DataOf<typeof loadMakeupBookings>[number], "students">;
