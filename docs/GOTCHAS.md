@@ -33,17 +33,17 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Area | Items |
 |---|---|
 | SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338 |
-| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342 |
+| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
-| PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314 |
-| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336 |
+| PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
+| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343 |
-| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347 |
+| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
 `supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
@@ -2765,3 +2765,37 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 343. **Rewriting a branch with `git reset --hard` also discards the uncommitted work in that tree.** lane2 rebuilt its
     branch to fold a fix into an earlier commit and lost a whole batch of un-committed conversions (regenerated from
     its script). WIP-commit before any reset — the same rule as the stash hook. (Wave 7 lane2, 2026-10-06, §8.140.)
+
+344. **Generated `Database` types do not know about RLS.** A to-one embed over a NOT NULL foreign key is typed
+    non-null, yet PostgREST returns `null` for it whenever RLS hides the embedded row (§7.212). Never delete a `?.`,
+    a `?? fallback` or an array/object normaliser on an embed because the type says it is unnecessary — the type
+    describes the schema, not what this role may see. Where type and access code disagree, record the real JSON
+    (role JWT, row present AND RLS-hidden) before changing either. (Wave 8 plan-review, 2026-10-06;
+    `docs/plans/WAVE8_GENERATED_TYPES_PLAN.md`.)
+
+345. **Generated RPC `Args` make every defaulted parameter OPTIONAL.** `end_class_shadow(p_effective_to date DEFAULT
+    NULL)` generates `p_effective_to?: string`. Swapping a hand-written required-key args type (the `*.rpc.ts`
+    wrappers, e.g. `classes.rpc.ts`, `accounting.rpc.ts`) for `Rpc<'fn'>['Args']` silently reopens "dropping the key
+    is a DIFFERENT call". Keep the hand-written type and assert it extends the generated one, so a renamed param is a
+    compile error while every key stays required. (Wave 8 plan-review, 2026-10-06; sibling of §7.123.)
+
+346. **A NULL-widening type override on a `STRICT` function is a silent no-op.** A STRICT function returns NULL
+    without running its body when any argument is NULL, so typing an arg as `T | null` "because the SQL handles
+    NULL" makes that call do nothing at all. 0 of 229 public functions are STRICT today; nothing stops the next one.
+    The overrides check reads `proisstrict` (`scripts/check-db-overrides.sh`). (Wave 8 plan-review, 2026-10-06.)
+
+347. **Types generated from the shared local DB can be ahead of your checkout — and of prod.** A sibling's `db/…`
+    migration applied locally lands in `supabase gen types` output, so code compiles against a column prod lacks;
+    Vercel deploys on push, before CI's staleness check (G5) can go red → PostgREST 400s live. The generator
+    refuses unless the local `schema_migrations` set equals the checkout's `supabase/migrations/*` set, and only the
+    root checkout regenerates. (Wave 8 plan-review, 2026-10-06; sibling of §7.60.)
+
+348. **"Type-only" is proven by a transpile diff, not by eye.** `as`, `: T`, `!` and `import`→`import type` are
+    stripped at build; `?.`, `??`, `|| ""`, a dropped payload key and a select-string edit are not — each changes what
+    users see while looking like a type fix. `scripts/check-runtime-identical.sh` compares transpiled output at base
+    and HEAD; a `types(…)` commit must exit 0 on it. (Wave 8 plan-review, 2026-10-06.)
+
+349. **A correctly typed call can still be `permission denied`.** Generated types encode the schema's shape, not
+    grants or RLS — a call that compiles cleanly against `Database` fails at runtime if the role lacks the privilege
+    (§7.87). Typing is not evidence that a surface works; a signed-in call through PostgREST is. (Wave 8
+    plan-review, 2026-10-06.)
