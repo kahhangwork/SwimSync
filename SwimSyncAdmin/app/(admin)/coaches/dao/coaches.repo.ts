@@ -2,6 +2,19 @@
 // { data, error }; no logic, no mapping (that lives in domain/).
 
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The rows the mapped reads return. Every to-one embed is widened to `| null` —
+// RLS nulls a hidden embed whatever the generated type says (§7.344) — and the
+// session_coaches embeds are typed `| X[]` too because domain/coachesRows.ts
+// keeps its Array.isArray normalisers.
+export type CoachSelectRow = RlsNullable<DataOf<typeof loadCoaches>[number], "profiles">;
+type SessionSelected = NonNullable<DataOf<typeof loadSessionCoaches>[number]["lesson_sessions"]>;
+type ClassSelected = NonNullable<SessionSelected["classes"]>;
+type SessionEmbed = Omit<SessionSelected, "classes"> & {
+  classes: ClassSelected | ClassSelected[] | null;
+};
+export type SessionCoachRow = { lesson_sessions: SessionEmbed | SessionEmbed[] | null };
 
 export function loadCoaches() {
   return supabase

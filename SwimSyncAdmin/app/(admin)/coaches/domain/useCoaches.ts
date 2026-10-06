@@ -42,7 +42,7 @@ export function useCoaches() {
   async function loadCoaches() {
     setLoading(true);
     const { data } = await repo.loadCoaches();
-    setCoaches(toCoachRows((data ?? []) as any[]));
+    setCoaches(toCoachRows(data ?? []));
     setLoading(false);
   }
 
@@ -91,7 +91,7 @@ export function useCoaches() {
       if (scRes.error) throw scRes.error;
 
       const today = todayInSg();
-      const sessions = toOverrideSessions((scRes.data ?? []) as any[], today);
+      const sessions = toOverrideSessions(scRes.data ?? [], today);
 
       if (sessions.length === 0) {
         if (!isStale()) setImpact([]);

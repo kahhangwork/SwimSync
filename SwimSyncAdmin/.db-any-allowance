@@ -7,8 +7,6 @@ app/(admin)/classes/domain/classRows.ts 2
 app/(admin)/classes/domain/useClassDrawer.ts 1
 app/(admin)/classes/domain/useClassList.ts 2
 app/(admin)/classes/domain/useRoster.ts 2
-app/(admin)/coaches/domain/coachesRows.ts 6
-app/(admin)/coaches/domain/useCoaches.ts 2
 app/(admin)/credit-notes/domain/creditNoteRows.ts 1
 app/(admin)/dashboard/domain/useDashboard.ts 2
 app/(admin)/history/domain/useHistory.ts 1

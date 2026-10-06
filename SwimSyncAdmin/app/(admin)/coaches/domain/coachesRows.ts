@@ -4,26 +4,27 @@
 
 import type { CoachRow } from "../types";
 import type { OverrideSession } from "./coachDisableImpact";
+import type { CoachSelectRow, SessionCoachRow } from "../dao/coaches.repo";
 
-export function toCoachRows(data: any[]): CoachRow[] {
-  return (data ?? []).map((c: any) => ({
+export function toCoachRows(data: CoachSelectRow[]): CoachRow[] {
+  return (data ?? []).map((c) => ({
     id: c.id,
     profile_id: c.profile_id,
     full_name: c.profiles?.full_name ?? "—",
     email: c.profiles?.email ?? "—",
     phone: c.profiles?.phone ?? null,
     class_titles: (c.classes ?? [])
-      .filter((cls: any) => cls.is_active)
-      .map((cls: any) => cls.title),
+      .filter((cls) => cls.is_active)
+      .map((cls) => cls.title),
     disabled_at: c.disabled_at ?? null,
   }));
 }
 
 // The ⚠ RISK 8 candidate set: the coach's override sessions on or before today
 // (only PAST/TODAY lessons can be unmarked and fall to the admin after disable).
-export function toOverrideSessions(scData: any[], today: string): OverrideSession[] {
+export function toOverrideSessions(scData: SessionCoachRow[], today: string): OverrideSession[] {
   return (scData ?? [])
-    .map((r: any) => {
+    .map((r) => {
       const ls = Array.isArray(r.lesson_sessions)
         ? r.lesson_sessions[0]
         : r.lesson_sessions;
