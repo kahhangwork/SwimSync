@@ -10,7 +10,7 @@ describe("mapClasses", () => {
     const rows = [
       { id: "c1", title: "Dolphins", day_of_week: 1, coach_id: "co1", is_active: true, coaches: { id: "co1", profiles: { full_name: "Ana" } } },
     ];
-    expect(mapClasses(rows)).toEqual([
+    expect(mapClasses(rows as any)).toEqual([ // loose fixture rows: pin the normalisers
       { id: "c1", title: "Dolphins", day_of_week: 1, coach_id: "co1", coach_name: "Ana", is_active: true },
     ]);
   });
@@ -20,7 +20,7 @@ describe("mapClasses", () => {
       { id: "c2", title: "Sharks", day_of_week: 3, coach_id: "co2", is_active: false, coaches: [{ id: "co2", profiles: [{ full_name: "Bo" }] }] },
       { id: "c3", title: "Rays", day_of_week: 5, coach_id: "co3", is_active: true, coaches: null },
     ];
-    const out = mapClasses(rows);
+    const out = mapClasses(rows as any); // array / null embeds: pin the Array.isArray normalisers
     expect(out[0].coach_name).toBe("Bo");
     expect(out[0].is_active).toBe(false);
     expect(out[1].coach_name).toBe("Unknown coach");

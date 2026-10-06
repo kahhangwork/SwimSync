@@ -9,12 +9,27 @@
 import { supabase } from "@/lib/supabase";
 import type { SessionCoachRow } from "@/lib/sessionRoster";
 
-/** Class + coach pickers. Inactive classes are included and labelled. */
-export async function loadPickerData(): Promise<{
-  classRows: unknown[];
-  coachRows: unknown[];
-  error: string | null;
-}> {
+// The picker rows, typed from each select. `coaches` / `profiles` are to-one
+// embeds RLS can null (§7.344), typed `| X[]` too because
+// domain/substituteRows.ts keeps its Array.isArray normalisers.
+type PickerData = Awaited<ReturnType<typeof loadPickerData>>;
+type ClassSelected = PickerData["classRows"][number];
+type CoachEmbedSelected = NonNullable<ClassSelected["coaches"]>;
+type ProfileSelected = NonNullable<CoachEmbedSelected["profiles"]>;
+type CoachEmbed = Omit<CoachEmbedSelected, "profiles"> & {
+  profiles: ProfileSelected | ProfileSelected[] | null;
+};
+export type PickerClassRow = Omit<ClassSelected, "coaches"> & {
+  coaches: CoachEmbed | CoachEmbed[] | null;
+};
+type CoachSelected = PickerData["coachRows"][number];
+export type PickerCoachRow = Omit<CoachSelected, "profiles"> & {
+  profiles: ProfileSelected | ProfileSelected[] | null;
+};
+
+/** Class + coach pickers. Inactive classes are included and labelled.
+ *  Return type inferred, so each row is typed from its select (Wave 8). */
+export async function loadPickerData() {
   const [{ data: classData, error: classErr }, { data: coachData, error: coachErr }] =
     await Promise.all([
       supabase

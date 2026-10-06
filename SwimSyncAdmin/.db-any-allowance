@@ -8,7 +8,6 @@ app/(admin)/invoices/domain/invoiceRows.ts 2
 app/(admin)/invoices/domain/undeliveredEmails.ts 1
 app/(admin)/invoices/domain/usePendingDebits.ts 1
 app/(admin)/platform/dao/platform.api.ts 1
-app/(admin)/substitutes/domain/substituteRows.ts 2
 app/accept-invite/dao/acceptInvite.repo.ts 1
 app/reset-password/dao/resetPassword.repo.ts 1
 components/Table.tsx 1

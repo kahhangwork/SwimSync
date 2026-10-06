@@ -1,4 +1,5 @@
 import type { DayOfWeek } from "@/lib/lessonDates";
+import type { PickerClassRow, PickerCoachRow } from "../dao/substitutes.repo";
 
 // Pure normalisation of the PostgREST picker rows, lifted verbatim from the
 // page's loadPickers so the nested-join flattening can be characterised alone.
@@ -16,8 +17,8 @@ export type Coach = { id: string; name: string };
 
 /** Flatten `classes(coaches(profiles(full_name)))` — PostgREST returns the
  *  embed as either an object or a one-element array depending on the relation. */
-export function mapClasses(rows: unknown[]): ClassRow[] {
-  return (rows as any[]).map((c) => {
+export function mapClasses(rows: PickerClassRow[]): ClassRow[] {
+  return rows.map((c) => {
     const coach = Array.isArray(c.coaches) ? c.coaches[0] : c.coaches;
     const prof = Array.isArray(coach?.profiles) ? coach.profiles[0] : coach?.profiles;
     return {
@@ -31,8 +32,8 @@ export function mapClasses(rows: unknown[]): ClassRow[] {
   });
 }
 
-export function mapCoaches(rows: unknown[]): Coach[] {
-  return (rows as any[]).map((c) => {
+export function mapCoaches(rows: PickerCoachRow[]): Coach[] {
+  return rows.map((c) => {
     const prof = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
     return { id: c.id, name: prof?.full_name ?? "Unknown coach" };
   });
