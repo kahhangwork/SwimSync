@@ -2,15 +2,15 @@
 // Child Profile screen's mapping already did when it moved out of the route file.
 // §7.25's prove-it-red rule does not apply — there is no fix, only a move. Each
 // guarded line was mutated once and a named case went red (playbook §5).
-import {
-  formatTime,
-  capitalize,
-  formatDate,
-  classesOf,
-  outstandingOf,
-  creditOf,
-  childDetailOf,
-} from "./childFormat";
+import { formatTime, capitalize, formatDate } from "./childFormat";
+import * as F from "./childFormat";
+
+// Loose fixtures on purpose (Wave 8): they feed string amounts and null embeds/balances
+// to pin every `??`/Number() fallback the typed rows no longer admit.
+const classesOf = (s: any) => F.classesOf(s);
+const outstandingOf = (r: any) => F.outstandingOf(r);
+const creditOf = (r: any) => F.creditOf(r);
+const childDetailOf = (...a: any[]) => (F.childDetailOf as (...x: any[]) => ReturnType<typeof F.childDetailOf>)(...a);
 
 const cls = (day: string, extra: object = {}) => ({
   day_of_week: day,

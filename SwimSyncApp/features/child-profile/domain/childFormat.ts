@@ -5,6 +5,12 @@
 import { formatSgStamp } from "@/lib/lessonDates";
 import type { GradeLevel } from "@/lib/skillProgress";
 import type { ChildDetail } from "../types";
+import type {
+  OutstandingInvoiceRow,
+  ParentBalancesRow,
+  SkillProgressRow,
+  StudentProfileRow,
+} from "../dao/childProfile.repo";
 
 export function formatTime(time: string | null): string | null {
   if (!time) return null;
@@ -31,11 +37,12 @@ export function formatDate(dateStr: string | null): string {
 
 /** Every ACTIVE enrolment with an embedded class, in PostgREST order (this
  *  screen never sorted them — unlike Home). */
-export function classesOf(student: any): ChildDetail["classes"] {
+export function classesOf(student: StudentProfileRow): ChildDetail["classes"] {
   return (student.student_class_enrolments ?? [])
-    .filter((e: any) => e.is_active && e.classes)
-    .map((e: any) => {
-      const cls: any = e.classes;
+    .filter((e) => e.is_active && e.classes)
+    .map((e) => {
+      // census: ui-cast (Wave 8) — the filter above keeps only rows WITH a class.
+      const cls = e.classes!;
       return {
         coach_name: cls?.coaches?.profiles?.full_name ?? null,
         day: cls?.day_of_week ?? null,
@@ -47,9 +54,9 @@ export function classesOf(student: any): ChildDetail["classes"] {
     });
 }
 
-export function outstandingOf(invoices: any[] | null): number {
+export function outstandingOf(invoices: OutstandingInvoiceRow[] | null): number {
   return (invoices ?? []).reduce(
-    (sum: number, inv: any) => sum + Number(inv.net_amount),
+    (sum: number, inv) => sum + Number(inv.net_amount),
     0
   );
 }
@@ -57,18 +64,18 @@ export function outstandingOf(invoices: any[] | null): number {
 // Sums whatever balance rows the read returned. The child profile's read is
 // already narrowed to the child's business, so this is that business's credit
 // (D5) — unlike Home's family-wide total (features/parent-home/domain/homeRows).
-export function creditOf(parentRecord: any): number {
-  return ((parentRecord as any)?.parent_tenant_balances ?? []).reduce(
-    (sum: number, b: any) => sum + Number(b.credit_balance ?? 0),
+export function creditOf(parentRecord: ParentBalancesRow | null): number {
+  return (parentRecord?.parent_tenant_balances ?? []).reduce(
+    (sum: number, b) => sum + Number(b.credit_balance ?? 0),
     0
   );
 }
 
 export function childDetailOf(
-  student: any,
+  student: StudentProfileRow,
   classes: ChildDetail["classes"],
-  scaleRows: any[] | null,
-  progressRows: any[] | null,
+  scaleRows: GradeLevel[] | null,
+  progressRows: SkillProgressRow[] | null,
   outstandingAmount: number,
   creditBalance: number
 ): ChildDetail {
@@ -77,19 +84,19 @@ export function childDetailOf(
     full_name: student.full_name,
     date_of_birth: student.date_of_birth,
     gender: student.gender,
-    // Cast because supabase-js infers a to-one embed as an ARRAY without an
-    // !inner hint. Read off tenant_levels, not off the student (§7.28).
-    level_label: (student as any).tenant_levels?.label ?? null,
-    level_note: (student as any).tenant_levels?.note ?? null,
+    // Read off tenant_levels, not off the student (§7.28). An object or null (RLS),
+    // typed from the select since Wave 8 — the old `as any` is gone.
+    level_label: student.tenant_levels?.label ?? null,
+    level_note: student.tenant_levels?.note ?? null,
     // Kept unsorted here — summariseSkillProgress orders by sort_order/label at
     // render. Carry the id so grades can be paired to each skill.
-    level_skills: ((student as any).tenant_levels?.tenant_level_skills ?? []).map(
-      (sk: any) => ({ id: sk.id, label: sk.label, sort_order: sk.sort_order })
+    level_skills: (student.tenant_levels?.tenant_level_skills ?? []).map(
+      (sk) => ({ id: sk.id, label: sk.label, sort_order: sk.sort_order })
     ),
     skill_grades: Object.fromEntries(
-      ((progressRows as any[]) ?? []).map((p) => [p.skill_id, p.grade_level_id])
+      (progressRows ?? []).map((p) => [p.skill_id, p.grade_level_id])
     ),
-    scale: (scaleRows as GradeLevel[]) ?? [],
+    scale: scaleRows ?? [],
     notes: student.notes,
     assignment_status: student.assignment_status,
     is_active: student.is_active,

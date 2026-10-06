@@ -63,7 +63,7 @@ export function useChildProfile() {
       // This child belongs to ONE business, so both figures are that business's:
       // what the family owes it (siblings there included) and the credit the
       // family holds there. The home card is the family-wide total, on purpose.
-      const tenantId = (student as any).tenant_id;
+      const tenantId = student.tenant_id;
 
       const { data: invoices } = await fetchOutstandingInvoices(
         parentStudentLink.parent_id,
@@ -85,7 +85,7 @@ export function useChildProfile() {
     // otherwise pull both scales and their ranks would collide. Read-only here;
     // the coach does the grading.
     const [{ data: scaleRows }, { data: progressRows }] = await Promise.all([
-      fetchGradeScale((student as any).tenant_id),
+      fetchGradeScale(student.tenant_id),
       fetchSkillProgress(id),
     ]);
 
@@ -94,7 +94,7 @@ export function useChildProfile() {
         student,
         classes,
         scaleRows as GradeLevel[] | null,
-        progressRows as any[] | null,
+        progressRows,
         outstandingAmount,
         creditBalance
       )

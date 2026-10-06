@@ -6,8 +6,6 @@ features/add-child/domain/useAddChild.ts 1
 features/billing/domain/billingFormat.ts 9
 features/billing/domain/useBilling.ts 1
 features/billing/domain/useReferral.ts 3
-features/child-profile/domain/childFormat.ts 17
-features/child-profile/domain/useChildProfile.ts 3
 features/coach-classes/domain/classesFormat.ts 3
 features/coach-pay/domain/useMyPay.ts 2
 features/coach-settings/domain/useCoachSettings.ts 1

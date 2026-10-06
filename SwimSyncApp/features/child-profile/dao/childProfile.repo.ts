@@ -4,6 +4,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 
 export const fetchStudentProfile = (id: string) =>
   supabase
@@ -76,3 +77,21 @@ export const fetchSkillProgress = (id: string) =>
     .from("student_skill_progress")
     .select("skill_id, grade_level_id")
     .eq("student_id", id);
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// Every to-one embed here is a LEFT join RLS can null (§7.344): tenant_levels,
+// an enrolment's classes, the class's locations and coaches, the coach's profiles.
+type StudentData = DataOf<typeof fetchStudentProfile>;
+type EnrolmentData = StudentData["student_class_enrolments"][number];
+type ClassData = NonNullable<EnrolmentData["classes"]>;
+type CoachData = NonNullable<ClassData["coaches"]>;
+export type ProfileClassRow = Omit<RlsNullable<ClassData, "locations">, "coaches"> & {
+  coaches: RlsNullable<CoachData, "profiles"> | null;
+};
+export type ProfileEnrolmentRow = Omit<EnrolmentData, "classes"> & { classes: ProfileClassRow | null };
+export type StudentProfileRow = Omit<RlsNullable<StudentData, "tenant_levels">, "student_class_enrolments"> & {
+  student_class_enrolments: ProfileEnrolmentRow[];
+};
+export type OutstandingInvoiceRow = DataOf<typeof fetchOutstandingInvoices>[number];
+export type ParentBalancesRow = DataOf<typeof fetchParentBalances>;
+export type SkillProgressRow = DataOf<typeof fetchSkillProgress>[number];
