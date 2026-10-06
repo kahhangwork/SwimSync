@@ -31,6 +31,7 @@ import {
   fetchTrialBookings,
   fetchMakeupBookings,
 } from "../dao/schedule.repo";
+import type { BookingRow, ScheduleClassRow, WindowSessionRow } from "../dao/schedule.repo";
 import { fetchMarkableFloor, fetchCoveredOutSessions } from "../dao/schedule.rpc";
 import type { WeekLesson, BacklogItem } from "../types";
 import {
@@ -129,7 +130,7 @@ export function useScheduleLoad({
     if (!current()) return;
 
     const ownedClasses = classesRes.data ?? [];
-    const ownedClassIds = new Set(ownedClasses.map((c: any) => c.id as string));
+    const ownedClassIds = new Set(ownedClasses.map((c) => c.id as string));
     const assignments = parseAssignments(rosterRes.data);
     const assignmentByLesson = assignmentsByLesson(assignments);
     const rosteredDates = rosteredDatesByClass(assignments);
@@ -144,7 +145,7 @@ export function useScheduleLoad({
     const coveredRes =
       coveredClassIds.length > 0
         ? await fetchCoveredClasses(coveredClassIds)
-        : { data: [] as any[] };
+        : { data: [] as ScheduleClassRow[] };
     if (!current()) return;
 
     // ── (c) THE CLASSES I SHADOW ──────────────────────────────────────────
@@ -161,7 +162,7 @@ export function useScheduleLoad({
     const shadowRes =
       shadowClassIds.length > 0
         ? await fetchShadowedClasses(shadowClassIds)
-        : { data: [] as any[] };
+        : { data: [] as ScheduleClassRow[] };
     if (!current()) return;
 
     const shadowedClassIds = new Set(shadowClassIds);
@@ -171,7 +172,7 @@ export function useScheduleLoad({
 
     const sessionsRes = classIds.length > 0
       ? await fetchWindowSessions(classIds, rangeStart, rangeEnd)
-      : { data: [] as any[] };
+      : { data: [] as WindowSessionRow[] };
     const windowSessions = sessionsRes.data ?? [];
 
     const { sessionByClassDate, sessionDatesByClass } = sessionIndex(windowSessions);
@@ -195,10 +196,10 @@ export function useScheduleLoad({
     const [bookingsRes, makeupsRes] = await Promise.all([
       classIds.length > 0
         ? fetchTrialBookings(classIds, rangeStart, rangeEnd)
-        : Promise.resolve({ data: [] as any[] }),
+        : Promise.resolve({ data: [] as BookingRow[] }),
       classIds.length > 0
         ? fetchMakeupBookings(classIds, rangeStart, rangeEnd)
-        : Promise.resolve({ data: [] as any[] }),
+        : Promise.resolve({ data: [] as BookingRow[] }),
     ]);
     const bookingRows = bookingsRes.data ?? [];
     const makeupRows = makeupsRes.data ?? [];

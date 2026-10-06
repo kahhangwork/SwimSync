@@ -4,6 +4,13 @@
 // the returns are new. NO CLOCK here: nothing reads the date or the time.
 import type { DbStatus } from "@/lib/attendanceSummary";
 import { ROW_LIMIT } from "../constants";
+import type {
+  BookingRow,
+  RosterRow,
+  ScheduleClassRow,
+  ShadowAssignmentRow,
+  WindowSessionRow,
+} from "../dao/schedule.repo";
 
 /** The classes I am covering INTO — see the covered-classes read in loadData. */
 export function coveredClassIdsOf(
@@ -17,34 +24,34 @@ export function coveredClassIdsOf(
 
 /** The classes I shadow, minus any I own or cover (a class appears once). */
 export function shadowClassIdsOf(
-  shadowRows: any[] | null,
+  shadowRows: ShadowAssignmentRow[] | null,
   ownedClassIds: Set<string>,
   coveredClassIds: string[]
 ): string[] {
   return [
-    ...new Set((shadowRows ?? []).map((r: any) => r.class_id as string)),
+    ...new Set((shadowRows ?? []).map((r) => r.class_id as string)),
   ].filter((id) => !ownedClassIds.has(id) && !coveredClassIds.includes(id));
 }
 
-export type CoachClass = { cls: any; owned: boolean; shadowed: boolean };
+export type CoachClass = { cls: ScheduleClassRow; owned: boolean; shadowed: boolean };
 
 export function coachClassesOf(
-  ownedClasses: any[],
-  coveredRes: { data: any[] | null },
-  shadowRes: { data: any[] | null },
+  ownedClasses: ScheduleClassRow[],
+  coveredRes: { data: ScheduleClassRow[] | null },
+  shadowRes: { data: ScheduleClassRow[] | null },
   shadowedClassIds: Set<string>
 ): CoachClass[] {
   /** Every class a card can come from, each carrying whether it is mine and
    *  whether I merely shadow it. The two flags are never both true — the
    *  database refuses a shadow assignment on a class the coach owns. */
-  const coachClasses: { cls: any; owned: boolean; shadowed: boolean }[] = [
-    ...ownedClasses.map((cls: any) => ({ cls, owned: true, shadowed: false })),
-    ...((coveredRes.data ?? []) as any[]).map((cls: any) => ({
+  const coachClasses: { cls: ScheduleClassRow; owned: boolean; shadowed: boolean }[] = [
+    ...ownedClasses.map((cls) => ({ cls, owned: true, shadowed: false })),
+    ...(coveredRes.data ?? []).map((cls) => ({
       cls,
       owned: false,
       shadowed: false,
     })),
-    ...((shadowRes.data ?? []) as any[]).map((cls: any) => ({
+    ...(shadowRes.data ?? []).map((cls) => ({
       cls,
       owned: false,
       shadowed: shadowedClassIds.has(cls.id),
@@ -62,7 +69,7 @@ export type SessionInfo = {
   statusByStudent: Map<string, DbStatus>;
 };
 
-export function sessionIndex(windowSessions: any[]): {
+export function sessionIndex(windowSessions: WindowSessionRow[]): {
   sessionByClassDate: Map<string, SessionInfo>;
   sessionDatesByClass: Map<string, string[]>;
 } {
@@ -85,15 +92,15 @@ export function sessionIndex(windowSessions: any[]): {
   // (its datesToCheck unions existing session dates), so the month would
   // stall with nothing anywhere saying why.
   const sessionDatesByClass = new Map<string, string[]>();
-  windowSessions.forEach((s: any) => {
+  windowSessions.forEach((s) => {
     sessionByClassDate.set(`${s.class_id}:${s.session_date}`, {
       id: s.id,
       cancelled: s.cancelled_at != null,
       markedStudentIds: new Set(
-        (s.attendance ?? []).map((a: any) => a.student_id)
+        (s.attendance ?? []).map((a) => a.student_id)
       ),
       statusByStudent: new Map(
-        (s.attendance ?? []).map((a: any) => [a.student_id, a.status])
+        (s.attendance ?? []).map((a) => [a.student_id, a.status])
       ),
     });
     const dates = sessionDatesByClass.get(s.class_id as string) ?? [];
@@ -104,8 +111,8 @@ export function sessionIndex(windowSessions: any[]): {
 }
 
 export function bookedIndex(
-  bookingRows: any[],
-  makeupRows: any[]
+  bookingRows: BookingRow[],
+  makeupRows: BookingRow[]
 ): Map<string, Map<string, string[]>> {
   const bookedByClassDate = new Map<string, Map<string, string[]>>();
   for (const b of [...bookingRows, ...makeupRows]) {
@@ -128,10 +135,10 @@ export function isTruncated({
   makeupRows,
   rosterRes,
 }: {
-  windowSessions: any[];
-  bookingRows: any[];
-  makeupRows: any[];
-  rosterRes: { data: any[] | null };
+  windowSessions: WindowSessionRow[];
+  bookingRows: BookingRow[];
+  makeupRows: BookingRow[];
+  rosterRes: { data: RosterRow[] | null };
 }): boolean {
   return (
     windowSessions.length >= ROW_LIMIT ||

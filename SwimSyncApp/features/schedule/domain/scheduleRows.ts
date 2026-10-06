@@ -79,7 +79,7 @@ export function buildSchedule({
     // Who must be marked is a question about the LESSON'S date — a child who
     // joined last week was not expected at last month's lessons. See
     // EnrolmentSpan in lib/attendanceCompleteness.ts.
-    const enrolmentSpans: EnrolmentSpan[] = enrolments.map((e: any) => ({
+    const enrolmentSpans: EnrolmentSpan[] = enrolments.map((e) => ({
       studentId: e.student_id as string,
       from: toSgDate(e.enrolled_at),
       until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,

@@ -11,7 +11,7 @@ import {
 } from "./scheduleIndex";
 import { ROW_LIMIT } from "../constants";
 
-const rows = (n: number) => Array.from({ length: n }, () => ({}));
+const rows = (n: number): any[] => Array.from({ length: n }, () => ({}));
 
 describe("scheduleIndex (characterisation)", () => {
   it("coveredClassIdsOf: rostered classes I do not own", () => {
@@ -20,12 +20,12 @@ describe("scheduleIndex (characterisation)", () => {
 
   it("shadowClassIdsOf: deduped, minus owned and covered; null rows -> []", () => {
     const shadow = [{ class_id: "a" }, { class_id: "c" }, { class_id: "c" }, { class_id: "b" }];
-    expect(shadowClassIdsOf(shadow, new Set(["a"]), ["b"])).toEqual(["c"]);
+    expect(shadowClassIdsOf(shadow as any, new Set(["a"]), ["b"])).toEqual(["c"]);
     expect(shadowClassIdsOf(null, new Set(), [])).toEqual([]);
   });
 
   it("coachClassesOf: owned, then covered, then shadowed — flags per source; null data -> skipped", () => {
-    const out = coachClassesOf([{ id: "o" }], { data: [{ id: "c" }] }, { data: [{ id: "s" }] }, new Set(["s"]));
+    const out = coachClassesOf([{ id: "o" }] as any, { data: [{ id: "c" }] as any }, { data: [{ id: "s" }] as any }, new Set(["s"]));
     expect(out.map((c) => [c.cls.id, c.owned, c.shadowed])).toEqual([
       ["o", true, false],
       ["c", false, false],
@@ -38,7 +38,7 @@ describe("scheduleIndex (characterisation)", () => {
     const { sessionByClassDate, sessionDatesByClass } = sessionIndex([
       { id: "x", class_id: "c1", session_date: "2026-09-14", cancelled_at: "2026-09-10T00:00:00+08:00", attendance: [{ student_id: "s1", status: "absent" }] },
       { id: "y", class_id: "c1", session_date: "2026-09-21", cancelled_at: null, attendance: null },
-    ]);
+    ] as any);
     const x = sessionByClassDate.get("c1:2026-09-14")!;
     expect([x.id, x.cancelled, [...x.markedStudentIds], x.statusByStudent.get("s1")]).toEqual(["x", true, ["s1"], "absent"]);
     expect(sessionByClassDate.get("c1:2026-09-21")!.markedStudentIds.size).toBe(0);
@@ -54,7 +54,7 @@ describe("scheduleIndex (characterisation)", () => {
   });
 
   it("9. isTruncated: each leg alone AT the limit trips it; one below does not; a null roster does not throw", () => {
-    const none = { windowSessions: [], bookingRows: [], makeupRows: [], rosterRes: { data: [] } };
+    const none = { windowSessions: [] as any[], bookingRows: [] as any[], makeupRows: [] as any[], rosterRes: { data: [] as any[] | null } };
     expect(isTruncated(none)).toBe(false);
     expect(isTruncated({ ...none, windowSessions: rows(ROW_LIMIT) })).toBe(true);
     expect(isTruncated({ ...none, bookingRows: rows(ROW_LIMIT) })).toBe(true);

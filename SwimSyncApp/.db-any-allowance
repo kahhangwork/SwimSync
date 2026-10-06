@@ -24,9 +24,6 @@ features/parent-attendance/ui/HistoryList.tsx 1
 features/parent-home/domain/homeRows.ts 11
 features/paynow/domain/embeddedTenant.ts 1
 features/roster/domain/rosterRows.ts 34
-features/schedule/domain/scheduleIndex.ts 22
-features/schedule/domain/scheduleRows.ts 1
-features/schedule/domain/useScheduleLoad.ts 6
 features/schedule/ui/ProgressChip.tsx 1
 lib/coachRoster.ts 1
 lib/payoutBreakdown.ts 1

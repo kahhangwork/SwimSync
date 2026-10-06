@@ -12,6 +12,7 @@
 // dao/ is transport only (fence check 2).
 
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 import { ROW_LIMIT, CLASS_SELECT } from "../constants";
 
 type Coach = { id: string };
@@ -86,3 +87,12 @@ export const fetchMakeupBookings = (classIds: string[], rangeStart: string, rang
     .gte("session_date", rangeStart)
     .lte("session_date", rangeEnd)
     .limit(ROW_LIMIT);
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// `locations` is a LEFT to-one embed: RLS can null it (§7.344). `lesson_sessions`
+// in the roster read is `!inner`, so it is never null — the row is dropped instead.
+export type ScheduleClassRow = RlsNullable<DataOf<typeof fetchOwnedClasses>[number], "locations">;
+export type RosterRow = DataOf<typeof fetchRosterRows>[number];
+export type ShadowAssignmentRow = DataOf<typeof fetchShadowAssignments>[number];
+export type WindowSessionRow = DataOf<typeof fetchWindowSessions>[number];
+export type BookingRow = DataOf<typeof fetchTrialBookings>[number] | DataOf<typeof fetchMakeupBookings>[number];

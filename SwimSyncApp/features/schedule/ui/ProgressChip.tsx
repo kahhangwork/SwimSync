@@ -29,7 +29,7 @@ export function ProgressChip({ progress }: { progress: LessonProgress }) {
 
   return (
     <View className={`flex-row items-center gap-1 rounded-full px-2.5 py-1 ${tone.bg}`}>
-      <Ionicons name={tone.icon as any} size={12} color={tone.hex} />
+      <Ionicons name={tone.icon as any /* db-any-ok: icon */} size={12} color={tone.hex} />
       <Text className={`text-xs font-semibold ${tone.fg}`}>
         {progressLabel(progress)}
       </Text>
