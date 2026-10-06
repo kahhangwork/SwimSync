@@ -64,7 +64,7 @@ export function useStudentList() {
     }
     setLoadError(null);
     setCapped((data ?? []).length >= ROW_LIMIT);
-    setStudents((data ?? []).map((s: any) => toStudentRow(s, lessonCount)));
+    setStudents((data ?? []).map((s) => toStudentRow(s, lessonCount)));
     setLoading(false);
   }
 

@@ -27,10 +27,10 @@ export function usePackageSettings() {
     // SILENT path (pre-existing): signed out → `id=eq.undefined` 400s → `prof` is null
     // → the default thresholds above stay, with no message.
     const { data: prof } = await repo.fetchTenantPackageSettings(userRes.user?.id!);
-    setTenantId((prof as any)?.tenant_id ?? null);
-    const stored = (prof as any)?.tenants?.low_package_lessons;
+    setTenantId(prof?.tenant_id ?? null);
+    const stored = prof?.tenants?.low_package_lessons;
     if (stored !== null && stored !== undefined) setThreshold(String(stored));
-    const storedDays = (prof as any)?.tenants?.package_expiry_warning_days;
+    const storedDays = prof?.tenants?.package_expiry_warning_days;
     if (storedDays !== null && storedDays !== undefined)
       setExpiryDays(String(storedDays));
 

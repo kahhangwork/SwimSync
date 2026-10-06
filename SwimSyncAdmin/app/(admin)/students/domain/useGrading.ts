@@ -72,7 +72,7 @@ export function useGrading(reload: () => Promise<void>) {
     }
 
     setGradeLevels(
-      (levelsRes.data ?? []).map((l: any) => ({
+      (levelsRes.data ?? []).map((l) => ({
         id: l.id,
         label: l.label,
         sort_order: l.sort_order,
@@ -85,7 +85,7 @@ export function useGrading(reload: () => Promise<void>) {
         id: student.id,
         full_name: student.full_name,
         level_id: student.level_id,
-        progress: (progRes.data ?? []) as any,
+        progress: progRes.data ?? [],
       },
     ]);
     setGradeLoading(false);

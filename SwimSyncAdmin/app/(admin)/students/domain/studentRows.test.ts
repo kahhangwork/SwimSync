@@ -69,7 +69,7 @@ describe("toStudentRow", () => {
         classes: { id: "c-mon", title: "Mon 9am", day_of_week: "monday", start_time: "09:00:00", coaches: null },
       },
     ],
-  };
+  } as any; // partial rows (c-old has no coaches key): pin the `?.` fallbacks
 
   it("reads level and parent off the JOINED rows (§7.28)", () => {
     const r = toStudentRow(row, new Map());

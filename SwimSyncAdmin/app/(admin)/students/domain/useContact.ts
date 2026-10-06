@@ -17,6 +17,7 @@
 import { useRef, useState } from "react";
 import { blankToNull } from "@/lib/sgPhone";
 import * as repo from "../dao/students.repo";
+import type { ContactParentRow, ContactSelectRow } from "../dao/students.repo";
 import type { StudentRow } from "../types";
 
 export type ContactParent = {
@@ -83,10 +84,10 @@ export function useContact() {
       return;
     }
 
-    const row = data as any;
+    const row: ContactSelectRow = data;
     const parents = (row.parent_students ?? [])
-      .map((ps: any) => ps.parents)
-      .filter(Boolean);
+      .map((ps) => ps.parents)
+      .filter(Boolean) as ContactParentRow[]; // census: ui-cast (Wave 8) — `.filter(Boolean)` drops the RLS-hidden parents; TS does not narrow through it
     const claimed = parents.length > 0;
     setContactClaimed(claimed);
 
@@ -96,7 +97,7 @@ export function useContact() {
       // blank (§7.28) — which reads as "this family gave us nothing" when they
       // gave us everything. The UI driver asserts the exact seeded strings.
       setContactParents(
-        parents.map((p: any) => ({
+        parents.map((p) => ({
           full_name: p.profiles?.full_name ?? null,
           email: p.profiles?.email ?? null,
           phone: p.profiles?.phone ?? null,

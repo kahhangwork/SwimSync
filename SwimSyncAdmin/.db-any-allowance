@@ -26,11 +26,6 @@ app/(admin)/platform/domain/useFamilyStatus.ts 1
 app/(admin)/platform/domain/useStudentMove.ts 2
 app/(admin)/referrals/domain/referralRows.ts 6
 app/(admin)/referrals/domain/useReferrals.ts 3
-app/(admin)/students/domain/studentRows.ts 3
-app/(admin)/students/domain/useContact.ts 3
-app/(admin)/students/domain/useGrading.ts 2
-app/(admin)/students/domain/usePackageSettings.ts 3
-app/(admin)/students/domain/useStudentList.ts 1
 app/(admin)/substitutes/domain/substituteRows.ts 2
 app/(admin)/trials/domain/trialRows.ts 11
 app/(admin)/trials/domain/useTrials.ts 2

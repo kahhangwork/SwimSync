@@ -9,6 +9,7 @@
 import { formatTime } from "@/lib/utils";
 import { WEEKDAY_ORDER } from "../constants";
 import type { EnrolledClass, StudentRow } from "../types";
+import type { StudentSelectRow } from "../dao/students.repo";
 
 /** Lessons per child, for duplicate detection: a merge must keep the row
  *  holding the history, and merge_students() refuses the other direction
@@ -23,21 +24,23 @@ export function countLessons(att: { student_id: string }[] | null): Map<string, 
 
 /**
  * One PostgREST row from `fetchStudents` → the shape the table renders.
- * `s` is `any` because the select is a string; every nesting read below is a
- * §7.28 hazard — read off the JOINED row, never the student.
+ * Every nesting read below is a §7.28 hazard — read off the JOINED row, never
+ * the student. (Typed from the select since Wave 8, so a wrong level is now a
+ * compile error.)
  */
-export function toStudentRow(s: any, lessonCount: Map<string, number>): StudentRow {
+export function toStudentRow(s: StudentSelectRow, lessonCount: Map<string, number>): StudentRow {
   // ALL of them, weekday-ordered — not `.find()`. The chips are the only
   // place the admin can see that a child is in more than one class, so a
   // first-match read here would hide the state this whole wave creates.
   const classes: EnrolledClass[] = (s.student_class_enrolments ?? [])
-    .filter((e: any) => e.is_active && e.classes)
-    .map((e: any) => ({
-      id: e.classes.id,
-      title: e.classes.title,
-      coach_name: e.classes.coaches?.profiles?.full_name ?? null,
-      day: e.classes.day_of_week ?? null,
-      start: e.classes.start_time ? formatTime(e.classes.start_time) : null,
+    .filter((e) => e.is_active && e.classes)
+    // `!`: guarded by the filter above, which drops every enrolment whose class is hidden.
+    .map((e) => ({
+      id: e.classes!.id,
+      title: e.classes!.title,
+      coach_name: e.classes!.coaches?.profiles?.full_name ?? null,
+      day: e.classes!.day_of_week ?? null,
+      start: e.classes!.start_time ? formatTime(e.classes!.start_time) : null,
     }))
     .sort(
       (a: EnrolledClass, b: EnrolledClass) =>

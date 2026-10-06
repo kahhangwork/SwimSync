@@ -19,6 +19,31 @@ import type { StrokeCell } from "@/lib/assessment";
 import { ilikeContains } from "@/lib/tableSearch";
 import { ROW_LIMIT } from "../constants";
 import type { SearchField } from "../types";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// ── The rows the reads return ────────────────────────────────────────────────
+// Every to-one embed is widened to `| null` — RLS nulls a hidden embed whatever
+// the generated type says (§7.344) — and domain/ keeps its `?.` / `??` / filter
+// on each. (fetchStudents' select interpolates one of two literal embeds, so
+// supabase-js still parses it: a union of literals, not a GenericStringError.)
+type StudentSelected = DataOf<typeof fetchStudents>[number];
+type EnrolmentSelected = StudentSelected["student_class_enrolments"][number];
+type ClassSelected = NonNullable<EnrolmentSelected["classes"]>;
+type ClassEmbed = Omit<ClassSelected, "coaches"> & {
+  coaches: RlsNullable<NonNullable<ClassSelected["coaches"]>, "profiles"> | null;
+};
+type ParentLinkSelected = StudentSelected["parent_students"][number];
+type ParentEmbed = RlsNullable<NonNullable<ParentLinkSelected["parents"]>, "profiles">;
+export type StudentSelectRow = Omit<StudentSelected, "student_class_enrolments" | "parent_students"> & {
+  student_class_enrolments: (Omit<EnrolmentSelected, "classes"> & { classes: ClassEmbed | null })[];
+  parent_students: { parents: ParentEmbed | null }[];
+};
+type ContactSelected = DataOf<typeof fetchStudentContact>;
+type ContactParent = NonNullable<ContactSelected["parent_students"][number]["parents"]>;
+export type ContactParentRow = RlsNullable<ContactParent, "profiles">;
+export type ContactSelectRow = Omit<ContactSelected, "parent_students"> & {
+  parent_students: { parents: ContactParentRow | null }[];
+};
 
 // ── Session ─────────────────────────────────────────────────────────────────
 
