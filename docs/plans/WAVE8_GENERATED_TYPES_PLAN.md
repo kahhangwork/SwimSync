@@ -279,7 +279,7 @@ intended behaviour, the row is reclassified type-only and the code is NOT change
 
 | # | File:line | What the types revealed | What the user sees today (reproduced) | Type-only / bug (runtime-identity verdict) | Test that fails without fix | `--only` driver | Commit |
 |---|---|---|---|---|---|---|---|
-| 1 | `SwimSyncApp/features/contact/dao/contact.repo.ts:13` | id may be `undefined` in a filter | to reproduce in F0 | to classify in F0 | | `contact-details` | |
+| 1 | `SwimSyncApp/features/contact/dao/contact.repo.ts:13` (+ :20, :30, :39) | id may be `undefined` in a filter | **Nothing wrong, reproduced on UNFIXED code:** without an id the load never runs, `ready` stays false and `contact.tsx` shows only its spinner, so the form and Save never render. A Save forced without an id gets PostgREST `400 22P02 invalid input syntax for type uuid: "undefined"` (real probe, GET + PATCH) → toast "Could not save your details." — never a silent save | **Type-only — RECLASSIFIED, code behaviour unchanged.** Runtime-identity exit 0 (`fe0547d → 13c2ff8`). Repo params → `string`; Save passes `session?.id!` beside a comment naming the guard | `features/contact/domain/useContactDetails.test.ts` (3 tests; pins the behaviour above, green on unfixed and typed code — a reclassified row has no failing test by definition) | `contact-details` (to run before F0 merges) | `13c2ff8` |
 
 ## Definition of done
 
