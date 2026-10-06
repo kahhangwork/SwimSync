@@ -111,8 +111,18 @@ type OptionalKeys<I, K extends PropertyKey> = Flatten<
     [P in keyof I as P extends K ? P : never]?: I[P] | null;
   }
 >;
+// Columns one trigger fills TOGETHER: send all of them (non-null) or none.
+// fill_lesson_session_times overwrites BOTH times when EITHER is NULL, so a lone
+// start_time would be silently replaced by the class's (independent review, Wave 8).
+type FilledTogether = { lesson_sessions: "start_time" | "end_time" };
+type AllOrNone<I, K extends keyof I> =
+  | { [P in K]-?: NonNullable<I[P]> }
+  | { [P in K]?: null };
 type InsertOf<T extends keyof GeneratedTables> = T extends keyof TriggerFilled
-  ? OptionalKeys<GeneratedTables[T]["Insert"], TriggerFilled[T][number]>
+  ? T extends keyof FilledTogether
+    ? Flatten<Omit<OptionalKeys<GeneratedTables[T]["Insert"], TriggerFilled[T][number]>, FilledTogether[T]>> &
+        AllOrNone<GeneratedTables[T]["Insert"], FilledTogether[T] & keyof GeneratedTables[T]["Insert"]>
+    : OptionalKeys<GeneratedTables[T]["Insert"], TriggerFilled[T][number]>
   : GeneratedTables[T]["Insert"];
 
 /** The schema every client is typed with: the generated one, widened as above. */
