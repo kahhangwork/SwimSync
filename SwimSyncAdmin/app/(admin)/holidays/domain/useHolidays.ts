@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
 import { parseHolidaysCsv } from "./holidaysCsv";
 import { buildVoidCounts, clampExtDays } from "./holidayRows";
 import {
@@ -103,10 +104,13 @@ export function useHolidays() {
     if (!newName.trim()) return setFormError("Give the holiday a name.");
     setBusy(true);
     setFormError(null);
-    const tenant_id = (await myTenantId())!;
-    // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-    // A caller with no tenant (signed out; no CHECK ties tenant_admin to a tenant_id)
-    // sends NULL → 23502/RLS refuses the insert → "Could not add that holiday."
+    const tenant_id = await myTenantId();
+    // No business (signed out; no CHECK ties tenant_admin to a tenant_id): say so
+    // and send nothing — never a NULL tenant the database refuses (Wave 8).
+    if (!tenant_id) {
+      setBusy(false);
+      return setFormError(NO_TENANT_MESSAGE);
+    }
     // Pass the date string straight through — never a re-formatted Date (§7.7).
     const { code, error: err } = await insertHoliday(tenant_id, newDate, newName.trim());
     setBusy(false);
@@ -142,9 +146,13 @@ export function useHolidays() {
 
     let added = 0;
     if (rows.length > 0) {
-      const tenant_id = (await myTenantId())!;
-      // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-      // No tenant → NULL rows → 23502/RLS refuses the upsert → "Could not import that file."
+      const tenant_id = await myTenantId();
+      // No business: say so and send nothing (Wave 8 — was a NULL-tenant upsert).
+      if (!tenant_id) {
+        setBusy(false);
+        setError(NO_TENANT_MESSAGE);
+        return;
+      }
       const { count, error: err } = await upsertHolidays(
         rows.map((r) => ({ tenant_id, holiday_date: r.date, name: r.name }))
       );
