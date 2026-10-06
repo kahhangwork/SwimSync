@@ -2,18 +2,20 @@
 // parent Attendance tab's row mappings already did when they moved out of the
 // route file. §7.25's prove-it-red rule does not apply — there is no fix, only a
 // move. Each guarded line was mutated once and a named case went red (playbook §5).
-import {
-  matchesFilter,
-  timeLabel,
-  childrenOf,
-  recordsOf,
-  activeClassesOf,
-  hasExpectedLessonOf,
-  enrolmentInputsOf,
-  makeupInputsOf,
-  extraInputsOf,
-  cancelledInputsOf,
-} from "./attendanceFormat";
+import { matchesFilter, timeLabel } from "./attendanceFormat";
+import * as F from "./attendanceFormat";
+
+// Loose fixtures on purpose (Wave 8): array-shaped and null embeds, missing keys and
+// null days pin every normaliser and `??` the typed rows no longer admit.
+const loose = <A extends unknown[], R>(fn: (...a: A) => R) => fn as unknown as (...a: any[]) => R;
+const childrenOf = loose(F.childrenOf);
+const recordsOf = loose(F.recordsOf);
+const activeClassesOf = loose(F.activeClassesOf);
+const hasExpectedLessonOf = loose(F.hasExpectedLessonOf);
+const enrolmentInputsOf = loose(F.enrolmentInputsOf);
+const makeupInputsOf = loose(F.makeupInputsOf);
+const extraInputsOf = loose(F.extraInputsOf);
+const cancelledInputsOf = loose(F.cancelledInputsOf);
 
 describe("attendanceFormat (characterisation)", () => {
   it("matchesFilter: each chip's statuses; All matches everything", () => {
@@ -50,7 +52,7 @@ describe("attendanceFormat (characterisation)", () => {
     const cls = (day: string | null) => ({ day_of_week: day, id: "c", title: "T" });
     // 2026-09-05 is a Saturday.
     const due = activeClassesOf([{ enrolled_at: "2026-08-01T00:00:00+08:00", classes: [cls("saturday")] }]);
-    expect(due[0].cls.day_of_week).toBe("saturday"); // array embed normalised
+    expect(due[0].cls?.day_of_week).toBe("saturday"); // array embed normalised
     expect(hasExpectedLessonOf(due, "2026-09-05")).toBe(true);
     const joinedToday = activeClassesOf([{ enrolled_at: "2026-09-06T00:00:00+08:00", classes: cls("saturday") }]);
     expect(hasExpectedLessonOf(joinedToday, "2026-09-06")).toBe(false);

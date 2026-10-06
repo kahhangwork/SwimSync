@@ -5,6 +5,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 
 type Session = { id: string };
 
@@ -83,3 +84,17 @@ export const fetchUpcomingCancelled = (classIds: string[], today: string, horizo
     .in("class_id", classIds)
     .gte("session_date", today)
     .lte("session_date", horizon);
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// Every to-one embed is a LEFT join RLS can null (§7.344) and is widened `| null`.
+type AttendanceData = DataOf<typeof fetchAttendance>[number];
+type LessonData = NonNullable<AttendanceData["lesson_sessions"]>;
+export type ChildLinkRow = RlsNullable<DataOf<typeof fetchChildLinks>[number], "students">;
+export type ChildAttendanceRow = Omit<AttendanceData, "lesson_sessions"> & {
+  lesson_sessions: RlsNullable<LessonData, "classes"> | null;
+};
+export type ActiveEnrolmentRow = RlsNullable<DataOf<typeof fetchActiveEnrolments>[number], "classes">;
+export type HolidayRow = DataOf<typeof fetchUpcomingHolidays>[number];
+export type MakeupRow = RlsNullable<DataOf<typeof fetchUpcomingMakeups>[number], "classes">;
+export type ExtraLessonRow = RlsNullable<DataOf<typeof fetchUpcomingExtras>[number], "classes">;
+export type CancelledLessonRow = RlsNullable<DataOf<typeof fetchUpcomingCancelled>[number], "classes">;

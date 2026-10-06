@@ -14,8 +14,6 @@ features/coach-settings/ui/Row.tsx 1
 features/grade/domain/useStudentGrades.ts 6
 features/mark-attendance/domain/attendanceRows.ts 10
 features/mark-attendance/domain/useAttendanceLoad.ts 2
-features/parent-attendance/domain/attendanceFormat.ts 18
-features/parent-attendance/domain/useParentAttendance.ts 3
 features/parent-attendance/ui/HistoryList.tsx 1
 features/parent-home/domain/homeRows.ts 11
 features/paynow/domain/embeddedTenant.ts 1

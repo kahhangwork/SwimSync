@@ -9,6 +9,14 @@ import {
   type DayOfWeek,
 } from "@/lib/lessonDates";
 import type { DbStatus, FilterOption, AttendanceRecord, Child } from "../types";
+import type {
+  ActiveEnrolmentRow,
+  CancelledLessonRow,
+  ChildAttendanceRow,
+  ChildLinkRow,
+  ExtraLessonRow,
+  MakeupRow,
+} from "../dao/parentAttendance.repo";
 
 export function matchesFilter(status: DbStatus, filter: FilterOption): boolean {
   if (filter === "All") return true;
@@ -44,18 +52,21 @@ export function timeLabel(start: string | null, end: string | null): string {
   return s ?? "";
 }
 
-export function childrenOf(links: any[] | null): Child[] {
-  return (links ?? []).map((l: any) => ({
-    id: l.students.id,
-    full_name: l.students.full_name,
-    assignment_status: l.students.assignment_status,
-    is_active: l.students.is_active,
+// `students!` names its guard (Wave 8): parent_students_select shows a parent a link
+// row only when parent_owns_student(student_id) — the same predicate students_select
+// grants — so a link this read returns always embeds its student.
+export function childrenOf(links: ChildLinkRow[] | null): Child[] {
+  return (links ?? []).map((l) => ({
+    id: l.students!.id,
+    full_name: l.students!.full_name,
+    assignment_status: l.students!.assignment_status,
+    is_active: l.students!.is_active,
   }));
 }
 
-export function recordsOf(data: any[] | null): AttendanceRecord[] {
+export function recordsOf(data: ChildAttendanceRow[] | null): AttendanceRecord[] {
   return (data ?? [])
-    .map((a: any) => ({
+    .map((a) => ({
       id: a.id,
       status: a.status as DbStatus,
       session_date: a.lesson_sessions?.session_date ?? "",
@@ -67,15 +78,17 @@ export function recordsOf(data: any[] | null): AttendanceRecord[] {
 }
 
 /** Each active enrolment paired with its (to-one) class, normalised. */
-export function activeClassesOf(enrolments: any[] | null): { enr: any; cls: any }[] {
-  return (enrolments ?? []).map((enr: any) => ({
+export type ActiveClass = { enr: ActiveEnrolmentRow; cls: ActiveEnrolmentRow["classes"] };
+
+export function activeClassesOf(enrolments: ActiveEnrolmentRow[] | null): ActiveClass[] {
+  return (enrolments ?? []).map((enr) => ({
     enr,
     cls: Array.isArray(enr.classes) ? enr.classes[0] : enr.classes,
   }));
 }
 
 /** Has any lesson fallen due since this child joined (ANY active enrolment)? */
-export function hasExpectedLessonOf(activeClasses: { enr: any; cls: any }[], today: string): boolean {
+export function hasExpectedLessonOf(activeClasses: ActiveClass[], today: string): boolean {
   return activeClasses.some(({ enr, cls }) => {
     const day = cls?.day_of_week as DayOfWeek | undefined;
     return (
@@ -86,19 +99,20 @@ export function hasExpectedLessonOf(activeClasses: { enr: any; cls: any }[], tod
   });
 }
 
-export function enrolmentInputsOf(activeClasses: { enr: any; cls: any }[]) {
+export function enrolmentInputsOf(activeClasses: ActiveClass[]) {
   return activeClasses
     .filter(({ cls }) => cls?.day_of_week && cls?.title)
+    // census: ui-cast (Wave 8) — `cls!`: the filter above keeps only rows WITH a class.
     .map(({ cls }, i) => ({
-      class_id: (cls.id as string) ?? `enr-${i}`,
-      day_of_week: cls.day_of_week as DayOfWeek,
-      class_title: cls.title as string,
-      time_label: timeLabel(cls.start_time ?? null, cls.end_time ?? null),
+      class_id: (cls!.id as string) ?? `enr-${i}`,
+      day_of_week: cls!.day_of_week as DayOfWeek,
+      class_title: cls!.title as string,
+      time_label: timeLabel(cls!.start_time ?? null, cls!.end_time ?? null),
     }));
 }
 
-export function makeupInputsOf(makeupRows: any[] | null) {
-  return (makeupRows ?? []).map((m: any) => {
+export function makeupInputsOf(makeupRows: MakeupRow[] | null) {
+  return (makeupRows ?? []).map((m) => {
     const c = Array.isArray(m.classes) ? m.classes[0] : m.classes;
     return {
       // Fall back to the booking id (never null) rather than a shared literal,
@@ -112,8 +126,8 @@ export function makeupInputsOf(makeupRows: any[] | null) {
   });
 }
 
-export function extraInputsOf(extraRows: any[] | null) {
-  return (extraRows ?? []).map((s: any) => {
+export function extraInputsOf(extraRows: ExtraLessonRow[] | null) {
+  return (extraRows ?? []).map((s) => {
     const c = Array.isArray(s.classes) ? s.classes[0] : s.classes;
     return {
       class_id: s.class_id as string,
@@ -124,8 +138,8 @@ export function extraInputsOf(extraRows: any[] | null) {
   });
 }
 
-export function cancelledInputsOf(cancelledRows: any[] | null) {
-  return (cancelledRows ?? []).map((s: any) => {
+export function cancelledInputsOf(cancelledRows: CancelledLessonRow[] | null) {
+  return (cancelledRows ?? []).map((s) => {
     const c = Array.isArray(s.classes) ? s.classes[0] : s.classes;
     return {
       class_id: s.class_id as string,

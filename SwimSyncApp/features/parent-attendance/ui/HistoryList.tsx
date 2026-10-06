@@ -78,7 +78,7 @@ export function HistoryList(p: Pick<Att, "loadingRecords" | "children" | "select
           return (
             <Card key={item.id} className="flex-row items-center gap-3">
               <Ionicons
-                name={icon.name as any}
+                name={icon.name as any /* db-any-ok: icon */}
                 size={24}
                 color={icon.color}
               />

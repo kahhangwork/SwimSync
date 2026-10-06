@@ -23,6 +23,7 @@ import {
   fetchUpcomingCancelled,
 } from "../dao/parentAttendance.repo";
 import type { AttendanceRecord, Child, FilterOption } from "../types";
+import type { CancelledLessonRow, ExtraLessonRow } from "../dao/parentAttendance.repo";
 import {
   matchesFilter,
   childrenOf,
@@ -145,12 +146,12 @@ export function useParentAttendance() {
       // dao/parentAttendance.repo fetchUpcomingExtras.
       activeClassIds.length
         ? fetchUpcomingExtras(activeClassIds, today, horizon)
-        : Promise.resolve({ data: [] as any[], error: null }),
+        : Promise.resolve({ data: [] as ExtraLessonRow[], error: null }),
       // Lessons the admin cancelled in advance, in any of the child's classes —
       // shown struck "Cancelled" so the parent sees WHY there is no lesson.
       activeClassIds.length
         ? fetchUpcomingCancelled(activeClassIds, today, horizon)
-        : Promise.resolve({ data: [] as any[], error: null }),
+        : Promise.resolve({ data: [] as CancelledLessonRow[], error: null }),
     ]);
 
     if (!fresh()) return;
@@ -171,7 +172,7 @@ export function useParentAttendance() {
     }
 
     const holidays = new Set(
-      (holidayRows ?? []).map((h: any) => h.holiday_date as string)
+      (holidayRows ?? []).map((h) => h.holiday_date as string)
     );
 
     const enrolmentInputs = enrolmentInputsOf(activeClasses);
