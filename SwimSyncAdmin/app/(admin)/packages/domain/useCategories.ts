@@ -6,6 +6,7 @@ import { useState } from "react";
 import * as repo from "../dao/packages.repo";
 import * as rpc from "../dao/packages.rpc";
 import type { Category } from "../types";
+import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
 
 type Shared = {
   setBusy: (b: boolean) => void;
@@ -20,12 +21,14 @@ export function useCategories({ setBusy, setError, reload }: Shared) {
     const trimmed = newCategory.trim();
     if (!trimmed) return;
     setBusy(true);
-    const { error: err } = await repo.insertCategory({
-      name: trimmed,
-      // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-      // No tenant → NULL → 23502/RLS → "Could not add that category."
-      tenant_id: (await rpc.myTenantId())!,
-    });
+    // No business: say so and send nothing — never a NULL tenant (Wave 8).
+    const tenant_id = await rpc.myTenantId();
+    if (!tenant_id) {
+      setBusy(false);
+      setError(NO_TENANT_MESSAGE);
+      return;
+    }
+    const { error: err } = await repo.insertCategory({ name: trimmed, tenant_id });
     setBusy(false);
     if (err) {
       setError(
