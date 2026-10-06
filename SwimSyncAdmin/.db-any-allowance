@@ -4,7 +4,6 @@ app/(admin)/accounting/domain/summaryRow.ts 1
 app/(admin)/admins/domain/adminsRows.ts 1
 app/(admin)/attendance/domain/attendanceRows.ts 4
 app/(admin)/credit-notes/domain/creditNoteRows.ts 1
-app/(admin)/history/domain/useHistory.ts 1
 app/(admin)/holidays/dao/holidays.repo.ts 1
 app/(admin)/invoices/domain/invoiceRows.ts 2
 app/(admin)/invoices/domain/undeliveredEmails.ts 1

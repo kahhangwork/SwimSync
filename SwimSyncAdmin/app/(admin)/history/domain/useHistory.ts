@@ -29,7 +29,7 @@ export function useHistory() {
 
       setLoadError(null);
       setRows(
-        (data ?? []).map((r: any) => ({
+        (data ?? []).map((r) => ({
           id: r.id,
           created_at: r.created_at,
           actor_id: r.actor_id ?? null,
