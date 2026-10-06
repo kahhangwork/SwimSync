@@ -1803,6 +1803,9 @@ isOneToOne: false
 "coach_shadowed_class_on":
 { Args: { "p_class_id": string,"p_coach_id": string,"p_date": string }; Returns: boolean
                            },
+"coach_taught_student":
+{ Args: { "p_student_id": string }; Returns: boolean
+                           },
 "coach_teaches_session":
 { Args: { "p_session_id": string }; Returns: boolean
                            },
