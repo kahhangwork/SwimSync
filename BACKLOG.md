@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-06 (later) — **Wave 6 SHIPPED** (§8.139): package lessons draw at marking; the monthly run bills only ad-hoc lessons (PRD §7.16). Filed *Re-offer the backdated draw*, *Coach app shows the window guard's own words*, *The guard message says "Sep" where the apps say "Sept"*. Next: Wave 7, the DB clock. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-06 (evening) — **Wave 7 SHIPPED** (§8.140): the injectable DB clock; *Inject the database clock* and *Promote §7.7 to a check over supabase/functions* removed (shipped). Filed *Pin the clock for UI drivers* (L). Next: Wave 8, generated types. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -281,11 +281,11 @@ confirmed the coachless-lesson bug and its fix shipped the same day (PRD §4.3).
 Package lessons draw at marking; the run bills only ad-hoc lessons; Generate is optional for a package-only month
 (PRD §7.16). Two lanes; deploys #69–#73. Next is Wave 7.
 
-#### Wave 7 — *Inject the database clock* (L) — **NEXT; plan first** (a quiet stretch — not mid-billing)
+#### ~~Wave 7~~ — **SHIPPED 2026-10-06** (§8.140, plan `docs/plans/WAVE7_DB_CLOCK_PLAN.md`)
 
-5. Wave 6's migrations have landed (2026-10-06): the start-date RPC (`set_enrolment_start`, live) and the new
-   draw-down (`package_candidates_for`, the D6 guard, `today_sg()` in `class_unmarked_lesson_pairs`) go on its conversion list rather than being converted twice. Billing guards last; Deno twice.
-   **Fold in:** *Promote §7.7 to a check over supabase/functions* (S, below) — the same clock/date family.
+The injectable DB clock (`app_now()`/`app_today()`, ARCHITECTURE §6af); every dated pgTAP file pins it; G1–G4 in
+CI (incl. the folded-in §7.7 check over `supabase/functions`). Deploys #74–#76. Driver pinning stays out (D2) →
+*Pin the clock for UI drivers* (L, Foundations). Next is Wave 8.
 
 #### Wave 8 — cheaper by waiting
 
@@ -1638,70 +1638,28 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Promote §7.7 to a check over supabase/functions — **S** — _filed 2026-10-06 (§8.138)_
-A CI scan (`check-*.sh` or a Deno test reading the sources) that fails on `slice(0, 10)` / `split("T")[0]` over a
-timestamptz in `supabase/functions/**` (non-test), with an allowlist for UTC-midnight date arithmetic
-(`dates.ts formatDate`, `public-package validUntilPreview`).
+### Pin the clock for UI drivers — **L** — _filed 2026-10-06 (§8.140, Wave 7 D2)_
+Let a Playwright driver replay a fixed day, the way every pgTAP file now does (Wave 7, ARCHITECTURE §6af).
 
-**Why:** §7.7 bit a THIRD place on 2026-10-06 — the engine's earliest-enrolment floor and the referral email's
-*Valid until* both read a UTC date — and its written audit greps only the two app folders, so nothing looked at the
-edge functions. GOTCHAS' rule: a trap that bit again is promoted to a check. **Notes:** model on
-`drivers/check-driver-dates.sh` (§7.302); prove it red against `41d9676^` (the engine slice). Rides Wave 7.
+**Why:** the drivers are the last tests that run on whatever day CI happens to run. A driver that books, marks or
+bills is exercised only on today's position in the month — the §7.304 class of bug (a fixture collision that only
+real days 247 of 730 hit) is still reachable there, and §7.302's label drift was found the same way.
 
-### Inject the database clock — **L** — _filed 2026-10-01_
-**Make every date-sensitive test choose its own "today", so no test can ever expire.** Today the database has no
-single clock: 51 public functions read `now()` / `CURRENT_DATE` directly (57 counting `today_sg()`,
-`session_window_start()`, `markable_floor()`), so a test cannot say "pretend it is 1 November".
+**Notes — there are FOUR clocks, and all four must agree or the driver tests a world that cannot exist:**
+1. **The browser** — Playwright's `page.clock` can fix it.
+2. **The app's JS** — both apps read `todayInSg()` / `nowMinutesInSg()` from `Date`, so (1) covers them in the
+   browser, but the Next server components and API routes run in Node and do not see it.
+3. **Postgres** — `app_now()`. **Lock 2 refuses exactly this path on purpose:** PostgREST and the edge functions log
+   in as `authenticator`, which never pins (§7.333). Pinning through the API needs a deliberate, separately-reviewed
+   relaxation for local only (e.g. a role-level setting on a local-only role), and it must keep the prod proof
+   (`app_clock_locks.sh`) green. Never a request header — PostgREST writes `request.*` from the client.
+4. **The engine** (Deno, `generate-invoices`) — reads `new Date()`; its own tests inject `now` via `BillingScenario`,
+   but a driver-triggered run does not.
+Decide first whether a cheaper target is enough (e.g. pin only (1)+(3) for the attendance/booking drivers and leave
+billing drivers on real time). Until then: drivers derive dates from the real clock (`lib.mjs` `sgLabel()`), guarded
+by `check-driver-dates.sh` (§7.302).
 
-**Why — what 2026-10-01 proved.** `main` CI went red that morning with no code change (§7.302–§7.304). A test has
-**two clocks**: its own dates, and the database's "today" (which sets the marking floor = 1st of LAST month, SGT).
-- **Hardcoded dates froze one clock and left the other running** — the gap grew until the floor passed `'2026-08-08'`
-  and the guard (correctly) refused it. Three pgTAP files, 14 assertions (§7.303).
-- **Derived dates move both clocks together** — the fix shipped that day (`78589c7`, a `td` temp table built from
-  `session_window_start()`). It works, but every test is still only exercised on whatever day CI happens to run.
-- **An injected clock freezes both** — a test replays the same day forever, and can deliberately target edge days:
-  the 1st of a month, a leap day, the days before the month's first Saturday. That last window is exactly where
-  §7.304's fixture collision hid — real-clock CI only hit it on some days (247 of 730 in 2026–27).
-
-**Shape.**
-1. One SQL function, e.g. `app_today()` → the SGT date. Product functions call it instead of `now()` /
-   `CURRENT_DATE` / `today_sg()` **for date decisions**. Timestamps (`created_at`, `confirmed_at`, `paid_at`) stay
-   real — only "what day is it" moves.
-2. Tests pin it: `SET LOCAL app.today = '2026-09-15'` at the top of the file's transaction.
-3. **Prod safety is the crux.** The override must be honoured only where a database-level flag allows it (local / CI),
-   never on prod — a client-movable clock would let someone mark a closed month or dodge the completed-month guard.
-   PostgREST writes `request.*` settings from headers/JWT, so the setting must live outside that namespace. **Prove it
-   cannot be set from a client** (a pgTAP probe as `authenticated` and `anon`) rather than assume it. Own security review.
-4. **A guard so the clock cannot leak back:** CI refuses a new raw `now()` / `CURRENT_DATE` used for a date decision
-   in a migration (the `check-driver-dates.sh` / `check-test-dates.sh` pattern).
-
-**Precedent already in the repo — copy its reasoning:** the Deno billing-engine tests already inject the clock.
-`BillingScenario` in `supabase/functions/generate-invoices/test-helpers.ts` pairs every billing month with its own
-`now`, which is why those tests use far-future 2029 months and never rot.
-
-**How to sequence it.** Expand/contract, one function family per migration (CLAUDE.md: one schema change in flight).
-Recount the surface first — the count above is a hint (query: `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON
-n.oid=p.pronamespace WHERE n.nspname='public' AND prosrc ~* 'now\(\)|current_date'`). Not every read is a decision —
-classify stamp vs decision per function (read bodies with `pg_get_functiondef`, §7.40). **Billing guards last**, Deno
-suite run twice (§7.15). Then convert pgTAP files to `SET LOCAL app.today`, starting with the ones carrying
-`-- date-literal-ok:` markers (47 lines on 2026-10-01 — each records why it is safe today) and the three files with a
-`td` table. **Not mid-billing** — it touches the guards the monthly run depends on; pick a quiet stretch.
-
-**Rejected alternative — a "time machine"** (libfaketime in CI's Postgres, run the suite as if it were the 1st of next
-month). Considered 2026-10-01 and dropped: unproven against the Supabase-CLI-owned container (needs a spike);
-fragile across CLI/image upgrades (must self-check that `now()` is really faked or it passes vacuously); Postgres
-multi-process quirks; it only DETECTS a month early rather than prevents; needs several simulated dates per run to
-catch §7.304-shaped bugs; ~1–2 days. Already deferred once (`docs/plans/DRIVER_BACKLOG_PLAN.md` §6). The injected
-clock makes it unnecessary. **Also do not pin `session_window_start()` to a FUTURE month as a stand-in** — `now()`
-does not move, so any test whose lessons must be in the past reddens by construction (§7.303, §7.226, §7.277).
-
-**What guards meanwhile** (built 2026-10-01): `scripts/check-test-dates.sh` — fails CI on a literal date/month in
-pgTAP or a UI fixture that the floor has not passed, unless the line says `-- date-literal-ok: <why>` (§7.305; it
-models only the floor, not `today_sg()` horizons); `check-driver-dates.sh` (driver labels, §7.302);
-`check-fixture-roundtrip.sh`'s co-load pass (§7.304). Plan: `docs/plans/TEST_DATE_EXPIRY_ALARM_PLAN.md`.
-
-**Size:** L (~1–2 weeks). Product change across the billing guards; migrations + prod deploys.
-
+**Size:** L — four clocks, one deliberate change to a security lock, ~60 drivers to sweep.
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the
 single deliberate exclusion in `profile_reference_columns()`; every other FK pointing at

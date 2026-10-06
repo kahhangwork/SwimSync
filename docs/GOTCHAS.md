@@ -32,21 +32,21 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 | Area | Items |
 |---|---|
-| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337 |
-| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328 |
-| `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293 |
+| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338 |
+| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342 |
+| `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334 |
-| Source-scanning guards | 230, 231, 233, 241, 247, 248, 302, 305, 309 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343 |
+| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
-`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` · §7.303/§7.305 → `scripts/check-test-dates.sh` ·
+`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
 §7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic).
 
 ---
@@ -2704,6 +2704,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `docker exec -e PGPASSWORD=postgres <db> psql -h 127.0.0.1 -U authenticator`, in a `supabase/tests/http/`
     script wired into CI that exits non-zero if the login fails (model: `signup_trust.sh`). (Wave 7 plan-review,
     2026-10-06.)
+    - **Also (2026-10-06, §8.140):** `authenticator` ITSELF holds no EXECUTE on anything — it only switches roles —
+      so a check that calls the function as plain `authenticator` fails with `permission denied`, not on the lock.
+      Every check does what PostgREST does: `SET ROLE authenticated` / `service_role` first (`app_clock_locks.sh`).
 
 334. **`supabase migration up` never runs `seed.sql`.** On the shared DB, anything switched on by a seed-only row
     (Wave 7's clock-override flag) is OFF after a no-reset apply until the row is inserted by hand. Make the
@@ -2725,3 +2728,40 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `'2026-10-01 07:59'` means 15:59 SGT and the "07:59 SGT is still yesterday in UTC" edge silently stops being
     tested. Pins carry `+08` and the clock RAISEs on an offset-less value. (Wave 7 plan-review, 2026-10-06; the
     §7.7 family.)
+
+338. **Literalizing a clock call can turn an assertion into a tautology — and "names identical" cannot see it.** A
+    converter that swaps every `session_window_start()` for its pinned value also rewrites the ACTUAL side:
+    `is(session_window_start(), d_floor)` → `is('2026-08-01', '2026-08-01')`, green forever (`attendance_window`
+    #1–2, Wave 7, caught in lane1 review). A literal may replace fixture data or the EXPECTED value (the stronger
+    form: `is(markable_floor(x), '2026-08-01')`), never the subject of an `is/isnt/ok/cmp_ok/results_eq` that was a
+    clock function. Audit both ways: diff-scan for statements where a clock call disappeared, and a structural scan
+    for an assertion whose first argument has no call, no `FROM`, no column. A regex literalizer must also mask
+    string literals (descriptions name `today_sg()`) and stop a `± N` chain before `N * 7` (precedence).
+    (Wave 7, 2026-10-06, §8.140.)
+
+339. **`cmd | grep -q` under `set -o pipefail` reports a MATCH as no-match.** `grep -q` exits on the first hit, the
+    producer takes SIGPIPE (141), and the pipeline's status is the failure. G1's first draft called 2 of 82 dated
+    pgTAP files date-free that way. Use `grep -q PAT <(cmd)`, `grep -m1`, or let awk limit. (Wave 7 lane2,
+    2026-10-06, §8.140; `scripts/lib/pgtap-pin.sh`.)
+
+340. **The session shell is zsh: `for x in $LIST` does NOT word-split, and `echo` eats backslash escapes.** A loop
+    over a space-separated variable ran ONCE with the whole string as `x` (three times in one session — a census,
+    a file map, a migration builder), and `echo "\echo …"` became `cho …` (zsh `echo` turns `\e` into ESC), which
+    aborted a psql rehearsal mid-transaction. Put multi-step shell in a `bash` script file, or use `${=LIST}` /
+    `printf '%s\n'`. (Wave 7, 2026-10-06, §8.140.)
+
+341. **`name::text` carries collation `"C"` — `results_eq` against a literal `VALUES` raises "could not determine which
+    collation to use".** Catalog columns (`pg_proc.proname`) are type `name`. Emit `proname::text COLLATE "default"`
+    and `ORDER BY` the raw `name` (C order) so the rows line up with a literal generated by `ORDER BY proname`.
+    (Wave 7 clock census, 2026-10-06, §8.140.)
+
+342. **A trigger function's EXECUTE is never checked at fire time, and a SECURITY INVOKER trigger runs as the WRITING
+    role.** So (1) `has_function_privilege('anon', <trigger fn>)` is TRUE through the default PUBLIC grant and means
+    nothing — an ACL check over invoker functions must skip `prorettype = 'trigger'` (it falsely flagged anon on
+    `enforce_parent_package_lifecycle`); and (2) whatever such a trigger calls (`app_now()`) must be granted to every
+    role that can INSERT/UPDATE its TABLE — the same holds for a column `DEFAULT`. Both are asserted in
+    `app_clock.test.sql`. (Wave 7 M3, 2026-10-06, §8.140; sibling of §7.42.)
+
+343. **Rewriting a branch with `git reset --hard` also discards the uncommitted work in that tree.** lane2 rebuilt its
+    branch to fold a fix into an earlier commit and lost a whole batch of un-committed conversions (regenerated from
+    its script). WIP-commit before any reset — the same rule as the stash hook. (Wave 7 lane2, 2026-10-06, §8.140.)

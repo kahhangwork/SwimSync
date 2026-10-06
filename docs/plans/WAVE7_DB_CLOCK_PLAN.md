@@ -261,6 +261,18 @@ lane1: ~3½–4½ days (classification + censuses ¾, M1 1¼ incl. locks script,
 - Future pins clamp `markable_floor` unless the test sets `tenants.created_at` (§7.277).
 - UI drivers still run on the real clock (D2). PostgREST and the engine can never pin (lock 2), so Deno and drivers are unaffected.
 - On prod, a direct SQL session that sets `swimsync.now` gets an exception, not a moved clock. Nothing on prod sets it; the census asserts no function does.
+- **Shipped 2026-10-06 (§8.140).** Status: DONE. M1–M3 on prod; M4/M5 needed no migration (see *Outcome* under Migrations). 92 pgTAP files = 83 pinned (G1 hit count was 82 + `app_clock_edges`), 1 clock-free (`app_clock`), 8 date-free. G1–G4 required in CI.
+- **Pin-shift result (+3 months, scratch copies).** Appendix B's *Guarded* column was a text scan, and 16 of its 37 `y` marks were false: those files write guarded tables only as superuser fixtures (the guards skip non-authenticated), edit existing rows (corrections are always allowed), or mark holidays below the floor. Re-marked `n` with reasons in Appendix B. Final: red = guarded in every batch.
+
+  | Batch | Guarded (first mark) | Red | Re-marked n |
+  |---|---|---|---|
+  | 1 | 3 | 0 | student_claims, student_merge, unbilled_sealed_lessons |
+  | 2a | 12 | 11 | coach_wages |
+  | 2b | 12 | 5 | credit_note_double_credit, credit_note_trigger, document_name_snapshot, edge_cases, holiday_late_buyer, holiday_admin_guard, holiday_day_rpc |
+  | 2c | 7 | 2 | package_corrections, package_draw_at_marking_b, package_holiday_extension, partial_payment_followups, partial_payment |
+  | 2d | 6 | 3 | stranger_isolation, tenant_suspension, void_credit_note |
+- **Conversion choices kept on purpose (lane2):** `app_now() ± INTERVAL` stamps stay (tenants.created_at backdates — before every pin, §7.277 — graded_at, expires_at); literal-valued fixture temp tables (`f`, `td`, …) stay, each value being the old derivation evaluated under the pin; `email_claim`'s lease lines keep REAL `now()` with `-- clock: stamp` (REAL-TIME functions); `accounting_package_revenue`'s two descriptions now say `app_now()`. G1 treats `->>'today'` as a JSON key; G2 deliberately does not (the census counts that key).
+- **One flake, not reproduced:** a single full run showed `credit_drawdown` "planned 29, ran 0" — green alone and on every re-run; most likely a concurrent run on the shared DB.
 
 ## Appendix A — classification (lane1, T1 — FINAL, censused 2026-10-06 against the live local DB)
 

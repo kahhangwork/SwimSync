@@ -440,6 +440,26 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 > and exits 2 if it scanned too little. Local proofs only: `CHECK_TEST_DATES_FLOOR=YYYY-MM-DD` or file arguments
 > (refused under `CI`). An annotation needs a static clock audit, not a pin run (§7.305, §7.308).
 >
+> **Since Wave 7 (2026-10-06) a pinned pgTAP file is SKIPPED here** — its literals are relative to the pinned clock
+> and cannot expire. "Pinned" is decided only by G1's predicate (`scripts/lib/pgtap-pin.sh`, RISK 9), so a pin in a
+> comment / with `false` / before `BEGIN` / without the `clock pinned` assertion is still scanned. It now prints
+> `scanned P pgTAP (K clock-pinned, skipped) + …`.
+>
+> **Every dated pgTAP file pins the clock — G1** (`scripts/check-pgtap-clock.sh`, required since Wave 7 T5). The
+> exact header: `BEGIN;` → `SELECT set_config('swimsync.now', 'YYYY-MM-DD hh:mm+08', true);` → [`CREATE EXTENSION IF
+> NOT EXISTS pgtap;`] → `SELECT plan(N);` → `SELECT is(app_today(), '<pin date>'::date, 'clock pinned');`, and no raw
+> `now()` / `CURRENT_*` / `'today'` / `session_window_start()` arithmetic outside a line marked `-- clock: stamp`. A
+> file that tests the clock itself opts out with `-- clock-free: <reason>` (only `app_clock.test.sql`). A NEW
+> dated test copies that header; read `app_now()`/`app_today()` or literals, never the wall clock. Never literalize
+> the subject of an assertion (§7.338). 2026-10-06: 92 files = 83 pinned, 1 clock-free, 8 date-free.
+>
+> **No migration reads a raw clock — G2** (`scripts/check-migration-clock.sh`, required). Migrations newer than its
+> CUTOFF (M3, `20261006000500`) may not hold `now()`/`CURRENT_*`/`clock_timestamp`/… except on a line marked
+> `-- clock: stamp` or `-- clock-real: <why>`. The backstop it cannot route around is the **frozen clock census** in
+> `app_clock.test.sql` (below). **No edge function takes the UTC date of a timestamp — G3**
+> (`scripts/check-functions-sg-date.sh`, required): `slice(0, 10)` / `split("T")[0]` in `supabase/functions/**`,
+> allowlist file + function exact, or `// utc-date-ok: <why>`. Blind to `.substring(0, 10)` and Intl (script header).
+>
 > **Every fixture is now LOADED by CI too** (2026-08-01), by
 > `drivers/check-fixture-roundtrip.sh` — a step in `backend-tests`, which already boots a
 > Supabase stack. It runs **two passes**:
@@ -1479,6 +1499,27 @@ in auto mode and its email-retry skip (§7.265, §7.266). No run-day test writes
   `checkInvariants` refuses a lesson both invoiced and drawn; `teardown()` deletes package draws first.
 - **Apps** (lane 2): the PK001 mapper (both apps, byte-identical), Billing months `package_funded`, the Held footnote,
   the D5 dialog on sale + confirm, the parent usage list. Driver above.
+
+### Wave 7 — the injectable database clock (2026-10-06, §8.140)
+
+- **pgTAP** `app_clock` (27, `-- clock-free`): flag row present; unpinned `app_now()` = `now()`; pinned `app_now`/
+  `app_today`/`today_sg`/`session_window_start` follow the pin incl. 07:59 SGT on the 1st and a `Z` pin; offset-less
+  pin RAISEs (§7.337); lock 1 (no flag row) RAISEs — red-proven; the invoker chain under `authenticated`; ACL parity
+  for `today_sg`, for every invoker function and every invoker TRIGGER's table writers, and for column defaults
+  (§7.342); no API role on `private`; nothing but `app_now` mentions `swimsync.now` or calls `set_config`; and the
+  **frozen clock census** (#27): `(proname, raw clock tokens)` for every public function, 44 rows / 77 tokens — red
+  on any new raw read or changed count. Updating it is a deliberate act: say in the commit whether the new read is a
+  stamp or real-time.
+- **pgTAP** `app_clock_edges` (24): own tenants, `SET LOCAL TimeZone = 'UTC'`; E1 07:59 SGT on 1 Oct (UTC still
+  30 Sep), E2 31 Oct 23:59 → 1 Nov 00:00 SGT, E3 2028-02-29, E4 the day before a month's first Saturday — over
+  `markable_floor`, `assert_markable_date`, `class_unmarked_lesson_pairs`, `enrolment_start_bounds`,
+  `student_package_coverage`. Red-proven: helpers re-bodied to the UTC date → E1/E2 red (9 tests).
+- **HTTP** `supabase/tests/http/app_clock_locks.sh` (4, CI step "App clock locks (authenticator login)"): a REAL
+  `authenticator` login sets a 2001 pin, then as `service_role` / `authenticated` `app_now()` and `today_sg()` stay
+  real — lock 2. pgTAP cannot prove it (§7.333). Red-proven by removing the `session_user` line.
+- **Pin-shift proof** (conversion, scratch only): every converted file re-run with the pin +3 months; a file that
+  writes through a date guard as `authenticated` must go red. 21 red / 21 guarded after 16 text-scan false
+  positives were re-marked — per-batch table in `docs/plans/WAVE7_DB_CLOCK_PLAN.md` *Known consequences*.
 
 ### Reading a RED nightly sweep — the four triage rules
 

@@ -89,6 +89,9 @@ touching an unfamiliar subsystem.
   or a `YYYY-MM-DD`, and degrades instead of throwing. **Never "harden" `toSgDate()` to match it**:
   34 call sites compare its output *lexically*, so a degrade there turns a crash into a silently
   wrong attendance backlog. Display and logic are different helpers on purpose. (§7.229, §7.230.)
+- **In SQL, a date DECISION reads `app_now()` / `app_today()`, never `now()`;** a pgTAP file pins it as its first
+  statement (`set_config('swimsync.now', '… +08', true)`, copy any pinned file's header). G1, G2 and the frozen census
+  in `app_clock.test.sql` go red otherwise. Never insert the flag row on prod. (ARCHITECTURE §6af.)
 
 **Billing — the guards are load-bearing, not friction**
 - **Never add an override** to the unmarked-attendance block or the completed-month guard.

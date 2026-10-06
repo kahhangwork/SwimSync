@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-06 (later) — **§8.139: Wave 6 SHIPPED in two lanes — package lessons draw at MARKING; the
-monthly run bills only ad-hoc lessons; Generate is optional for a package-only month. Deploys #69–#73; Little Orcas's
-package backfilled (8 lessons, S$420 left) after the user had Brayden Ong unlinked from the Ang family.**_
+_Last updated: 2026-10-06 (evening) — **§8.140: Wave 7 SHIPPED in two lanes — the database has ONE injectable clock
+(`app_now()`/`app_today()`, two locks, prod identical); all 83 dated pgTAP files pin it; G1–G4 required in CI.
+Deploys #74–#76 (M1–M3); M4/M5 needed no migration.**_
 
-_Previously (§8.138, 2026-10-05 → 06) — Wave 4: *Starts on* on every add-to-class; the Front-desk hire's blind spot fixed._
+_Previously (§8.139, 2026-10-06) — Wave 6: package lessons draw at marking; the run bills only ad-hoc lessons._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.337** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.343** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -349,6 +349,23 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.140 (2026-10-06) — Wave 7: the injectable database clock (two lanes, root orchestrating)
+
+**Planned earlier the same day (`/plan-with-confidence` D1–D6 → `/plan-review`, 9 risks), shipped by this session as
+lane1 (root: classification, every migration, every prod step, the docs) with lane2 (worktree `wave7-tests`, closed:
+G1–G4 + converting 82 pgTAP files + the edge-day suite), coordinated by cross-session TASK/DONE/HOLD messages.**
+Commits `f072685` (M1) · `64b678a` (M2) · `d93d9c0` (M3) · `fe5223a` (census, G2 required) · `4d8cc90` (G1 required) ·
+lane2 `fec8dc5` `0e258d1` `9f70b69` `6d2c75a` `5e2e2de` `73004ed` `8c44c54` · `16a33ab` (handoff).
+
+- **Shipped:** ARCHITECTURE §6af (the clock, its two locks, the prohibitions); DEPLOYMENT #74–#76; TESTING §5
+  *Wave 7* + the G1–G3 notes; plan Appendix A (all 71 clock readers classified) and B (file map, 16 re-marks).
+  pgTAP 91/1882 → 92/1991; Deno 292 ×2 after every migration; vitest 1093, jest 680, tsc, fixture roundtrip green.
+- **Found and fixed in-wave:** `app_clock.test.sql` tripped the date-literal check on `main` (red one push,
+  `7868133`); M3's trigger made the invoker-ACL check flag `anon` (§7.342); the conversion made two assertions
+  tautologies (§7.338). M4 needed no migration and M5 is the frozen census (plan *Outcome*).
+- **Gotchas:** §7.338–§7.343; §7.333 refined. **Not done (D2):** UI drivers still run on the real clock → BACKLOG
+  *Pin the clock for UI drivers*. PRD untouched — no user-visible change. Nightly not dispatched.
+
 ## 8.139 (2026-10-06) — Wave 6: package lessons draw at marking (two lanes, root orchestrating)
 
 **`/plan-with-confidence` (D1–D7, D2 refined: Generate optional) → `/plan-review` (12 risks) → shipped in plan order
@@ -366,26 +383,7 @@ A → engine v33 → Apps-1 → B → Apps-2, the root writing every migration a
 - **Nightly `37398088721`:** 71/72; `app-coach-settings` (CI file-chooser timeout) re-ran 6/6 locally → gate cleared.
 - **Gotchas:** §7.323–§7.332; §7.302 *Hit again*. **Not done:** BACKLOG's three Wave 6 follow-ups; Wave 7 unplanned.
 
-## 8.138 (2026-10-05 → 06) — Wave 4: a start date on add-to-class; the Front-desk hire's blind spot fixed
-
-**Re-ranked the backlog with the user into Waves 4–8, billed September (Coach Kah Hang only — Little Orcas is the
-owner's, §9), then `/plan-with-confidence` → `/plan-review` → two lanes: this session (root) shipped the start-date
-feature end to end; a side session (worktree `wave4-frontdesk`, now removed) drove the Front-desk role and found that an
-operations-only co-admin saw NO teaching coach anywhere — fixed and live before its driver merged.**
-Commits `8d73d3b` `06d4811` (backlog) · `48b61ce` (plan) · `1069aa4` `0984b0c` (migrations) · `ccc0e4a` `91627f0`
-`0b3cb65` (apps) · `41d9676` `aec2076` (functions) · `993bc87`…`d9f5f42` (lane 2).
-
-- **Shipped:** PRD §7.4 (*Starts on*, *Change start date*), PRD §4.3 (who taught is readable to operations roles);
-  ARCHITECTURE §6ad; DEPLOYMENT #64–#68. pgTAP +52, vitest 1028 → 1062, Deno +3, two drivers (TESTING §5).
-- **Decided with the user:** backlog Waves 4–8 (hire = Front desk; refund display and hide-edit-controls → *Deliberately
-  not doing*); NEW *Package-funded lessons need no monthly run* ranked ahead of the DB clock; all four add paths; edit
-  after the add; both nightly gates WAIVED.
-- **Found by asking "is this on purpose?":** the user challenged a quirk I had filed as intended — it was a §7.7 bug
-  (engine's UTC date slice), and a second one turned up in `package-emails`. Both fixed; the check is BACKLOG S.
-- **Gotchas:** §7.318–§7.322; §7.7 and §7.272 *Hit again* (#19 now scoped — promoted to a fix).
-- **Not done:** Little Orcas September (owner, WhatsApp sent); Wave 6 unplanned. Nightly not dispatched.
-
-_(§8.137 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.138 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -431,7 +429,8 @@ for one marked inactive.
 **State on 2026-10-06: nightly `37398088721` (on `cb2025f`) was 71/72** — the first over #61/#63/#65/#67 and both
 Wave 4 drivers, all green; the one red, `app-coach-settings` (CI file-chooser timeout, code untouched for weeks), re-ran
 6/6 locally (§8.139). **The NEXT nightly is the first over all of Wave 6** (#69–#73) and the first run of
-`verify-package-draw-at-marking` (33), so expect 73 drivers. Read first: that one, then `packages-admin`, `packages`,
+`verify-package-draw-at-marking` (33), so expect 73 drivers — and the first over Wave 7's DB (prod-identical: drivers
+log in as `authenticator`, which never pins). Read first: that one, then `packages-admin`, `packages`,
 `package-renewal`, `accounting-packages`, `attendance-guard`, `cancel-lesson`, the invoice/billing-months drivers
 (*Nothing to bill*), and `app-coach-settings` again (a second red there is a real driver problem, not a flake).
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -448,14 +447,15 @@ which mutate shared seed state — are in the same section.
    settled* for the 15 pilot children (PRD §7.17) — **and now Brayden Ong** (unlinked from the Ang family 2026-10-06,
    his 6 + 13 Sep lessons unclaimed: invite his parent or settle). The Ang family's package lessons are already paid
    (drawn at B), so they need no Generate. Coach Kah Hang's September is billed and sealed.
-3. **Next build — Wave 7, *Inject the database clock* (L) — `/plan-with-confidence` first** (`BACKLOG.md` → *Build
-   order*; Wave 6's new functions are on its conversion list). Not mid-billing. The three Wave 6 follow-ups are S-items
-   in BACKLOG (*Re-offer the backdated draw*, the coach P0001 mapping, "Sep"/"Sept").
+3. **Next build — Wave 8, *Generate real Supabase `Database` types*** (`BACKLOG.md` → *Build order*; it was waiting
+   for Waves 6–7 to stop rewriting functions). The three Wave 6 follow-ups are S-items in BACKLOG; *Pin the clock for
+   UI drivers* (L) is filed, unranked.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
-- **A new test/fixture date:** derive it from `session_window_start()` or CI refuses it (§7.305).
+- **A new pgTAP file pins the clock** (copy a pinned header; G1 is required) and a date DECISION in SQL reads
+  `app_now()`/`app_today()` (G2 + the frozen census). A UI fixture date still derives from the floor (§7.305).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); a `--only` run RESETS the DB.
 - **A new staff-creating route must mint a `staff_invitations` row** (§7.289); **a new admin surface must name its
@@ -463,8 +463,8 @@ which mutate shared seed state — are in the same section.
 
 **GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20261006000200` (Wave 6 B: switch on + backfill), on prod,
-0 pending (2026-10-06). **B's rollback is valid only until the first seal of a month containing draws** (its header).
+**No migration is HELD or in flight.** Latest applied is `20261006000500` (Wave 7 M3), on prod, 0 pending
+(2026-10-06). **B's rollback is valid only until the first seal of a month containing draws** (its header).
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

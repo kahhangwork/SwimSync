@@ -808,6 +808,7 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/app/(admin)/roles/` | The Roles page — roles, holders, the 8×3 grid; owner-only writes (D9) |
 | `SwimSyncAdmin/lib/enrolmentStart.ts` (+ rpc, test) · `components/StartsOnField.tsx` | *Starts on*: bounds → today-only fallback, sealed / unbilled / this-month warnings, the second press, dropped dates (§6ad) |
 | `supabase/migrations/20261006000100…_a.sql` · `…000200…_b.sql` · `supabase/tests/package_draw_at_marking{,_b}.test.sql` · `generate-invoices/wave6.test.ts` | Wave 6 (§6ae): the matcher, draw/return triggers, PK001 guard, PK002 backstop, the four RPCs; B = switch on + backfill |
+| `supabase/migrations/20261006000300_app_clock.sql` · `…000400_clock_decide_ops` · `…000500_clock_stamp_feeds` · `supabase/tests/app_clock{,_edges}.test.sql` · `supabase/tests/http/app_clock_locks.sh` · `scripts/check-{pgtap,migration}-clock.sh` · `scripts/check-functions-sg-date.sh` · `scripts/lib/pgtap-pin.sh` | Wave 7 (§6af): the injectable clock, its two locks, the frozen census; G1–G3 + the shared pin predicate |
 | `SwimSyncAdmin/lib/staffInvitation.ts` | `mintStaffInvitation()` — every staff-creating route calls it before `generateLink`/`createUser` (§6aa) |
 | `SwimSyncAdmin/app/api/resend-invoice-email/route.ts` | Per-invoice email resend (lane 2): `billing:edit` as the caller, then a CRON_SECRET proxy to `generate-invoices`' `{resend_invoice_email}` branch |
 | `supabase/tests/http/signup_trust.sh` | The GoTrue-path sign-up trust test, in CI (§7.295) |
@@ -968,6 +969,29 @@ wrongful refusal blocks a whole class's save with no override (§7.324). The eng
 (`package_mode_unreadable`: no invoice, no seal): billing a lesson a package paid is the worse error. Both count
 "expected" through `class_unmarked_lesson_pairs`, the core of `class_unmarked_lesson_dates` — do not write a third
 copy — Billing months' per-month unmarked count (`package_month_funding.unmarked_lessons`) is the same pairs function, server-side, never a client derivation. Plan + deploy record: `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md`.
+
+### 6af. The database has ONE injectable clock — `app_now()` / `app_today()`; prod can never move it (2026-10-06)
+
+**A date DECISION in SQL reads `app_now()` / `app_today()`** (or the helpers re-bodied onto them: `today_sg()`,
+`session_window_start()`, `markable_floor()`, `markable_window_start()`). A pgTAP file pins it per transaction with
+`SELECT set_config('swimsync.now', '<ts with offset>', true)`; no test has a second, real clock (§7.302–§7.305).
+A STAMP that a decision later reads back (`unenrolled_at`, `enrolled_at` + its DEFAULT, `deactivated_at`,
+`confirmed_at`, `requested_at` DEFAULT, the CN year, referral `expires_at`) comes from `app_now()` too. A pure audit
+stamp stays `now()`; a **security / delivery window stays `now()` and must never move** — staff-invitation expiry
+(`handle_new_user`) and the email-claim lease (`email_delivery_state`, `claim_*_email`).
+
+**Prod can never move it — two locks (D3).** Lock 1: `private.clock_override_enabled` (schema not exposed, no API
+grant) holds a row only where `seed.sql` ran — local and CI. A pin without the row RAISEs; **never insert that row on
+prod.** Lock 2: `session_user = 'authenticator'` (PostgREST, edge functions) ignores any pin — so the engine and the
+UI drivers always run on the real clock. A pin must carry a UTC offset (§7.337). Nothing but `app_now()` may mention
+`swimsync.now` or call `set_config`.
+
+**Kept true by checks, not memory:** G2 refuses a raw clock in a new migration (`-- clock: stamp` / `-- clock-real:`
+to opt a line out); the **frozen clock census** in `app_clock.test.sql` is red on any change to which public function
+reads a raw clock, by any route; ACL parity there keeps every caller of an invoker clock-reader — function, trigger
+or column default — able to execute `app_now()` (§7.342). **Do not** drop `app_now`/`app_today`/the flag table in any
+DOWN (§7.335), re-body a REAL-TIME function onto the pin, or add a second clock GUC. Plan:
+`docs/plans/WAVE7_DB_CLOCK_PLAN.md` (Appendix A = the classification of all 71 clock readers).
 
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 

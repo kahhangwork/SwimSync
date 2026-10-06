@@ -1121,3 +1121,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
 73. **Deploy record (2026-10-06): Apps-2 + driver (`0ef1e89`, lane 2) — backdated dialog, *Nothing to bill*, usage
     list.** After B, same day. Bundle grep (method proven on existing strings first): app "Show lessons used",
     admin "Nothing to bill" and "Draw from package", each in a new chunk hash. CI green.
+74. **Deploy record (2026-10-06): Wave 7 M1 `20261006000300` (`f072685`) — the injectable clock.** Pre-reads:
+    `private` schema absent, `authenticator` exposes no extra schema, prod md5 = local for `today_sg` /
+    `session_window_start`. Post: 0 pending; `private.clock_override_enabled` **empty** (seed never runs on prod — and
+    **never insert into it on prod**: lock 1 is the empty table); `app_now()` = `now()`; `app_today()` = SGT date;
+    `anon` holds neither; no API role holds anything on the flag table; prod md5 = local after. Grant dump: only
+    `authenticated`/`service_role` EXECUTE on `app_now`/`app_today`. Rollback rehearsed in BEGIN…ROLLBACK
+    (`supabase/rollback/…_app_clock_DOWN.sql`, never drops the clock layer — §7.335).
+75. **Deploy record (2026-10-06): Wave 7 M2 `20261006000400` (`64b678a`) — 9 DECIDE functions on `app_now()`.**
+    Prod md5 = local before (9/9) and after (9/9); same gate; no privilege change.
+76. **Deploy record (2026-10-06): Wave 7 M3 `20261006000500` (`d93d9c0`) — STAMP-FEEDS + `DEFAULT app_now()` on
+    `student_class_enrolments.enrolled_at`, `parent_packages.requested_at`.** Pre-read: every role with INSERT/UPDATE
+    on those tables holds `app_now()` (prod, empty result). Post: md5 7/7 = local; defaults read `app_now()`. Final
+    grant dump: no grant line changed since M1 except the two clock functions. No app or engine change rode any
+    Wave 7 push (path diff empty each time); prod behaviour is identical by construction (`app_now()` = `now()`).

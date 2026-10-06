@@ -25,6 +25,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 | WAVE_2_PACKAGES_BRIEF.md | SUPERSEDED by PACKAGE_REVENUE_REFUNDS_PLAN.md | Wave 2's decisions W1–W6 (still the source for those) |
 | ATTENDANCE_SAVE_TESTS_PLAN.md | DONE (§8.134, deploy #60) | Wave 2 lane 2 — the attendance save path's hook + screen tests |
 | WAVE3_RENDER_TESTS_PLAN.md | DONE (§8.137, deploy #63) | Wave 3 — two lanes: admin invoice/Pending-charges tests; parent money cards + the D5 child-card fix |
+| WAVE7_DB_CLOCK_PLAN.md | DONE (§8.140, deploys #74–#76) | Wave 7 — the injectable DB clock (`app_now()`/`app_today()`), 83 pgTAP files pinned, guards G1–G4 |
 
 ## Done
 
