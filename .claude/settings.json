@@ -7,5 +7,19 @@
       "Bash(supabase functions list*)",
       "Bash(supabase db dump*)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r \".tool_input.command // empty\" | grep -Eq \"(^|[^[:alnum:]_-])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+stash([^[:alnum:]_-]|$)\" && { echo \"Blocked: git stash — the stash stack is shared across every worktree (session-close rule). Use a WIP commit instead: git commit -m 'WIP: …'\" >&2; exit 2; } || exit 0",
+            "statusMessage": "Checking for git stash"
+          }
+        ]
+      }
+    ]
   }
 }
