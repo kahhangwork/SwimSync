@@ -506,7 +506,7 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 >    is a compensated hazard, and this one broke CI before it was removed (§7.73).
 
 > **Every driver runs NIGHTLY in CI as of 2026-08-05** (`.github/workflows/ui-drivers.yml`,
-> 04:00 SGT daily + a manual Run-workflow button), via
+> 03:17 SGT daily — GitHub starts it hours late, so read the run's own time — + a manual Run-workflow button), via
 > `drivers/run-all-drivers.sh` — which is also the way to run the whole set locally.
 > The protocol per driver is uniform, deliberately: `supabase db reset` → kong restart
 > (§7.44) → load its fixture → run it under a hard timeout. The next reset is the cleanup,

@@ -23,7 +23,7 @@ name: UI drivers (nightly)
 
 on:
   schedule:
-    - cron: "0 20 * * *" # 20:00 UTC = 04:00 SGT daily
+    - cron: "17 19 * * *" # 19:17 UTC = 03:17 SGT daily. Off the hour on purpose: GitHub queues :00 crons hardest (starts ran 2h45m-5h15m late at "0 20"). Still the PREVIOUS UTC day (§7.122).
   workflow_dispatch:
     inputs:
       only:
