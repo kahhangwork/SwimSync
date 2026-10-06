@@ -43,6 +43,14 @@ describe("toCreditNoteRow", () => {
     expect(toCreditNoteRow({ ...base, credit_note_email_state: undefined }).email_state).toBe("UNSENT");
   });
 
+  // Bug ledger #3 (Wave 8): PostgREST returns issued_at in UTC, so the old
+  // `.split("T")[0]` showed — and exported to CSV — the PREVIOUS day for any note
+  // issued 00:00–07:59 SGT. Probe: 07:30 SGT on 6 Oct came back as below.
+  it("created_at is the SINGAPORE date of issued_at, not its UTC date", () => {
+    expect(toCreditNoteRow({ ...base, issued_at: "2026-10-05T23:30:00+00:00" }).created_at).toBe("2026-10-06");
+    expect(toCreditNoteRow({ ...base, issued_at: "2026-10-06T00:30:00+00:00" }).created_at).toBe("2026-10-06");
+  });
+
   it("the snapshot student_name wins over the embed; missing embeds read —", () => {
     const r = toCreditNoteRow({ ...base, student_name: "Snap", students: null, parents: null, issued_at: null });
     expect(r.student_name).toBe("Snap");

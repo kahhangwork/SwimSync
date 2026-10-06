@@ -1,4 +1,5 @@
 import type { CsvColumn } from "@/lib/csv";
+import { toSgDate } from "@/lib/lessonDates";
 import type { CreditNoteRow, EmailDeliveryState } from "../types";
 import type { NoteSelectRow } from "../dao/creditNotes.repo";
 
@@ -37,7 +38,10 @@ export function toCreditNoteRow(cn: NoteSelectRow): CreditNoteRow {
     amount: Number(cn.amount),
     reason: cn.reason,
     linked_invoice_id: cn.applied_to_invoice_id,
-    created_at: cn.issued_at?.split("T")[0] ?? "—",
+    // The SINGAPORE date of the timestamptz — `.split("T")[0]` was its UTC date,
+    // a day early for anything issued 00:00–07:59 SGT (Bug ledger #3, §7.7).
+    // Guarded: toSgDate(null) is "1970-01-01" and an empty value throws.
+    created_at: cn.issued_at ? toSgDate(cn.issued_at) : "—",
     status: cn.status,
     email_sent_at: cn.email_sent_at ?? null,
     // The computed column is always selected; the fallback only guards a row
