@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import type { BillingMonthRow } from "@/lib/billingMonths";
+import { PACKAGE_FUNDED_REASON, type BillingMonthRow } from "@/lib/billingMonths";
 import type { UndeliveredEmail } from "../domain/undeliveredEmails";
 import { BillingMonthsCard } from "./BillingMonthsCard";
 
@@ -52,6 +52,18 @@ function renderCard(overrides: Partial<ComponentProps<typeof BillingMonthsCard>>
   render(<BillingMonthsCard {...props} />);
   return props;
 }
+
+describe("BillingMonthsCard — Nothing to bill (Wave 6 D2)", () => {
+  it("labels a package-funded month and says Generate is optional", () => {
+    renderCard({
+      rows: [{ ...month("2026-08", "package_funded"), reason: PACKAGE_FUNDED_REASON }],
+    });
+    const row = screen.getByTestId("billing-month-2026-08");
+    expect(row.getAttribute("data-state")).toBe("package_funded");
+    expect(row.textContent).toMatch(/Nothing to bill/);
+    expect(row.textContent).toMatch(/All package-funded\. Generate to close it for Accounting \(optional\)\./);
+  });
+});
 
 describe("BillingMonthsCard — may not have arrived", () => {
   it("shows no count when no invoice email is MAY_HAVE_SENT", () => {

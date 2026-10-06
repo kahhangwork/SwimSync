@@ -52,7 +52,41 @@ export type BillingRun = {
   error: string | null;
 };
 
-export type MonthState = "closed" | "open" | "not_billed" | "not_run";
+export type MonthState = "closed" | "open" | "not_billed" | "not_run" | "package_funded";
+
+/** One row of package_month_funding(p_tenant) (Wave 6, migration A): per month
+ *  with any billable mark OR any unmarked expected lesson. */
+export type MonthFunding = {
+  billing_month: string;
+  /** Billable lessons a package paid for at marking (live draws). */
+  drawn_lessons: number;
+  /** Billable lessons with no invoice line, no live draw, no live settlement. */
+  waiting_lessons: number;
+  /** class_unmarked_lesson_pairs for the month — the gate's own derivation. */
+  unmarked_lessons: number | null;
+};
+
+/** The state label already says "Nothing to bill"; this is the rest (D2). */
+export const PACKAGE_FUNDED_REASON =
+  "All package-funded. Generate to close it for Accounting (optional).";
+
+/**
+ * Wave 6 D2 + ⚠ RISK 3: "Nothing to bill" needs the POSITIVE and COMPLETE
+ * preconditions, each read, never assumed — a month with no lessons, or with
+ * lessons still unmarked, must never read as done (§7.219, §7.17). Fails
+ * CLOSED: a missing row or an unreadable count is "not package-funded".
+ * Ended + unsealed are the caller's: only billable (ended) months reach it,
+ * and a sealed month is Closed first.
+ */
+export function isPackageFunded(f: MonthFunding | undefined): boolean {
+  if (!f) return false;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const drawn = n(f.drawn_lessons);
+  const waiting = n(f.waiting_lessons);
+  const unmarked = n(f.unmarked_lessons);
+  if (drawn === null || waiting === null || unmarked === null) return false;
+  return drawn >= 1 && waiting === 0 && unmarked === 0;
+}
 
 export type BillingMonthRow = {
   month: string;
@@ -136,6 +170,8 @@ export type DeriveInput = {
   todaySg: string;
   /** The tenant's invoice_run_day (1–28). */
   runDay: number;
+  /** package_month_funding rows. Omitted or a failed read → no month qualifies. */
+  funding?: MonthFunding[];
 };
 
 /** Every month worth a row, newest first (plan §3). */
@@ -153,6 +189,7 @@ export function deriveBillingMonths(input: DeriveInput): BillingMonthRow[] {
     runsBy.set(r.billing_month, list);
   }
   const invoiced = new Set(invoiceMonths);
+  const fundingBy = new Map((input.funding ?? []).map((f) => [f.billing_month, f]));
 
   // ⚠ RISK 7: a month an OPEN month's latest run says must be billed first. It
   // may have no run and no invoice — without promoting it, the admin is told to
@@ -188,6 +225,11 @@ export function deriveBillingMonths(input: DeriveInput): BillingMonthRow[] {
 
       if (period) {
         return [{ ...base, state: "closed", needsAttention: false, reason: null }];
+      }
+      // Wave 6 D2: the CURRENT funding read outranks a stale run's reason (a run
+      // from before the last marks were saved); the run stays in recentRuns.
+      if (isPackageFunded(fundingBy.get(month))) {
+        return [{ ...base, state: "package_funded", needsAttention: false, reason: PACKAGE_FUNDED_REASON }];
       }
       if (runs.length) {
         return [{ ...base, state: "open", needsAttention: true, reason: reasonFor(runs[0]) }];
@@ -225,7 +267,9 @@ export function visibleMonths(
   if (showAll) return { visible: rows, hiddenCount: 0 };
   let closedShown = 0;
   const visible = rows.filter((r) => {
-    if (r.state !== "closed") return true;
+    // A package-funded month needs nothing (Wave 6 D2), so it is capped with
+    // the closed ones rather than shown forever.
+    if (r.state !== "closed" && r.state !== "package_funded") return true;
     closedShown += 1;
     return closedShown <= CLOSED_CAP;
   });

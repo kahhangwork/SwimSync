@@ -16,6 +16,12 @@ import { supabase } from "@/lib/supabase";
 export const unbilledSealedLessons = (tenantId: string) =>
   supabase.rpc("unbilled_sealed_lessons", { p_tenant: tenantId });
 
+/** Wave 6 D2: per-month drawn / waiting / unmarked counts for "Nothing to bill".
+ *  DEFINER, gated on billing:view — package_applications RLS is packages:view,
+ *  so a billing-only admin would miscount reading it directly. */
+export const packageMonthFunding = (tenantId: string) =>
+  supabase.rpc("package_month_funding", { p_tenant: tenantId });
+
 export const writeOffParentBalance = (
   parentId: string,
   tenantId: string,

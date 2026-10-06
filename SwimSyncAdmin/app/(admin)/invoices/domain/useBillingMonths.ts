@@ -9,9 +9,11 @@ import {
   stillUnclaimed,
   type BillingMonthRow,
   type BillingPeriod,
+  type MonthFunding,
   type RunUnclaimedStudent,
 } from "@/lib/billingMonths";
 import * as repo from "../dao/invoices.repo";
+import * as rpc from "../dao/invoices.rpc";
 import * as api from "../dao/invoices.api";
 import {
   resendInvoiceReasonLabel,
@@ -103,7 +105,7 @@ export function useBillingMonths() {
     setStaleNote(null);
     void loadUndelivered(tenantId);
     const latestBillableMonth = previousBillingMonth();
-    const [tenant, periods, runs, invoices] = await Promise.all([
+    const [tenant, periods, runs, invoices, funding] = await Promise.all([
       repo.fetchTenant(tenantId),
       repo.fetchBillingPeriods(tenantId),
       repo.fetchBillingRuns(tenantId),
@@ -111,6 +113,7 @@ export function useBillingMonths() {
         tenantId,
         monthsBefore(latestBillableMonth, INVOICE_MONTH_WINDOW)
       ),
+      rpc.packageMonthFunding(tenantId),
     ]);
     const error = tenant.error ?? periods.error ?? runs.error ?? invoices.error;
     if (error) {
@@ -132,6 +135,10 @@ export function useBillingMonths() {
         todaySg: todayInSg(),
         // Same default and clamp as useTenantBilling's display of it.
         runDay: runDayOf(tenant.data?.invoice_run_day),
+        // Wave 6 D2: deliberately NOT in the error chain above. A failed read
+        // here only means no month can read "Nothing to bill" — fail CLOSED to
+        // today's text, never blank the card over an optional nicety.
+        funding: funding.error ? [] : ((funding.data ?? []) as MonthFunding[]),
       })
     );
     setLoaded(true);

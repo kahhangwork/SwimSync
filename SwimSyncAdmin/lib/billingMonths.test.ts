@@ -13,6 +13,7 @@ import {
   type BillingPeriod,
   type BillingRun,
   type DeriveInput,
+  type MonthFunding,
 } from "./billingMonths";
 
 // docs/plans/BILLING_MONTHS_PLAN.md §3 + the ⚠ RISK 6/7/8/10 assertions.
@@ -207,6 +208,76 @@ describe("⚠ RISK 6 — a stale snapshot must not drive a settlement", () => {
   });
   it("a settlement that stops SHORT of the latest lesson does not hide them", () => {
     expect(stillUnclaimed(stored, new Set(), new Map([["s1", "2026-08-01"]]))).toHaveLength(1);
+  });
+});
+
+// Wave 6 D2 (refined 2026-10-06) + ⚠ RISK 3: a month every billable lesson of
+// which a package already paid for needs no Generate. It reads "Nothing to
+// bill" ONLY when the positive and complete preconditions all hold — an empty
+// or unmarked month must keep today's text (§7.219, §7.17).
+describe("Wave 6 — Nothing to bill (all package-funded)", () => {
+  const fund = (m: string, over: Partial<MonthFunding> = {}): MonthFunding => ({
+    billing_month: m, drawn_lessons: 3, waiting_lessons: 0, unmarked_lessons: 0, ...over,
+  });
+  const amber = base({ todaySg: "2026-09-22", runDay: 7 });
+
+  it("all drawn, none waiting, none unmarked → Nothing to bill, no attention", () => {
+    const [aug] = deriveBillingMonths({ ...amber, funding: [fund("2026-08")] });
+    expect(aug).toMatchObject({ state: "package_funded", needsAttention: false });
+    expect(aug.reason).toMatch(/Generate to close it for Accounting \(optional\)/);
+    expect(attentionSummary([aug])).toBeNull();
+  });
+
+  it("an EMPTY month (absent from the funding rows) keeps today's text", () => {
+    const [aug] = deriveBillingMonths({ ...amber, funding: [] });
+    expect(aug).toMatchObject({ state: "not_billed", needsAttention: true });
+  });
+
+  it("an UNMARKED month keeps today's text, however much was drawn", () => {
+    const [aug] = deriveBillingMonths({ ...amber, funding: [fund("2026-08", { unmarked_lessons: 1 })] });
+    expect(aug.state).toBe("not_billed");
+  });
+
+  it("an unreadable unmarked count fails CLOSED (never Nothing to bill)", () => {
+    for (const unmarked_lessons of [null, undefined, NaN] as unknown as number[]) {
+      const [aug] = deriveBillingMonths({ ...amber, funding: [fund("2026-08", { unmarked_lessons })] });
+      expect(aug.state).toBe("not_billed");
+    }
+  });
+
+  it("a lesson still waiting to be billed keeps today's text", () => {
+    const [aug] = deriveBillingMonths({ ...amber, funding: [fund("2026-08", { waiting_lessons: 1 })] });
+    expect(aug.state).toBe("not_billed");
+  });
+
+  it("nothing drawn (all marks non-billable) is not 'package-funded'", () => {
+    const [aug] = deriveBillingMonths({ ...amber, funding: [fund("2026-08", { drawn_lessons: 0 })] });
+    expect(aug.state).toBe("not_billed");
+  });
+
+  it("overrides a STALE run's reason (Q2); the run stays in recentRuns", () => {
+    const stale = run("2026-08", { status: "incomplete_attendance",
+      blocking: [{ class_id: "c", class_title: "Sat", session_date: "2026-08-02", unmarked_student_count: 1 }] });
+    const [aug] = deriveBillingMonths({ ...amber, runs: [stale], funding: [fund("2026-08")] });
+    expect(aug.state).toBe("package_funded");
+    expect(aug.recentRuns.map((r) => r.id)).toEqual([stale.id]);
+  });
+
+  it("is capped with the closed months, not shown forever like an open one", () => {
+    const rows = deriveBillingMonths({
+      ...amber,
+      periods: ["2026-04", "2026-05", "2026-06"].map((m) => period(m)),
+      runs: [run("2026-07"), run("2026-08")],
+      funding: [fund("2026-07"), fund("2026-08")],
+    });
+    const { visible, hiddenCount } = visibleMonths(rows);
+    expect(visible.map((r) => r.month)).toEqual(["2026-08", "2026-07", "2026-06"]);
+    expect(hiddenCount).toBe(2);
+  });
+
+  it("a SEALED month is Closed, never Nothing to bill (pressing Generate closed it)", () => {
+    const [aug] = deriveBillingMonths({ ...amber, periods: [period("2026-08", 0)], funding: [fund("2026-08")] });
+    expect(aug.state).toBe("closed");
   });
 });
 

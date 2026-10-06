@@ -8,12 +8,14 @@ import {
   monthsBefore,
   runDayOf,
   type BillingPeriod,
+  type MonthFunding,
 } from "@/lib/billingMonths";
 import {
   getAuthUser,
   loadBillingMonthsInput,
   loadProfileTenantId,
 } from "../dao/dashboard.repo";
+import { packageMonthFunding } from "../dao/dashboard.rpc";
 
 /** The Dashboard's one-line "a month still needs billing" alert (D1, D5: every
  *  admin of the business). Same derivation as the Invoices page's card, so the
@@ -33,10 +35,13 @@ export function useBillingAlert() {
       if (!tenantId) return;
 
       const latestBillableMonth = previousBillingMonth();
-      const [tenant, periods, runs, invoices] = await loadBillingMonthsInput(
-        tenantId,
-        monthsBefore(latestBillableMonth, INVOICE_MONTH_WINDOW)
-      );
+      const [[tenant, periods, runs, invoices], funding] = await Promise.all([
+        loadBillingMonthsInput(
+          tenantId,
+          monthsBefore(latestBillableMonth, INVOICE_MONTH_WINDOW)
+        ),
+        packageMonthFunding(tenantId),
+      ]);
       if (tenant.error || periods.error || runs.error || invoices.error) return;
 
       const rows = deriveBillingMonths({
@@ -48,6 +53,8 @@ export function useBillingAlert() {
         latestBillableMonth,
         todaySg: todayInSg(),
         runDay: runDayOf(tenant.data?.invoice_run_day),
+        // Wave 6 D2: a failed read fails CLOSED to today's alert, as on the card.
+        funding: funding.error ? [] : ((funding.data ?? []) as MonthFunding[]),
       });
       setSummary(attentionSummary(rows));
     })();

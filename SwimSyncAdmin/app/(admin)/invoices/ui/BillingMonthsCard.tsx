@@ -140,6 +140,7 @@ const STATE_STYLE: Record<BillingMonthRow["state"], { dot: string; label: string
   open: { dot: "bg-red-500", label: "Open" },
   not_billed: { dot: "bg-amber-500", label: "Not billed yet" },
   not_run: { dot: "bg-gray-300", label: "Not run yet" },
+  package_funded: { dot: "bg-sky-500", label: "Nothing to bill" },
 };
 
 function MonthRow({
