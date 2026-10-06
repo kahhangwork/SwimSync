@@ -6,6 +6,7 @@ import {
   updateLocation,
 } from "../dao/locations.repo";
 import type { Location } from "../types";
+import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
 
 type Deps = {
   locations: Location[];
@@ -78,10 +79,15 @@ export function useLocationForm({ locations, setBusy, setError, load }: Deps) {
       ({ error: err } = await updateLocation(editing.id, payload));
     } else {
       const { data: auth } = await getAuthUser();
-      // Both `!` are NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-      // No user / no tenant → key dropped → RLS refuses → the error below (see the dao).
-      const { data: profile } = await loadProfileTenantId(auth.user?.id!);
-      ({ error: err } = await insertLocation(payload, profile?.tenant_id!));
+      // Signed out, or a profile with no business: say so and send nothing —
+      // never a NULL tenant for RLS to refuse (Wave 8).
+      const profile = auth.user ? (await loadProfileTenantId(auth.user.id)).data : null;
+      if (!profile?.tenant_id) {
+        setBusy(false);
+        setError(NO_TENANT_MESSAGE);
+        return;
+      }
+      ({ error: err } = await insertLocation(payload, profile.tenant_id));
     }
 
     setBusy(false);
