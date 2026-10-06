@@ -19,7 +19,7 @@
 -- become authenticator (§7.333), so any assertion here would be vacuous. It is proven over a real login by
 -- supabase/tests/http/app_clock_locks.sh.
 BEGIN;
-SELECT plan(24);
+SELECT plan(25);
 
 -- ---- 1. The flag row (lock 1's switch) is present: seed.sql ran, or M1's hand insert did (§7.334) ----------
 SELECT is((SELECT count(*)::int FROM private.clock_override_enabled), 1,
@@ -94,6 +94,20 @@ SELECT is_empty($$
   SELECT r FROM unnest(ARRAY['anon','authenticated','service_role']) r
    WHERE has_schema_privilege(r, 'private', 'USAGE') OR has_schema_privilege(r, 'private', 'CREATE')
 $$, 'no API role can use or create in the private schema');
+
+-- The general form of the parity: a SECURITY INVOKER function that calls the clock runs app_now() as ITS caller,
+-- so every role that may execute it must hold app_now()/app_today() (M2's four invoker re-bodies, and any later).
+SELECT is_empty($$
+  SELECT p.proname, r
+    FROM pg_proc p, unnest(ARRAY['anon','authenticated','service_role']) r
+   WHERE p.pronamespace = 'public'::regnamespace
+     AND NOT p.prosecdef
+     AND p.proname NOT IN ('app_now', 'app_today')
+     AND p.prosrc ~ '(app_now|app_today|today_sg|session_window_start)\('
+     AND has_function_privilege(r, p.oid, 'EXECUTE')
+     AND NOT (has_function_privilege(r, 'public.app_now()', 'EXECUTE')
+              AND has_function_privilege(r, 'public.app_today()', 'EXECUTE'))
+$$, 'every role that can call an invoker function reading the clock can call app_now() and app_today()');
 
 -- A column DEFAULT app_now() runs as the INSERTING role: every role that may insert must be able to call it.
 SELECT is_empty($$
