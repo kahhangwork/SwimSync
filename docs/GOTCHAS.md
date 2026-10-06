@@ -46,7 +46,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
-`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
+`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
 §7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic) · §7.350/§7.347 → G5 `scripts/check-db-types.sh` · §7.346 → `scripts/check-db-overrides.sh` · §7.348 → `scripts/check-runtime-identical.sh` (CI, per `types(…)` commit) · casts regrowing → G6 `scripts/check-db-any.sh`.
 
 ---
@@ -94,8 +94,8 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
      `.split("T")[0]` / `.slice(0, 10)` on a `*_at` field is the UTC date: Credit Notes list + CSV, the admin Claims
      cards and the parent's "Waiting since" all showed the previous day 00:00–07:59 SGT (Bug ledger #3–#5). The
      parent-side test had passed for the WRONG reason (§7.25) — its fixture wrote `+08:00`, a shape PostgREST never
-     sends. **Write fixtures in the shape the API returns.** G3 covers `supabase/functions` only → BACKLOG *Extend G3
-     to the apps*.
+     sends. **Write fixtures in the shape the API returns.** Both apps are now guarded too — G3-apps
+     (`scripts/check-apps-sg-date.sh`), which matches any receiver: the parent-side bug read `createdAtIso`, no `_at`.
 
 8. **~~The engine's completeness gate never fires on the admin path.~~ FIXED 2026-07-18
    (§8a).** `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcoded `force: true`,

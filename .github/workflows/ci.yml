@@ -68,6 +68,12 @@ jobs:
       - name: No edge function takes the UTC date of a timestamp (G3)
         run: scripts/check-functions-sg-date.sh
 
+      # §7.7 again, in both apps: PostgREST returns every timestamptz in UTC, so
+      # `issued_at.slice(0, 10)` is a day early before 08:00 — three screens at once
+      # in Wave 8 (Bug ledger #3–#5). Marker: `// sg-date-ok: <why>`.
+      - name: Neither app takes the UTC date of a timestamp (G3-apps)
+        run: scripts/check-apps-sg-date.sh
+
       # Wave 8: both apps carry the SAME generated Database types (they share no
       # package). A one-sided edit or regen is a lie in one app.
       - name: Both apps' database.types.ts are byte-identical

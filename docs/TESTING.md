@@ -459,6 +459,11 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 > `app_clock.test.sql` (below). **No edge function takes the UTC date of a timestamp — G3**
 > (`scripts/check-functions-sg-date.sh`, required): `slice(0, 10)` / `split("T")[0]` in `supabase/functions/**`,
 > allowlist file + function exact, or `// utc-date-ok: <why>`. Blind to `.substring(0, 10)` and Intl (script header).
+> **Neither app does either — G3-apps** (`scripts/check-apps-sg-date.sh`, repo-invariants): every tracked non-test
+> source file in `SwimSyncApp/` + `SwimSyncAdmin/`; `slice`/`substring`/`substr(0, 10)` on ANY receiver and any
+> `split("T")`; per-line `// sg-date-ok: <why>` only, no allowlist. Its comment-stripper is a lexer (strings, templates
+> with `${…}` as code, regex literals) and matched TypeScript's scanner on all 815 files. Proven red on the old bodies
+> of Wave 8 Bug ledger #3–#5 and green on benign edits, on macOS awk and Ubuntu mawk (§7.231).
 >
 > **Every fixture is now LOADED by CI too** (2026-08-01), by
 > `drivers/check-fixture-roundtrip.sh` — a step in `backend-tests`, which already boots a
