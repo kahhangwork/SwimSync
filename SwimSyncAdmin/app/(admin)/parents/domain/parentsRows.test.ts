@@ -11,14 +11,14 @@ describe("parents domain — pure mapping", () => {
     const rows = [
       { parent_id: "p1", tenant_id: "t1", is_active: true, inactivated_at: null, parents: { profiles: { full_name: "Amy", email: "a@x.sg", phone: "9" } } },
       { parent_id: "p2", tenant_id: "t1", is_active: false, inactivated_at: "2026-01-01", parents: { profiles: {} } },
-    ];
+    ] as any; // an empty profile: pins the `?? {}` / "—" / null defaults
     const fams = toFamilyRows(rows, []);
     expect(fams[0]).toMatchObject({ full_name: "Amy", email: "a@x.sg", phone: "9", is_active: true });
     expect(fams[1]).toMatchObject({ full_name: "—", email: "—", phone: null, inactivated_at: "2026-01-01" });
   });
 
   it("keeps only children at the same business as the parent's membership", () => {
-    const rows = [{ parent_id: "p1", tenant_id: "t1", is_active: true, inactivated_at: null, parents: { profiles: { full_name: "Amy" } } }];
+    const rows = [{ parent_id: "p1", tenant_id: "t1", is_active: true, inactivated_at: null, parents: { profiles: { full_name: "Amy" } } }] as any; // partial profile
     const kids = [
       { parent_id: "p1", students: { id: "s1", full_name: "Kid A", is_active: true, tenant_id: "t1" } },
       { parent_id: "p1", students: { id: "s2", full_name: "Kid B", is_active: true, tenant_id: "t2" } }, // other business

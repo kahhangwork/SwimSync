@@ -3,6 +3,17 @@
 // boundary test: nothing outside dao/ may touch the supabase client.
 
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The rows each read returns. Every to-one embed is widened to `| null` — RLS
+// nulls a hidden embed whatever the generated type says (§7.344) — and
+// domain/parentsRows.ts keeps its `?.` / `??` / filter on each.
+type FamilySelected = DataOf<typeof loadFamilies>[number];
+export type FamilySelectRow = Omit<FamilySelected, "parents"> & {
+  parents: RlsNullable<NonNullable<FamilySelected["parents"]>, "profiles"> | null;
+};
+export type FamilyProfile = NonNullable<NonNullable<FamilySelectRow["parents"]>["profiles"]>;
+export type KidSelectRow = RlsNullable<DataOf<typeof loadKids>[number], "students">;
 
 // RLS scopes this to the caller's own business — parent_tenants_select hides
 // other businesses' memberships, which is why no tenant filter is written here.

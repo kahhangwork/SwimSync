@@ -2,13 +2,14 @@
 // network. Kept pure so it carries the page's unit tests (parentsRows.test.ts).
 
 import type { FamilyRow } from "../types";
+import type { FamilyProfile, FamilySelectRow, KidSelectRow } from "../dao/parents.repo";
 
 // Combine the parent_tenants rows with their parent_students children, keeping
 // only children AT THIS BUSINESS. A sibling elsewhere is another admin's concern
 // and must not be actionable from here.
-export function toFamilyRows(rows: any[], kids: any[]): FamilyRow[] {
+export function toFamilyRows(rows: FamilySelectRow[], kids: KidSelectRow[]): FamilyRow[] {
   return rows.map((r) => {
-    const profile = r.parents?.profiles ?? {};
+    const profile: Partial<FamilyProfile> = r.parents?.profiles ?? {};
     return {
       parent_id: r.parent_id,
       tenant_id: r.tenant_id,
@@ -19,13 +20,15 @@ export function toFamilyRows(rows: any[], kids: any[]): FamilyRow[] {
       inactivated_at: r.inactivated_at,
       children: (kids ?? [])
         .filter(
-          (k: any) =>
+          (k) =>
             k.parent_id === r.parent_id && k.students?.tenant_id === r.tenant_id
         )
-        .map((k: any) => ({
-          id: k.students.id,
-          full_name: k.students.full_name,
-          is_active: k.students.is_active,
+        // `!`: guarded by the filter above — for a hidden (null) student
+        // `k.students?.tenant_id` is undefined, which never equals r.tenant_id.
+        .map((k) => ({
+          id: k.students!.id,
+          full_name: k.students!.full_name,
+          is_active: k.students!.is_active,
         })),
     };
   });

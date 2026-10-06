@@ -32,7 +32,7 @@ export function useParents() {
     setLoading(true);
     const { data } = await loadFamilies();
 
-    const rows = (data ?? []) as any[];
+    const rows = data ?? [];
     const parentIds = rows.map((r) => r.parent_id);
 
     // Family-grain payment method: this page's rows are parents, so the
@@ -43,7 +43,7 @@ export function useParents() {
 
     const { data: kids } = await loadKids(parentIds);
 
-    setFamilies(toFamilyRows(rows, (kids ?? []) as any[]));
+    setFamilies(toFamilyRows(rows, kids ?? []));
     setLoading(false);
   }
 
