@@ -46,7 +46,7 @@ describe("unassigned domain — pure helpers", () => {
 
   it("maps class options and counts only active enrolments", () => {
     const out = toClassOptions([
-      { id: "cl1", title: "Fish", day_of_week: "monday", start_time: "09:00", student_class_enrolments: [{ is_active: true }, { is_active: false }] },
+      { id: "cl1", title: "Fish", day_of_week: "monday", start_time: "09:00", student_class_enrolments: [{ id: "e1", is_active: true }, { id: "e2", is_active: false }] },
     ]);
     expect(out[0]).toMatchObject({ id: "cl1", title: "Fish", student_count: 1 });
   });

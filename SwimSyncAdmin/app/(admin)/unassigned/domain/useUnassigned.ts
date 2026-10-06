@@ -45,21 +45,21 @@ export function useUnassigned() {
 
     const { data: upcoming } = await repo.loadUpcomingTrials();
     const awaitingTrial = new Set(
-      (upcoming ?? []).map((b: any) => b.student_id as string)
+      (upcoming ?? []).map((b) => b.student_id as string)
     );
 
-    setStudents(toStudents((data ?? []) as any[], awaitingTrial));
+    setStudents(toStudents(data ?? [], awaitingTrial));
     setLoading(false);
   }
 
   async function loadCoaches() {
     const { data } = await repo.loadCoaches();
-    setCoaches(toCoaches((data ?? []) as any[]));
+    setCoaches(toCoaches(data ?? []));
   }
 
   async function loadClassesForCoach(coachId: string) {
     const { data } = await repo.loadClassesForCoach(coachId);
-    setClassOptions(toClassOptions((data ?? []) as any[]));
+    setClassOptions(toClassOptions(data ?? []));
   }
 
   async function handleAssign() {

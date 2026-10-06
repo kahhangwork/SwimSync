@@ -2,6 +2,18 @@
 // { data, error }; no logic, no mapping (that lives in domain/).
 
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The rows each read returns. Every to-one embed is widened to `| null` — RLS
+// nulls a hidden embed whatever the generated type says (§7.344) — and domain/
+// keeps its `?.` / `??` on each.
+type StudentSelected = DataOf<typeof loadUnassignedStudents>[number];
+type ParentSelected = NonNullable<StudentSelected["parent_students"][number]["parents"]>;
+export type UnassignedStudentRow = Omit<StudentSelected, "parent_students"> & {
+  parent_students: { parents: RlsNullable<ParentSelected, "profiles"> | null }[];
+};
+export type CoachSelectRow = RlsNullable<DataOf<typeof loadCoaches>[number], "profiles">;
+export type ClassOptionRow = DataOf<typeof loadClassesForCoach>[number];
 
 // SGT calendar date (YYYY-MM-DD). Kept exactly as the page computed it; the
 // trial queries below filter on it.
