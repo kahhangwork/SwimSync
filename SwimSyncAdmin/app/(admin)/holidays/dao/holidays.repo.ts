@@ -48,7 +48,7 @@ export async function loadVoidedRows(
     .select("lesson_sessions!inner(session_date, classes!inner(tenant_id))")
     .eq("status", "holiday")
     .eq("lesson_sessions.classes.tenant_id", tenant);
-  return (data ?? []) as unknown as { lesson_sessions: { session_date: string } | null }[];
+  return data ?? [];
 }
 
 /** Void every lesson on the date. Returns [count, errorMessage]. */

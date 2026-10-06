@@ -2,7 +2,6 @@
 # Only ever LOWERED — regenerate with `scripts/check-db-any.sh --update`. Absent = 0.
 app/(admin)/accounting/domain/summaryRow.ts 1
 app/(admin)/credit-notes/domain/creditNoteRows.ts 1
-app/(admin)/holidays/dao/holidays.repo.ts 1
 app/(admin)/invoices/domain/invoiceRows.ts 2
 app/(admin)/invoices/domain/undeliveredEmails.ts 1
 app/(admin)/invoices/domain/usePendingDebits.ts 1
