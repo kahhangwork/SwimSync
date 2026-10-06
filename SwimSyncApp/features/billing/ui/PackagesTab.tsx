@@ -10,12 +10,15 @@ import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import { formatDate } from "../domain/billingFormat";
 import { ReferralSection } from "./ReferralSection";
+import { PackageUsageList } from "./PackageUsageList";
+import { usePackageUsage } from "../domain/usePackageUsage";
 import type { useBilling } from "../domain/useBilling";
 
 type Billing = ReturnType<typeof useBilling>;
 
 export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "products" | "requestingId" | "requestPackage" | "cancelRequest">) {
   const { packageError, packages, products, requestingId, requestPackage, cancelRequest } = p;
+  const usage = usePackageUsage();
   return (
     <>
       <>
@@ -92,6 +95,7 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                     lessons
                   </Text>
                 )}
+                <PackageUsageList packageId={pkg.id} usage={usage} />
               </>
             ) : (
               <>
