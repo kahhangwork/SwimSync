@@ -23,10 +23,11 @@ export function usePackageSettings() {
 
   async function loadPackages() {
     const { data: userRes } = await repo.getCurrentUser();
-    // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-    // SILENT path (pre-existing): signed out → `id=eq.undefined` 400s → `prof` is null
-    // → the default thresholds above stay, with no message.
-    const { data: prof } = await repo.fetchTenantPackageSettings(userRes.user?.id!);
+    // Signed out: skip the settings read (it was an `id=eq.undefined` 400) and
+    // keep the defaults, with no message — the page is unpersonalised, not
+    // broken (Wave 8, lane1's decision). Coverage still loads below.
+    const userId = userRes.user?.id;
+    const prof = userId ? (await repo.fetchTenantPackageSettings(userId)).data : null;
     setTenantId(prof?.tenant_id ?? null);
     const stored = prof?.tenants?.low_package_lessons;
     if (stored !== null && stored !== undefined) setThreshold(String(stored));
