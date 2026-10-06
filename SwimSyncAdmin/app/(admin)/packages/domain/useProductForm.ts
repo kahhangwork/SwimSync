@@ -6,6 +6,7 @@
 import { useState } from "react";
 import * as repo from "../dao/packages.repo";
 import * as rpc from "../dao/packages.rpc";
+import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
 
 type Shared = {
   setBusy: (b: boolean) => void;
@@ -60,6 +61,12 @@ export function useProductForm({ setBusy, reload }: Shared) {
 
     setBusy(true);
     setFormError(null);
+    // No business: say so and send nothing — never a NULL tenant (Wave 8).
+    const tenant_id = await rpc.myTenantId();
+    if (!tenant_id) {
+      setBusy(false);
+      return setFormError(NO_TENANT_MESSAGE);
+    }
     const { error: err } = await repo.insertProduct({
       name,
       category_id: pCategory || null,
@@ -69,9 +76,7 @@ export function useProductForm({ setBusy, reload }: Shared) {
       // Override present ⇒ its own type + value; absent ⇒ NULL/NULL = inherit.
       referral_discount_type: pRefOverride ? pRefType : null,
       referral_discount_value: pRefOverride ? Number(pRefValue) : null,
-      // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-      // No tenant → NULL → 23502/RLS → "Could not create the package."
-      tenant_id: (await rpc.myTenantId())!,
+      tenant_id,
     });
     setBusy(false);
     if (err) {
