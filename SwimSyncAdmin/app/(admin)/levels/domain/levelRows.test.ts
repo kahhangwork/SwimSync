@@ -21,7 +21,7 @@ describe("toLevels", () => {
 
   it("keeps a level held ONLY by departed children (0 active) — it must not vanish", () => {
     const [l] = toLevels([
-      { id: "L2", label: "Dolphin", sort_order: 2, note: null, students: [{ id: "x", is_active: false }], tenant_level_skills: null },
+      { id: "L2", label: "Dolphin", sort_order: 2, note: null, students: [{ id: "x", is_active: false }], tenant_level_skills: null as any }, // pins the kept `?? []`
     ]);
     expect(l.student_count).toBe(0);
     expect(l.inactive_count).toBe(1);
@@ -30,7 +30,7 @@ describe("toLevels", () => {
   it("orders skills by sort_order, then label (PostgREST can't order an embed)", () => {
     const [l] = toLevels([
       {
-        id: "L1", label: "A", sort_order: 1, note: null, students: null,
+        id: "L1", label: "A", sort_order: 1, note: null, students: null as any, // pins the kept `?? []`
         tenant_level_skills: [
           { id: "s3", label: "Kick", sort_order: 2 },
           { id: "s2", label: "Bubbles", sort_order: 1 },

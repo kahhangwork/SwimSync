@@ -10,7 +10,6 @@ app/(admin)/holidays/dao/holidays.repo.ts 1
 app/(admin)/invoices/domain/invoiceRows.ts 2
 app/(admin)/invoices/domain/undeliveredEmails.ts 1
 app/(admin)/invoices/domain/usePendingDebits.ts 1
-app/(admin)/levels/domain/levelRows.ts 4
 app/(admin)/locations/domain/useLocations.ts 3
 app/(admin)/platform/dao/platform.api.ts 1
 app/(admin)/substitutes/domain/substituteRows.ts 2

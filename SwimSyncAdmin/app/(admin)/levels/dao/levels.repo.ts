@@ -6,6 +6,10 @@
 // RLS scopes every read here to the caller's own business.
 import { supabase } from "@/lib/supabase";
 import type { Skill } from "../types";
+import type { DataOf } from "@/lib/database.overrides";
+
+/** One tenant_levels row as loadLevels selects it (both embeds are to-many). */
+export type LevelSelectRow = DataOf<typeof loadLevels>[number];
 
 export function loadLevels() {
   return supabase
