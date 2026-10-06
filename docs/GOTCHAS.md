@@ -2637,3 +2637,31 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     failure becomes that section's FAIL detail (`act()` in `verify-front-desk-role.mjs`), then a red-proof reports
     every check it breaks. (Wave 4 lane 2, 2026-10-05, §8.138.)
 
+
+323. **`UPDATE OF <col>` triggers fire for EVERY row a supabase-js upsert touches — even when the value is
+    unchanged — and a BEFORE ROW trigger in a batch sees NONE of the same statement's AFTER ROW effects** (AFTER
+    ROW triggers are queued to the end of the statement). Any trigger on `attendance` that has side effects or can
+    refuse must compare `OLD` with `NEW`, act only on a real transition, and be idempotent. Pin it with an
+    "unchanged re-save writes nothing and is not refused" test. (Wave 6 plan, RISK 2, 2026-10-06.)
+
+324. **One refused attendance row refuses the WHOLE class, and the coach app will not save while any child is
+    unmarked** (`useSaveAttendance.ts`; sibling of §7.67). A new attendance guard must therefore fail OPEN on doubt,
+    refuse with its own SQLSTATE that both save paths map to a message naming child, date and class, and ship that
+    mapping BEFORE the guard is switched on. The workaround a stuck coach reaches for — marking the child absent —
+    is a silent underbill. (Wave 6 plan, RISK 2, 2026-10-06.)
+
+325. **A feature with two switches that must agree (a flag plus disabled triggers, or a flag in two places) is a
+    double-billing window.** Use ONE switch that every consumer reads (trigger body, engine, readers), fail CLOSED
+    when it cannot be read (never `?? false`, §7.172), and keep it out of anything an admin can write —
+    `app_settings` is UPDATE-able by platform admins, and a `tenants` column needs a `guard_tenant_columns`
+    "nobody" mapping. (Wave 6 plan, RISK 1, 2026-10-06.)
+
+326. **"No run needed" means "never sealed" — and the seal is load-bearing.** It drives `markable_floor` (§7.319),
+    arm 1 of the ordering guard (`orderingGuard.ts` — any present row in an unsealed month counts as unbilled, and
+    that arm lives in TypeScript, not SQL), and `accounting_summary`'s refusal of unsealed months. There is no
+    billing cron. Any path that removes the need to press Generate must say what closes the month, or list these
+    effects. (Wave 6 plan, RISK 3, 2026-10-06; extends §7.319.)
+
+327. **A new FK onto `students` with `ON DELETE CASCADE` makes `merge_students` RAISE on every merge** — its
+    cascade census refuses any cascade it has not been taught to move. Use `NO ACTION`, or teach `merge_students`
+    in the same migration. (Wave 6 plan, RISK 9, 2026-10-06.)

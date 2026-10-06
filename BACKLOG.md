@@ -276,7 +276,7 @@ _Supersedes every older ranking below, which is kept as history. Forced by: Wave
 Start date on add-to-class + *Change start date* (PRD §7.4) and the COMMENT fix; the Front-desk walkthrough
 confirmed the coachless-lesson bug and its fix shipped the same day (PRD §4.3). Next is Wave 6.
 
-#### Wave 6 — *Package-funded lessons need no monthly run* (L) — **NEXT; plan first (`/plan-with-confidence`)**
+#### Wave 6 — *Package-funded lessons need no monthly run* (L) — **NEXT; PLANNED 2026-10-06 → `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md`** (draw at marking; decisions D1–D7)
 
 4. Changes WHEN money moves for every package family on both live businesses, so it is planned before it is built.
    **Precedes the DB clock** (rework edge): both rewrite the engine's guards and the package draw-down; clock-first
