@@ -51,11 +51,10 @@ jobs:
         run: scripts/check-test-dates.sh
 
       # Wave 7: a pgTAP file that touches a date pins the clock (set_config
-      # 'swimsync.now') in the exact form, so it can never expire. Advisory until
-      # every file is converted (plan T5 makes it required).
+      # 'swimsync.now') in the exact form, so it can never expire. Required since
+      # Wave 7 T5, when all 83 dated files were pinned.
       - name: Every dated pgTAP file pins the clock (G1)
         run: scripts/check-pgtap-clock.sh
-        continue-on-error: true
 
       # Wave 7: a migration newer than the clock cutoff reads app_now()/app_today(),
       # never a raw now()/CURRENT_DATE, unless marked `-- clock: stamp`/`-- clock-real:`.

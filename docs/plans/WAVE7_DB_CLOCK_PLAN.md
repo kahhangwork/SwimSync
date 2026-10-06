@@ -436,7 +436,7 @@ proof — the lane2 batch precondition (zero unconverted functions) is the gate.
 | `session_coach_roster` | y | session_window_start assign_class_shadow |  | set_students_active student_class_enrolments | 2 |
 | `sessions_i_am_main_on` | n |  |  | student_class_enrolments | 2 |
 | `skill_progress` | n |  |  | student_class_enrolments | 2 |
-| `stranger_isolation` | y | today_sg |  | student_class_enrolments | 2 |
+| `stranger_isolation` | n (was y: lane2 T4d pin-shift stays green — superuser fixture inserts only, no guarded write as authenticated) | today_sg |  | student_class_enrolments | 2 |
 | `student_claims` | n (was y: text-scan false positive — only superuser fixture inserts, which the guards skip; pin-shift +3mo stays green, lane2 T3, verified by lane1) |  |  |  | 1 |
 | `student_identity` | n |  |  |  | 1 |
 | `student_merge` | n (was y: text-scan false positive — only superuser fixture inserts, which the guards skip; pin-shift +3mo stays green, lane2 T3, verified by lane1) |  |  |  | 1 |
@@ -448,11 +448,11 @@ proof — the lane2 batch precondition (zero unconverted functions) is the gate.
 | `tenant_levels` | n |  |  |  | 1 |
 | `tenant_provisioning` | n |  | platform_tenant_overview |  | 2 |
 | `tenant_public_holidays` | n |  |  |  | 1 |
-| `tenant_suspension` | y | disable_coach | platform_tenant_overview | parent_packages credit_notes student_class_enrolments | 2 |
+| `tenant_suspension` | n (was y: lane2 T4d pin-shift stays green — superuser fixture inserts only, no guarded write as authenticated) | disable_coach | platform_tenant_overview | parent_packages credit_notes student_class_enrolments | 2 |
 | `tenant_unmarked_lesson_count` | y | today_sg markable_floor | tenant_unmarked_lesson_count | student_class_enrolments | 2 |
 | `trial_onboarding` | y | session_window_start markable_floor book_trial |  | student_class_enrolments | 2 |
 | `unbilled_sealed_lessons` | n (was y: text-scan false positive — only superuser fixture inserts, which the guards skip; pin-shift +3mo stays green, lane2 T3, verified by lane1) |  |  |  | 1 |
-| `void_credit_note` | y |  |  | credit_notes student_class_enrolments | 2 |
+| `void_credit_note` | n (was y: lane2 T4d pin-shift stays green — superuser fixture inserts only, no guarded write as authenticated) |  |  | credit_notes student_class_enrolments | 2 |
 
 
 ## Pre-commit gate (walk before every commit in this wave; an unticked box is a blocker)
