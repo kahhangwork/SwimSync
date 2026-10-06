@@ -8,20 +8,21 @@
 -- come last because they are the ones that move real money.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(41);
+SELECT plan(42);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE td AS
-WITH w AS (SELECT session_window_start() AS w, (session_window_start() - INTERVAL '1 month')::date AS wj),
-     d AS (SELECT w + ((6 - EXTRACT(DOW FROM w)::int + 7) % 7)   AS x,   -- first Saturday ≥ floor
-                  wj + ((6 - EXTRACT(DOW FROM wj)::int + 7) % 7) AS j    -- first Saturday a month earlier
-             FROM w)
-SELECT x, j, x + 4 AS wed,                                       -- a Wednesday: not a class day
-       to_char(j, 'YYYY-MM') AS j_ym,
-       to_char(x, 'YYYY-MM') AS x_ym,
-       to_char(x + INTERVAL '1 month',  'YYYY-MM') AS p1_ym,
-       to_char(x + INTERVAL '2 months', 'YYYY-MM') AS p2_ym
-  FROM d;
+SELECT
+  '2026-08-01'::date AS x,
+  '2026-07-04'::date AS j,
+  '2026-08-05'::date AS wed,
+  '2026-07'::text    AS j_ym,
+  '2026-08'::text    AS x_ym,
+  '2026-09'::text    AS p1_ym,
+  '2026-10'::text    AS p2_ym;
 GRANT SELECT ON td TO authenticated;
 
 -- ── fixture ────────────────────────────────────────────────────────────────
@@ -32,11 +33,11 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
-  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000001','authenticated','authenticated','r-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"R Admin","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000002','authenticated','authenticated','r-coachA@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"Coach A","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000003','authenticated','authenticated','r-coachB@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"Coach B","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000004','authenticated','authenticated','r-coachT@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"Coach T","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000005','authenticated','authenticated','r-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"R Parent","role":"parent"}', now(), now(), '','','','');
+  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000001','authenticated','authenticated','r-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"R Admin","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
+  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000002','authenticated','authenticated','r-coachA@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"Coach A","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
+  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000003','authenticated','authenticated','r-coachB@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"Coach B","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
+  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000004','authenticated','authenticated','r-coachT@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"Coach T","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
+  ('00000000-0000-0000-0000-000000000000','71000000-0000-0000-0000-000000000005','authenticated','authenticated','r-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"R Parent","role":"parent"}', app_now(), app_now(), '','','','');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
@@ -55,6 +56,8 @@ SELECT t.id, 'Default Group' FROM tenants t
 -- function the guard itself reads — and every payroll period is derived from it
 -- in the same shape as before (j's month, x's month, then the two after). Readable
 -- by `authenticated` because the probes run as that role.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 -- classes.location_id is NOT NULL since the location contract migration
 -- (20260824000200). Give every tenant one location to hang classes off,
 -- tenant-agnostic and idempotent (mirrors the Default Group category block).
@@ -378,7 +381,7 @@ SELECT is((SELECT gross FROM _j_month WHERE coach_name='Coach A'), 30.00::NUMERI
   'the settled month pays Coach A, who taught it — no roster row exists yet');
 
 RESET ROLE;
-UPDATE coach_payouts SET status='paid', paid_at=now()
+UPDATE coach_payouts SET status='paid', paid_at=app_now()
  WHERE period_month=(SELECT j_ym FROM td) AND tenant_id='99999999-0000-0000-0000-000000000001';
 
 SET LOCAL ROLE authenticated;

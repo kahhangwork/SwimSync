@@ -5,8 +5,10 @@
 -- of them, while each coach sees only the students enrolled in their own classes.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(10);
+SELECT plan(11);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- Multi-tenancy scaffolding: coaches and students now require a tenant. This
 -- fixture creates its own so the test stays independent of the seed. The rule
@@ -22,10 +24,10 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a1',
    'authenticated','authenticated','rls-parentA@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Parent A","role":"parent"}', now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Parent A","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','rls-parentB@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Parent B","role":"parent"}', now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"Parent B","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO students (id, full_name, assignment_status, tenant_id) VALUES
   ('c0000000-0000-0000-0000-0000000000a1','Kid A','assigned','99999999-0000-0000-0000-000000000004'),
@@ -48,13 +50,13 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000c9',
    'authenticated','authenticated','rls-parentC@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Parent C","role":"parent"}', now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Parent C","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d8',
    'authenticated','authenticated','rls-coachX@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Coach X","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000004"}', now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Coach X","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000004"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d9',
    'authenticated','authenticated','rls-coachY@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Coach Y","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000004"}', now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"Coach Y","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000004"}', app_now(), app_now(), '', '', '', '');
 
 -- classes.category_id is NOT NULL (20260725000400). A test creates its own
 -- tenants inside this transaction, so they have none of the categories the

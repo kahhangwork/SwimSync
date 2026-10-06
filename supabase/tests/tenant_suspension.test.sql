@@ -76,8 +76,10 @@
 --     point does not stay contained.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(88);
+SELECT plan(89);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixture ──────────────────────────────────────────────────────────────────
 -- Tenant S ("Suspend School") is suspended mid-suite. Tenant K ("Keep
@@ -93,32 +95,32 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   -- S: owner-admin SA, pure coach SC
   ('00000000-0000-0000-0000-000000000000','e5aa0000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','ts-s-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Suspend Admin","role":"tenant_admin","tenant_id":"e5aa0000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ts-s-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Suspend Admin","role":"tenant_admin","tenant_id":"e5aa0000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','e5aa0000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','ts-s-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Suspend Coach","role":"coach","tenant_id":"e5aa0000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ts-s-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Suspend Coach","role":"coach","tenant_id":"e5aa0000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   -- K: owner-admin KA, active coach KC, and KC2 — disabled later (chunk 2 re-run)
   ('00000000-0000-0000-0000-000000000000','e5bb0000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','ts-k-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Keep Admin","role":"tenant_admin","tenant_id":"e5bb0000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ts-k-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Keep Admin","role":"tenant_admin","tenant_id":"e5bb0000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','e5bb0000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','ts-k-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Keep Coach","role":"coach","tenant_id":"e5bb0000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ts-k-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Keep Coach","role":"coach","tenant_id":"e5bb0000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','e5bb0000-0000-0000-0000-0000000000c2',
-   'authenticated','authenticated','ts-k-coach2@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Keep Coach Two","role":"coach","tenant_id":"e5bb0000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ts-k-coach2@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Keep Coach Two","role":"coach","tenant_id":"e5bb0000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   -- P2: the two-tenant parent. P3: a formerly-active family of S (rejoin case).
   ('00000000-0000-0000-0000-000000000000','e5cc0000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','ts-parent2@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ts-parent2@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','e5cc0000-0000-0000-0000-0000000000d2',
-   'authenticated','authenticated','ts-parent3@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ts-parent3@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{}', app_now(), app_now(), '', '', '', ''),
   -- The platform admin.
   ('00000000-0000-0000-0000-000000000000','e5cc0000-0000-0000-0000-0000000000e1',
-   'authenticated','authenticated','ts-platform@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Platform Pat","role":"platform_admin"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','ts-platform@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Platform Pat","role":"platform_admin"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
@@ -174,7 +176,7 @@ SELECT p.id, t.tid FROM parents p,
  WHERE p.profile_id='e5cc0000-0000-0000-0000-0000000000d1';
 -- P3 was a member of S once, and left.
 INSERT INTO parent_tenants (parent_id, tenant_id, is_active, inactivated_at)
-SELECT p.id, 'e5aa0000-0000-0000-0000-000000000001', FALSE, now()
+SELECT p.id, 'e5aa0000-0000-0000-0000-000000000001', FALSE, app_now()
   FROM parents p WHERE p.profile_id='e5cc0000-0000-0000-0000-0000000000d2';
 
 INSERT INTO student_class_enrolments (student_id, class_id, is_active) VALUES
@@ -413,7 +415,7 @@ SELECT is((SELECT COUNT(*)::int FROM billing_periods), 1,
 
 -- 28. The guard: suspended_at is not client-writable, even by the owner.
 SELECT throws_ok(
-  $$ UPDATE tenants SET suspended_at = now()
+  $$ UPDATE tenants SET suspended_at = app_now()
       WHERE id = 'e5aa0000-0000-0000-0000-000000000001' $$,
   'P0001',
   'tenants.owner_profile_id / suspended_at cannot be changed by a client — use platform_reassign_owner / suspend_tenant / unsuspend_tenant (20260813000300)',

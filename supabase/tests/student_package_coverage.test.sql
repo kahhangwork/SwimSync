@@ -24,8 +24,10 @@
 -- Runs on its own tenants; self-contained; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(24);
+SELECT plan(25);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -40,25 +42,25 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','bd000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','cov-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cov-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Cov Admin A","role":"tenant_admin","is_coach":true,"tenant_id":"ba000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','bd000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','cov-coach@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cov-coach@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Cov Coach","role":"coach","tenant_id":"ba000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','bb000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','cov-parent-1@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cov-parent-1@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Cov Parent One","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','bb000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','cov-parent-2@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cov-parent-2@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Cov Parent Two","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'ba000000-0000-0000-0000-000000000001'
@@ -174,7 +176,7 @@ INSERT INTO student_class_enrolments (student_id, class_id) VALUES
 -- Kid M USED to be in the covered Private class, and left. If the is_active
 -- filter is ever dropped, this row makes Kid M read "package" — wrongly.
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, unenrolled_at) VALUES
-  ('b5000000-0000-0000-0000-000000000003','bf000000-0000-0000-0000-000000000002', FALSE, now());
+  ('b5000000-0000-0000-0000-000000000003','bf000000-0000-0000-0000-000000000002', FALSE, app_now());
 
 -- Parent 1 requests the Private-scoped package; admin confirms (the lifecycle
 -- trigger snapshots terms and sets expiry — the only path to 'active').
@@ -333,7 +335,7 @@ SELECT is(
 -- ── 11. Date-expired active packages are excluded server-side ──────────────
 RESET ROLE;
 UPDATE parent_packages
-   SET expires_on = (now() AT TIME ZONE 'Asia/Singapore')::date - 1
+   SET expires_on = '2026-09-14'::date
  WHERE id = 'b7000000-0000-0000-0000-000000000002';
 
 SET LOCAL ROLE authenticated;
@@ -351,8 +353,8 @@ SELECT is(
 -- the package's start date arrives — the engine bills those lessons ad-hoc too.
 RESET ROLE;
 UPDATE parent_packages
-   SET start_date = (now() AT TIME ZONE 'Asia/Singapore')::date + 30,
-       expires_on = (now() AT TIME ZONE 'Asia/Singapore')::date + 120
+   SET start_date = '2026-10-15'::date,
+       expires_on = '2027-01-13'::date
  WHERE id = 'b7000000-0000-0000-0000-000000000002';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"bd000000-0000-0000-0000-000000000001","role":"authenticated"}';

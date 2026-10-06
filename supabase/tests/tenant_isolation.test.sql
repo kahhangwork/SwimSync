@@ -18,8 +18,10 @@
 -- silently-superuser run visible.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(24);
+SELECT plan(25);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Two tenants ─────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -34,26 +36,26 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','20000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','ten-adminA@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Admin A","role":"tenant_admin","tenant_id":"11111111-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ten-adminA@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Admin A","role":"tenant_admin","tenant_id":"11111111-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','20000000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','ten-adminB@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Admin B","role":"tenant_admin","tenant_id":"11111111-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ten-adminB@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Admin B","role":"tenant_admin","tenant_id":"11111111-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','20000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','ten-coachA@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Coach A","role":"coach","tenant_id":"11111111-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ten-coachA@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Coach A","role":"coach","tenant_id":"11111111-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','20000000-0000-0000-0000-0000000000b2',
-   'authenticated','authenticated','ten-coachB@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Coach B","role":"coach","tenant_id":"11111111-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ten-coachB@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Coach B","role":"coach","tenant_id":"11111111-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','20000000-0000-0000-0000-0000000000a3',
-   'authenticated','authenticated','ten-parentA@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Parent A","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ten-parentA@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Parent A","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','20000000-0000-0000-0000-0000000000b3',
-   'authenticated','authenticated','ten-parentB@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Parent B","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ten-parentB@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Parent B","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','20000000-0000-0000-0000-0000000000f1',
-   'authenticated','authenticated','ten-platform@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Platform Owner","role":"platform_admin"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','ten-platform@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Platform Owner","role":"platform_admin"}', app_now(), app_now(), '', '', '', '');
 
 -- ── A class per tenant (tenant_id filled by the class_tenant_fill trigger) ──
 -- classes.category_id is NOT NULL (20260725000400). A test creates its own

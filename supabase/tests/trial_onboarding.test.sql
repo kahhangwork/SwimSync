@@ -20,8 +20,10 @@
 -- GROW: a gate that raises after writing is not a gate.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(35);
+SELECT plan(36);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ⚠ BOOKING DATES ARE DERIVED FROM THE FLOOR, NEVER LITERAL (§7.303). book_trial
 -- refuses a date before markable_floor() — the 1st of LAST month for a business
@@ -31,10 +33,15 @@ SELECT plan(35);
 -- session_window_start(), so the file reads the same function the guard does
 -- and stays valid in every month — and under a pinned floor. Readable by
 -- `authenticated` because every probe below runs as that role.
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 CREATE TEMP TABLE td AS
-SELECT sat AS sat1, sat + 7 AS sat2, sat + 14 AS sat3, sat + 3 AS tue
-  FROM (SELECT session_window_start()
-             + ((6 - EXTRACT(DOW FROM session_window_start())::int + 7) % 7) AS sat) f;
+SELECT
+  '2026-08-01'::date AS sat1,
+  '2026-08-08'::date AS sat2,
+  '2026-08-15'::date AS sat3,
+  '2026-08-04'::date AS tue;
 GRANT SELECT ON td TO authenticated;
 
 -- ── Two businesses, so the tenant boundary can be probed ───────────────────
@@ -47,20 +54,20 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','66000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','trial-admin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"TRIAL Admin A","role":"tenant_admin","tenant_id":"66666666-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','trial-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"TRIAL Admin A","role":"tenant_admin","tenant_id":"66666666-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','66000000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','trial-coach-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"TRIAL Coach A","role":"coach","tenant_id":"66666666-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','trial-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"TRIAL Coach A","role":"coach","tenant_id":"66666666-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','66000000-0000-0000-0000-0000000000c2',
-   'authenticated','authenticated','trial-coach-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"TRIAL Coach B","role":"coach","tenant_id":"66666666-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','trial-coach-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"TRIAL Coach B","role":"coach","tenant_id":"66666666-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','66000000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','trial-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"TRIAL Parent","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','trial-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"TRIAL Parent","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','66000000-0000-0000-0000-0000000000d2',
-   'authenticated','authenticated','trial-parent2@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"TRIAL Parent Two","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','trial-parent2@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"TRIAL Parent Two","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 -- Class A belongs to business A and its coach; class B to business B.
 -- classes.category_id is NOT NULL (20260725000400). A test creates its own
@@ -234,7 +241,7 @@ SELECT throws_like(
 
 -- 22. A CLOSED one does not — a family that left and is considering coming back
 --     is a real trial.
-UPDATE student_class_enrolments SET is_active = FALSE, unenrolled_at = NOW()
+UPDATE student_class_enrolments SET is_active = FALSE, unenrolled_at = app_now()
  WHERE student_id = (SELECT id FROM students WHERE full_name='Ongoing Kid');
 SELECT lives_ok(
   $$ SELECT book_trial('66666666-1111-0000-0000-000000000001',(SELECT sat2 FROM td),

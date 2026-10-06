@@ -44,8 +44,10 @@
 -- found them.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(4);
+SELECT plan(5);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── One business, fully populated, one real family, one stranger ────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -56,17 +58,17 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','2b000000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','strg-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Strg Admin","role":"tenant_admin","tenant_id":"1b000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','strg-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Strg Admin","role":"tenant_admin","tenant_id":"1b000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','2b000000-0000-0000-0000-0000000000c2',
-   'authenticated','authenticated','strg-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Strg Coach","role":"coach","tenant_id":"1b000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','strg-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Strg Coach","role":"coach","tenant_id":"1b000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','2b000000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','strg-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Real Parent","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','strg-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Real Parent","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','2b000000-0000-0000-0000-0000000000e1',
-   'authenticated','authenticated','strg-mallory@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Mallory Stranger","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','strg-mallory@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Mallory Stranger","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (id, tenant_id, name)
 VALUES ('3b000000-0000-0000-0000-000000000001','1b000000-0000-0000-0000-000000000001','Default Group');
@@ -88,7 +90,7 @@ SELECT t.id, 'Default location' FROM tenants t
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
                      location_id, price_per_lesson, category_id)
 SELECT '3b000000-0000-0000-0000-000000000003', c.id, 'Stranger Class',
-       lower(to_char(today_sg(),'FMday'))::day_of_week,
+       lower(to_char('2026-09-15'::date,'FMday'))::day_of_week,
        '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 25, '3b000000-0000-0000-0000-000000000001'
   FROM coaches c WHERE c.profile_id = '2b000000-0000-0000-0000-0000000000c2';
 
@@ -108,7 +110,7 @@ VALUES ('4b000000-0000-0000-0000-000000000001','3b000000-0000-0000-0000-00000000
 
 INSERT INTO lesson_sessions (id, class_id, session_date, start_time, end_time)
 VALUES ('5b000000-0000-0000-0000-000000000001','3b000000-0000-0000-0000-000000000003',
-        today_sg(),'10:00','11:00');
+        '2026-09-15'::date,'10:00','11:00');
 
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 VALUES ('5b000000-0000-0000-0000-000000000001','4b000000-0000-0000-0000-000000000001',
@@ -116,13 +118,13 @@ VALUES ('5b000000-0000-0000-0000-000000000001','4b000000-0000-0000-0000-00000000
 
 INSERT INTO invoices (id, parent_id, tenant_id, billing_month, gross_amount, net_amount)
 SELECT '6b000000-0000-0000-0000-000000000001', p.id,'1b000000-0000-0000-0000-000000000001',
-       to_char(today_sg() - INTERVAL '1 month','YYYY-MM'), 25, 25
+       to_char('2026-09-15'::date - INTERVAL '1 month','YYYY-MM'), 25, 25
   FROM parents p WHERE p.profile_id = '2b000000-0000-0000-0000-0000000000d1';
 
 INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status,
                            amount, class_title, session_date)
 VALUES ('6b000000-0000-0000-0000-000000000001','4b000000-0000-0000-0000-000000000001',
-        '5b000000-0000-0000-0000-000000000001','present',25,'Stranger Class', today_sg());
+        '5b000000-0000-0000-0000-000000000001','present',25,'Stranger Class', '2026-09-15'::date);
 
 -- ── The probe harness ───────────────────────────────────────────────────────
 -- Counts every base table in `public` AS THE CALLING ROLE. SECURITY INVOKER is

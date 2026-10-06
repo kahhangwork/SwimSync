@@ -10,8 +10,10 @@
 -- in isolation (the notes are seeded directly, as the engine/trigger would leave them).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(29);
+SELECT plan(30);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Tenants: T1 (subject) and T2 (a foreign admin) ───────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -25,20 +27,20 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','a1000000-0000-0000-0000-0000000000a1',
    'authenticated','authenticated','tap-void-admin1@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Void Admin 1","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000d1"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Void Admin 1","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000d1"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a1000000-0000-0000-0000-0000000000c1',
    'authenticated','authenticated','tap-void-coach1@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Void Coach 1","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000d1"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Void Coach 1","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000d1"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a1000000-0000-0000-0000-0000000000b2',
    'authenticated','authenticated','tap-void-parent@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Void Parent","role":"parent"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Void Parent","role":"parent"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a1000000-0000-0000-0000-0000000000a2',
    'authenticated','authenticated','tap-void-admin2@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Void Admin 2","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000d2"}',
-   now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"Void Admin 2","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000d2"}',
+   app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
@@ -116,7 +118,7 @@ BEGIN
   INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status, paid_at, paid_marked_by)
   VALUES ('99999999-0000-0000-0000-0000000000d1', v_inv, pg_temp.pid(), p_month,
           p_inv_gross, p_inv_credit, p_inv_net, p_inv_status::invoice_status,
-          CASE WHEN p_paid THEN now() ELSE NULL END,
+          CASE WHEN p_paid THEN app_now() ELSE NULL END,
           CASE WHEN p_paid THEN 'a1000000-0000-0000-0000-0000000000a1'::uuid ELSE NULL END);
 
   INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
@@ -129,7 +131,7 @@ BEGIN
   VALUES ('CN-'||p_suffix, pg_temp.pid(), 'c1000000-0000-0000-0000-000000000001', 'Void Kid', v_inv,
     v_ii, v_ls, p_amount, 'present', 'absent', p_note_status, '99999999-0000-0000-0000-0000000000d1',
     CASE WHEN p_note_status='applied' THEN v_inv ELSE NULL END,
-    CASE WHEN p_note_status='applied' THEN now() ELSE NULL END)
+    CASE WHEN p_note_status='applied' THEN app_now() ELSE NULL END)
   RETURNING id INTO v_cn;
   RETURN v_cn;
 END $$ LANGUAGE plpgsql;

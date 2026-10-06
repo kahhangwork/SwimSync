@@ -19,9 +19,11 @@
 -- that must fail.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
 -- 20 not 21: 'kind is stored as passed' went with the column (20260804000100).
-SELECT plan(20);
+SELECT plan(21);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Callers: one of each shape that can reach an RPC ────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code)
@@ -32,17 +34,17 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','55000000-0000-0000-0000-0000000000f1',
-   'authenticated','authenticated','prov-platform@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"PROV Platform","role":"platform_admin"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','prov-platform@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"PROV Platform","role":"platform_admin"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','55000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','prov-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"PROV Admin","role":"tenant_admin","tenant_id":"55555555-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','prov-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"PROV Admin","role":"tenant_admin","tenant_id":"55555555-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','55000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','prov-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"PROV Coach","role":"coach","tenant_id":"55555555-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','prov-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"PROV Coach","role":"coach","tenant_id":"55555555-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','55000000-0000-0000-0000-0000000000a3',
-   'authenticated','authenticated','prov-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"PROV Parent","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','prov-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"PROV Parent","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 -- The count every refusal is measured against.
 CREATE TEMP TABLE prov_baseline AS SELECT COUNT(*)::INT AS n FROM tenants;

@@ -11,8 +11,10 @@
 -- below fails (is_tenant_admin admits any active admin). Rolled back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(24);
+SELECT plan(25);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('99999999-0000-0000-0000-0000000000b0', 'tap-rops', 'TAP Roles Ops', 'SWIM-RO01');
@@ -22,8 +24,8 @@ CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB)
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
     updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000', p_id, 'authenticated', 'authenticated',
-    p_email, crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', p_meta,
-    now(), now(), '', '', '', '') $$ LANGUAGE sql;
+    p_email, crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', p_meta,
+    app_now(), app_now(), '', '', '', '') $$ LANGUAGE sql;
 
 -- Owner first (becomes owner), then a coach.
 SELECT pg_temp.mkuser('b0000000-0000-0000-0000-0000000000a1', 'tap-ro-owner@test.local',
@@ -132,12 +134,12 @@ SELECT is((SELECT count(*)::int FROM lesson_sessions), 1, 'the class''s coach st
 RESET ROLE;
 
 -- ── Deactivation and suspension still win over any role ─────────────────────
-UPDATE profiles SET admin_disabled_at = now() WHERE id = 'b0000000-0000-0000-0000-0000000000d2';
+UPDATE profiles SET admin_disabled_at = app_now() WHERE id = 'b0000000-0000-0000-0000-0000000000d2';
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.as_user('b0000000-0000-0000-0000-0000000000d2');
 SELECT is((SELECT count(*)::int FROM students), 0, 'a deactivated EDIT co-admin reads nothing');
 RESET ROLE;
-UPDATE tenants SET suspended_at = now() WHERE id = '99999999-0000-0000-0000-0000000000b0';
+UPDATE tenants SET suspended_at = app_now() WHERE id = '99999999-0000-0000-0000-0000000000b0';
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.as_user('b0000000-0000-0000-0000-0000000000a1');
 SELECT is((SELECT count(*)::int FROM lesson_sessions), 0, 'a suspended business: the owner reads no lessons');

@@ -12,8 +12,10 @@
 -- (RISK 11 pin, RISK 6 void) are called out inline.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(57);
+SELECT plan(58);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Tenants: A (referral ON, 10% inherit, 14-day expiry), B (OFF), C (suspended)
 INSERT INTO tenants (id, slug, display_name, join_code, referral_enabled,
@@ -28,10 +30,10 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
   confirmation_token, recovery_token, email_change_token_new, email_change) VALUES
   ('00000000-0000-0000-0000-000000000000','d1d00000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','ref-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','ref-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Ref Admin A","role":"tenant_admin","is_coach":true,"tenant_id":"d1000000-0000-0000-0000-000000000001"}',
-   now(), now(),'','','','');
+   app_now(), app_now(),'','','','');
 
 -- 20 parent families (handle_new_user makes profiles + parents).
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -40,9 +42,9 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 SELECT '00000000-0000-0000-0000-000000000000',
        ('d1b00000-0000-0000-0000-0000000000'||lpad(g::text,2,'0'))::uuid,
        'authenticated','authenticated','ref-p'||lpad(g::text,2,'0')||'@test.local',
-       crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
+       crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
        json_build_object('full_name','Ref P'||g||' Family','role','parent')::jsonb,
-       now(), now(),'','','',''
+       app_now(), app_now(),'','','',''
 FROM generate_series(1,20) g;
 
 -- Convenience: profile id 'd1b00000-…-0000000NN' → parents.id.
@@ -67,7 +69,7 @@ UPDATE parent_tenants SET is_active = false
 INSERT INTO parent_tenants (parent_id, tenant_id)
   SELECT parent_id, 'd1000000-0000-0000-0000-000000000003' FROM pm
    WHERE profile_id='d1b00000-0000-0000-0000-000000000003';
-UPDATE tenants SET suspended_at = now() WHERE id = 'd1000000-0000-0000-0000-000000000003';
+UPDATE tenants SET suspended_at = app_now() WHERE id = 'd1000000-0000-0000-0000-000000000003';
 
 -- Same-household: p09 (referrer) and p10 (referee) share a phone.
 UPDATE profiles SET phone = '90000009'
@@ -178,7 +180,7 @@ SELECT throws_ok(
   'that join code was not recognised', 'a SUSPENDED tenant''s referral code is not recognised');
 RESET ROLE;
 -- disabled code: disable p01's A code, p04 tries it.
-UPDATE parent_tenants SET referral_code_disabled_at = now()
+UPDATE parent_tenants SET referral_code_disabled_at = app_now()
   WHERE parent_id=(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000001')
     AND tenant_id='d1000000-0000-0000-0000-000000000001';
 SET LOCAL ROLE authenticated;
@@ -266,9 +268,9 @@ SELECT is((SELECT status FROM referral_rewards
 -- FIFO: p08 has three available rewards; the earliest reserves first.
 INSERT INTO referral_rewards (tenant_id, parent_id, kind, referral_id, status, earned_at)
 VALUES
- ('d1000000-0000-0000-0000-000000000001',(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000008'),'manual',NULL,'available', now() - interval '3 days'),
- ('d1000000-0000-0000-0000-000000000001',(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000008'),'manual',NULL,'available', now() - interval '2 days'),
- ('d1000000-0000-0000-0000-000000000001',(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000008'),'manual',NULL,'available', now() - interval '1 days');
+ ('d1000000-0000-0000-0000-000000000001',(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000008'),'manual',NULL,'available', app_now() - interval '3 days'),
+ ('d1000000-0000-0000-0000-000000000001',(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000008'),'manual',NULL,'available', app_now() - interval '2 days'),
+ ('d1000000-0000-0000-0000-000000000001',(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000008'),'manual',NULL,'available', app_now() - interval '1 days');
 INSERT INTO parent_packages (tenant_id, parent_id, product_id)
 VALUES ('d1000000-0000-0000-0000-000000000001',
         (SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000008'),
@@ -277,7 +279,7 @@ SELECT is(
   (SELECT date_trunc('day', earned_at) FROM referral_rewards
     WHERE parent_id=(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000008')
       AND status='reserved'),
-  date_trunc('day', now() - interval '3 days'),
+  date_trunc('day', app_now() - interval '3 days'),
   'FIFO: the earliest-earned reward reserves first');
 
 -- ═══ GROUP 6 — activate → convert, idempotency, D8 ═══════════════════════════
@@ -295,7 +297,7 @@ SELECT is(
   (SELECT count(*)::int FROM referral_rewards
     WHERE parent_id=(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000001')
       AND kind='referrer' AND status='available'
-      AND expires_at BETWEEN now() + interval '13 days' AND now() + interval '15 days'),
+      AND expires_at BETWEEN app_now() + interval '13 days' AND app_now() + interval '15 days'),
   1, 'the referrer earns one reward, expiring in ~14 days');
 
 -- Idempotency: a further UPDATE that does not re-cross into active mints nothing.
@@ -331,7 +333,7 @@ SELECT is((SELECT status FROM referral_rewards
 
 -- p13 expired-at-reservation: an expired reward is never reserved.
 INSERT INTO referral_rewards (tenant_id, parent_id, kind, referral_id, status, expires_at)
-VALUES ('d1000000-0000-0000-0000-000000000001',(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000013'),'manual',NULL,'available', now() - interval '1 day');
+VALUES ('d1000000-0000-0000-0000-000000000001',(SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000013'),'manual',NULL,'available', app_now() - interval '1 day');
 INSERT INTO parent_packages (id, tenant_id, parent_id, product_id)
 VALUES ('d1f00000-0000-0000-0000-000000000013','d1000000-0000-0000-0000-000000000001',
         (SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000013'),
@@ -347,7 +349,7 @@ INSERT INTO parent_packages (id, tenant_id, parent_id, product_id)
 VALUES ('d1f00000-0000-0000-0000-000000000014','d1000000-0000-0000-0000-000000000001',
         (SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000014'),
         'd1e00000-0000-0000-0000-000000000001');
-UPDATE referral_rewards SET expires_at = now() - interval '1 minute' WHERE id='d1a00000-0000-0000-0000-000000000014';
+UPDATE referral_rewards SET expires_at = app_now() - interval '1 minute' WHERE id='d1a00000-0000-0000-0000-000000000014';
 UPDATE parent_packages SET status='active' WHERE id='d1f00000-0000-0000-0000-000000000014';
 SELECT is((SELECT status FROM referral_rewards WHERE id='d1a00000-0000-0000-0000-000000000014'),
   'expired', 'RISK 13: a reward that expired while reserved settles as expired (unclaimed)');
@@ -362,8 +364,8 @@ INSERT INTO parent_packages (id, tenant_id, parent_id, product_id)
 VALUES ('d1f00000-0000-0000-0000-000000000015','d1000000-0000-0000-0000-000000000001',
         (SELECT parent_id FROM pm WHERE profile_id='d1b00000-0000-0000-0000-000000000015'),
         'd1e00000-0000-0000-0000-000000000001');
-UPDATE parent_packages SET paid_claimed_at = now() WHERE id='d1f00000-0000-0000-0000-000000000015';
-UPDATE referral_rewards SET expires_at = now() - interval '1 minute' WHERE id='d1a00000-0000-0000-0000-000000000015';
+UPDATE parent_packages SET paid_claimed_at = app_now() WHERE id='d1f00000-0000-0000-0000-000000000015';
+UPDATE referral_rewards SET expires_at = app_now() - interval '1 minute' WHERE id='d1a00000-0000-0000-0000-000000000015';
 UPDATE parent_packages SET status='active' WHERE id='d1f00000-0000-0000-0000-000000000015';
 SELECT is((SELECT amount_payable FROM parent_packages WHERE id='d1f00000-0000-0000-0000-000000000015'),
   288.00::numeric, 'RISK 6/13: a CLAIMED package keeps the price it was given');
@@ -456,7 +458,7 @@ RESET ROLE;
 
 -- ═══ GROUP 11 — RISK 6: void ═════════════════════════════════════════════════
 -- void refused on a CLAIMED reserved package.
-UPDATE parent_packages SET paid_claimed_at = now() WHERE id='d1f00000-0000-0000-0000-000000000019';
+UPDATE parent_packages SET paid_claimed_at = app_now() WHERE id='d1f00000-0000-0000-0000-000000000019';
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"d1d00000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_ok(

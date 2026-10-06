@@ -36,8 +36,10 @@
 -- that on the tail of the chain is more fragile than a fixture of its own.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(9);
+SELECT plan(10);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── fixture ────────────────────────────────────────────────────────────────
 -- Two tenants: the one under test, and a foreign one whose session id is what
@@ -50,11 +52,11 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
-  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000001','authenticated','authenticated','g-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"G Admin","role":"tenant_admin","tenant_id":"98888888-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000002','authenticated','authenticated','g-coachA@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"Guard A","role":"coach","tenant_id":"98888888-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000003','authenticated','authenticated','g-coachB@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"Guard B","role":"coach","tenant_id":"98888888-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000004','authenticated','authenticated','g-coachC@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"Guard C","role":"coach","tenant_id":"98888888-0000-0000-0000-000000000001"}', now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000005','authenticated','authenticated','g-coachX@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}','{"full_name":"Guard X","role":"coach","tenant_id":"98888888-0000-0000-0000-000000000002"}', now(), now(), '','','','');
+  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000001','authenticated','authenticated','g-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"G Admin","role":"tenant_admin","tenant_id":"98888888-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
+  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000002','authenticated','authenticated','g-coachA@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"Guard A","role":"coach","tenant_id":"98888888-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
+  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000003','authenticated','authenticated','g-coachB@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"Guard B","role":"coach","tenant_id":"98888888-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
+  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000004','authenticated','authenticated','g-coachC@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"Guard C","role":"coach","tenant_id":"98888888-0000-0000-0000-000000000001"}', app_now(), app_now(), '','','',''),
+  ('00000000-0000-0000-0000-000000000000','72000000-0000-0000-0000-000000000005','authenticated','authenticated','g-coachX@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}','{"full_name":"Guard X","role":"coach","tenant_id":"98888888-0000-0000-0000-000000000002"}', app_now(), app_now(), '','','','');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t

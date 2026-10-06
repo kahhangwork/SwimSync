@@ -39,8 +39,10 @@
 -- Runs on its own tenants; self-contained; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(30);
+SELECT plan(31);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── RLS is actually ON (not merely policies written) ───────────────────────
 SELECT ok(
@@ -74,34 +76,34 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   -- admin A
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','skp-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','skp-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"SKP Admin A","role":"tenant_admin","tenant_id":"a1000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   -- coach A — serves the student (owns the class they are enrolled in)
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','skp-coach-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','skp-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"SKP Coach A","role":"coach","tenant_id":"a1000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   -- coach A2 — same business, but does NOT serve the student
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000a3',
-   'authenticated','authenticated','skp-coach-a2@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','skp-coach-a2@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"SKP Coach A2","role":"coach","tenant_id":"a1000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   -- parent A — owns the student
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000a4',
-   'authenticated','authenticated','skp-parent-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','skp-parent-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"SKP Parent A","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   -- admin B — the other business
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','skp-admin-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','skp-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"SKP Admin B","role":"tenant_admin","tenant_id":"a1000000-0000-0000-0000-000000000002"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'a1000000-0000-0000-0000-000000000001'
@@ -407,7 +409,7 @@ RESET ROLE;
 
 ALTER TABLE student_skill_progress DISABLE TRIGGER trg_skill_progress_tenant;
 UPDATE student_skill_progress
-   SET graded_at = NOW() - interval '90 days',
+   SET graded_at = app_now() - interval '90 days',
        graded_by = 'a2000000-0000-0000-0000-0000000000a2'
  WHERE student_id = 'a7000000-0000-0000-0000-000000000001'
    AND skill_id   = 'a4000000-0000-0000-0000-000000000001';
@@ -416,7 +418,7 @@ ALTER TABLE student_skill_progress ENABLE TRIGGER trg_skill_progress_tenant;
 -- The fixture itself is asserted. A backdate that silently did not take would
 -- make every assertion below vacuous.
 SELECT ok(
-  (SELECT graded_at < NOW() - interval '89 days' FROM student_skill_progress
+  (SELECT graded_at < app_now() - interval '89 days' FROM student_skill_progress
     WHERE student_id='a7000000-0000-0000-0000-000000000001'
       AND skill_id='a4000000-0000-0000-0000-000000000001'),
   'the DISABLE TRIGGER fixture really did plant a 90-day-old graded_at');
@@ -440,7 +442,7 @@ SELECT lives_ok($$
 $$, 're-confirming an unchanged grade is accepted');
 
 SELECT ok(
-  (SELECT graded_at > NOW() - interval '1 day' FROM student_skill_progress
+  (SELECT graded_at > app_now() - interval '1 day' FROM student_skill_progress
     WHERE student_id='a7000000-0000-0000-0000-000000000001'
       AND skill_id='a4000000-0000-0000-0000-000000000001'),
   're-confirming an UNCHANGED grade advances graded_at (20260829000100)');
@@ -462,7 +464,7 @@ RESET ROLE;
 
 ALTER TABLE student_skill_progress DISABLE TRIGGER trg_skill_progress_tenant;
 UPDATE student_skill_progress
-   SET graded_at = NOW() - interval '90 days',
+   SET graded_at = app_now() - interval '90 days',
        graded_by = 'a2000000-0000-0000-0000-0000000000a2'
  WHERE student_id = 'a7000000-0000-0000-0000-000000000001'
    AND skill_id   = 'a4000000-0000-0000-0000-000000000001';
@@ -474,7 +476,7 @@ UPDATE student_skill_progress
    AND skill_id   = 'a4000000-0000-0000-0000-000000000001';
 
 SELECT ok(
-  (SELECT graded_at < NOW() - interval '89 days' FROM student_skill_progress
+  (SELECT graded_at < app_now() - interval '89 days' FROM student_skill_progress
     WHERE student_id='a7000000-0000-0000-0000-000000000002'
       AND skill_id='a4000000-0000-0000-0000-000000000001'),
   'a bare student_id repoint PRESERVES graded_at (merge_students'' contract)');
