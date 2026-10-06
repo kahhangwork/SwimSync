@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r \".tool_input.command // empty\" | grep -Eq \"(^|[^[:alnum:]_-])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+stash([^[:alnum:]_-]|$)\" && { echo \"Blocked: git stash — the stash stack is shared across every worktree (session-close rule). Use a WIP commit instead: git commit -m 'WIP: …'\" >&2; exit 2; } || exit 0",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-git-stash.sh\"",
             "statusMessage": "Checking for git stash"
           }
         ]
