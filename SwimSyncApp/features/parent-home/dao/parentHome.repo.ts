@@ -7,6 +7,7 @@
 // dao/ is transport only (fence check 2).
 
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 import { todayInSg } from "@/lib/lessonDates";
 
 type Session = { id: string };
@@ -93,3 +94,25 @@ export const fetchSignupJoinCode = (session: Session) =>
 
 export const clearSignupJoinCode = (parentId: string) =>
   supabase.from("parents").update({ signup_join_code: null }).eq("id", parentId);
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// Every to-one embed is a LEFT join RLS can null (§7.344): a link's student, an
+// enrolment's class, the class's location and coach, the coach's profile, a booking's
+// class. Widened `| null` here; the reads in domain/homeRows keep every `?.`/`??`.
+type HomeData = DataOf<typeof fetchParentHome>;
+type HomeStudent = NonNullable<HomeData["parent_students"][number]["students"]>;
+type HomeEnrolment = HomeStudent["student_class_enrolments"][number];
+type HomeClass = NonNullable<HomeEnrolment["classes"]>;
+export type HomeClassRow = Omit<RlsNullable<HomeClass, "locations">, "coaches"> & {
+  coaches: RlsNullable<NonNullable<HomeClass["coaches"]>, "profiles"> | null;
+};
+export type HomeStudentRow = Omit<HomeStudent, "student_class_enrolments"> & {
+  student_class_enrolments: (Omit<HomeEnrolment, "classes"> & { classes: HomeClassRow | null })[];
+};
+export type ParentHomeRow = Omit<HomeData, "parent_students"> & {
+  parent_students: { students: HomeStudentRow | null }[];
+};
+export type HomeBookingRow =
+  | RlsNullable<DataOf<typeof fetchUpcomingTrials>[number], "classes">
+  | RlsNullable<DataOf<typeof fetchUpcomingMakeups>[number], "classes">;
+export type HomeOutstandingRow = DataOf<typeof fetchOutstandingInvoices>[number];

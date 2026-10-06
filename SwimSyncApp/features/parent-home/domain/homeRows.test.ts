@@ -2,14 +2,16 @@
 // parent Home tab's row mapping already did when it moved out of the route file.
 // §7.25's prove-it-red rule does not apply — there is no fix, only a move. Each
 // guarded line was mutated once and a named case went red (playbook §5).
-import {
-  formatTime,
-  capitalize,
-  totalCredit,
-  mapChildren,
-  firstBookingByStudent,
-  totalOutstandingOf,
-} from "./homeRows";
+import { formatTime, capitalize } from "./homeRows";
+import * as F from "./homeRows";
+
+// Loose fixtures on purpose (Wave 8): string amounts and null embeds pin every
+// Number()/`??` the typed rows no longer admit.
+const loose = <A extends unknown[], R>(fn: (...a: A) => R) => fn as unknown as (...a: any[]) => R;
+const totalCredit = loose(F.totalCredit);
+const mapChildren = loose(F.mapChildren);
+const firstBookingByStudent = loose(F.firstBookingByStudent);
+const totalOutstandingOf = loose(F.totalOutstandingOf);
 
 const enrol = (day: string | null, start: string, end: string, extra: object = {}) => ({
   is_active: true,

@@ -4,6 +4,7 @@
 // pinned by homeRows.test.ts. No clock, no client.
 import { WEEKDAY_ORDER } from "../constants";
 import type { Child, ChildClass } from "../types";
+import type { HomeBookingRow, HomeOutstandingRow, ParentHomeRow } from "../dao/parentHome.repo";
 
 export function formatTime(time: string | null): string | null {
   if (!time) return null;
@@ -23,22 +24,26 @@ export function capitalize(str: string | null): string {
  *  no single balance any more. The summary card shows the total the family
  *  holds; the Billing tab is where each business's invoice shows what its
  *  own credit actually covered. */
-export function totalCredit(parent: any): number {
-  const balances = (parent as any).parent_tenant_balances ?? [];
-  return balances.reduce((sum: number, b: any) => sum + Number(b.credit_balance ?? 0), 0);
+export function totalCredit(parent: ParentHomeRow): number {
+  const balances = parent.parent_tenant_balances ?? [];
+  return balances.reduce((sum: number, b) => sum + Number(b.credit_balance ?? 0), 0);
 }
 
-export function mapChildren(parent: any): Child[] {
-  return (parent.parent_students ?? []).map((ps: any) => {
-    const s = ps.students;
+export function mapChildren(parent: ParentHomeRow): Child[] {
+  return (parent.parent_students ?? []).map((ps) => {
+    // `!` names its guard (Wave 8): parent_students_select shows a parent a link row
+    // only when parent_owns_student(student_id) — the same predicate students_select
+    // grants — so a returned link always embeds its student.
+    const s = ps.students!;
     // EVERY active enrolment, not `.find()`. Sorted by weekday so two
     // classes read in the order the week runs rather than in whatever order
     // PostgREST returned them — an unordered list of a family's week looks
     // like a bug even when every row in it is right.
     const classes: ChildClass[] = (s.student_class_enrolments ?? [])
-      .filter((e: any) => e.is_active && e.classes)
-      .map((e: any) => {
-        const cls = e.classes;
+      .filter((e) => e.is_active && e.classes)
+      .map((e) => {
+        // census: ui-cast (Wave 8) — `!`: the filter above keeps only rows WITH a class.
+        const cls = e.classes!;
         return {
           coach_name: cls?.coaches?.profiles?.full_name ?? null,
           day: cls?.day_of_week ?? null,
@@ -67,11 +72,11 @@ export function mapChildren(parent: any): Child[] {
  *  so the first one wins. `fallback` is the title shown when the class did
  *  not embed ("their class" for a trial, "another class" for a make-up). */
 export function firstBookingByStudent(
-  rows: any[] | null,
+  rows: HomeBookingRow[] | null,
   fallback: string
 ): Map<string, { class_title: string; session_date: string }> {
   const byStudent = new Map<string, { class_title: string; session_date: string }>();
-  for (const b of (rows ?? []) as any[]) {
+  for (const b of rows ?? []) {
     // Earliest first from the query, so the first one wins.
     if (!byStudent.has(b.student_id)) {
       byStudent.set(b.student_id, {
@@ -83,9 +88,9 @@ export function firstBookingByStudent(
   return byStudent;
 }
 
-export function totalOutstandingOf(invoices: any[] | null): number {
+export function totalOutstandingOf(invoices: HomeOutstandingRow[] | null): number {
   return (invoices ?? []).reduce(
-    (sum: number, inv: any) => sum + Number(inv.net_amount),
+    (sum: number, inv) => sum + Number(inv.net_amount),
     0
   );
 }
