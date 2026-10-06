@@ -121,7 +121,7 @@ export async function loadCalendarData(range: DateRange): Promise<CalendarLoad> 
     absences = (data ?? []) as BuildInput["absences"];
   }
 
-  const classes: CalendarClass[] = (classesRes.data ?? []).map((c: any) => ({
+  const classes: CalendarClass[] = (classesRes.data ?? []).map((c) => ({
     id: c.id,
     title: c.title,
     day_of_week: c.day_of_week as DayOfWeek,
@@ -136,12 +136,12 @@ export async function loadCalendarData(range: DateRange): Promise<CalendarLoad> 
     deactivated_at: c.deactivated_at ?? null,
   }));
 
-  const coachOptions = ((coachesRes.data ?? []) as any[])
+  const coachOptions = (coachesRes.data ?? [])
     .map((c) => ({ id: c.id as string, name: (c.profiles?.full_name as string) ?? "Unknown coach" }))
     .sort((a, b) => a.name.localeCompare(b.name));
   const coachNames = new Map(coachOptions.map((c) => [c.id, c.name]));
 
-  const enrolments: BuildInput["enrolments"] = ((enrolRes.data ?? []) as any[]).map((e) => ({
+  const enrolments: BuildInput["enrolments"] = (enrolRes.data ?? []).map((e) => ({
     student_id: e.student_id,
     class_id: e.class_id,
     enrolled_at: e.enrolled_at,
@@ -150,7 +150,7 @@ export async function loadCalendarData(range: DateRange): Promise<CalendarLoad> 
   }));
 
   const bookings: BuildInput["bookings"] = [
-    ...((trialsRes.data ?? []) as any[]).map((b) => ({
+    ...(trialsRes.data ?? []).map((b) => ({
       kind: "trial" as const,
       student_id: b.student_id,
       class_id: b.class_id,
@@ -158,7 +158,7 @@ export async function loadCalendarData(range: DateRange): Promise<CalendarLoad> 
       cancelled_at: b.cancelled_at ?? null,
       full_name: b.students?.full_name ?? "Unknown",
     })),
-    ...((makeupsRes.data ?? []) as any[]).map((b) => ({
+    ...(makeupsRes.data ?? []).map((b) => ({
       kind: "makeup" as const,
       student_id: b.student_id,
       class_id: b.class_id,
