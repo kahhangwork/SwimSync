@@ -39,7 +39,7 @@ describe("toBookings", () => {
     const books = [
       { id: "b1", session_date: "2026-09-12", student_id: "s1", students: { full_name: "Ann" }, classes: { title: "Sat B" } },
       { id: "b2", session_date: "2026-09-19", student_id: null, students: null, classes: null },
-    ];
+    ] as any; // a null student_id: pins the kept `?? ""`
     const att = [{ student_id: "s1", lesson_sessions: { session_date: "2026-09-12" } }];
     expect(toBookings(books, att)).toEqual([
       { id: "b1", session_date: "2026-09-12", student_id: "s1", student_name: "Ann", class_title: "Sat B", marked: true },
@@ -61,7 +61,7 @@ describe("toEligible", () => {
         { is_active: true, classes: { id: "sat-a", title: "Sat A", category_id: GROUP } },
       ] },
       { id: "c", full_name: "Unenrolled", is_active: true, student_class_enrolments: null },
-    ];
+    ] as any; // pins the kept `?? []`
     expect(toEligible(kids)).toEqual([
       { id: "a", full_name: "Active", home_classes: [{ id: "sat-a", title: "Sat A", category_id: GROUP }] },
     ]);
@@ -86,11 +86,12 @@ describe("toExtraMap / toParentsOf / toLivePackages", () => {
   });
 
   it("drops packages expired before today (string compare), defaults the rest", () => {
+    // Partial / null / string rows: pin the String(), Number() and `?? 0` handling.
     expect(toLivePackages([
       { parent_id: "p1", category_id: null, expires_on: "2026-09-18", live_lessons_remaining: "3" },
       { parent_id: "p1", category_id: GROUP, expires_on: "2026-09-17", live_lessons_remaining: 5 },
       { parent_id: "p2", expires_on: null },
-    ], "2026-09-18")).toEqual([
+    ] as any, "2026-09-18")).toEqual([
       { parent_id: "p1", category_id: null, expires_on: "2026-09-18", live_lessons_remaining: 3 },
     ]);
   });

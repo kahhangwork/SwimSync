@@ -8,9 +8,17 @@
 // change hiding inside a refactor (rule 0).
 import { expectedLessonDates, formatSgDate } from "@/lib/lessonDates";
 import type { Booking, ClassRow, EligibleKid, LivePackage } from "../types";
+import type {
+  AttendanceSelectRow,
+  BookingSelectRow,
+  OffScheduleRow,
+  ParentLinkRow,
+  StudentSelectRow,
+} from "../dao/makeups.repo";
+import type { LiveBalanceRow } from "../dao/makeups.rpc";
 
 /** class_id -> off-schedule session dates. */
-export function toExtraMap(extras: any[] | null): Map<string, string[]> {
+export function toExtraMap(extras: OffScheduleRow[] | null): Map<string, string[]> {
   const extraMap = new Map<string, string[]>();
   for (const e of extras ?? []) {
     const list = extraMap.get(e.class_id as string) ?? [];
@@ -22,14 +30,14 @@ export function toExtraMap(extras: any[] | null): Map<string, string[]> {
 
 // Marked = an attendance row exists for that child on that date. Same
 // student+date approximation the Trials page uses.
-export function toBookings(books: any[] | null, att: any[] | null): Booking[] {
+export function toBookings(books: BookingSelectRow[] | null, att: AttendanceSelectRow[] | null): Booking[] {
   const markedKeys = new Set(
     (att ?? []).map(
-      (a: any) => `${a.student_id}:${a.lesson_sessions?.session_date}`
+      (a) => `${a.student_id}:${a.lesson_sessions?.session_date}`
     )
   );
 
-  return (books ?? []).map((b: any) => ({
+  return (books ?? []).map((b) => ({
     id: b.id,
     session_date: b.session_date,
     student_id: b.student_id ?? "",
@@ -41,16 +49,17 @@ export function toBookings(books: any[] | null, att: any[] | null): Booking[] {
 
 // Eligible: active child with an active enrolment. The RPC re-checks all
 // of this — the list is an affordance, not the guard (§7.32).
-export function toEligible(kids: any[] | null): EligibleKid[] {
+export function toEligible(kids: StudentSelectRow[] | null): EligibleKid[] {
   return (kids ?? [])
-    .filter((k: any) => k.is_active)
-    .map((k: any) => {
+    .filter((k) => k.is_active)
+    .map((k) => {
       const enrolled = (k.student_class_enrolments ?? [])
-        .filter((e: any) => e.is_active && e.classes)
-        .map((e: any) => ({
-          id: e.classes.id,
-          title: e.classes.title,
-          category_id: e.classes.category_id,
+        .filter((e) => e.is_active && e.classes)
+        // `!`: guarded by the filter above, which drops every enrolment whose class is hidden.
+        .map((e) => ({
+          id: e.classes!.id,
+          title: e.classes!.title,
+          category_id: e.classes!.category_id,
         }));
       if (enrolled.length === 0) return null;
       return {
@@ -63,7 +72,7 @@ export function toEligible(kids: any[] | null): EligibleKid[] {
 }
 
 /** student -> parent ids, for the package-expiry advisory. */
-export function toParentsOf(data: any[] | null): Map<string, string[]> {
+export function toParentsOf(data: ParentLinkRow[] | null): Map<string, string[]> {
   const m = new Map<string, string[]>();
   for (const r of data ?? []) {
     const list = m.get(r.student_id as string) ?? [];
@@ -74,8 +83,8 @@ export function toParentsOf(data: any[] | null): Map<string, string[]> {
 }
 
 /** Live packages not yet expired as of `today2` (todayInSg()). */
-export function toLivePackages(data: any[] | null, today2: string): LivePackage[] {
-  return ((data ?? []) as any[])
+export function toLivePackages(data: LiveBalanceRow[] | null, today2: string): LivePackage[] {
+  return (data ?? [])
     .filter((p) => String(p.expires_on ?? "") >= today2)
     .map((p) => ({
       parent_id: p.parent_id,

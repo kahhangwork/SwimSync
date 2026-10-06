@@ -4,6 +4,19 @@
 // orchestration (Promise.all, the two fire-and-forget advisory loads) stays in
 // domain/useMakeups.ts exactly as the page had it.
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The rows each read returns. Every to-one embed is widened to `| null` — RLS nulls
+// a hidden embed whatever the generated type says (§7.344) — and domain/
+// makeupRows.ts keeps its `?.` / `??` / filter on each.
+export type BookingSelectRow = RlsNullable<DataOf<typeof loadBookings>[number], "students" | "classes">;
+type StudentSelected = DataOf<typeof loadStudents>[number];
+export type StudentSelectRow = Omit<StudentSelected, "student_class_enrolments"> & {
+  student_class_enrolments: RlsNullable<StudentSelected["student_class_enrolments"][number], "classes">[];
+};
+export type OffScheduleRow = DataOf<typeof loadOffScheduleSessions>[number];
+export type AttendanceSelectRow = RlsNullable<DataOf<typeof loadAttendance>[number], "lesson_sessions">;
+export type ParentLinkRow = DataOf<typeof loadParentLinks>[number];
 
 export function loadActiveClasses() {
   return supabase

@@ -3,6 +3,7 @@ import { useTableSort } from "@/components/Table";
 import { todayInSg } from "@/lib/lessonDates";
 import { filterEligibleKids } from "@/lib/makeupSearch";
 import * as repo from "../dao/makeups.repo";
+import type { AttendanceSelectRow } from "../dao/makeups.repo";
 import * as rpc from "../dao/makeups.rpc";
 import {
   datesForClass,
@@ -75,10 +76,10 @@ export function useMakeups() {
     setExtraDates(toExtraMap(extras));
 
     const today = todayInSg();
-    const ids = (books ?? []).map((b: any) => b.student_id);
+    const ids = (books ?? []).map((b) => b.student_id);
     const { data: att } = ids.length
       ? await repo.loadAttendance(ids)
-      : { data: [] as any[] };
+      : { data: [] as AttendanceSelectRow[] };
 
     const rows: Booking[] = toBookings(books, att);
     setUpcoming(rows.filter((r) => r.session_date >= today));
@@ -90,7 +91,7 @@ export function useMakeups() {
     // warning simply doesn't show, and the booking still works.
     // ⚠ Do NOT await these or fold them into a Promise.all (RISK 5): that makes
     // the booking form wait on an advisory.
-    const kidIds = (kids ?? []).map((k: any) => k.id);
+    const kidIds = (kids ?? []).map((k) => k.id);
     if (kidIds.length) {
       repo.loadParentLinks(kidIds).then(({ data }) => {
         setParentsOf(toParentsOf(data));
