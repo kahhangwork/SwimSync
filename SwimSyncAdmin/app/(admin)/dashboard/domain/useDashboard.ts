@@ -40,7 +40,7 @@ export function useDashboard() {
       const { data: unassignedData } = await loadUnassigned();
 
       setUnassigned(
-        (unassignedData ?? []).map((s: any) => ({
+        (unassignedData ?? []).map((s) => ({
           id: s.id,
           full_name: s.full_name,
           parent_name:
@@ -57,7 +57,7 @@ export function useDashboard() {
       const { data: invoiceData } = await loadOutstandingInvoices();
 
       setInvoices(
-        (invoiceData ?? []).map((inv: any) => ({
+        (invoiceData ?? []).map((inv) => ({
           id: inv.id,
           billing_month: inv.billing_month,
           net_amount: Number(inv.net_amount),
