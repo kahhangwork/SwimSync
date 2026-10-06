@@ -81,6 +81,11 @@ jobs:
       - name: Sign-up trust (HTTP)
         run: supabase/tests/http/signup_trust.sh
 
+      # Lock 2 of the injectable clock (20261006000300): the API's login role (authenticator) never pins
+      # swimsync.now. A real login, not pgTAP — pgTAP cannot become authenticator (§7.333).
+      - name: App clock locks (authenticator login)
+        run: supabase/tests/http/app_clock_locks.sh
+
       # Deno: generate-invoices billing math + credit ledger. test.sh pulls
       # SERVICE_ROLE_KEY / API_URL from `supabase status`.
       - name: Engine tests (Deno)

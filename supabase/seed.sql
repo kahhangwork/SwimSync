@@ -88,3 +88,9 @@ SELECT co.id, 'Saturday Beginners', 'saturday', '10:00', '11:00',
        '7c000000-0000-0000-0000-000000000002'
 FROM coaches co
 WHERE co.profile_id = 'c0000000-0000-0000-0000-000000000001';
+
+-- ---- The test-clock switch (Wave 7, 20261006000300_app_clock) ----
+-- Lets a pgTAP file pin "now" with set_config('swimsync.now', …, true). LOCAL + CI ONLY: seed never runs on prod,
+-- so prod's table stays empty and a pin there RAISEs (lock 1). `supabase migration up` does NOT run this file —
+-- after a no-reset apply, insert the row by hand (§7.334).
+INSERT INTO private.clock_override_enabled VALUES (true) ON CONFLICT DO NOTHING;

@@ -254,7 +254,75 @@ lane1: ~3½–4½ days (classification + censuses ¾, M1 1¼ incl. locks script,
 - UI drivers still run on the real clock (D2). PostgREST and the engine can never pin (lock 2), so Deno and drivers are unaffected.
 - On prod, a direct SQL session that sets `swimsync.now` gets an exception, not a moved clock. Nothing on prod sets it; the census asserts no function does.
 
-## Appendix A — classification (lane1, T1; preliminary from 2026-10-06 scan)
+## Appendix A — classification (lane1, T1 — FINAL, censused 2026-10-06 against the live local DB)
+
+**Census method.** Function bodies from `pg_get_functiondef` (§7.40), never from migration files. Raw clock regex = the
+plan's token list, case-insensitive. **71** `public` functions match (raw token or a helper call) — equal to the
+preliminary count. **0** views, **0** RLS policies, **0** CHECK constraints, and no function in any other app schema
+read a clock, so the 71 functions + the column defaults below are the whole surface. No touched function is
+overloaded (only `session_pay_amount` is, and it reads no clock).
+
+**Reader rule applied.** App / engine readers (`SwimSyncApp`, `SwimSyncAdmin`, `supabase/functions`) can never pin
+(D2, lock 2), so they cannot make a stamp STAMP-FEEDS. Only a **DB** reader that compares the stamp to a date/month
+does. A reader that only tests `IS [NOT] NULL`, `IS DISTINCT FROM`, or `ORDER BY`s it (FIFO) leaves it STAMP.
+
+### Final per-migration lists (row count = step 7's touched-function count)
+
+| Mn | Function | Token(s) that move | Why |
+|---|---|---|---|
+| M1 | `today_sg` | its one `now()` | the lever — every caller converts |
+| M1 | `session_window_start` | its one `now()` | the lever — `markable_floor`, `markable_window_start` and callers convert |
+| M2 | `student_package_coverage` | 4× `(now() AT TIME ZONE …)::date` | DECIDE: covered/expiring as of today |
+| M2 | `suggest_package_start` | 1× | DECIDE |
+| M2 | `package_renewal_candidates` | 1× (the `today` CTE) | DECIDE |
+| M2 | `platform_tenant_overview` | 3× (month boundaries) | DECIDE |
+| M2 | `tenant_unmarked_lesson_count` | 1× (`now_time`) | DECIDE (time of day); its date part is M1 |
+| M2 | `apply_referral_reward` | `expires_at > now()` | DECIDE |
+| M2 | `family_has_usable_reward` | 2× `expires_at > now()` | DECIDE |
+| M2 | `grant_referral_reward` | `now() + expiry_days` | STAMP-FEEDS (expiry read by the three above) |
+| M2 | `settle_referral_reward` | lines `expires_at <= now()` ×2 and `now() + expiry_days` ×1 — **NOT** `used_at`/`converted_at` (STAMP) | DECIDE + its expiry stamp; kept with its family in M2 |
+| M3 | `enforce_parent_package_lifecycle` | the 2 `confirmed_at` lines — **NOT** the 2 `cancelled_at` lines (STAMP) | STAMP-FEEDS: `accounting_summary` revenue month, `record_package_refund` paid-on date, its own `start_date` default |
+| M3 | `next_credit_note_ref` | `to_char(NOW(),'YYYY')` | STAMP-FEEDS: the ref's year |
+| M3 | `enrolment_start_at` | `RETURN NOW();` | STAMP-FEEDS → `enrolled_at` |
+| M3 | `deactivate_class` | `deactivated_at = NOW()` — **NOT** `updated_at` | STAMP-FEEDS: `mark_day_holiday`, `guard_package_draw_order`, `tenant_unmarked_lesson_count` compare its SGT date |
+| M3 | `close_student_enrolment` | `unenrolled_at = NOW()` — **NOT** `updated_at` | STAMP-FEEDS (readers below) |
+| M3 | `set_students_active` | `unenrolled_at = NOW()` — **NOT** `inactivated_at`/`updated_at` | STAMP-FEEDS |
+| M3 | `reassign_student_tenant` | `unenrolled_at = NOW()` — **NOT** `updated_at` | STAMP-FEEDS |
+| M4 | *(none expected)* | — | every billing guard (`assert_markable_date`, `guard_attendance_date`, `guard_session_date`, `guard_package_draw_order`, `enrolment_start_bounds`) has **0 raw tokens** and reads only the helpers → converted by M1. M4 re-verifies after M3 and is a no-op migration unless a straggler appears |
+
+M1–M3 = **2 + 9 + 7 = 18 functions**, plus 2 column defaults (M3).
+
+### Reader census (DB readers that compare the stamp to a date)
+
+| Column (writer) | DB date-readers | Class |
+|---|---|---|
+| `student_class_enrolments.unenrolled_at` (`close_student_enrolment`, `set_students_active`, `reassign_student_tenant`) | `apply_cancel_reconcile`, `assert_class_retirable`, `class_expected_count`, `class_unmarked_lesson_pairs`, `mark_day_holiday`, `set_enrolment_start`, `tenant_unmarked_lesson_count` | **STAMP-FEEDS** (M3) |
+| `student_class_enrolments.enrolled_at` (`enrolment_start_at`, column default) | same set + `set_enrolment_start` | **STAMP-FEEDS** (M3) |
+| `classes.deactivated_at` (`deactivate_class`) | `mark_day_holiday`, `guard_package_draw_order`, `tenant_unmarked_lesson_count` | **STAMP-FEEDS** (M3) |
+| `parent_packages.confirmed_at` (`enforce_parent_package_lifecycle`) | `accounting_summary` (month), `record_package_refund` (paid-on), itself (`start_date`) | **STAMP-FEEDS** (M3) |
+| `parent_packages.requested_at` (column default) | `assign_parent_package_reference` (`PKG-YYYY` year) | **STAMP-FEEDS** → default (a) |
+| `referral_rewards.expires_at` (`grant_`/`settle_referral_reward`) | `apply_`/`family_has_usable_`/`settle_referral_reward` | **STAMP-FEEDS** (M2) |
+| `credit_notes.issued_at`, `referral_rewards.earned_at`, `makeup_bookings.booked_at`, `credit_applications.applied_at` | `ORDER BY` only (FIFO) | STAMP |
+| `invoices.paid_at` (`confirm_invoice_paid`, also its `RETURN NOW()`), `paid_claimed_at`, `cancelled_at` (all writers), `disabled_at`, `admin_disabled_at`, `suspended_at`, `inactivated_at`, `decided_at`, `dismissed_at`, `ended_at`, `generated_at`, `graded_at`, `reversed_at`, `debited_at`, `folded_at`, `written_off_at`, `used_at`, `converted_at`, `voided_at`, `referral_code_disabled_at`, `offered_at` | `IS [NOT] NULL` / `IS DISTINCT FROM` / display only; app & engine readers cannot pin | STAMP |
+| `staff_invitations.expires_at`/`consumed_at` (`handle_new_user`); `email_claimed_at`, `invoice_email_claimed_at` (`claim_*_email`); `email_delivery_state` | security / delivery windows | **REAL-TIME** — never moves; M5 marks each line `-- clock-real:` only if a later migration re-bodies them (not in this wave: re-bodying them would be a non-clock edit, step 3) |
+
+So the preliminary "to verify" list resolves as: `deactivate_class` → M3 (confirmed); `close_student_enrolment`,
+`set_students_active`, `reassign_student_tenant` (`unenrolled_at` only) → M3; `confirm_invoice_paid`, `disable_coach`,
+`suspend_tenant`, `handle_attendance_update`, `set_students_active.inactivated_at` → **STAMP** (no DB date-reader).
+
+### Column-default census (23 non-`created_at`/`updated_at` `DEFAULT now()` columns)
+
+| Column | DB date-reader | Class / choice |
+|---|---|---|
+| `student_class_enrolments.enrolled_at` | the unenrolled_at set above | STAMP-FEEDS → **(a)** `SET DEFAULT app_now()` in M3. INSERT holders: authenticated, service_role (anon: none) — both get EXECUTE in M1 |
+| `parent_packages.requested_at` | `assign_parent_package_reference` (year) | STAMP-FEEDS → **(a)** in M3. INSERT holders: authenticated, service_role (anon: none) |
+| `staff_invitations.expires_at` | `handle_new_user` | **REAL-TIME** — never moves |
+| `attendance.marked_at`, `billing_periods.completed_at`, `billing_runs.ran_at`, `class_shadow_coaches.assigned_at`, `coach_payouts.generated_at`, `credit_applications.applied_at`, `credit_notes.issued_at`, `invoices.generated_at`, `makeup_bookings.booked_at`, `package_applications.applied_at`, `package_refunds.recorded_at`, `parent_tenants.joined_at`, `payment_records.paid_at`, `referral_rewards.earned_at`, `session_coach_absences.marked_at`, `session_coaches.assigned_at`, `session_pay_overrides.set_at`, `student_settlements.recorded_at`, `student_skill_progress.graded_at`, `trial_bookings.booked_at` (20) | none (ordering or display only) | STAMP — stays `now()`; no choice (b) needed |
+
+**Choice (b) list for lane2: empty.** No pinned file needs to set a defaulted stamp explicitly — the two
+decision-feeding defaults move with (a).
+
+### Preliminary scan (kept for the record)
 
 71 public functions read a clock (incl. the helpers); 24 call `today_sg`/`session_window_start`/`markable_floor`/`markable_window_start`. Preliminary:
 - **Via helpers (converted by M1):** `assert_class_retirable`, `assert_markable_date` (SECURITY INVOKER — see ACL parity), `assign_class_shadow`, `book_makeup`, `book_trial`, `cancel_lesson`, `class_unmarked_lesson_pairs`, `coach_is_active_class_shadow`, `disable_coach`, `end_class_shadow`, `enrolment_start_bounds`, `guard_attendance_date`, `guard_session_date`, `guard_package_draw_order`, `markable_floor`, `markable_window_start`, `record_package_refund`, `restore_lesson`, `schedule_extra_lesson`, `set_class_terms`, `set_enrolment_start`, `sync_class_display_price`, `tenant_unmarked_lesson_count` (date part). `enrolment_start_at` is only PARTLY converted by M1: its `RETURN NOW()` moves in M3.
