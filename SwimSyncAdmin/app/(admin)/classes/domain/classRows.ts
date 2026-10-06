@@ -3,6 +3,7 @@
 // classRows.test.ts (characterisation — pins existing behaviour, playbook §0).
 import { dayOfWeekOrder } from "@/lib/tableSort";
 import type { ClassRow } from "../types";
+import type { ClassSelectRow } from "../dao/classes.repo";
 
 export function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -18,7 +19,7 @@ export function capitalize(s: string) {
  * flag off the enrolment nesting typechecks clean and renders every class
  * retired. The four cases in classRows.test.ts pin exactly this (RISK 2).
  */
-export function mapClassRow(c: any): ClassRow {
+export function mapClassRow(c: ClassSelectRow): ClassRow {
   return {
     id: c.id,
     coach_id: c.coach_id,
@@ -37,7 +38,7 @@ export function mapClassRow(c: any): ClassRow {
     colour: c.colour ?? null,
     // The ENROLMENT's flag — count only the active enrolments.
     student_count: (c.student_class_enrolments ?? []).filter(
-      (e: any) => e.is_active
+      (e) => e.is_active
     ).length,
     // c.is_active, NOT e.is_active — see the §7.28 note above. `!== false` keeps
     // a legacy row (is_active absent, pre-deactivate_class()) ACTIVE; Boolean(…)

@@ -53,7 +53,7 @@ export function useClassDrawer(coaches: Coach[]) {
       return;
     }
     setShadows(
-      (data ?? []).map((r: any) => ({
+      (data ?? []).map((r) => ({
         id: r.id,
         coach_id: r.coach_id,
         coach_name:

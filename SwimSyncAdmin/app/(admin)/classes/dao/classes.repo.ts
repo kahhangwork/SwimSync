@@ -4,8 +4,19 @@
 // reads must not change by one character. Mapping lives in domain/classRows.ts;
 // orchestration (Promise.all, the clock) lives in the hooks.
 import { supabase } from "@/lib/supabase";
-import type { TablesInsert } from "@/lib/database.overrides";
+import type { DataOf, RlsNullable, TablesInsert } from "@/lib/database.overrides";
 import { ROW_LIMIT } from "../constants";
+
+// The row mapClassRow reads. Every to-one embed is widened to `| null` — RLS nulls
+// a hidden embed whatever the generated type says (§7.344) — and the domain keeps
+// its `?.` / `??` on each.
+type ClassSelected = DataOf<typeof loadClasses>[number];
+export type ClassSelectRow = RlsNullable<
+  Omit<ClassSelected, "coaches"> & {
+    coaches: RlsNullable<NonNullable<ClassSelected["coaches"]>, "profiles"> | null;
+  },
+  "locations" | "class_categories"
+>;
 
 // ⚠ RETIRED CLASSES ARE LOADED, AND THAT IS LOAD-BEARING, NOT COSMETIC.
 // This used to be `.eq("is_active", true)`. Since the invoice engine stopped

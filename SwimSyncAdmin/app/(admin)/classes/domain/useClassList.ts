@@ -37,14 +37,14 @@ export function useClassList() {
       repo.loadShadowRates(),
     ]);
     const earliestShadowRate = new Map<string, string>();
-    for (const r of (shadowRates ?? []) as any[]) {
+    for (const r of shadowRates ?? []) {
       const seen = earliestShadowRate.get(r.coach_id);
       if (!seen || r.effective_from < seen) {
         earliestShadowRate.set(r.coach_id, r.effective_from);
       }
     }
     setCoaches(
-      (data ?? []).map((c: any) => ({
+      (data ?? []).map((c) => ({
         id: c.id,
         full_name: c.profiles?.full_name ?? "Unknown",
         shadowRateFrom: earliestShadowRate.get(c.id) ?? null,

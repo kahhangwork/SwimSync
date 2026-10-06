@@ -30,7 +30,7 @@ const base = {
   class_categories: { default_capacity: 6 },
   colour: null,
   deactivated_at: null,
-};
+} as any; // partial rows, price as a string, flags absent: pin Number(), `!== false` and `?? []`
 
 describe("mapClassRow — §7.28: c.is_active is the CLASS flag, not the enrolment's", () => {
   it("active class with a CLOSED enrolment → is_active true, student_count 0", () => {

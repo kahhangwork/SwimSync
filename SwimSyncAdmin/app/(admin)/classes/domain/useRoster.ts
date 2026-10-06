@@ -49,7 +49,7 @@ export function useRoster(classes: ClassRow[]) {
     setRosterError(null);
 
     setEnrolments(
-      (enr ?? []).map((e: any) => ({
+      (enr ?? []).map((e) => ({
         class_id: e.class_id,
         is_active: e.is_active,
         enrolled_at: e.enrolled_at,
@@ -62,7 +62,7 @@ export function useRoster(classes: ClassRow[]) {
       }))
     );
     setBookings(
-      (bk ?? []).map((b: any) => ({
+      (bk ?? []).map((b) => ({
         class_id: b.class_id,
         session_date: b.session_date,
         student_id: b.student_id,
