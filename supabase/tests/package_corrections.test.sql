@@ -18,8 +18,10 @@ SELECT plan(12);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
-INSERT INTO tenants (id, slug, display_name, join_code) VALUES
-  ('ba000000-0000-0000-0000-000000000001','pkc-a','Pkg Corrections Swim','SWIM-PKCA');
+-- LEGACY (invoice-time) package mode, set explicitly: since Wave 6 migration B the default is draw-at-marking,
+-- and this file pins the invoice-time correction path that still governs switch-off tenants and old invoices.
+INSERT INTO tenants (id, slug, display_name, join_code, package_draw_at_marking) VALUES
+  ('ba000000-0000-0000-0000-000000000001','pkc-a','Pkg Corrections Swim','SWIM-PKCA', FALSE);
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,

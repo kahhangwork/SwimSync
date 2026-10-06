@@ -604,6 +604,9 @@ export function shouldRetryTenantEmails(
   if (status === "tenant_suspended") return false;
   // Settings unreadable → suspension unknown → treated as suspended.
   if (status === "tenant_unreadable") return false;
+  // Wave 6: which lessons a package already paid is unknown — resending would
+  // rest on the same unread state. Nothing was generated; nothing to retry.
+  if (status === "package_mode_unreadable") return false;
   if (status === "auto_disabled" && !isManual) return false;
   return true;
 }

@@ -146,10 +146,10 @@ export function useSaveAttendance({
       // ⚠ CN001 — the credit-note trigger REFUSED to un-correct a lesson whose
       // credit is already applied (20260818000100). One row in a batch upsert, so
       // the whole roster rolled back — attendanceSaveErrorMessage says so.
-      showToast(
-        attendanceSaveErrorMessage((upsertError as { code?: string }).code),
-        "error"
-      );
+      // ⚠ PK001 (package out-of-order guard) — the DB's message IS the toast,
+      // so pass it; the code alone falls back to text that can't name the date.
+      const { code, message } = upsertError as { code?: string; message?: string };
+      showToast(attendanceSaveErrorMessage(code, message), "error");
       setSaving(false);
       return;
     }

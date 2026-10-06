@@ -419,6 +419,10 @@ function failPackageLedger(real: SupabaseClient): SupabaseClient {
         return (table: string) =>
           table === "package_applications"
             ? {
+                // Reads pass through (engine v33 reads the drawn set — Wave 6);
+                // only the ledger WRITE fails.
+                select: (...args: unknown[]) =>
+                  (target.from(table).select as (...a: unknown[]) => unknown)(...args),
                 insert: () =>
                   Promise.resolve({
                     data: null,

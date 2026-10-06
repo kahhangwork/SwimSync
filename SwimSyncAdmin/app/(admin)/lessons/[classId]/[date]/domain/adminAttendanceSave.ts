@@ -116,9 +116,10 @@ export async function saveAdminAttendance(input: {
   );
   const { error: upsertError } = await deps.upsertAttendance(rows);
   if (upsertError) {
-    const mapped = attendanceSaveErrorMessage(upsertError.code);
+    const mapped = attendanceSaveErrorMessage(upsertError.code, upsertError.message);
     // Mapped message for the known code; the DB's own words for anything else
-    // (a window-guard refusal names the floor date, and that is the fix).
+    // (a window-guard refusal names the floor date, a PK001 package-guard
+    // refusal names the earlier lesson — that is the fix).
     const message =
       upsertError.code === "CN001"
         ? mapped

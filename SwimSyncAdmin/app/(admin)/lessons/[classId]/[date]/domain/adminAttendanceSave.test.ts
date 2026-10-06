@@ -132,6 +132,18 @@ describe("saveAdminAttendance", () => {
     expect(calls.notifyCreditNote).toHaveLength(0);
   });
 
+  it("surfaces a PK001 (package out-of-order guard) verbatim, once, and stops (no audit, no email)", async () => {
+    const db = "Mark 3 Oct first — the package has 1 lesson left. (Ava · Dolphins Fri 4pm)";
+    const { deps, calls } = mockDeps({
+      upsertAttendance: vi.fn(async (...a) => { calls.upsertAttendance.push(a); return { error: { code: "PK001", message: db } }; }),
+    });
+    const r = await saveAdminAttendance({ deps, classId: "c1", date: "d", actorProfileId: "a", knownSessionId: "s", entries: ENTRIES });
+    expect(r).toEqual({ ok: false, step: "upsert", message: db });
+    expect(calls.upsertAttendance).toHaveLength(1); // no retry, no per-row split (§7.67)
+    expect(calls.insertAudit).toHaveLength(0);
+    expect(calls.notifyCreditNote).toHaveLength(0);
+  });
+
   it("surfaces any other upsert refusal with the DB's own words (the window guard names the floor)", async () => {
     const { deps } = mockDeps({
       upsertAttendance: vi.fn(async () => ({ error: { code: "P0001", message: "That lesson (01 Mar 2026) is closed. Attendance can be marked back to 01 Jul 2026" } })),

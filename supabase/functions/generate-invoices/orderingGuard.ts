@@ -236,8 +236,22 @@ async function monthHasUnbilledLessons(
     if (!billableStudentIds.length && !bookingsByDate.size) continue;
 
     // ── ARM 1: any billable (present/trial_paid) row → unbilled revenue ──────
-    if ((attRows ?? []).some((a) => BILLABLE.has(a.status as string))) {
-      return true;
+    // Wave 6: a lesson a package paid for AT MARKING is not unbilled revenue.
+    // Without this, a package-only month nobody needs to Generate (D2) would
+    // block every later month forever (RISK 3, §7.326). An unreadable drawn set
+    // throws → caught below → fail skippable, like every other read here.
+    const billableRows = (attRows ?? []).filter((a) => BILLABLE.has(a.status as string));
+    if (billableRows.length) {
+      const { data: drawnRows, error: dErr } = await supabase
+        .from("package_applications")
+        .select("lesson_session_id, student_id")
+        .in("lesson_session_id", sessionIds)
+        .is("reversed_at", null);
+      if (dErr || !drawnRows) throw new Error(dErr?.message ?? "package draws unreadable");
+      const drawn = new Set(drawnRows.map((r) => `${r.lesson_session_id}:${r.student_id}`));
+      if (billableRows.some((a) => !drawn.has(`${a.lesson_session_id}:${a.student_id}`))) {
+        return true;
+      }
     }
 
     // ── ARM 2: an unmarked expected/booked lesson still >= floor ─────────────

@@ -19,9 +19,11 @@ SELECT plan(30);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
-INSERT INTO tenants (id, slug, display_name, join_code) VALUES
-  ('aa000000-0000-0000-0000-000000000001','pkg-a','Packages Swim A','SWIM-PKGA'),
-  ('aa000000-0000-0000-0000-000000000002','pkg-b','Packages Swim B','SWIM-PKGB');
+-- LEGACY (invoice-time) package mode, set explicitly: since Wave 6 migration B the default is draw-at-marking;
+-- the marking-time mode is pinned in package_draw_at_marking.test.sql.
+INSERT INTO tenants (id, slug, display_name, join_code, package_draw_at_marking) VALUES
+  ('aa000000-0000-0000-0000-000000000001','pkg-a','Packages Swim A','SWIM-PKGA', FALSE),
+  ('aa000000-0000-0000-0000-000000000002','pkg-b','Packages Swim B','SWIM-PKGB', FALSE);
 
 -- Admin A is the private-coach shape (tenant_admin AND coach) so tenant A can
 -- own a class. Admin B is a plain tenant admin. The parent is global.

@@ -31,9 +31,10 @@ ALTER TABLE f ADD COLUMN x DATE;
 UPDATE f SET x = sws - 1 - ((EXTRACT(DOW FROM sws - 1)::int - EXTRACT(DOW FROM d0)::int + 7) % 7);
 GRANT SELECT ON f TO PUBLIC;
 
-INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('f6000000-0000-0000-0000-0000000000a0','w6-t','W6 T','SWIM-W6TT', now() - INTERVAL '200 days'),
-  ('f6000000-0000-0000-0000-0000000000b0','w6-t2','W6 T2','SWIM-W6T2', now() - INTERVAL '200 days');
+-- The switch is set EXPLICITLY (off): since migration B the column DEFAULT is on.
+INSERT INTO tenants (id, slug, display_name, join_code, created_at, package_draw_at_marking) VALUES
+  ('f6000000-0000-0000-0000-0000000000a0','w6-t','W6 T','SWIM-W6TT', now() - INTERVAL '200 days', FALSE),
+  ('f6000000-0000-0000-0000-0000000000b0','w6-t2','W6 T2','SWIM-W6T2', now() - INTERVAL '200 days', FALSE);
 
 CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB) RETURNS VOID AS $$
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,

@@ -1202,6 +1202,75 @@ async function generateForTenant(
     };
   }
 
+  // ── Wave 6: lessons a package ALREADY paid for at marking ─────────────────
+  // docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md. With the tenant's switch
+  // on, attendance triggers draw the package the moment a lesson is marked, so
+  // a drawn lesson is PAID and must never reach an invoice line (the DB backstop
+  // on invoice_items would refuse it — PK002 — and fail the run's write). The
+  // drawn set is dropped UNCONDITIONALLY: before migration B no such rows exist,
+  // so a switch-off run is byte-for-byte today's.
+  //
+  // ⚠ FAIL CLOSED (RISK 1, §7.325): an unreadable switch or drawn set returns
+  // package_mode_unreadable — no invoice, no seal, never a throw (§7.265). Do NOT
+  // default the switch to false or the drawn set to empty: either one bills a
+  // lesson the family already paid for.
+  const { data: modeRow, error: modeErr } = await supabase
+    .from("tenants")
+    .select("package_draw_at_marking")
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (modeErr || typeof modeRow?.package_draw_at_marking !== "boolean") {
+    return packageModeUnreadable(
+      modeErr ? modeErr.message : "the business's package mode is missing"
+    );
+  }
+  const drawAtMarking: boolean = modeRow.package_draw_at_marking;
+
+  const itemSessionIds = [
+    ...new Set([...parentItems.values()].flat().map((i) => i.lesson_session_id)),
+  ];
+  const drawnKeys = new Set<string>();
+  // Chunked: an .in() list rides the URL, and a month of sessions can be long.
+  for (let i = 0; i < itemSessionIds.length; i += 200) {
+    const { data: drawnRows, error: drawnErr } = await supabase
+      .from("package_applications")
+      .select("lesson_session_id, student_id")
+      .in("lesson_session_id", itemSessionIds.slice(i, i + 200))
+      .is("reversed_at", null);
+    if (drawnErr || !drawnRows) {
+      return packageModeUnreadable(
+        drawnErr ? drawnErr.message : "the package draws could not be read"
+      );
+    }
+    for (const r of drawnRows) {
+      drawnKeys.add(`${r.lesson_session_id}:${r.student_id}`);
+    }
+  }
+  if (drawnKeys.size) {
+    for (const [parentId, items] of parentItems) {
+      parentItems.set(
+        parentId,
+        items.filter((i) => !drawnKeys.has(`${i.lesson_session_id}:${i.student_id}`))
+      );
+    }
+  }
+
+  function packageModeUnreadable(reason: string): GenerateResult {
+    return {
+      tenant_id: tenantId,
+      billing_month: billingMonth,
+      mode,
+      forced: force,
+      status: "package_mode_unreadable",
+      invoices_created: 0,
+      sealed: false,
+      message:
+        `Could not read which lessons a package has already paid for (${reason}). ` +
+        `No invoices were generated and the month was left open — generate again.`,
+      results: log,
+    };
+  }
+
   // Holiday extensions are now event-driven: a lesson marked 'holiday' extends
   // its covering package as it is marked (recompute_holiday trigger,
   // 20260818000700), so expires_on is already current here — no pre-billing
@@ -1317,7 +1386,10 @@ async function generateForTenant(
     // fully fund it) keeps its class_rate_on price: the shortfall path is
     // today's ad-hoc billing, unchanged. A parent with no packages never
     // enters this block and takes the exact statements they always did.
-    const pkgs = packagesByParent.get(parentId) ?? [];
+    // Wave 6: with the switch on, packages are drawn at marking ONLY — the SQL
+    // matcher (package_candidates_for) is the one rule, and this loop must not
+    // be a second copy. Every remaining item is ad-hoc at its class price.
+    const pkgs = drawAtMarking ? [] : packagesByParent.get(parentId) ?? [];
     const pkgDrawByItem = new Map<number, { pkg: ActivePackage; amount: number }>();
     let packageApplied = 0;
     for (let idx = 0; idx < items.length; idx++) {

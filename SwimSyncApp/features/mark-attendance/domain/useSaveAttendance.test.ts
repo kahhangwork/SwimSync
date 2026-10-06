@@ -280,6 +280,20 @@ describe("useSaveAttendance — the right lesson (§7.64)", () => {
 });
 
 describe("useSaveAttendance — failure paths", () => {
+  it("PK001 toasts the DB's own words and stops: no absences, no audit, no email, stays", async () => {
+    const db = "Mark 3 Oct first — the package has 1 lesson left. (Ava · Dolphins Fri 4pm)";
+    when("upsertAttendance", async () => ({ error: { code: "PK001", message: db } }));
+    const { result } = setup();
+    await runSave(result);
+
+    expect(toasts()).toEqual([[db, "error"]]);
+    for (const fn of ["upsertAbsences", "deleteAbsences", "insertAuditLog", "notifyCreditNotes", "leaveScreen"]) {
+      expect(calledFns()).not.toContain(fn);
+    }
+    expect(calls.filter((c) => c.fn === "upsertAttendance")).toHaveLength(1); // no retry, no per-row split
+    expect(result.current.saving).toBe(false);
+  });
+
   it("CN001 says so and stops: no absences, no audit, no email, stays", async () => {
     when("upsertAttendance", async () => ({ error: { code: "CN001", message: "refused" } }));
     const { result } = setup(
