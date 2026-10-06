@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-06 — **Waves 4–5 SHIPPED** (§8.138): start date on add-to-class, *Change start date*, the COMMENT fix, and the Front-desk coachless-lesson bug (confirmed + fixed). Filed *Promote §7.7 to a check over supabase/functions* (S, folded into Wave 7). Next: Wave 6 *Package-funded lessons need no monthly run*, plan first. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-06 (later) — **Wave 6 SHIPPED** (§8.139): package lessons draw at marking; the monthly run bills only ad-hoc lessons (PRD §7.16). Filed *Re-offer the backdated draw*, *Coach app shows the window guard's own words*, *The guard message says "Sep" where the apps say "Sept"*. Next: Wave 7, the DB clock. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -276,16 +276,15 @@ _Supersedes every older ranking below, which is kept as history. Forced by: Wave
 Start date on add-to-class + *Change start date* (PRD §7.4) and the COMMENT fix; the Front-desk walkthrough
 confirmed the coachless-lesson bug and its fix shipped the same day (PRD §4.3). Next is Wave 6.
 
-#### Wave 6 — *Package-funded lessons need no monthly run* (L) — **NEXT; PLANNED 2026-10-06 → `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md`** (draw at marking; decisions D1–D7)
+#### ~~Wave 6~~ — **SHIPPED 2026-10-06** (§8.139, plan `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md`)
 
-4. Changes WHEN money moves for every package family on both live businesses, so it is planned before it is built.
-   **Precedes the DB clock** (rework edge): both rewrite the engine's guards and the package draw-down; clock-first
-   would inject `app_today()` into functions this item then rewrites. Not mid-billing.
+Package lessons draw at marking; the run bills only ad-hoc lessons; Generate is optional for a package-only month
+(PRD §7.16). Two lanes; deploys #69–#73. Next is Wave 7.
 
-#### Wave 7 — *Inject the database clock* (L) — **a quiet stretch after Wave 6**
+#### Wave 7 — *Inject the database clock* (L) — **NEXT; plan first** (a quiet stretch — not mid-billing)
 
-5. Starts once Wave 6's migrations have landed — the start-date RPC (`set_enrolment_start`, live) and the new
-   draw-down then go on its conversion list rather than being converted twice. Billing guards last; Deno twice.
+5. Wave 6's migrations have landed (2026-10-06): the start-date RPC (`set_enrolment_start`, live) and the new
+   draw-down (`package_candidates_for`, the D6 guard, `today_sg()` in `class_unmarked_lesson_pairs`) go on its conversion list rather than being converted twice. Billing guards last; Deno twice.
    **Fold in:** *Promote §7.7 to a check over supabase/functions* (S, below) — the same clock/date family.
 
 #### Wave 8 — cheaper by waiting
@@ -1091,33 +1090,36 @@ modifier in the system — changes `amount_payable`, never `total_value`. **LIVE
 (`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
 
-### Package-funded lessons need no monthly run — **L** — _filed 2026-10-05 (the user, after checking September)_
-**The package purchase IS the invoice.** Only ad-hoc lessons should need the monthly *Generate*; a lesson a package
-covers draws the package down on its own, and a family whose month is fully covered never needs a run at all.
+### Re-offer the backdated draw — **S** _(filed 2026-10-06, Wave 6 lane 2)_
+A *Check marked lessons* action on a held package's row that runs `package_backlog_preview` / `draw_package_backlog`
+again.
 
-**Why:** September 2026's check found Little Orcas (a package business, piloting) with **no billing run ever** — its
-owner would have to run *Generate* each month only to move a package balance and receive an invoice that arrives
-already **Paid** (PRD §7.16). Today the stored balance moves **only at the monthly run**; the "lessons remaining"
-counter is derived live. The run is ceremony for a family that prepaid.
+**Why:** the *Draw from package / Keep as ad-hoc* question (PRD §7.16) is asked ONCE, right after activation. If that
+preview read fails (the page then shows a banner) or the admin closes the tab, there is no later way to draw those
+lessons from the package — they bill ad-hoc at the next run, which may not be what the family paid for.
 
-**Notes — what the plan must settle:**
-- **When the draw-down happens:** at marking (an attendance trigger/RPC), or derived at read time and committed later.
-  Either way the stored balance and the live counter must keep agreeing (§7.16's invariant).
-- **Mixed families:** a lesson outside the package's categories, or after it is exhausted or expired, is still
-  **ad-hoc** → still invoiced. The monthly run keeps existing; it just skips covered lessons.
-- **Corrections:** present → absent on a package lesson returns value to the **package**, not a credit note. The
-  credit-note path (§7.8) stays for invoiced lessons. Holiday/cancel extensions (event-driven since §8.70) interact.
-- **The guards are load-bearing:** the completeness gate and month seal (CLAUDE.md "Billing") must still hold for the
-  ad-hoc lessons. Does a package-only month still need to be *closed*? Never weaken a guard to make this fit.
-- **Accounting:** package revenue is already counted when the package is PAID (2026-09-27, PRD §7.23) — unchanged.
-- **Migration of in-flight balances:** lessons marked before the switch but not yet billed (e.g. Little Orcas's
-  September) must be drawn exactly once — not by both the old run and the new trigger.
-- **Not this item:** children whose packages are sold OUTSIDE SwimSync (Little Orcas's 15 pilot children, Sept 2026)
-  are ad-hoc to the engine under either model; their route is inviting the parent + recording the package, or the
-  monthly *Record it as settled* (PRD §7.17).
+**Notes:** both RPCs exist and re-derive at call time (a second draw draws 0), so this is UI only — the Held table
+row in `app/(admin)/packages/ui/HeldTable.tsx`. Gate on packages:edit like the dialog.
 
-**Ranked** ahead of *Inject the database clock* (Build order, Wave 6). Precedent to reuse: the Deno engine's
-`BillingScenario` (package scenarios) and `package_applications` as the draw-down ledger.
+### Coach app shows the window guard's own words — **S** _(filed 2026-10-06, Wave 6 lane 2)_
+Make the coach app's `attendanceSaveErrorMessage` pass the DB text through for the marking-window guard (P0001), as
+it now does for PK001.
+
+**Why:** a coach saving a lesson below the marking floor sees "Please try again" — retrying cannot work, and the DB
+message already names the floor date. The admin panel shows the DB text; the coach app does not.
+
+**Notes:** `SwimSyncApp/lib/attendanceSaveError.ts` (byte-identical with the admin copy — the drift test pins it).
+P0001 is a generic RAISE code: pass through only messages from `guard_attendance_date`, not every P0001.
+
+### The guard message says "Sep" where the apps say "Sept" — **S** _(filed 2026-10-06, Wave 6 lane 2)_
+Format the PK001 date the way the apps do.
+
+**Why:** the D6 guard's text is built in Postgres (`to_char(…, 'FMDD Mon')` → "Mark 27 Sep first") and shown
+verbatim, while every app label is en-SG ("27 Sept") — §7.302's display split, now inside a DB message. Only
+September differs; cosmetic.
+
+**Notes:** a migration redefining `guard_package_draw_order` from its DB body (§7.40) with a CASE for September, or
+return the date in the message and format client-side. The driver matches the day number only.
 
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT

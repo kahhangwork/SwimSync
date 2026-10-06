@@ -2,7 +2,7 @@
 
 _Planned 2026-10-06 with `/plan-with-confidence`. Hardened by `/plan-review` 2026-10-06 (12 risks; mitigations are inlined as
 `⚠ RISK n MITIGATION`, gate at the end). BACKLOG → *Package-funded lessons need no monthly run* (L).
-Status: PLANNED — not started._
+Status: SHIPPED 2026-10-06 (A d3c64c2, engine v33 ddb7fec, Apps-1 d60e89e, B a714180 — all live; Apps-2 merging). See *Deploy record* at the end._
 
 ## What this builds, and why
 
@@ -683,3 +683,18 @@ _Gotchas from this review were graduated to `docs/GOTCHAS.md` §7.323–§7.327 
 - [x] Step 1.4 STOP: settled 2026-10-06 — D2 refined (Generate optional; seals with 0 invoices).
 - [ ] Nightly proposed to the user, not dispatched.
 
+
+## Deploy record (2026-10-06)
+
+| Step | What | Verified |
+|---|---|---|
+| A | `20261006000100` on prod | `migration list --linked` remote; grants: anon none, authenticated only the 4 RPCs; switch 0/3 |
+| E | `generate-invoices` v33 | `functions list` version 33; downloaded code contains `package_mode_unreadable` |
+| Apps-1 | `d60e89e` (lane 2) | both served bundles contain "A family package can't cover an earlier unmarked lesson"; CI green |
+| Brayden | prod `parent_students` row `87b8e327…` deleted (user's call: keep Brayden Ong separate from the Ang family's "2 Siblings" package) | Brayden 0 links, Ang parent 2 children |
+| B pre-read | Little Orcas package `5bc5e668…`: S$700 stored, S$35/lesson, 12 Jul → 4 Oct; 8 eligible lessons (Adabelle ×4, Alexis ×4, 6–27 Sep); no seals for Little Orcas; 0 invoices today; 0 runs in 15 min | shown to the user |
+| B | `20261006000200` on prod — NOTICE "8 lesson(s) drawn" | stored = live = S$420; 8 live marking-time draws; 0 both invoiced and drawn; switch 3/3, default true |
+
+Deviations from the plan, each recorded in its commit: `lesson_session_id` FK is CASCADE (unmark_day_holiday);
+the backfill is a function `package_backfill_draws()` so pgTAP can prove it; `package_month_funding` returns
+`unmarked_lessons` (lane 2's request — one derivation); the PK001 text ends "Nothing was saved.".

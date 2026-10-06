@@ -139,11 +139,12 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 5. **Verify** in the list below: one row per parent for that month, each with
    **Gross / Package / Credit / Net** and an **Outstanding** badge. Spot-check a couple
    against what you marked (billable lessons × class rate).
-   - **If a family holds a prepaid package** (PRD §7.16), their in-scope lessons are
-     priced at the *package's* locked rate — not the class rate — and appear in the
-     **Package** column; an invoice fully covered arrives already **Paid**. That is
-     correct, not an error. Their package balance only moves at this moment, so the
-     app's "lessons remaining" and the stored balance agree right after generating.
+   - **If a family holds a prepaid package** (PRD §7.16): *since 2026-10-06 the package is drawn when each lesson
+     is MARKED*, so covered lessons never reach an invoice. A family whose month was entirely package-funded gets
+     **no invoice and no email** — that is correct, not a missing invoice. A mixed family's invoice lists only its
+     ad-hoc lessons (out of category, after the package ran out or expired) at the class price, with **Package**
+     S$0. A month with no ad-hoc lessons at all reads **Nothing to bill — all package-funded** on Billing months:
+     generating it is optional (0 invoices; it closes the month so it shows on Accounting).
 
 ---
 

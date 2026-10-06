@@ -807,6 +807,7 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/lib/permissions.ts` (+ test) · `components/PermissionsProvider.tsx` | The role model the panel reads: 8 areas, `can()`, `gridProblem()` (mirrors `set_role_grid`), `isWithin()`; the provider loads `my_admin_permissions` once (§6ab) |
 | `SwimSyncAdmin/app/(admin)/roles/` | The Roles page — roles, holders, the 8×3 grid; owner-only writes (D9) |
 | `SwimSyncAdmin/lib/enrolmentStart.ts` (+ rpc, test) · `components/StartsOnField.tsx` | *Starts on*: bounds → today-only fallback, sealed / unbilled / this-month warnings, the second press, dropped dates (§6ad) |
+| `supabase/migrations/20261006000100…_a.sql` · `…000200…_b.sql` · `supabase/tests/package_draw_at_marking{,_b}.test.sql` · `generate-invoices/wave6.test.ts` | Wave 6 (§6ae): the matcher, draw/return triggers, PK001 guard, PK002 backstop, the four RPCs; B = switch on + backfill |
 | `SwimSyncAdmin/lib/staffInvitation.ts` | `mintStaffInvitation()` — every staff-creating route calls it before `generateLink`/`createUser` (§6aa) |
 | `SwimSyncAdmin/app/api/resend-invoice-email/route.ts` | Per-invoice email resend (lane 2): `billing:edit` as the caller, then a CRON_SECRET proxy to `generate-invoices`' `{resend_invoice_email}` branch |
 | `supabase/tests/http/signup_trust.sh` | The GoTrue-path sign-up trust test, in CI (§7.295) |
@@ -943,6 +944,30 @@ surface — a lesson that didn't run is marked *cancelled*; a later start is ref
 non-money columns for `operations:view` — never `class_rates` itself, which stays behind `pricing:view` (§7.318;
 `lib/whoTaught.drift.test.ts` enforces it). **Do not loosen `class_rates_admin_select` to fix a coachless screen.**
 Plan: `docs/plans/WAVE4_START_DATE_FRONT_DESK_PLAN.md`.
+
+### 6ae. Packages draw at MARKING — one matcher, one switch, fail-open guard, fail-closed engine (2026-10-06)
+
+**The rule lives once, in SQL.** `package_candidates_for(session, student)` is the only package-matching code
+(family = every linked parent; tenant from the class; make-up category snapshot; window; FIFO by expiry; and the
+eligibility — not invoiced, not already drawn, not settled). The attendance trigger (`trg_attendance_package_draw`
+→ `package_draw_for` / `package_return_for`), the D6 guard, the backlog preview and draw, and migration B's
+backfill (`package_backfill_draws`) all call it. **The engine no longer matches packages** when the switch is on —
+it drops drawn lessons and bills the rest at class price. `package_live_balances()` stops simulating for
+switch-on tenants (live = stored). **Do not re-add a matcher in TypeScript or in a reader.**
+
+**One switch.** `tenants.package_draw_at_marking` (default **on** since B; "nobody" in `guard_tenant_columns`) is
+read by every consumer. **Never add a second** (`DISABLE TRIGGER`, an `app_settings` key, an env var) — two
+switches that disagree is a double-billing window (§7.325).
+
+**Funded at most once, both directions in the DB:** the draw refuses an invoiced lesson; `trg_invoice_item_not_drawn`
+refuses an invoice line for a drawn lesson (PK002). The ledger (`package_applications`) has two shapes — legacy
+(`invoice_item_id`) and marking-time (`lesson_session_id`, `student_id`, `lesson_date`) — a CHECK allows exactly one.
+
+**Failure polarity is deliberate and opposite.** The D6 guard (`guard_package_draw_order`, PK001) **fails OPEN**: a
+wrongful refusal blocks a whole class's save with no override (§7.324). The engine **fails CLOSED**
+(`package_mode_unreadable`: no invoice, no seal): billing a lesson a package paid is the worse error. Both count
+"expected" through `class_unmarked_lesson_pairs`, the core of `class_unmarked_lesson_dates` — do not write a third
+copy — Billing months' per-month unmarked count (`package_month_funding.unmarked_lessons`) is the same pairs function, server-side, never a client derivation. Plan + deploy record: `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md`.
 
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 

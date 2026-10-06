@@ -1102,3 +1102,22 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
 68. **Deploy record (2026-10-06): `package-emails` — referral reward *Valid until* is the SGT date (`aec2076`).**
     Function only. Was `String(expires_at).slice(0, 10)` (§7.7). Verified by download: `sgDateOfStamp` present; the
     only remaining slice text is the explanatory comment.
+
+69. **Deploy record (2026-10-06): Wave 6 migration A `20261006000100` (`d3c64c2`) — expand only, switch OFF.**
+    `migration list --linked` remote filled; remote grant read: no `anon` EXECUTE on any new function,
+    `authenticated` only on `package_backlog_preview`, `draw_package_backlog`, `package_usage`,
+    `package_month_funding`; switch 0/3. Rollback rehearsed byte-identical (`supabase/rollback/…_a_DOWN.sql`).
+70. **Deploy record (2026-10-06): `generate-invoices` v33 (`ddb7fec`) — bills only ad-hoc lessons when the switch
+    is on; fails closed (`package_mode_unreadable`).** `functions list` → 33; downloaded code contains
+    `package_mode_unreadable`. Identical to v32 while the switch is off.
+71. **Deploy record (2026-10-06): Apps-1 (`d60e89e`, lane 2) — the PK001 guard message, both apps.** Shipped BEFORE
+    B (plan RISK 2). Bundle grep "A family package can't cover an earlier unmarked lesson" found in both.
+72. **Deploy record (2026-10-06): Wave 6 migration B `20261006000200` (`a714180`) — SWITCH ON + backfill.** Pre-read
+    shown to the user (Little Orcas package: S$700, 8 eligible lessons; nothing in flight). Before the push, the
+    user had Brayden Ong unlinked from the Ang parent on prod (one `parent_students` row) so the "2 Siblings"
+    package would not pay for him. Push NOTICE "8 lesson(s) drawn"; post-read stored = live = S$420, 8 live
+    draws, 0 both invoiced and drawn, switch 3/3, default true. **The rollback window closes at the first seal of a
+    month containing draws** (`supabase/rollback/…_b_DOWN.sql` refuses then).
+73. **Deploy record (2026-10-06): Apps-2 + driver (`0ef1e89`, lane 2) — backdated dialog, *Nothing to bill*, usage
+    list.** After B, same day. Bundle grep (method proven on existing strings first): app "Show lessons used",
+    admin "Nothing to bill" and "Draw from package", each in a new chunk hash. CI green.

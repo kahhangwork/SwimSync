@@ -33,16 +33,16 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Area | Items |
 |---|---|
 | SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315 |
-| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318 |
+| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
-| Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321 |
+| Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
-| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332 |
 | Source-scanning guards | 230, 231, 233, 241, 247, 248, 302, 305, 309 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
@@ -2478,6 +2478,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     with a trailing `// date-label-ok: <why>`). Proven: red on `main`'s drivers (21 lines), red with the old
     `orphan-report` line restored, green fixed. **The lesson beyond dates: a trap that recurs after being written
     down is a missing guard** — `check-driver-ports.sh` is the same move. (2026-10-01.)
+    - **Hit again (2026-10-06, §8.139) — in PRODUCT text this time:** the Wave 6 guard (PK001) builds "Mark 27 Sep
+      first" with `to_char(…,'FMDD Mon')` in Postgres and the apps show it verbatim beside en-SG "27 Sept". The CI
+      guard covers drivers only. Not a bug (September only, cosmetic) — filed as BACKLOG *The guard message says
+      "Sep" where the apps say "Sept"*; the promotion for DB-built user text is that item, not a new check.
 
 303. **A pgTAP file that writes a LITERAL date through a guarded path is a time bomb with a date on it.** On
     2026-10-01 `main` CI went red on `trial_onboarding` (10/35), `session_coach_roster` (3/41) and
@@ -2665,3 +2669,31 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 327. **A new FK onto `students` with `ON DELETE CASCADE` makes `merge_students` RAISE on every merge** — its
     cascade census refuses any cascade it has not been taught to move. Use `NO ACTION`, or teach `merge_students`
     in the same migration. (Wave 6 plan, RISK 9, 2026-10-06.)
+
+328. **An access gate written `IF … OR NOT (a OR b OR (x = current_parent_id() AND …)) THEN RAISE` does NOT
+    raise for a non-parent — `current_parent_id()` is NULL, the arm is NULL, `NOT (false OR NULL)` is NULL, and
+    an `IF` on NULL takes the else.** Wave 6's `package_usage` let a coach, another business's admin and a
+    Front-desk co-admin read a family's package; caught only because pgTAP tried every caller shape. Wrap the
+    whole predicate: `NOT COALESCE(…, false)`, and test each refused caller, not just the allowed ones.
+    (2026-10-06, §8.139.)
+
+329. **A mutant that fails type-checking runs NOTHING — `deno test` aborts before the first test, so a grep for
+    `FAILED` finds none and the mutation reads "still green".** Wave 6's fail-closed mutant (`drawnRows` maybe
+    null) did exactly that. Run mutants with `deno test --no-check`, and judge a mutation by the run's own
+    `N passed | M failed` line, never by the absence of failures. (2026-10-06, §8.139; sibling of §7.25, §7.311.)
+
+330. **A check passes vacuously when its precondition never held — or held and was erased by an earlier step.**
+    Three in one day (Wave 6): a holiday void on `d0` deleted the very marks two later pgTAP cases re-saved, so
+    both passed on rows that no longer existed; a driver's "nothing bad shown" was read after the toast had
+    faded; a "balance came back" check passed when the balance never left. **Assert the precondition as its
+    own check** (`package_draw_at_marking.test.sql` 26b), poll for EITHER outcome and judge the one that
+    appeared, and gate "came back to X" on having left X. Found by mutation, not by reading. (2026-10-06, §8.139.)
+
+331. **Never decide "fetch or not" from a variable assigned INSIDE a `setState` updater** — React may run the
+    updater after the next line, so the variable still holds its old value. Read a ref instead
+    (`SwimSyncApp/features/billing/domain/usePackageUsage.ts`). (Wave 6 lane 2, 2026-10-06, §8.139.)
+
+332. **`next dev` dies after hours of hot reloads — a V8 heap dump with no error line.** It took a long `--only`
+    driver batch down mid-run (Wave 6 lane 2); restarted with `NODE_OPTIONS=--max-old-space-size=8192`, every
+    driver passed. Restart the admin dev server before a long batch rather than trusting a day-old one.
+    (2026-10-06, §8.139.)
