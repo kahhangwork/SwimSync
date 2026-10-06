@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-06 (evening) — **Wave 7 SHIPPED** (§8.140): the injectable DB clock; *Inject the database clock* and *Promote §7.7 to a check over supabase/functions* removed (shipped). Filed *Pin the clock for UI drivers* (L). Next: Wave 8, generated types. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-06 (night) — **Wave 8 SHIPPED** (§8.141): generated Supabase `Database` types in both apps; *Generate real Supabase `Database` types* removed (shipped). Filed *Extend G3 to the apps* (S). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -289,7 +289,8 @@ CI (incl. the folded-in §7.7 check over `supabase/functions`). Deploys #74–#7
 
 #### Wave 8 — cheaper by waiting
 
-6. *Generate real Supabase `Database` types* — always last. After Waves 6–7, which rewrite dozens of functions.
+6. ~~*Generate real Supabase `Database` types*~~ — **shipped 2026-10-06** (§8.141, ARCHITECTURE §6ag,
+   `docs/plans/WAVE8_GENERATED_TYPES_PLAN.md`); found and fixed five bugs on the way (Bug ledger #1–#5).
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
 (low-balance nudge, automated reminders), Native builds → Push → Logo check, Bulk WhatsApp, In-app payment gateway.
@@ -333,7 +334,7 @@ _Superseded 2026-10-05. Forced by: the Foundations driver backlog and
 
 5. ~~*Deeper component-render tests* — the rest~~ — **shipped 2026-10-05** (§8.137, `docs/TESTING.md` §5,
    `docs/plans/WAVE3_RENDER_TESTS_PLAN.md`); found and fixed the child Balances card summing every business (PRD §5.6).
-6. *Generate real Supabase `Database` types* — always last (a schema snapshot).
+6. ~~*Generate real Supabase `Database` types*~~ — shipped 2026-10-06 (Wave 8 above).
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
 (low-balance nudge, automated reminders), Native builds → Push → Logo check, Bulk WhatsApp, In-app payment gateway.
@@ -647,8 +648,7 @@ Deliberately not doing 2026-08-16.)*
 
 **Two items are deliberately LAST, and get cheaper by waiting:**
 
-- **Generate real Supabase `Database` types** (M) — a schema snapshot. Waves 2 and 3 are
-  both migrations; every one landed first invalidates it.
+- ~~**Generate real Supabase `Database` types**~~ — shipped 2026-10-06 (§8.141).
 - **Deeper component-render tests** (M) — they pinned screens the feature-tier refactor was about
   to rewrite. *(That refactor finished 2026-09-24 in both apps, so this reason no longer holds — it
   now waits on value, not on a redesign.)*
@@ -1638,6 +1638,20 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
+### Extend G3 to the apps — **S** — _filed 2026-10-06 (§8.141)_
+A CI grep over `SwimSyncApp/` and `SwimSyncAdmin/` (non-test) that fails on `.split("T")[0]` / `.slice(0, 10)` /
+`.substring(0, 10)` applied to a `*_at` value, mirroring G3 (`scripts/check-functions-sg-date.sh`, functions only).
+
+**Why:** §7.7 has now bitten in the engine (§8.138) and in three app screens at once (§8.141, Bug ledger #3–#5:
+Credit Notes + CSV, admin Claims, the parent's "Waiting since"), each a day early before 08:00 SGT. PostgREST returns
+every timestamptz in UTC, so every new screen that formats an `issued_at` can reintroduce it, and a `+08:00` test
+fixture hides it (§7.25).
+
+**Notes:** the safe forms are `toSgDate(x)` (logic; guard a nullable first — `toSgDate(null)` is "1970-01-01",
+§7.229) and `formatSgStamp(x, opts)` (display). A `date` column (`date_of_birth`, `session_date`) is a bare
+YYYY-MM-DD and is fine — match on the `_at` suffix, allow an inline `// sg-date-ok: <reason>` marker. Prove red on the
+three fixed sites' old bodies. G3's parser lessons apply (§7.230).
+
 ### Pin the clock for UI drivers — **L** — _filed 2026-10-06 (§8.140, Wave 7 D2)_
 Let a Playwright driver replay a fixed day, the way every pgTAP file now does (Wave 7, ARCHITECTURE §6af).
 
@@ -1749,30 +1763,6 @@ nothing else will notice it.
 alignment and text assertion still passes, so width is a human-judgement signal, not a
 pass/fail one. Do not "fix" this by adding a width assertion to the driver; fix the two
 pages' column classes. The threshold in the driver is 80px and is arbitrary.
-
-### Generate real Supabase `Database` types — **M** — _low priority, do last_
-Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
-→ `createClient<Database>(...)`) so query results are typed from the real schema instead
-of guessed from the select string, retiring the `any` casts scattered across every
-screen that reads a nested join.
-
-**Why:** today there is no `Database` generic anywhere, so supabase-js infers response
-shapes from the select string alone and every nested embed is treated as an `any` — real
-type safety across the app's ~11+ query sites is simply absent. With generated types, a
-misspelled column, a dropped field, or a wrong status value is caught by the compiler
-before it ships, everywhere, not just where someone remembered to be careful.
-
-**Notes:** **deliberately ranked last, and only worth doing once the schema has stopped
-changing** — the generated types are a *snapshot* that must be regenerated on every
-migration, or they silently go stale and start lying, which is worse than no types. It's
-an **M**, not an **S**: it touches every query site, and even with the generic in place
-supabase-js still infers to-one embeds as arrays without `!inner`/`!hint` annotations, so
-a few casts remain. This **supersedes and absorbs** the `any`-cast fix already applied in
-`(parent)/home/child/[id].tsx` (shipped 2026-07-16, HANDOVER §8d) — that cast was the
-pragmatic `S`-sized fix to clear the baseline now; this is the thorough version for later. Do **not**
-start this while migrations are still landing (as of 2026-09-27: roles & permissions, the email claim column,
-package revenue and refunds are the schema-touching items ahead of it). The natural trigger is "the schema is
-frozen and we want compiler-enforced safety before a big build."
 
 ### ~~Shared `lessonDates.ts` package~~ — **M** — **NOT DOING 2026-09-27** → *Deliberately not doing*
 The file is duplicated **byte-identical** in both apps.

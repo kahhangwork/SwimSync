@@ -42,8 +42,8 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347 |
-| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352 |
+| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
 `supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
@@ -89,6 +89,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
      day early (→ `sgDateOfStamp`). Audit: `grep -rn "slice(0, *10)" supabase/functions --include=*.ts | grep -v test`
      — only UTC-midnight date arithmetic may remain. **Bitten in a new place again → promote to a check:** BACKLOG
      *Promote §7.7 to a check over supabase/functions*.
+   - **Hit again (2026-10-06, §8.141) — in BOTH APPS, through a PostgREST string.** PostgREST returns every
+     `timestamptz` in UTC (`"2026-10-05T23:30:00+00:00"` for 07:30 SGT — recorded on the Wave 8 credit-notes probe), so
+     `.split("T")[0]` / `.slice(0, 10)` on a `*_at` field is the UTC date: Credit Notes list + CSV, the admin Claims
+     cards and the parent's "Waiting since" all showed the previous day 00:00–07:59 SGT (Bug ledger #3–#5). The
+     parent-side test had passed for the WRONG reason (§7.25) — its fixture wrote `+08:00`, a shape PostgREST never
+     sends. **Write fixtures in the shape the API returns.** G3 covers `supabase/functions` only → BACKLOG *Extend G3
+     to the apps*.
 
 8. **~~The engine's completeness gate never fires on the admin path.~~ FIXED 2026-07-18
    (§8a).** `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcoded `force: true`,
@@ -653,6 +660,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - **Never `as` an RPC result.** Match the migration's `RETURNS TABLE` names, or map field-by-field so a rename
       is a compile error.
     - Durable fix: generated types (`BACKLOG.md` → *Generate real Supabase `Database` types*).
+    - **Durable fix shipped (Wave 8, 2026-10-06, §8.141):** both clients are `createClient<Database>`; a dao's row type
+      is derived from its own select (`DataOf<typeof fetchX>`), so a renamed column is a compile error; `jsonb` RPC/
+      column results narrow once through `fromJson` (ARCHITECTURE §6ag). G6 keeps the casts from growing back.
     - **Audit:** `grep -n "as [A-Z][A-Za-z]*\[\]" **/*.tsx` and check every hit against its RPC.
     - Sibling: **supabase-js infers a to-one embed as an ARRAY while PostgREST returns an OBJECT**
       (`profiles!inner(role)` → `"profiles": {"role": "tenant_admin"}`). Avoid `as unknown as T`; accept both shapes
@@ -1987,6 +1997,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `"YYYY-MM-DD"` (UTC midnight is 08:00 SGT the same day; east of Greenwich it never wraps). Use it for every
     rendered date; `formatSgDate` still takes a `"YYYY-MM-DD"` you already hold.
     (2026-08-30.)
+    - **Edges, measured 2026-10-06 (Wave 8 credit-notes fix):** `toSgDate(null)` does NOT throw — it silently returns
+      `"1970-01-01"`; `undefined` and `""` throw "Invalid time value". On a nullable column guard with a truthy check
+      first (`x ? toSgDate(x) : "—"`).
 
 230. **A source-scanning guard is only as good as its PARSER, and all three of its ways to lie are silent** —
     from `sgDisplay.drift.test.ts` (both apps). Enumerate and classify the reds before fixing anything.
@@ -2772,6 +2785,12 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     describes the schema, not what this role may see. Where type and access code disagree, record the real JSON
     (role JWT, row present AND RLS-hidden) before changing either. (Wave 8 plan-review, 2026-10-06;
     `docs/plans/WAVE8_GENERATED_TYPES_PLAN.md`.)
+    - **Hit again — the bare-access face, a LIVE bug (2026-10-06, Bug ledger #2, §8.141):** RLS on the EMBEDDED table
+      can be narrower than on the parent row. A coach saw every enrolment of their class (`coach_owns_class`) but a
+      student only through an ACTIVE enrolment, so a removed child's past-lesson enrolment embedded `students: null`
+      and the marking screen crashed on `e.students.id` (fixed: `20261006000600`, ARCHITECTURE §6ag). **A bare embed
+      access (no `?.`) is safe only with a POLICY proof** — compare both tables' `pg_policies` — and that proof is
+      written beside the row type.
 
 345. **Generated RPC `Args` make every defaulted parameter OPTIONAL.** `end_class_shadow(p_effective_to date DEFAULT
     NULL)` generates `p_effective_to?: string`. Swapping a hand-written required-key args type (the `*.rpc.ts`
@@ -2811,3 +2830,21 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `lib/database.overrides.ts` (`NULLABLE_RPC_ARGS`, `TRIGGER_FILLED_COLUMNS`, both proven against `pg_proc`/
     `pg_trigger` by `scripts/check-db-overrides.sh`). A CLI bump is its own commit, pinned in both workflows, with
     a regen. (Wave 8 F0, 2026-10-06.)
+
+351. **A worktree shares its refs with the root, so `origin/main` moves under it when the root pushes.** 2026-10-06
+    (Wave 8 lane2): a branch cut from `origin/main` landed on the root's fresh push, yet the WIP commit that followed
+    staged the PRE-merge versions of another lane's 5 files — it would have reverted a merged commit. Other faces:
+    `G6_BASE=origin/main scripts/check-db-any.sh` suddenly "raises" folders the root just merged; a branch's base is
+    silently stale. Rules: `git diff --cached --name-only` before EVERY commit (WIP too); never `git add` a folder you
+    do not own; on a G6 "raise" of someone else's folder, `git fetch` + rebase and regenerate the allowance with
+    `--update`, never hand-edit it. (Caught before it left the worktree.)
+
+352. **Deleting `SwimSyncAdmin/.next` (or running `npm run build`) under a live `next dev` 500s every page.** 2026-10-06:
+    the root ran `rm -rf .next` + `npm run build` while the driver dev server served from it; the dev log showed ENOENT on
+    `.next/server/vendor-chunks/…` and six UI drivers failed "0/44" — read as six product regressions. Stop `next dev`
+    first, or restart it after. A half-written `.next/types` makes `tsc` report "routes.d.ts is not a module" /
+    `LayoutProps`: delete `.next/types` only, with no dev server running (sibling of the §7 `.next/types` items).
+
+353. **`grep -c` exits 1 when it counts ZERO**, so `npx tsc … | grep -c "error TS" && git push …` never pushes on a CLEAN
+    typecheck — a merge silently did not land (2026-10-06; caught by `git log origin/main`). Capture counts with
+    `N=$(… | grep -c …; true)` and compare the text; confirm every push with `git log -1 origin/main`.

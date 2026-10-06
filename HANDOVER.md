@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-06 (evening) — **§8.140: Wave 7 SHIPPED in two lanes — the database has ONE injectable clock
-(`app_now()`/`app_today()`, two locks, prod identical); all 83 dated pgTAP files pin it; G1–G4 required in CI.
-Deploys #74–#76 (M1–M3); M4/M5 needed no migration.**_
+_Last updated: 2026-10-06 (night) — **§8.141: Wave 8 SHIPPED in two lanes — both apps typed from the generated schema,
+no database `any` left; G5/G6/runtime-identity in CI; five bugs the types exposed fixed (Bug ledger #1–#5, one migration
+`20261006000600`, deploy #77). The nightly gate was skipped on the user's word — read the next nightly first.**_
 
-_Previously (§8.139, 2026-10-06) — Wave 6: package lessons draw at marking; the run bills only ad-hoc lessons._
+_Previously (§8.140, 2026-10-06) — Wave 7: the injectable database clock, G1–G4 required._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.349** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.353** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -349,6 +349,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.141 (2026-10-06) — Wave 8: generated Supabase `Database` types (two lanes, root orchestrating)
+
+**Shipped from the committed plan (D1–D6) as lane1 (root: F0, the coach/parent app, every probe, the migration, the
+merges) + lane2 (worktree `wave8-admin`, closed: the admin panel + the 11 NOT-A-GUARD fixes), lane2 reporting each
+unit for review and merge.** F0 `5e0fa74`…`f937c65` (hardened after two independent Opus reviews) → ~40 per-folder
+units → `6f24eea`; handoff `b67ebcc`.
+
+- **Shipped:** ARCHITECTURE §6ag (generated types, widen-only overrides, `fromJson`, the four guards, past pupils);
+  TESTING §5 *Wave 8*; DEPLOYMENT #77–#78; PRD §4.3 + §7.6 notes. Census: App 8 / Admin 3 `db-any-ok` only.
+- **Bugs the types exposed (plan Bug ledger):** #1 contact id — reclassified type-only; #2 coach marking hung on a
+  removed child (migration, user decision: coaches see past pupils); #3–#5 timestamptz sliced to its UTC date.
+- **Gotchas:** §7.351–§7.353; *Hit again* on §7.7, §7.344; edges on §7.229; §7.76 durable fix shipped.
+  **Not done:** nightly over Wave 8 unread (gate skipped); BACKLOG *Extend G3 to the apps* (S) filed.
+
 ## 8.140 (2026-10-06) — Wave 7: the injectable database clock (two lanes, root orchestrating)
 
 **Planned earlier the same day (`/plan-with-confidence` D1–D6 → `/plan-review`, 9 risks), shipped by this session as
@@ -366,24 +380,7 @@ lane2 `fec8dc5` `0e258d1` `9f70b69` `6d2c75a` `5e2e2de` `73004ed` `8c44c54` · `
 - **Gotchas:** §7.338–§7.343; §7.333 refined. **Not done (D2):** UI drivers still run on the real clock → BACKLOG
   *Pin the clock for UI drivers*. PRD untouched — no user-visible change. Nightly not dispatched.
 
-## 8.139 (2026-10-06) — Wave 6: package lessons draw at marking (two lanes, root orchestrating)
-
-**`/plan-with-confidence` (D1–D7, D2 refined: Generate optional) → `/plan-review` (12 risks) → shipped in plan order
-A → engine v33 → Apps-1 → B → Apps-2, the root writing every migration and the engine, lane 2 (worktree
-`wave6-apps`, closed) the apps and the driver.** Commits `ad51148` (plan) · `d3c64c2` (A) · `ddb7fec` (engine) ·
-`d60e89e` (Apps-1) · `a714180` (B) · `0ef1e89` (Apps-2 + driver) · `c14830d` (handoff).
-
-- **Shipped:** PRD §7.16 (money moves at marking; the D6 guard; the backdated dialog; the usage list); ARCHITECTURE
-  §6ae; DEPLOYMENT #69–#73; TESTING §5 *Wave 6*. pgTAP 1789 → 1858, Deno 284 → 292 (twice), vitest 1062 → 1093,
-  jest 666 → 680, driver 33/33.
-- **Found by the new tests, fixed before prod:** `package_usage`'s gate let a coach / another business / Front desk
-  read a package (§7.328); the guard's message named a lesson its own filters excluded; three vacuous checks (§7.330).
-- **Prod data, the user's call:** Brayden Ong unlinked from the Ang parent before B (DEPLOYMENT #72) — his 2 Sep
-  lessons are now unclaimed; the Little Orcas owner must invite his parent or record them settled.
-- **Nightly `37398088721`:** 71/72; `app-coach-settings` (CI file-chooser timeout) re-ran 6/6 locally → gate cleared.
-- **Gotchas:** §7.323–§7.332; §7.302 *Hit again*. **Not done:** BACKLOG's three Wave 6 follow-ups; Wave 7 unplanned.
-
-_(§8.138 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.139 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -442,14 +439,15 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over all of Wave 6. Red → fix first.
+1. **Read the next nightly** (never dispatch it unasked) — the first over all of Waves 6, 7 AND 8 (Wave 8 merged
+   without the nightly gate, on the user's word). Red → fix first; a red on a surface Wave 8 touched is Wave 8's.
 2. **Little Orcas September is the OWNER's** (WhatsApp sent 2026-10-05): *Generate Sep 2026*, then *Record it as
    settled* for the 15 pilot children (PRD §7.17) — **and now Brayden Ong** (unlinked from the Ang family 2026-10-06,
    his 6 + 13 Sep lessons unclaimed: invite his parent or settle). The Ang family's package lessons are already paid
    (drawn at B), so they need no Generate. Coach Kah Hang's September is billed and sealed.
-3. **Next build — Wave 8, *Generate real Supabase `Database` types*** (`BACKLOG.md` → *Build order*; it was waiting
-   for Waves 6–7 to stop rewriting functions). The three Wave 6 follow-ups are S-items in BACKLOG; *Pin the clock for
-   UI drivers* (L) is filed, unranked.
+3. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8. Cheapest high-value S-items:
+   *Extend G3 to the apps* (§7.7 bit three app screens), the three Wave 6 follow-ups; *Pin the clock for UI drivers*
+   (L) is filed, unranked. **A schema migration now regenerates the types in the SAME commit** (CLAUDE.md, §7.350).
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).
@@ -463,8 +461,8 @@ which mutate shared seed state — are in the same section.
 
 **GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20261006000500` (Wave 7 M3), on prod, 0 pending
-(2026-10-06). **B's rollback is valid only until the first seal of a month containing draws** (its header).
+**No migration is HELD or in flight.** Latest applied is `20261006000600` (Wave 8, coach sees past pupils), on prod,
+0 pending (2026-10-06). **B's rollback is valid only until the first seal of a month containing draws** (its header).
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

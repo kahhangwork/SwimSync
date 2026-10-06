@@ -1135,3 +1135,14 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     on those tables holds `app_now()` (prod, empty result). Post: md5 7/7 = local; defaults read `app_now()`. Final
     grant dump: no grant line changed since M1 except the two clock functions. No app or engine change rode any
     Wave 7 push (path diff empty each time); prod behaviour is identical by construction (`app_now()` = `now()`).
+
+77. **Deploy record (2026-10-06): Wave 8 `20261006000600_coach_sees_past_pupils` (`fffa342`) — ADD-only RLS widening
+    (Bug ledger #2).** New `coach_taught_student()` + one OR arm on `students_select` (ALTER POLICY). Rollback rehearsed
+    locally first (DOWN restored the policy byte-identical, the new pgTAP file went red again, UP re-applied).
+    `db push` → `migration list --linked` 177/0 pending; remote dump: `coach_taught_student` EXECUTE for authenticated +
+    service_role only, no `anon`; prod policy carries the new arm (read-only query). The regenerated
+    `database.types.ts` rode the same commit (CLAUDE.md rule); the app side shipped after.
+78. **Wave 8 app pushes (2026-10-06, `5e0fa74` … `6f24eea`) — no backend.** First the Supabase CLI pin (2.119.0) alone, CI
+    green, then F0 and ~40 per-folder commits; every `types(wave8)` commit proven runtime-identical in CI. `fix(wave8)`
+    pushes verified by served bundle: the admin `/holidays` chunk carries the new NO_TENANT message. Vercel app build
+    failed once at `6f24eea` (transient; the next commit, same app code, built green).

@@ -239,6 +239,13 @@ inside one, and no rule anywhere branches on what kind of business it is.
 > not two product types — which is why coach *type* appears nowhere in the permission
 > model. See `TENANCY_DESIGN.md` §1 for the full reasoning.
 
+> *(implemented 2026-10-06, Wave 8)* **An admin whose account has no business cannot save into one.** Adding a
+> holiday or a CSV of them, a level or grade, a location, a package or category, a trial price, or settling an
+> unbilled lesson now checks first and shows *"Your account isn't linked to a business, so nothing was saved. Sign
+> out and back in, then try again."* — instead of sending a write the database refused with a generic or raw error.
+> Settling an unclaimed child whose record can't be read says *"That child's record couldn't be found, so nothing
+> was saved. Refresh the page and try again."*
+
 The original single global **`superadmin`** role split in two, because it was doing two
 different jobs:
 
@@ -1252,6 +1259,13 @@ screen for a past lesson shows **the students enrolled on that date**, not today
 list — otherwise a child who joined last week would appear on a lesson from before they
 existed here, and the save (which requires a status for everyone on screen) would force
 the coach to record attendance for a child who was not there.
+
+*(implemented 2026-10-06, Wave 8)* **The reverse holds too: a child REMOVED from the class still appears, by name,
+on the lessons from before their removal**, and the coach can mark them. A coach may read the name of any child
+they taught — any enrolment, active or closed, in a class they own or are rostered on. Before this, the coach saw
+the closed enrolment but not the child, and the marking screen for such a lesson never finished loading (while
+billing still expected it marked). Reading is all it grants: changing a child's active status stays limited to
+children enrolled now (ARCHITECTURE §6ag).
 
 #### Extra lessons: the admin arranges, the coach records *(implemented 2026-07-27)*
 

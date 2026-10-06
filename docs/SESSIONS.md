@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.139** | 2026-10-06 | Wave 6: package lessons draw at marking; the run bills only ad-hoc lessons | PRD §7.16 · ARCHITECTURE §6ae · DEPLOYMENT #69–#73 |
 | **8.138** | 2026-10-05 → 06 | Wave 4: start date on add-to-class; Front-desk sees who taught | PRD §7.4, §4.3 · ARCHITECTURE §6ad · DEPLOYMENT #64–#68 |
 | **8.137** | 2026-10-05 | Wave 3: money-screen tests (two lanes); child Balances card per-business | TESTING §5 · PRD §5.6 · DEPLOYMENT #63 |
 | **8.136** | 2026-10-05 | 04 Oct attendance checked on prod; a late-assigned child backdated by SQL | DEPLOYMENT #62 · BACKLOG start date (shipped §8.138) |

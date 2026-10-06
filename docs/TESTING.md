@@ -1521,6 +1521,30 @@ in auto mode and its email-retry skip (§7.265, §7.266). No run-day test writes
   writes through a date guard as `authenticated` must go red. 21 red / 21 guarded after 16 text-scan false
   positives were re-marked — per-batch table in `docs/plans/WAVE7_DB_CLOCK_PLAN.md` *Known consequences*.
 
+### Wave 8 — generated types and their guards (2026-10-06, §8.141)
+
+- **G5** `scripts/check-db-types.sh` (CI backend-tests, after `supabase start`): regenerates and diffs both
+  `database.types.ts`, then `scripts/check-db-overrides.sh` (NULLABLE_RPC_ARGS: function exists, none STRICT, params
+  real; TRIGGER_FILLED_COLUMNS: NOT NULL + an enabled BEFORE INSERT ROW trigger with no WHEN assigns it, comments/
+  strings/`:= NULL` ignored; strict block grammar). **Run it locally before a push** — CI runs after Vercel.
+- **`cmp`** of the two types files and **G6** `scripts/check-db-any.sh` (repo-invariants): per-file `any` count =
+  allowance; never above the push base; `database.types` imported as types only; ts-directives counted on raw text.
+- **Runtime identity** `scripts/check-runtime-identical.sh` (CI job `runtime-identity`): every `types(…)` commit in a
+  push must transpile to the same program (syntax trees, two stated normalisations incl. `fromJson`). Added files are
+  runtime unless pure-type (or the overrides file); `.d.ts` ignored. A `fix(…)` commit is exempt and carries its own
+  failing-first test instead.
+- Every guard's red proofs are in its commit message (`9d53df4`, `fe0547d`, `0f26dd0`, `8ef1ad0`, `8545551`,
+  `f937c65`) — two independent reviews found holes each time; the remaining known blind spots are in the scripts'
+  headers. Don't trust a guard you have not seen fail.
+- **Money reads** now have chain-recorder repo tests (`toEqual` on the whole call log, §7.314): app
+  `invoice-detail`, `billing`, `parent-home`, `coach-pay` (+ the existing `child-profile`); admin `invoices`,
+  `credit-notes`, `accounting`, `packages`, `wages`. Each was mutation-proven red; each unit's commit records a
+  real-PostgREST probe (role JWT, SQL ground truth > 0, row present AND RLS-hidden).
+- **pgTAP** `coach_past_pupils` (5): an owning coach and a rostered substitute see a REMOVED child; another class's
+  coach does not; `set_students_active` still refuses the coach. Red before `20261006000600` (1, 2).
+- **Fixture shape (§7.7 *Hit again*):** a test of a `timestamptz` value must use the shape PostgREST sends
+  (`…+00:00`). The pre-existing `waitingSince` test used `+08:00` and passed for the wrong reason.
+
 ### Reading a RED nightly sweep — the four triage rules
 
 *(Graduated from `HANDOVER.md` §9 on 2026-09-18. They had sat inside "Next steps", which is

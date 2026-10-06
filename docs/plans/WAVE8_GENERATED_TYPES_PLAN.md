@@ -1,6 +1,6 @@
 # Wave 8 — Generated Supabase `Database` types
 
-_Status: NOT STARTED · planned 2026-10-06 (`/plan-with-confidence`) · hardened by `/plan-review` 2026-10-06 · BACKLOG → *Generate real Supabase `Database` types*_
+_Status: **DONE 2026-10-06** (§8.141) · planned 2026-10-06 (`/plan-with-confidence`) · hardened by `/plan-review` 2026-10-06 · shipped in two lanes (lane1 root, lane2 worktree `wave8-admin`, closed) · ARCHITECTURE §6ag · the nightly merge gate was skipped on the user's word_
 
 ## What this builds, and why
 

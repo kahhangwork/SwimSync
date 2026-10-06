@@ -809,6 +809,7 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/lib/enrolmentStart.ts` (+ rpc, test) · `components/StartsOnField.tsx` | *Starts on*: bounds → today-only fallback, sealed / unbilled / this-month warnings, the second press, dropped dates (§6ad) |
 | `supabase/migrations/20261006000100…_a.sql` · `…000200…_b.sql` · `supabase/tests/package_draw_at_marking{,_b}.test.sql` · `generate-invoices/wave6.test.ts` | Wave 6 (§6ae): the matcher, draw/return triggers, PK001 guard, PK002 backstop, the four RPCs; B = switch on + backfill |
 | `supabase/migrations/20261006000300_app_clock.sql` · `…000400_clock_decide_ops` · `…000500_clock_stamp_feeds` · `supabase/tests/app_clock{,_edges}.test.sql` · `supabase/tests/http/app_clock_locks.sh` · `scripts/check-{pgtap,migration}-clock.sh` · `scripts/check-functions-sg-date.sh` · `scripts/lib/pgtap-pin.sh` | Wave 7 (§6af): the injectable clock, its two locks, the frozen census; G1–G3 + the shared pin predicate |
+| `SwimSyncApp|Admin/lib/database.types.ts` (generated) · `lib/database.overrides.ts` · `scripts/gen-db-types.sh` · `scripts/check-{db-types,db-any,db-overrides,runtime-identical}.sh` · `scripts/lib/{db-types.sh,runtime-identical.mjs,trigger-fill.sql}` · `SwimSyncAdmin/lib/noTenant.ts` | Wave 8 (§6ag): generated types, the widen-only overrides, G5/G6/runtime-identity; the shared no-business message |
 | `SwimSyncAdmin/lib/staffInvitation.ts` | `mintStaffInvitation()` — every staff-creating route calls it before `generateLink`/`createUser` (§6aa) |
 | `SwimSyncAdmin/app/api/resend-invoice-email/route.ts` | Per-invoice email resend (lane 2): `billing:edit` as the caller, then a CRON_SECRET proxy to `generate-invoices`' `{resend_invoice_email}` branch |
 | `supabase/tests/http/signup_trust.sh` | The GoTrue-path sign-up trust test, in CI (§7.295) |
@@ -992,6 +993,40 @@ reads a raw clock, by any route; ACL parity there keeps every caller of an invok
 or column default — able to execute `app_now()` (§7.342). **Do not** drop `app_now`/`app_today`/the flag table in any
 DOWN (§7.335), re-body a REAL-TIME function onto the pin, or add a second clock GUC. Plan:
 `docs/plans/WAVE7_DB_CLOCK_PLAN.md` (Appendix A = the classification of all 71 clock readers).
+
+### 6ag. Both apps are typed from the GENERATED schema; four CI guards keep it true (Wave 8, 2026-10-06)
+
+Both clients are `createClient<Database>`, where `Database` comes from **`lib/database.overrides.ts`** — the
+generated `lib/database.types.ts` (byte-identical in both apps, `scripts/gen-db-types.sh`, CLI pinned 2.119.0 in
+both workflows) with WIDENINGS applied. A dao exports its row types derived from its own select
+(`DataOf<typeof fetchX>[number]`), so a renamed column or a wrong nesting level is a compile error (§7.76, §7.28).
+
+- **The overrides file is the only place types are narrowed or widened, and it WIDENS ONLY** (RISK 4): roles widen to
+  the `user_role` enum; `NULLABLE_RPC_ARGS` (RPC params the SQL accepts as NULL, each citing its
+  `pg_get_functiondef` line) and `TRIGGER_FILLED_COLUMNS` (NOT NULL columns a BEFORE INSERT trigger fills; the
+  `lesson_sessions` time pair is all-or-none) are proven against `pg_proc`/`pg_trigger` by
+  `scripts/check-db-overrides.sh`. `RlsNullable<T, "embed">` widens every LEFT to-one embed — **types describe the
+  schema, not RLS or grants** (§7.344, §7.349). A bare embed access needs a written POLICY proof (§7.344 *Hit again*,
+  e.g. `coach_taught_student`, below).
+- **`fromJson<T>(value, "<source>")` is the ONLY narrowing of a `jsonb` value** (source = the SQL function, or
+  `table.column` for an engine-written column). It must stay `return value;` — the runtime-identity check proves it
+  and then erases the call. Other narrowing casts carry `// census: ui-cast (Wave 8) — <why>`; the few non-database
+  `any`s carry `db-any-ok` (both allowances hold nothing else).
+- **Never replace a hand-written required-key `*Args` type with `Rpc<…>["Args"]`** — generated Args make DEFAULTed
+  params optional (§7.345). Keep it and assert `type _Check = Assert<Extends<MyArgs, Rpc<"fn">["Args"]>>`.
+- **Guards (all in CI):** G5 `scripts/check-db-types.sh` (regen ≠ committed → red; runs the overrides check; local
+  run is the real gate, CI runs after Vercel); the `cmp` of both types files; G6 `scripts/check-db-any.sh` (the
+  `any` ratchet — count = allowance, never above the push base, `database.types` imported as types only);
+  `scripts/check-runtime-identical.sh` (every `types(…)` commit must transpile to the same program — §7.348). Each
+  was proven red and then hardened against two independent reviews; known blind spots are written in the scripts'
+  headers (`scripts/lib/trigger-fill.sql`, `runtime-identical.mjs`).
+- **A coach reads a child they TAUGHT** (`20261006000600`, Bug ledger #2): `students_select` gained
+  `coach_taught_student(id)` — any enrolment, active or closed, in a class the coach owns or is rostered on — exactly
+  the classes `enrolments_select` admits them to. **Read-only:** `coach_serves_student` (which authorises
+  `set_students_active` for a coach) is deliberately NOT widened.
+- ⚠ **Prohibitions:** never hand-edit `database.types.ts`; never regenerate from a worktree; a schema migration
+  regenerates in the SAME commit (CLAUDE.md, §7.350); never "fix" a type error with `?? ""`, a dropped key, `!inner`
+  or a deleted `?.` (plan *The rules*).
 
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 
