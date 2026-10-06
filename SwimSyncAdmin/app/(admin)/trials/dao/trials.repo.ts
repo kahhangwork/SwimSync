@@ -4,6 +4,16 @@
 // boundary of the multi-round-trip load and of the Convert flow (RISK 2 — the
 // two-press guard's order) stays in domain/useTrials.ts.
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The rows each read returns. Every to-one embed is widened to `| null` — RLS
+// nulls a hidden embed whatever the generated type says (§7.344) — and
+// domain/trialRows.ts keeps its `?.` / `??` on each.
+export type CategorySelectRow = DataOf<typeof loadCategories>[number];
+export type TrialRateRow = DataOf<typeof loadTrialRates>[number];
+export type TrialBookingRow = RlsNullable<DataOf<typeof loadBookings>[number], "students" | "classes">;
+export type AttendanceSelectRow = RlsNullable<DataOf<typeof loadAttendance>[number], "lesson_sessions">;
+export type StudentSelectRow = DataOf<typeof loadStudents>[number];
 
 export function getAuthUser() {
   return supabase.auth.getUser();

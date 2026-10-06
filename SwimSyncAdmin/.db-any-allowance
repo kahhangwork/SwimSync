@@ -27,8 +27,6 @@ app/(admin)/platform/domain/useStudentMove.ts 2
 app/(admin)/referrals/domain/referralRows.ts 6
 app/(admin)/referrals/domain/useReferrals.ts 3
 app/(admin)/substitutes/domain/substituteRows.ts 2
-app/(admin)/trials/domain/trialRows.ts 11
-app/(admin)/trials/domain/useTrials.ts 2
 app/accept-invite/dao/acceptInvite.repo.ts 1
 app/reset-password/dao/resetPassword.repo.ts 1
 components/Table.tsx 1

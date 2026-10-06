@@ -12,7 +12,7 @@ describe("toCategories", () => {
     { category_id: "grp", rate: "25", effective_from: "2026-09-01" }, // current
     { category_id: "grp", rate: "20", effective_from: "2026-01-01" }, // older: shadowed
     { category_id: "pvt", rate: 60, effective_from: "2026-09-18" }, // effective TODAY counts
-  ];
+  ] as any; // rates as strings: pin the Number() coercion
   const cats = [
     { id: "grp", name: "Group" },
     { id: "pvt", name: "Private" },
@@ -37,7 +37,7 @@ describe("toBookings", () => {
     const books = [
       { id: "b1", session_date: "2026-09-12", student_id: "s1", class_id: "c1", students: { full_name: "Ann" }, classes: { title: "Sat" } },
       { id: "b2", session_date: "2026-09-19", student_id: null, class_id: null, students: null, classes: null },
-    ];
+    ] as any; // null ids: pin the kept `?? ""`
     const att = [{ student_id: "s1", lesson_sessions: { session_date: "2026-09-12" } }];
     expect(toBookings(books, att)).toEqual([
       { id: "b1", session_date: "2026-09-12", student_id: "s1", student_name: "Ann", class_id: "c1", class_title: "Sat", marked: true },
@@ -53,7 +53,7 @@ describe("toEligible", () => {
       { id: "b", full_name: "Enrolled", is_active: true, student_class_enrolments: [{ is_active: true }] },
       { id: "c", full_name: "Left", is_active: false, student_class_enrolments: [] },
       { id: "d", full_name: "Never", is_active: true, student_class_enrolments: null },
-    ])).toEqual([
+    ] as any)).toEqual([ // `as any`: the null enrolments pin the kept `?? []`
       { id: "a", full_name: "Free" },
       { id: "d", full_name: "Never" },
     ]);

@@ -3,6 +3,7 @@ import { useTableSort } from "@/components/Table";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { todayInSg, formatSgDate } from "@/lib/lessonDates";
 import * as repo from "../dao/trials.repo";
+import type { AttendanceSelectRow } from "../dao/trials.repo";
 import * as rpc from "../dao/trials.rpc";
 import { datesForClass, toBookings, toCategories, toEligible } from "./trialRows";
 import { needsConvertConfirmation } from "./trialConvert";
@@ -87,10 +88,10 @@ export function useTrials() {
 
     // Which bookings have been marked? A booking whose lesson has passed and
     // is NOT marked is what holds the month open, so it gets its own list.
-    const ids = (books ?? []).map((b: any) => b.student_id);
+    const ids = (books ?? []).map((b) => b.student_id);
     const { data: att } = ids.length
       ? await repo.loadAttendance(ids)
-      : { data: [] as any[] };
+      : { data: [] as AttendanceSelectRow[] };
     const rows: Booking[] = toBookings(books, att);
 
     setUpcoming(rows.filter((r) => r.session_date >= today));
