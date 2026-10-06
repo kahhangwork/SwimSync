@@ -12,7 +12,7 @@ describe("toMemberships", () => {
         parents: [{ profiles: [{ full_name: "Ann" }] }] },
       { id: "pt2", parent_id: "p2", parents: { profiles: { full_name: "Bob" } } },
       { id: "pt3", parent_id: "p3", parents: null },
-    ]);
+    ] as any); // partial rows: pin the `?? null` defaults
     expect(m.map((x) => x.name)).toEqual(["Ann", "Bob", "—"]);
     expect(m[0]).toEqual({ membership_id: "pt1", parent_id: "p1", name: "Ann", code: "REF-AAAAA", disabled_at: null });
     expect(m[1].code).toBeNull();
@@ -29,7 +29,7 @@ describe("toReferrals / toRewards", () => {
 
   it("names resolve by parent id; an unknown id is —", () => {
     const [r] = toReferrals(
-      [{ id: "r1", referrer_parent_id: "p1", referee_parent_id: "px", status: "pending", created_at: "2026-09-01" }],
+      [{ id: "r1", referrer_parent_id: "p1", referee_parent_id: "px", status: "pending", created_at: "2026-09-01" }] as any, // partial: pins the `?? null`s
       names
     );
     expect(r).toEqual({ id: "r1", referrer: "Ann", referee: "—", status: "pending",
@@ -37,7 +37,7 @@ describe("toReferrals / toRewards", () => {
   });
 
   it("reward maps beneficiary and nulls the optional fields", () => {
-    const [w] = toRewards([{ id: "w1", parent_id: "p1", kind: "referrer", status: "available", earned_at: "e" }], names);
+    const [w] = toRewards([{ id: "w1", parent_id: "p1", kind: "referrer", status: "available", earned_at: "e" }] as any, names); // partial: pins the `?? null`s
     expect(w).toEqual({ id: "w1", beneficiary: "Ann", kind: "referrer", status: "available",
       earned_at: "e", expires_at: null, void_reason: null });
   });

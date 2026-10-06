@@ -46,13 +46,13 @@ export function useReferrals() {
 
     if (tenantRes.data) setSettings(tenantRes.data as Settings);
 
-    const mems: Membership[] = toMemberships(memRes.data as any[]);
+    const mems: Membership[] = toMemberships(memRes.data);
     setMemberships(mems);
     const nameById = new Map(mems.map((m) => [m.parent_id, m.name]));
 
-    setReferrals(toReferrals(refRes.data as any[], nameById));
+    setReferrals(toReferrals(refRes.data, nameById));
 
-    setRewards(toRewards(rwRes.data as any[], nameById));
+    setRewards(toRewards(rwRes.data, nameById));
 
     setLoading(false);
   }

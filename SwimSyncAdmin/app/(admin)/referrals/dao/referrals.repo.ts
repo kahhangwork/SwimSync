@@ -4,6 +4,22 @@
 // orchestration (Promise.all, reload after a write) in domain/useReferrals.ts.
 import { supabase } from "@/lib/supabase";
 import type { Settings } from "../types";
+import type { DataOf } from "@/lib/database.overrides";
+
+// The rows each read returns. `parents` / `profiles` are to-one embeds RLS can
+// null (§7.344), typed `| X[]` too because domain/referralRows.ts keeps its
+// Array.isArray normalisers.
+type MembershipSelected = DataOf<typeof loadMemberships>[number];
+type ParentSelected = NonNullable<MembershipSelected["parents"]>;
+type ProfileSelected = NonNullable<ParentSelected["profiles"]>;
+type ParentEmbed = Omit<ParentSelected, "profiles"> & {
+  profiles: ProfileSelected | ProfileSelected[] | null;
+};
+export type MembershipRow = Omit<MembershipSelected, "parents"> & {
+  parents: ParentEmbed | ParentEmbed[] | null;
+};
+export type ReferralSelectRow = DataOf<typeof loadReferrals>[number];
+export type RewardSelectRow = DataOf<typeof loadRewards>[number];
 
 export async function myTenantId(): Promise<string | null> {
   const { data: user } = await supabase.auth.getUser();
@@ -37,8 +53,9 @@ export function loadRewards(t: string) {
     .eq("tenant_id", t).order("earned_at", { ascending: false });
 }
 
-/** Every key REQUIRED — the admin client is untyped, so a dropped key would
- *  typecheck and silently leave a setting unsaved. */
+/** Every key REQUIRED — the update payload's generated type makes every column
+ *  optional, so a dropped key would typecheck and silently leave a setting
+ *  unsaved. */
 export function saveSettings(tenant: string, settings: Settings) {
   return supabase.from("tenants").update({
     referral_enabled: settings.referral_enabled,

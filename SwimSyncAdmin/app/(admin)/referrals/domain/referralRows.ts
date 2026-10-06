@@ -1,7 +1,8 @@
 import type { Membership, Referral, Reward } from "../types";
+import type { MembershipRow, ReferralSelectRow, RewardSelectRow } from "../dao/referrals.repo";
 
-export function toMemberships(rows: any[] | null): Membership[] {
-  return ((rows as any[]) ?? []).map((m) => {
+export function toMemberships(rows: MembershipRow[] | null): Membership[] {
+  return (rows ?? []).map((m) => {
     const p = Array.isArray(m.parents) ? m.parents[0] : m.parents;
     const pr = Array.isArray(p?.profiles) ? p.profiles[0] : p?.profiles;
     return {
@@ -14,8 +15,8 @@ export function toMemberships(rows: any[] | null): Membership[] {
   });
 }
 
-export function toReferrals(rows: any[] | null, nameById: Map<string, string>): Referral[] {
-  return ((rows as any[]) ?? []).map((r) => ({
+export function toReferrals(rows: ReferralSelectRow[] | null, nameById: Map<string, string>): Referral[] {
+  return (rows ?? []).map((r) => ({
     id: r.id,
     referrer: nameById.get(r.referrer_parent_id) ?? "—",
     referee: nameById.get(r.referee_parent_id) ?? "—",
@@ -26,8 +27,8 @@ export function toReferrals(rows: any[] | null, nameById: Map<string, string>): 
   }));
 }
 
-export function toRewards(rows: any[] | null, nameById: Map<string, string>): Reward[] {
-  return ((rows as any[]) ?? []).map((r) => ({
+export function toRewards(rows: RewardSelectRow[] | null, nameById: Map<string, string>): Reward[] {
+  return (rows ?? []).map((r) => ({
     id: r.id,
     beneficiary: nameById.get(r.parent_id) ?? "—",
     kind: r.kind,

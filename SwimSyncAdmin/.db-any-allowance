@@ -24,8 +24,6 @@ app/(admin)/platform/dao/platform.api.ts 1
 app/(admin)/platform/domain/familyRows.ts 4
 app/(admin)/platform/domain/useFamilyStatus.ts 1
 app/(admin)/platform/domain/useStudentMove.ts 2
-app/(admin)/referrals/domain/referralRows.ts 6
-app/(admin)/referrals/domain/useReferrals.ts 3
 app/(admin)/substitutes/domain/substituteRows.ts 2
 app/accept-invite/dao/acceptInvite.repo.ts 1
 app/reset-password/dao/resetPassword.repo.ts 1
