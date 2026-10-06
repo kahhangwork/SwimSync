@@ -32,29 +32,29 @@ SELECT set_config('swimsync.now', '', true);
 SELECT is(app_now(), now(), 'an empty pin is unpinned: app_now() = now()');
 
 -- ---- 3. Pinned ---------------------------------------------------------------------------------------------
-SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
-SELECT is(app_now(), '2026-09-15 10:00+08'::timestamptz, 'pinned: app_now() = the pin');
-SELECT is(app_today(), '2026-09-15'::date, 'pinned: app_today() = the pin''s SGT date');
-SELECT is(today_sg(), '2026-09-15'::date, 'pinned: today_sg() reads the pin (re-bodied)');
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
+SELECT is(app_now(), '2026-09-15 10:00+08'::timestamptz, 'pinned: app_now() = the pin');  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
+SELECT is(app_today(), '2026-09-15'::date, 'pinned: app_today() = the pin''s SGT date');  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
+SELECT is(today_sg(), '2026-09-15'::date, 'pinned: today_sg() reads the pin (re-bodied)');  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
 SELECT is(session_window_start(), '2026-08-01'::date, 'pinned: session_window_start() = 1st of the previous SGT month');
 
 -- 07:59 SGT on the 1st: UTC is still the previous day AND the previous month (§7.7).
-SELECT set_config('swimsync.now', '2026-10-01 07:59+08', true);
-SELECT is(app_today(), '2026-10-01'::date, '07:59 SGT on the 1st: app_today() is the SGT date, not the UTC one');
-SELECT is(session_window_start(), '2026-09-01'::date, '07:59 SGT on the 1st: the window starts in the SGT previous month');
+SELECT set_config('swimsync.now', '2026-10-01 07:59+08', true);  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
+SELECT is(app_today(), '2026-10-01'::date, '07:59 SGT on the 1st: app_today() is the SGT date, not the UTC one');  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
+SELECT is(session_window_start(), '2026-09-01'::date, '07:59 SGT on the 1st: the window starts in the SGT previous month');  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
 
-SELECT set_config('swimsync.now', '2026-09-30T23:59:00Z', true);
-SELECT is(app_today(), '2026-10-01'::date, 'a Z-suffixed pin is accepted and read in SGT');
+SELECT set_config('swimsync.now', '2026-09-30T23:59:00Z', true);  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
+SELECT is(app_today(), '2026-10-01'::date, 'a Z-suffixed pin is accepted and read in SGT');  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
 
 -- ---- 4. A pin must carry an offset (§7.337) ----------------------------------------------------------------
-SELECT set_config('swimsync.now', '2026-10-01 07:59', true);
+SELECT set_config('swimsync.now', '2026-10-01 07:59', true);  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
 SELECT throws_like($$SELECT app_now()$$, '%must carry a UTC offset%',
   'an offset-less pin RAISEs instead of being read as UTC');
 SELECT throws_like($$SELECT today_sg()$$, '%must carry a UTC offset%',
   'an offset-less pin RAISEs through the helpers too');
 
 -- ---- 5. Lock 1: a pin with no flag row RAISEs ----------------------------------------------------------------
-SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
 DELETE FROM private.clock_override_enabled;
 SELECT throws_ok($$SELECT app_now()$$, 'P0001',
   'swimsync.now is set but the clock override is disabled in this database',
@@ -66,14 +66,14 @@ INSERT INTO private.clock_override_enabled VALUES (true);
 -- ---- 6. The invoker chain under authenticated -----------------------------------------------------------------
 -- SET LOCAL ROLE keeps session_user = postgres, so the pin still applies; what this proves is the GRANTS:
 -- authenticated reaches app_now() through SECURITY INVOKER today_sg().
-SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
 SET LOCAL ROLE authenticated;
 CREATE TEMP TABLE clock_as_auth ON COMMIT DROP AS
   SELECT today_sg() AS today, session_window_start() AS win, app_today() AS app_today;
 RESET ROLE;
-SELECT is((SELECT today FROM clock_as_auth), '2026-09-15'::date, 'under authenticated: today_sg() returns the pinned date');
+SELECT is((SELECT today FROM clock_as_auth), '2026-09-15'::date, 'under authenticated: today_sg() returns the pinned date');  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
 SELECT is((SELECT win FROM clock_as_auth), '2026-08-01'::date, 'under authenticated: session_window_start() follows the pin');
-SELECT is((SELECT app_today FROM clock_as_auth), '2026-09-15'::date, 'under authenticated: app_today() is callable and pinned');
+SELECT is((SELECT app_today FROM clock_as_auth), '2026-09-15'::date, 'under authenticated: app_today() is callable and pinned');  -- date-literal-ok: a clock pin or its readback — no write passes a floor guard
 
 -- ---- 7. ACL parity (RISK 2) ------------------------------------------------------------------------------------
 SELECT is_empty($$
