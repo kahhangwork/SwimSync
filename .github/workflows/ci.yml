@@ -59,10 +59,8 @@ jobs:
 
       # Wave 7: a migration newer than the clock cutoff reads app_now()/app_today(),
       # never a raw now()/CURRENT_DATE, unless marked `-- clock: stamp`/`-- clock-real:`.
-      # Advisory until T5 bumps the cutoff past M4.
       - name: No new migration reads a raw clock (G2)
         run: scripts/check-migration-clock.sh
-        continue-on-error: true
 
       # §7.7: .slice(0, 10) / .split("T")[0] on a timestamp is the UTC date, a day
       # behind SGT before 08:00 — shipped in the engine until 41d9676.

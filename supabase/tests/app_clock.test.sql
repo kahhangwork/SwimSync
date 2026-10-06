@@ -19,7 +19,7 @@
 -- become authenticator (§7.333), so any assertion here would be vacuous. It is proven over a real login by
 -- supabase/tests/http/app_clock_locks.sh.
 BEGIN;
-SELECT plan(26);
+SELECT plan(27);
 
 -- ---- 1. The flag row (lock 1's switch) is present: seed.sql ran, or M1's hand insert did (§7.334) ----------
 SELECT is((SELECT count(*)::int FROM private.clock_override_enabled), 1,
@@ -143,6 +143,72 @@ SELECT is_empty($$
      AND proname <> 'app_now'
      AND (prosrc ~ 'swimsync\.now' OR prosrc ~* 'set_config')
 $$, 'no public function but app_now() mentions swimsync.now or calls set_config');
+
+-- ---- 9. The frozen clock census (Wave 7 M5) ---------------------------------------------------------------
+-- Every public function that still reads a RAW clock, and how many times. Frozen 2026-10-06 after M3; every entry
+-- is classified in the plan's Appendix A as STAMP (an audit stamp nothing reads back for a date) or REAL-TIME
+-- (handle_new_user's invitation expiry, email_delivery_state / claim_*_email), plus app_now()'s own two
+-- `RETURN now()` and enrolment_start_bounds' jsonb key 'today'.
+-- RED when any migration, by any route, adds a raw clock read to any public function or changes a count. The fix
+-- is app_now()/app_today() for a decision; for a genuine stamp or real-time window, update this list in the same
+-- migration's commit and say which class it is. G2 (scripts/check-migration-clock.sh) is the early warning; this
+-- is the backstop it cannot route around. Token list = G2's = the plan's.
+SELECT results_eq($$
+  SELECT p.proname::text COLLATE "default", count(*)::int
+    FROM pg_proc p
+   CROSS JOIN LATERAL regexp_matches(p.prosrc,
+     '\mnow\(\)|\mcurrent_date\M|\mcurrent_timestamp\M|\mcurrent_time\M|\mlocaltimestamp\M|\mclock_timestamp\M|\mstatement_timestamp\M|\mtransaction_timestamp\M|''now''|''today''',
+     'gi') m
+   WHERE p.pronamespace = 'public'::regnamespace
+   GROUP BY p.proname
+   ORDER BY p.proname   -- name order ("C"), the order the literal below was generated in
+$$, $$
+  VALUES
+    ('app_now', 2),
+    ('apply_credit_to_invoice', 4),
+    ('approve_student_claim', 2),
+    ('cancel_lesson', 2),
+    ('cancel_makeup_booking', 1),
+    ('cancel_trial_booking', 1),
+    ('claim_credit_note_email', 2),
+    ('claim_invoice_email', 2),
+    ('claim_invoice_paid', 1),
+    ('close_student_enrolment', 1),
+    ('confirm_invoice_paid', 2),
+    ('create_package_offer', 1),
+    ('deactivate_admin', 1),
+    ('deactivate_class', 1),
+    ('decline_student_claim', 1),
+    ('disable_coach', 3),
+    ('dismiss_student_claim', 1),
+    ('email_delivery_state', 2),
+    ('end_class_shadow', 1),
+    ('enforce_parent_package_lifecycle', 2),
+    ('enforce_skill_progress_tenant', 1),
+    ('enrolment_start_bounds', 1),
+    ('generate_coach_payouts', 1),
+    ('handle_attendance_update', 11),
+    ('handle_new_user', 2),
+    ('mark_payout_paid', 1),
+    ('merge_students', 1),
+    ('package_return_for', 1),
+    ('reactivate_class', 1),
+    ('reassign_student_tenant', 1),
+    ('regenerate_join_code', 1),
+    ('reverse_package_refund', 1),
+    ('set_class_terms', 1),
+    ('set_enrolment_start', 1),
+    ('set_parent_tenant_active', 1),
+    ('set_referral_code_disabled', 1),
+    ('set_students_active', 3),
+    ('settle_referral_reward', 2),
+    ('supersede_open_package_offer', 1),
+    ('suspend_tenant', 2),
+    ('undo_student_claim', 1),
+    ('void_credit_note', 5),
+    ('void_referral_reward', 1),
+    ('write_off_parent_balance', 2)
+$$, 'frozen clock census: no public function gained or lost a raw clock read');
 
 SELECT * FROM finish();
 ROLLBACK;

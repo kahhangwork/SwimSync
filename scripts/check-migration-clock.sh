@@ -29,10 +29,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # ⚠ THE ONE CONSTANT. Migrations with a timestamp > CUTOFF are checked.
-# Set to M1 (20261006000300_app_clock), which holds raw now() by design.
-# lane1 bumps it to M4's timestamp at T5, when G2 goes required: M2–M4 re-body
-# functions mechanically and keep their audit-stamp now() calls verbatim.
-CUTOFF=20261006000300
+# Set to M3 (20261006000500_clock_stamp_feeds) — the LAST migration of Wave 7, which
+# re-bodied functions mechanically and kept their audit-stamp now() calls verbatim.
+# M4 turned out to need no migration (every billing guard already read the helpers),
+# so "M4's timestamp" in the plan is M3's. Raised at T5, when G2 went required. Never
+# raise it again: a later migration marks its stamps `-- clock: stamp` instead.
+CUTOFF=20261006000500
 
 TOKENS_RE="(^|[^a-z0-9_])now[[:space:]]*\([[:space:]]*\)|(^|[^a-z0-9_])current_date([^a-z0-9_]|$)|(^|[^a-z0-9_])current_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])current_time([^a-z0-9_]|$)|(^|[^a-z0-9_])localtimestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])clock_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])statement_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])transaction_timestamp([^a-z0-9_]|$)|'now'|'today'"
 MARK_RE='-- clock: stamp|-- clock-real:[[:space:]]*[^[:space:]]'

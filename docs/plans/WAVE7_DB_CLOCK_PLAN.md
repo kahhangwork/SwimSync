@@ -116,6 +116,14 @@ GRANT EXECUTE ON FUNCTION public.app_now(), public.app_today() TO authenticated,
 | M4 | `…_clock_billing_guards` | **Last.** Any billing-guard path not already covered by M1 (`assert_markable_date`, `guard_*_date`, `enrolment_start_at`, D6 guard `guard_package_draw_order`): verify each routes through `app_*` and convert stragglers; **Deno ×2** | green + Deno ×2 + prod gate |
 | M5 | (if Appendix A finds more) | stragglers; then freeze the clock census literal in `app_clock.test.sql` | green + prod gate |
 
+**Outcome (2026-10-06, lane1).** M1 `20261006000300` (f072685), M2 `20261006000400` (64b678a), M3 `20261006000500`
+(d93d9c0) — each through steps 1–14, on prod before `main`. **M4 needed no migration:** a re-census after M3 found 44
+public functions still holding a raw clock token, exactly Appendix A's STAMP + REAL-TIME set plus `app_now` itself
+and `enrolment_start_bounds` (a jsonb key `'today'`, not a read); every billing guard has 0 raw tokens and reads only
+the helpers. Deno ×2 for M4 is therefore the M3 run. **M5 needed no migration either:** it is the frozen clock census
+in `app_clock.test.sql` (44 functions, 77 tokens), proven red twice (a new function with `now()`; a changed count).
+G2's cutoff = M3's timestamp, and G2 went required at that point (T5's G2 half).
+
 **Every migration Mn follows this sequence. Each line is a step; do not skip or reorder.**
 
 1. **⚠ RISK 1 MITIGATION — capture before (step).** Run `pg_get_functiondef`, `proacl`, `provolatile`, `prosecdef` and `proconfig` for every function Mn touches. Save them to the scratchpad `before/<fn>.sql` from the live local DB.
