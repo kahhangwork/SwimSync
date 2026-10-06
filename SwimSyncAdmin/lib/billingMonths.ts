@@ -11,6 +11,8 @@
 // and today arrives as todayInSg()'s "YYYY-MM-DD". No Date arithmetic on the
 // logic path (§7.7); display labels are built in UTC from the string itself.
 
+import { fromJson, type Tables } from "@/lib/database.overrides";
+
 export type BillingPeriod = {
   billing_month: string;
   completed_at: string;
@@ -317,8 +319,17 @@ export function runDayOf(raw: unknown): number {
 /** How far back the invoice-month read looks (⚠ RISK 10 — bounded read). */
 export const INVOICE_MONTH_WINDOW = 24;
 
+/** One billing_runs row as both callers select it. The Invoices page embeds
+ *  `profiles(full_name)` (who pressed Generate); the Dashboard does not, so the
+ *  embed is optional — and nullable, since RLS can hide it (§7.344). */
+export type BillingRunSelectRow = Pick<
+  Tables<"billing_runs">,
+  | "id" | "billing_month" | "ran_at" | "mode" | "status" | "sealed" | "invoices_created"
+  | "unclaimed_billable" | "earlier_unbilled_month" | "blocking" | "unclaimed_students" | "error"
+> & { profiles?: { full_name: string } | null };
+
 /** Map one raw billing_runs row (with its `profiles` embed) to a BillingRun. */
-export function mapBillingRun(r: any): BillingRun {
+export function mapBillingRun(r: BillingRunSelectRow): BillingRun {
   return {
     id: r.id,
     billing_month: r.billing_month,
@@ -330,8 +341,10 @@ export function mapBillingRun(r: any): BillingRun {
     invoices_created: r.invoices_created ?? 0,
     unclaimed_billable: r.unclaimed_billable ?? null,
     earlier_unbilled_month: r.earlier_unbilled_month ?? null,
-    blocking: r.blocking ?? null,
-    unclaimed_students: r.unclaimed_students ?? null,
+    // jsonb the engine writes (generate-invoices) — the column IS the source.
+    blocking: fromJson<RunBlockingLesson[] | null>(r.blocking, "billing_runs.blocking") ?? null,
+    unclaimed_students:
+      fromJson<RunUnclaimedStudent[] | null>(r.unclaimed_students, "billing_runs.unclaimed_students") ?? null,
     error: r.error ?? null,
   };
 }
