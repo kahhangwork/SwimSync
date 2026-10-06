@@ -69,8 +69,9 @@ export function useEditChild() {
     const { error } = await updateChild(id, {
       full_name: name.trim(),
       date_of_birth: dob.trim(),
-      // The picker offers only GENDER_OPTIONS, and a loaded value is the enum
-      // capitalised — so lower-cased it is always a `gender_type`.
+      // census: ui-cast (Wave 8) — the picker offers only GENDER_OPTIONS, and a loaded
+      // value is the enum capitalised (state defaults to "Male"), so lower-cased it is
+      // always a `gender_type`.
       gender: gender.toLowerCase() as Enums<"gender_type">,
       notes: notes.trim() || null,
     });

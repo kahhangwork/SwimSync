@@ -48,9 +48,9 @@ export function useUnclaimed() {
 
     const { data: student } = await repo.fetchStudentTenant(u.student_id);
 
-    // `!` (Wave 8): non-null for a signed-in admin with a real student row — this
-    // page's gate. Otherwise the insert is refused (NOT NULL / RLS) and the error
-    // is shown in the modal below, as before.
+    // Both `!` are NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+    // No student row / signed out → the key is dropped → NOT NULL/RLS refuses →
+    // setSettleError shows it in the modal.
     const { error } = await repo.insertSettlement(
       settlementPayload({
         tenantId: student?.tenant_id!,

@@ -78,8 +78,8 @@ export function useLocationForm({ locations, setBusy, setError, load }: Deps) {
       ({ error: err } = await updateLocation(editing.id, payload));
     } else {
       const { data: auth } = await getAuthUser();
-      // `!` (Wave 8): non-null for a signed-in tenant admin — this page's gate.
-      // Otherwise RLS refuses the insert and the error below is shown (see the dao).
+      // Both `!` are NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+      // No user / no tenant → key dropped → RLS refuses → the error below (see the dao).
       const { data: profile } = await loadProfileTenantId(auth.user?.id!);
       ({ error: err } = await insertLocation(payload, profile?.tenant_id!));
     }

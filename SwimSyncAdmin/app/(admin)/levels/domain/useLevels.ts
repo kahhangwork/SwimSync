@@ -100,8 +100,8 @@ export function useLevels() {
           ...payload,
           // The caller's own business. RLS refuses any other value anyway; this
           // is what makes the insert satisfy the WITH CHECK in the first place.
-          // `!` (Wave 8): non-null for a signed-in tenant admin — this page's gate;
-          // otherwise the insert is refused and "Could not save" is shown below.
+          // Both `!` are NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+          // No user / no tenant → key dropped → 23502/RLS → "Could not save. Please try again."
           tenant_id: (
             await repo.profileTenant((await repo.getAuthUser()).data.user?.id!)
           ).data?.tenant_id!,
@@ -154,8 +154,8 @@ export function useLevels() {
       rank: nextRank(gradeScale),
       // The caller's own business — RLS refuses any other value; this is what
       // satisfies the WITH CHECK (same pattern as the level insert).
-      // `!` (Wave 8): as in save() — non-null for a signed-in tenant admin;
-      // otherwise the insert is refused and "Could not add that grade." is shown.
+      // Both `!` are NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+      // No user / no tenant → key dropped → 23502/RLS → "Could not add that grade."
       tenant_id: (
         await repo.profileTenant((await repo.getAuthUser()).data.user?.id!)
       ).data?.tenant_id!,

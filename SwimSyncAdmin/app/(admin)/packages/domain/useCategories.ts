@@ -22,8 +22,8 @@ export function useCategories({ setBusy, setError, reload }: Shared) {
     setBusy(true);
     const { error: err } = await repo.insertCategory({
       name: trimmed,
-      // `!` (Wave 8): non-null for a signed-in tenant admin — this page's gate;
-      // otherwise the insert is refused and "Could not add that category." shows.
+      // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+      // No tenant → NULL → 23502/RLS → "Could not add that category."
       tenant_id: (await rpc.myTenantId())!,
     });
     setBusy(false);

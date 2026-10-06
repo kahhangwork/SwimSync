@@ -45,6 +45,8 @@ export function useAttendanceSave(input: {
     setSaveMsg(null);
     const entries: SaveEntry[] = roster
       .filter((r) => draft[r.studentId] !== null && draft[r.studentId] !== undefined)
+      // census: ui-cast (Wave 8) — `draft` is typed DbStatus | null; the filter above
+      // drops null/undefined, so this cast only strips the null.
       .map((r) => ({ studentId: r.studentId, status: draft[r.studentId] as DbStatus, prevStatus: r.prev }));
     const res = await saveAdminAttendance({ deps: supabaseSaveDeps(), classId, date, actorProfileId: actorId, knownSessionId: sessionId, entries });
     setSaving(false);

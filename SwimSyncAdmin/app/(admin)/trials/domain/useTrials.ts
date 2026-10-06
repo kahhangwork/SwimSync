@@ -256,8 +256,9 @@ export function useTrials() {
     // A new effective-dated ROW, never an update. Changing the price must not
     // re-value trials already taught (§7.3).
     const { error } = await repo.insertTrialRate({
-      // `!` (Wave 8): the rate editor renders only after loadAll() resolved this
-      // admin's tenant; were it null the insert is refused and the error shows.
+      // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+      // loadAll() stores whatever it found, NULL included, and the page renders once
+      // loading ends — so a tenant-less caller sends NULL → 23502/RLS → setRateError.
       tenant_id: tenantId!,
       category_id: categoryId,
       rate: value,

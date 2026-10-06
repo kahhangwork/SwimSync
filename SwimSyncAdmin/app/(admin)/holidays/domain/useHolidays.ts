@@ -104,9 +104,9 @@ export function useHolidays() {
     setBusy(true);
     setFormError(null);
     const tenant_id = (await myTenantId())!;
-    // `!` names its guard (Wave 8): /holidays is a scope:"tenant" page, and a tenant
-    // admin's profile always carries tenant_id — null only when signed out, when the
-    // insert is refused (23502/RLS) and the error branch below says so.
+    // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+    // A caller with no tenant (signed out; no CHECK ties tenant_admin to a tenant_id)
+    // sends NULL → 23502/RLS refuses the insert → "Could not add that holiday."
     // Pass the date string straight through — never a re-formatted Date (§7.7).
     const { code, error: err } = await insertHoliday(tenant_id, newDate, newName.trim());
     setBusy(false);
@@ -143,9 +143,8 @@ export function useHolidays() {
     let added = 0;
     if (rows.length > 0) {
       const tenant_id = (await myTenantId())!;
-      // `!` names its guard (Wave 8): /holidays is a scope:"tenant" page, and a tenant
-      // admin's profile always carries tenant_id — null only when signed out, when the
-      // insert is refused (23502/RLS) and the error branch below says so.
+      // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+      // No tenant → NULL rows → 23502/RLS refuses the upsert → "Could not import that file."
       const { count, error: err } = await upsertHolidays(
         rows.map((r) => ({ tenant_id, holiday_date: r.date, name: r.name }))
       );

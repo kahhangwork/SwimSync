@@ -23,8 +23,9 @@ export function usePackageSettings() {
 
   async function loadPackages() {
     const { data: userRes } = await repo.getCurrentUser();
-    // `!` (Wave 8): non-null for a signed-in admin — this page's gate. Signed out,
-    // the read 400s, `prof` is null and the defaults above stay, as before.
+    // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+    // SILENT path (pre-existing): signed out → `id=eq.undefined` 400s → `prof` is null
+    // → the default thresholds above stay, with no message.
     const { data: prof } = await repo.fetchTenantPackageSettings(userRes.user?.id!);
     setTenantId((prof as any)?.tenant_id ?? null);
     const stored = (prof as any)?.tenants?.low_package_lessons;

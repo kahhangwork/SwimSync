@@ -43,9 +43,8 @@ export function useOrphans(tenantId: string | null) {
       data: { user },
     } = await repo.getUser();
 
-    // `!` (Wave 8): non-null for a signed-in admin — this
-    // page's gate. Otherwise the insert is refused (NOT NULL / RLS) and the error
-    // is shown in the modal below, as before.
+    // `recordedBy: user?.id!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+    // Signed out → the key is dropped → NOT NULL/RLS refuses → setOrphanError shows it.
     const { error } = await repo.insertSettlement(
       settlementPayload({
         tenantId,

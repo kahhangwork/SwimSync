@@ -69,8 +69,8 @@ export function useProductForm({ setBusy, reload }: Shared) {
       // Override present ⇒ its own type + value; absent ⇒ NULL/NULL = inherit.
       referral_discount_type: pRefOverride ? pRefType : null,
       referral_discount_value: pRefOverride ? Number(pRefValue) : null,
-      // `!` (Wave 8): non-null for a signed-in tenant admin — this page's gate;
-      // otherwise the insert is refused and "Could not create the package." shows.
+      // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
+      // No tenant → NULL → 23502/RLS → "Could not create the package."
       tenant_id: (await rpc.myTenantId())!,
     });
     setBusy(false);

@@ -95,7 +95,7 @@ export function ClassFormModal({
           </label>
           <select
             value={day}
-            // The options are DAYS (the day_of_week enum) and the "" placeholder.
+            // census: ui-cast (Wave 8) — the options are DAYS (the day_of_week enum) and the "" placeholder.
             onChange={(e) => setDay(e.target.value as Enums<"day_of_week"> | "")}
             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
           >
