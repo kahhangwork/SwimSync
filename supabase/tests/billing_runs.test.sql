@@ -14,8 +14,10 @@
 -- fixture writes happen as superuser between probes via RESET ROLE.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(14);
+SELECT plan(15);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Grants (⚠ RISK 1) ───────────────────────────────────────────────────────
 SELECT ok(has_table_privilege('service_role','public.billing_runs','INSERT'),
@@ -33,8 +35,8 @@ SELECT ok(NOT has_table_privilege('anon','public.billing_runs','SELECT'),
 
 -- ── Two businesses ──────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('86000000-0000-0000-0000-0000000000a0','runsa','Runs Business A','SWIM-RUNA', now()),
-  ('86000000-0000-0000-0000-0000000000b0','runsb','Runs Business B','SWIM-RUNB', now());
+  ('86000000-0000-0000-0000-0000000000a0','runsa','Runs Business A','SWIM-RUNA', app_now()),
+  ('86000000-0000-0000-0000-0000000000b0','runsb','Runs Business B','SWIM-RUNB', app_now());
 
 -- Owner first, in its own statement (handle_new_user claims ownership only
 -- while owner_profile_id IS NULL), then the rest.
@@ -43,28 +45,28 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','86100000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','runs-owner-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Runs Owner A","role":"tenant_admin","tenant_id":"86000000-0000-0000-0000-0000000000a0"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','runs-owner-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Runs Owner A","role":"tenant_admin","tenant_id":"86000000-0000-0000-0000-0000000000a0"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','86100000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','runs-coadmin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Runs CoAdmin A","role":"tenant_admin","tenant_id":"86000000-0000-0000-0000-0000000000a0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','runs-coadmin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Runs CoAdmin A","role":"tenant_admin","tenant_id":"86000000-0000-0000-0000-0000000000a0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','86100000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','runs-owner-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Runs Owner B","role":"tenant_admin","tenant_id":"86000000-0000-0000-0000-0000000000b0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','runs-owner-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Runs Owner B","role":"tenant_admin","tenant_id":"86000000-0000-0000-0000-0000000000b0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','86100000-0000-0000-0000-000000000ca1',
-   'authenticated','authenticated','runs-coach-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Runs Coach A","role":"coach","tenant_id":"86000000-0000-0000-0000-0000000000a0"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','runs-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Runs Coach A","role":"coach","tenant_id":"86000000-0000-0000-0000-0000000000a0"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','86100000-0000-0000-0000-00000000009f',
-   'authenticated','authenticated','runs-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Runs Parent","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','runs-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Runs Parent","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','86100000-0000-0000-0000-0000000000da',
-   'authenticated','authenticated','runs-platform@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Runs Platform","role":"platform_admin"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','runs-platform@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Runs Platform","role":"platform_admin"}', app_now(), app_now(), '', '', '', '');
 
 -- Two runs for A (one by the co-admin — RISK 2 deletes them below), one for B.
 INSERT INTO billing_runs (tenant_id, billing_month, ran_by, mode, status, unclaimed_billable, unclaimed_students) VALUES

@@ -4,8 +4,10 @@
 -- raised — assert the value is unchanged). Rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(12);
+SELECT plan(13);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('cc000000-0000-0000-0000-0000000000a1','ccc','Cap Colour','SWIM-CCC1'),
@@ -16,20 +18,20 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','cb000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','cc-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cc-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"CC Admin","role":"tenant_admin","tenant_id":"cc000000-0000-0000-0000-0000000000a1"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cb000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','cc-coach@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cc-coach@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"CC Coach","role":"coach","tenant_id":"cc000000-0000-0000-0000-0000000000a1"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cb000000-0000-0000-0000-0000000000a3',
-   'authenticated','authenticated','cc-other-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','cc-other-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"CC Other Admin","role":"tenant_admin","tenant_id":"cc000000-0000-0000-0000-0000000000a2"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO class_categories (id, tenant_id, name) VALUES
   ('ce000000-0000-0000-0000-0000000000a1','cc000000-0000-0000-0000-0000000000a1','Group');

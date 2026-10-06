@@ -9,8 +9,10 @@
 -- it would have meant weakening a guard to suit a fixture.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(17);
+SELECT plan(18);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code)
 VALUES ('88888888-0000-0000-0000-000000000002','terms','Terms Swim','SWIM-TERM');
@@ -20,14 +22,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','79000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','terms-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Terms Admin","role":"tenant_admin","tenant_id":"88888888-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','terms-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Terms Admin","role":"tenant_admin","tenant_id":"88888888-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','79000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','terms-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Terms Coach","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','terms-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Terms Coach","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','79000000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','terms-coach-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Terms Coach B","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000002"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','terms-coach-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Terms Coach B","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', '');
 
 -- A coach at a DIFFERENT business, for the cross-tenant check.
 INSERT INTO tenants (id, slug, display_name, join_code)
@@ -37,8 +39,8 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','79000000-0000-0000-0000-000000000004',
-   'authenticated','authenticated','other-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Other Coach","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000003"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','other-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Other Coach","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000003"}', app_now(), app_now(), '', '', '', '');
 
 -- classes.category_id is NOT NULL (20260725000400). A test creates its own
 -- tenants inside this transaction, so they have none of the categories the
@@ -200,7 +202,7 @@ SELECT is(
   (SELECT string_agg(p.proname, ', ' ORDER BY p.proname)
      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public'
-      AND (p.prosrc ~ 'CURRENT_DATE' OR p.prosrc ~ 'now\(\)::date')
+      AND (p.prosrc ~ 'CURRENT[_]DATE' OR p.prosrc ~ 'now\(\)::date')
       -- Extension-owned functions are not ours to fix: pgTAP ships `_def_is`,
       -- which matches. Without this the assertion passes or fails depending on
       -- whether pgTAP happens to be installed — a test that is red against a

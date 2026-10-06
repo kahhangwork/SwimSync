@@ -23,8 +23,10 @@
 -- SET LOCAL ROLE, or the session stays superuser and the refusals all "pass".
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(23);
+SELECT plan(24);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('4e211111-0000-0000-0000-000000000001','merge-a','MERGE Business A','SWIM-MRGA'),
@@ -35,17 +37,17 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','4e200000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','merge-admin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"MERGE Admin A","role":"tenant_admin","tenant_id":"4e211111-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','merge-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"MERGE Admin A","role":"tenant_admin","tenant_id":"4e211111-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','4e200000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','merge-admin-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"MERGE Admin B","role":"tenant_admin","tenant_id":"4e211111-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','merge-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"MERGE Admin B","role":"tenant_admin","tenant_id":"4e211111-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','4e200000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','merge-coach-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"MERGE Coach A","role":"coach","tenant_id":"4e211111-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','merge-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"MERGE Coach A","role":"coach","tenant_id":"4e211111-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','4e200000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','merge-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"MERGE Parent","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','merge-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"MERGE Parent","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, '4e211111-0000-0000-0000-000000000001'
@@ -152,7 +154,7 @@ VALUES ('4e211111-0000-0000-0000-000000000001','4e299999-0000-0000-0000-00000000
 -- preservation assertion able to fail.
 ALTER TABLE student_skill_progress DISABLE TRIGGER trg_skill_progress_tenant;
 UPDATE student_skill_progress
-   SET graded_at = NOW() - interval '90 days',
+   SET graded_at = app_now() - interval '90 days',
        graded_by = '4e200000-0000-0000-0000-0000000000c1'
  WHERE student_id = '4e299999-0000-0000-0000-000000000002';
 ALTER TABLE student_skill_progress ENABLE TRIGGER trg_skill_progress_tenant;
@@ -313,7 +315,7 @@ SELECT is(
   1, 'the earned skill grade moved to the survivor');
 
 SELECT ok(
-  (SELECT graded_at < NOW() - interval '89 days' FROM student_skill_progress
+  (SELECT graded_at < app_now() - interval '89 days' FROM student_skill_progress
     WHERE student_id = '4e299999-0000-0000-0000-000000000001'),
   '⚠ the merge PRESERVED graded_at — it did not re-stamp the record to merge time');
 

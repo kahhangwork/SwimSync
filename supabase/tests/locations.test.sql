@@ -13,8 +13,10 @@
 -- Its own tenants, so nothing here depends on another fixture's state.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(14);
+SELECT plan(15);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- The check that would have caught the three RLS-off leaks (tenant_levels).
 SELECT ok(
@@ -31,28 +33,28 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','loc-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','loc-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Loc Admin A","role":"tenant_admin","tenant_id":"ac000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','loc-admin-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','loc-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Loc Admin B","role":"tenant_admin","tenant_id":"ac000000-0000-0000-0000-000000000002"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','loc-coach-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','loc-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Loc Coach A","role":"coach","tenant_id":"ac000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','loc-parent-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','loc-parent-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
-   '{"full_name":"Loc Parent A","role":"parent"}', now(), now(), '','','',''),
+   '{"full_name":"Loc Parent A","role":"parent"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-0000000000e1',
-   'authenticated','authenticated','loc-stranger@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','loc-stranger@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
-   '{"full_name":"Loc Stranger","role":"parent"}', now(), now(), '','','','');
+   '{"full_name":"Loc Stranger","role":"parent"}', app_now(), app_now(), '','','','');
 
 INSERT INTO class_categories (id, tenant_id, name)
 VALUES ('ad000000-0000-0000-0000-000000000001','ac000000-0000-0000-0000-000000000001','Group');
@@ -120,7 +122,7 @@ $$, 'P0001', 'that location belongs to another business',
 
 -- ── Archive guard: an ACTIVE class blocks the archive (DB-enforced) ──────────
 SELECT throws_ok($$
-  UPDATE locations SET archived_at = now()
+  UPDATE locations SET archived_at = app_now()
    WHERE id = 'ae000000-0000-0000-0000-000000000001'
 $$, '23514', NULL,
   'a location an ACTIVE class uses cannot be archived');
@@ -146,11 +148,11 @@ $$, 'a class can be written with only location_id (new-admin path)');
 
 -- ── Archive ALLOWED once only a RETIRED class references it ──────────────────
 -- Retire both classes on Bishan, then Bishan archives cleanly.
-UPDATE classes SET is_active = false, deactivated_at = now()
+UPDATE classes SET is_active = false, deactivated_at = app_now()
  WHERE location_id = 'ae000000-0000-0000-0000-000000000001';
 
 SELECT lives_ok($$
-  UPDATE locations SET archived_at = now()
+  UPDATE locations SET archived_at = app_now()
    WHERE id = 'ae000000-0000-0000-0000-000000000001'
 $$, 'a location only RETIRED classes use can be archived');
 

@@ -9,8 +9,10 @@
 -- the old profiles_update). Rolled back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(26);
+SELECT plan(27);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('99999999-0000-0000-0000-0000000000e0', 'tap-radm', 'TAP Roles Admins', 'SWIM-RA01');
@@ -20,8 +22,8 @@ CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB)
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
     updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000', p_id, 'authenticated', 'authenticated',
-    p_email, crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', p_meta,
-    now(), now(), '', '', '', '') $$ LANGUAGE sql;
+    p_email, crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', p_meta,
+    app_now(), app_now(), '', '', '', '') $$ LANGUAGE sql;
 CREATE OR REPLACE FUNCTION pg_temp.std(p_key TEXT) RETURNS UUID AS $$
   SELECT id FROM tenant_roles WHERE tenant_id = '99999999-0000-0000-0000-0000000000e0' AND standard_key = p_key $$ LANGUAGE sql;
 

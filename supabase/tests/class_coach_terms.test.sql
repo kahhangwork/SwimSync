@@ -12,8 +12,10 @@
 -- checks 2, 3a, 3b were red on the live readers (lane 2).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(11);
+SELECT plan(12);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('cc700000-0000-0000-0000-0000000000a0','cct-a','CCT A','SWIM-CCTA'),
@@ -24,8 +26,8 @@ CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB)
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
     updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000', p_id, 'authenticated', 'authenticated',
-    p_email, crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', p_meta,
-    now(), now(), '', '', '', '') $$ LANGUAGE sql;
+    p_email, crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', p_meta,
+    app_now(), app_now(), '', '', '', '') $$ LANGUAGE sql;
 
 SELECT pg_temp.mkuser('cc710000-0000-0000-0000-0000000000a1','cct-owner-a@test.local',
   '{"full_name":"CCT Owner A","role":"tenant_admin","tenant_id":"cc700000-0000-0000-0000-0000000000a0"}');

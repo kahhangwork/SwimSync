@@ -18,8 +18,10 @@
 -- sub, or the session stays superuser and every refusal "passes".
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(14);
+SELECT plan(15);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Tenants ──────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -32,17 +34,17 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','d0a00000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','dup-admin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"DUP Admin A","role":"tenant_admin","tenant_id":"d0b11111-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','dup-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"DUP Admin A","role":"tenant_admin","tenant_id":"d0b11111-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','d0a00000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','dup-admin-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"DUP Admin B","role":"tenant_admin","tenant_id":"d0b11111-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','dup-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"DUP Admin B","role":"tenant_admin","tenant_id":"d0b11111-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','d0a00000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','dup-coach-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"DUP Coach A","role":"coach","tenant_id":"d0b11111-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','dup-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"DUP Coach A","role":"coach","tenant_id":"d0b11111-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','d0a00000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','dup-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"DUP Parent P","role":"parent"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','dup-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"DUP Parent P","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 -- Parent P's ACCOUNT phone — the phone-via-parent-account signal reads this.
 UPDATE profiles SET phone = '93334444' WHERE email = 'dup-parent@test.local';

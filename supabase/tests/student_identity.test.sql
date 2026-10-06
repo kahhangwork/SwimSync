@@ -8,8 +8,10 @@
 -- Its own tenants, so nothing here depends on another fixture's state.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(9);
+SELECT plan(10);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('8b000000-0000-0000-0000-000000000001','ident-a','Identity Swim A','SWIM-IDTA'),
