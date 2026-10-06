@@ -1,7 +1,7 @@
 // Parent Requests — the already-decided list, including the way back (Undo).
 
 import { Button } from "@/components/Button";
-import { formatSgDate } from "@/lib/lessonDates";
+import { claimDayLabel } from "../domain/claimsRows";
 import type { Claim } from "../types";
 
 type Props = {
@@ -39,10 +39,7 @@ export function DecidedClaims(p: Props) {
                 <p className="text-xs text-gray-400">
                   {c.status}
                   {c.decided_at
-                    ? ` · ${formatSgDate(c.decided_at.slice(0, 10), {
-                        day: "numeric",
-                        month: "short",
-                      })}`
+                    ? ` · ${claimDayLabel(c.decided_at)}`
                     : ""}
                 </p>
               </div>

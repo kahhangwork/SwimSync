@@ -6,7 +6,7 @@ import { PackageChip } from "@/components/PackageChip";
 import { formatSgDate } from "@/lib/lessonDates";
 import { familyLabel } from "@/lib/packageCoverage";
 import type { Claim } from "../types";
-import { reasonLabel } from "../domain/claimsRows";
+import { claimDayLabel, reasonLabel } from "../domain/claimsRows";
 
 type Props = {
   c: Claim;
@@ -66,10 +66,7 @@ export function PendingClaimCard(p: Props) {
               ? "They said this IS their child"
               : "They said they were NOT SURE"}{" "}
             · asked{" "}
-            {formatSgDate(c.created_at.slice(0, 10), {
-              day: "numeric",
-              month: "short",
-            })}
+            {claimDayLabel(c.created_at)}
           </p>
         </div>
 

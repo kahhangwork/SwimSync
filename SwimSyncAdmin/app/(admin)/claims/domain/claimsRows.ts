@@ -2,6 +2,7 @@
 // Carries unit tests (claimsRows.test.ts). (claimNaming.ts, the naming rules,
 // lives beside this — moved here from lib/ as this is its sole importer.)
 
+import { formatSgDate, toSgDate } from "@/lib/lessonDates";
 import type { Claim } from "../types";
 
 export function reasonLabel(reason: string): string {
@@ -39,4 +40,12 @@ export function contestedStudentIds(pending: Claim[]): Set<string> {
       .map((c) => c.student_id)
       .filter((id, i, arr) => arr.indexOf(id) !== i)
   );
+}
+
+/** The day a claim was asked or decided, as "26 Jul" — from its timestamptz.
+ *  The SINGAPORE day: `stamp.slice(0, 10)` was the UTC day, a day early for
+ *  anything 00:00–07:59 SGT (Bug ledger #5, §7.7). Callers pass a non-null stamp
+ *  (created_at is NOT NULL; decided_at is checked before the call). */
+export function claimDayLabel(stamp: string): string {
+  return formatSgDate(toSgDate(stamp), { day: "numeric", month: "short" });
 }

@@ -2,7 +2,7 @@
 // had. Not a new rule, so §7.25's prove-red-first does not apply.
 
 import { describe, expect, it } from "vitest";
-import { contestedStudentIds, partitionClaims, reasonLabel } from "./claimsRows";
+import { claimDayLabel, contestedStudentIds, partitionClaims, reasonLabel } from "./claimsRows";
 import type { Claim } from "../types";
 
 const claim = (over: Partial<Claim>): Claim =>
@@ -41,5 +41,15 @@ describe("claims domain — pure derivations", () => {
     const contested = contestedStudentIds(pending);
     expect(contested.has("kid")).toBe(true);
     expect(contested.has("other")).toBe(false);
+  });
+});
+
+// Bug ledger #5 (Wave 8): PostgREST returns a timestamptz in UTC, so
+// `.slice(0, 10)` labelled a claim asked or decided 00:00–07:59 SGT with the
+// PREVIOUS day. 01:15 SGT on 26 Jul comes back as "2026-07-25T17:15:00+00:00".
+describe("claimDayLabel", () => {
+  it("labels the SINGAPORE day of the stamp, not its UTC day", () => {
+    expect(claimDayLabel("2026-07-25T17:15:00+00:00")).toBe("26 Jul");
+    expect(claimDayLabel("2026-07-26T09:00:00+00:00")).toBe("26 Jul");
   });
 });
