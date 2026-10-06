@@ -120,6 +120,11 @@ touching an unfamiliar subsystem.
 - **Read a function's body from the database, never from a migration file** — `CREATE OR
   REPLACE` means the newest body can be in any later migration, and grep finds the oldest:
   `SELECT pg_get_functiondef('public.<fn>'::regproc);`. Filed three times. (§7.40)
+- **A migration that changes the public schema regenerates the app types IN THE SAME COMMIT** —
+  `scripts/gen-db-types.sh` (root checkout only; it refuses on a worktree or when the shared DB's
+  migrations ≠ yours), committing both `lib/database.types.ts`. G5 fails CI otherwise, but CI runs
+  after Vercel deploys, so run `scripts/check-db-types.sh` before the push. Never hand-edit the
+  generated file; widen in `lib/database.overrides.ts`. (§7.350, `docs/plans/WAVE8_GENERATED_TYPES_PLAN.md`.)
 
 **React Native web**
 - **`Alert.alert` is a no-op on RN-web** — it silently does nothing on the deployed app.

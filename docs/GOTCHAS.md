@@ -36,7 +36,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
-| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347 |
+| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
@@ -47,7 +47,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
 `supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
-§7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic).
+§7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic) · §7.350/§7.347 → G5 `scripts/check-db-types.sh` · §7.346 → `scripts/check-db-overrides.sh` · §7.348 → `scripts/check-runtime-identical.sh` (CI, per `types(…)` commit) · casts regrowing → G6 `scripts/check-db-any.sh`.
 
 ---
 
@@ -2799,3 +2799,15 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     grants or RLS — a call that compiles cleanly against `Database` fails at runtime if the role lacks the privilege
     (§7.87). Typing is not evidence that a surface works; a signed-in call through PostgREST is. (Wave 8
     plan-review, 2026-10-06.)
+
+350. **A migration that changes the public schema without regenerating the types leaves both apps compiling
+    against a schema that no longer exists.** Since Wave 8 every client is `createClient<Database>`; the
+    generated `lib/database.types.ts` (both apps, byte-identical) is the compiler's only knowledge of the
+    schema, so a stale one is the §7.76 lie again — a renamed column still typechecks. **Rule:** the migration
+    and its regen land in ONE commit — `scripts/gen-db-types.sh` from the ROOT checkout (it refuses in a
+    worktree, on a CLI ≠ the ci.yml pin, and when the shared DB's applied migrations ≠ the checkout's, §7.347).
+    G5 (`scripts/check-db-types.sh`, CI backend-tests) fails a stale file, but CI runs after Vercel has
+    deployed the push — run it locally first. Never hand-edit the generated file: narrowing and widening live in
+    `lib/database.overrides.ts` (`NULLABLE_RPC_ARGS`, `TRIGGER_FILLED_COLUMNS`, both proven against `pg_proc`/
+    `pg_trigger` by `scripts/check-db-overrides.sh`). A CLI bump is its own commit, pinned in both workflows, with
+    a regen. (Wave 8 F0, 2026-10-06.)
