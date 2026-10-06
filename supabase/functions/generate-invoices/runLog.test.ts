@@ -36,6 +36,7 @@ Deno.test("RISK 3: every non-attempt status writes ZERO rows", () => {
     "month_not_ended",
     "already_complete",
     "tenant_unreadable",
+    "package_mode_unreadable", // Wave 6
   ];
   // The exported set is the single source — if it shrinks, this names it.
   assertEquals([...NON_ATTEMPT_STATUSES].sort(), [...statuses].sort());

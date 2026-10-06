@@ -291,6 +291,9 @@ export async function newScenario(
      *  monthEnded(). Sets `enrolledAt`, exposes `now`/`billingMonth` on the
      *  scenario, and makes completeMonth() inherit the same clock. */
     billing?: BillingWindow;
+    /** Wave 6: the tenant draws packages AT MARKING (tenants.package_draw_at_marking).
+     *  Off by default, so every pre-Wave-6 test runs in legacy mode on its own tenant. */
+    drawAtMarking?: boolean;
   } = {}
 ): Promise<Scenario> {
   const db = svc();
@@ -338,6 +341,7 @@ export async function newScenario(
       slug: `test-${tag}`,
       display_name: `Test Tenant ${tag}`,
       join_code: `SWIM-${tag.slice(0, 4).toUpperCase()}`,
+      ...(opts.drawAtMarking ? { package_draw_at_marking: true } : {}),
     })
     .select("id")
     .single();
@@ -715,6 +719,15 @@ export async function newScenario(
     // Any invoice of this parent that somehow escaped the tenant sweep.
     await db.from("invoices").delete().eq("parent_id", parentId);
 
+    // Wave 6 (RISK 6): marking-time package draws reference parent_packages, which
+    // a test deletes after this; remove them before attendance and sessions go.
+    const { data: tPkgs } = await db
+      .from("parent_packages").select("id").eq("tenant_id", tenantId);
+    const pkgIds = (tPkgs ?? []).map((r) => r.id as string);
+    if (pkgIds.length) {
+      await db.from("package_applications").delete().in("parent_package_id", pkgIds);
+    }
+
     // 2. Students of this tenant (tracked + strays added by a test).
     const { data: tStudents } = await db
       .from("students").select("id").eq("tenant_id", tenantId);
@@ -1050,6 +1063,28 @@ export async function checkInvariants(db: SupabaseClient, parentId: string) {
       if (Math.abs(pkgSum - declared) > 0.001) {
         problems.push(
           `invoice ${inv.id}: package_applied=${declared} but SUM(live package_applications)=${pkgSum}`
+        );
+      }
+    }
+  }
+
+  // Wave 6 (RISK 1): a lesson is funded at most once — no invoice line may share
+  // (lesson_session_id, student_id) with a LIVE marking-time package draw.
+  for (const inv of invoices ?? []) {
+    const { data: lines } = await db
+      .from("invoice_items")
+      .select("lesson_session_id, student_id")
+      .eq("invoice_id", inv.id);
+    for (const l of lines ?? []) {
+      const { data: drawn } = await db
+        .from("package_applications")
+        .select("id")
+        .eq("lesson_session_id", l.lesson_session_id)
+        .eq("student_id", l.student_id)
+        .is("reversed_at", null);
+      if (drawn?.length) {
+        problems.push(
+          `invoice ${inv.id}: lesson ${l.lesson_session_id}/${l.student_id} is invoiced AND drawn from a package`
         );
       }
     }

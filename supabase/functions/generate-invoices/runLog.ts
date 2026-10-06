@@ -30,6 +30,9 @@ export const NON_ATTEMPT_STATUSES: ReadonlySet<string> = new Set([
   "month_not_ended",
   "already_complete",
   "tenant_unreadable",
+  // Wave 6: the package mode or drawn set could not be read — nothing was
+  // attempted (no invoice, no seal). Same shape as tenant_unreadable.
+  "package_mode_unreadable",
 ]);
 
 /** ⚠ RISK 11: co-admins read this column. Message only, bounded. */

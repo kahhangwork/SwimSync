@@ -369,6 +369,12 @@ Deno.test("shouldRetryTenantEmails: an UNREADABLE tenant never gets a retry", ()
   assertEquals(shouldRetryTenantEmails("tenant_unreadable", true), false);
 });
 
+Deno.test("shouldRetryTenantEmails: package_mode_unreadable never gets a retry (Wave 6)", () => {
+  // Which lessons a package already paid is unknown; nothing was generated.
+  assertEquals(shouldRetryTenantEmails("package_mode_unreadable", false), false);
+  assertEquals(shouldRetryTenantEmails("package_mode_unreadable", true), false);
+});
+
 Deno.test("shouldRetryTenantEmails: auto-disabled skipped on auto, allowed on manual", () => {
   assertEquals(shouldRetryTenantEmails("auto_disabled", false), false); // auto run
   assertEquals(shouldRetryTenantEmails("auto_disabled", true), true); // manual run
