@@ -12,7 +12,7 @@
 // family's attendance and billing history. So the copy asks a QUESTION and
 // never announces a finding.
 
-import { formatSgDate } from "./lessonDates";
+import { formatSgDate, toSgDate } from "./lessonDates";
 
 export type ClaimCandidate = {
   student_id: string;
@@ -90,6 +90,9 @@ export function isPendingOutcome(outcome: string): boolean {
  * only thing managing that wait.
  */
 export function waitingSince(createdAtIso: string): string {
-  const d = createdAtIso.slice(0, 10);
+  // toSgDate, never `.slice(0, 10)`: PostgREST returns the timestamptz in UTC, so the
+  // first ten characters are the UTC date — a day early 00:00–07:59 SGT (§7.7,
+  // Wave 8 Bug-ledger row #4).
+  const d = toSgDate(createdAtIso);
   return `Waiting since ${formatSgDate(d)}`;
 }

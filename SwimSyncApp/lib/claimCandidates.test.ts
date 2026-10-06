@@ -99,4 +99,16 @@ describe("waitingSince", () => {
       "Waiting since Sun, 26 Jul"
     );
   });
+
+  // Wave 8 Bug-ledger row #4. The case above passes for the WRONG reason (§7.25): it
+  // writes the offset as +08:00, but PostgREST returns every timestamptz in UTC
+  // (`…+00:00`, recorded on the credit-notes probe 2026-10-06). A claim filed at
+  // 01:15 SGT on Sun 26 Jul arrives as "2026-07-25T17:15:00+00:00", and slicing its
+  // first 10 characters said "Sat, 25 Jul" — a day early, for every claim filed
+  // 00:00–07:59 SGT. RED on the unfixed `createdAtIso.slice(0, 10)`.
+  it("reads the SGT date off the UTC string PostgREST actually returns", () => {
+    expect(waitingSince("2026-07-25T17:15:00+00:00")).toBe(
+      "Waiting since Sun, 26 Jul"
+    );
+  });
 });
