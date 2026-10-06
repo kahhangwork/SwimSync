@@ -13,6 +13,7 @@ import {
   type LevelSkill,
 } from "@/lib/skillProgress";
 import { fetchStudentLevel, fetchGradeScale, fetchSkillProgress } from "../dao/grade.repo";
+import type { StudentLevelRow } from "../dao/grade.repo";
 import type { StudentInfo } from "../types";
 
 export function useStudentGrades() {
@@ -36,17 +37,17 @@ export function useStudentGrades() {
       return;
     }
 
-    // PostgREST returns the to-one tenant_levels embed as an object; the
-    // generated types widen it to an array, so cast rather than index (§7.28).
-    const level = (s as any).tenant_levels;
+    // PostgREST returns the to-one tenant_levels embed as an object (or null).
+    // Typed from the select since Wave 8 (StudentLevelRow) — the §7.28 cast is gone.
+    const level: StudentLevelRow["tenant_levels"] = s.tenant_levels;
     setStudent({
-      full_name: (s as any).full_name,
-      tenant_id: (s as any).tenant_id,
+      full_name: s.full_name,
+      tenant_id: s.tenant_id,
       level_label: level?.label ?? null,
       level_note: level?.note ?? null,
     });
     setSkills(
-      [...((level?.tenant_level_skills as LevelSkill[]) ?? [])].map((sk: any) => ({
+      [...((level?.tenant_level_skills as LevelSkill[]) ?? [])].map((sk) => ({
         id: sk.id,
         label: sk.label,
         sort_order: sk.sort_order,
@@ -57,14 +58,14 @@ export function useStudentGrades() {
     // by RLS to the coach's own business already; the tenant filter is belt-and-
     // braces and makes the query self-documenting.
     const [{ data: scaleRows }, { data: progressRows }] = await Promise.all([
-      fetchGradeScale((s as any).tenant_id),
+      fetchGradeScale(s.tenant_id),
       fetchSkillProgress(studentId),
     ]);
 
     setScale((scaleRows as GradeLevel[]) ?? []);
     setGrades(
       Object.fromEntries(
-        ((progressRows as any[]) ?? []).map((p) => [p.skill_id, p.grade_level_id])
+        (progressRows ?? []).map((p) => [p.skill_id, p.grade_level_id])
       )
     );
     setLoading(false);

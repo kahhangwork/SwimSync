@@ -4,6 +4,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 
 export const fetchStudentLevel = (studentId: string) =>
   supabase
@@ -26,3 +27,8 @@ export const fetchSkillProgress = (studentId: string) =>
     .from("student_skill_progress")
     .select("skill_id, grade_level_id")
     .eq("student_id", studentId);
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// `tenant_levels` is a LEFT to-one embed: an object, or null when the child has no
+// level or RLS hides it (§7.344) — never an array (the old §7.28 cast is gone).
+export type StudentLevelRow = RlsNullable<DataOf<typeof fetchStudentLevel>, "tenant_levels">;
