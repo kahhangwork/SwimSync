@@ -4,6 +4,15 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.overrides";
 import { BAN_FOREVER } from "@/lib/adminManagementGate";
 
+// The SUCCESS body of this route, asserted below by `NextResponse.json<SuspendTenantResponse>`
+// and read by the client through `postAs<SuspendTenantResponse>` (platform/dao/platform.api.ts),
+// so the two cannot drift (Wave 8). A type export is erased at build.
+export type SuspendTenantResponse = {
+  success: true;
+  /** Staff logins blocked. */
+  banned: number;
+};
+
 /**
  * Suspend a business. Platform admin only (WAVE_5_PLAN.md chunk 3).
  *
@@ -113,5 +122,5 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ success: true, banned: (staff ?? []).length });
+  return NextResponse.json<SuspendTenantResponse>({ success: true, banned: (staff ?? []).length });
 }

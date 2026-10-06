@@ -7,6 +7,16 @@ import {
   type StaffProfile,
 } from "@/lib/suspensionUnbanSet";
 
+// The SUCCESS body of this route, asserted below by `NextResponse.json<UnsuspendTenantResponse>`
+// and read by the client through `postAs<UnsuspendTenantResponse>` (platform/dao/platform.api.ts),
+// so the two cannot drift (Wave 8). A type export is erased at build.
+export type UnsuspendTenantResponse = {
+  success: true;
+  unbanned: number;
+  /** Individually disabled staff stay disabled. */
+  keptBanned: number;
+};
+
 /**
  * Unsuspend a business. Platform admin only (WAVE_5_PLAN.md chunk 3).
  *
@@ -113,7 +123,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({
+  return NextResponse.json<UnsuspendTenantResponse>({
     success: true,
     unbanned: toUnban.length,
     keptBanned: (staff ?? []).length - toUnban.length,

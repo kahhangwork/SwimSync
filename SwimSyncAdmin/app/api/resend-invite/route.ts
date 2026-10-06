@@ -4,6 +4,18 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.overrides";
 import { sendInviteEmail } from "@/lib/inviteEmail";
 
+// The SUCCESS body of this route, asserted below by `NextResponse.json<ResendInviteResponse>`
+// and read by the client through `postAs<ResendInviteResponse>` (platform/dao/platform.api.ts),
+// so the two cannot drift (Wave 8). A type export is erased at build.
+export type ResendInviteResponse = {
+  success: true;
+  adminEmail: string;
+  emailSent: boolean;
+  emailReason: string | null;
+  /** Set only when the email was NOT sent — the operator passes it on by hand. */
+  inviteLink: string | null;
+};
+
 /**
  * Re-send the set-your-password invite to a business's admin. Platform admin only.
  *
@@ -117,7 +129,7 @@ export async function POST(req: NextRequest) {
     joinCode: tenant.join_code,
   });
 
-  return NextResponse.json({
+  return NextResponse.json<ResendInviteResponse>({
     success: true,
     adminEmail: admin.email,
     emailSent: sendResult.sent,

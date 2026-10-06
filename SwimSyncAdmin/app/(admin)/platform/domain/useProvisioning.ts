@@ -14,6 +14,8 @@
 
 import { useState } from "react";
 import { postAs } from "../dao/platform.api";
+import type { ProvisionTenantResponse } from "@/app/api/provision-tenant/route";
+import type { ResendInviteResponse } from "@/app/api/resend-invite/route";
 
 const BLANK = {
   businessName: "",
@@ -66,7 +68,7 @@ export function useProvisioning(
     }
 
     setCreating(true);
-    const { res, json } = await postAs("/api/provision-tenant", {
+    const { res, json } = await postAs<ProvisionTenantResponse>("/api/provision-tenant", {
       businessName: newBiz.businessName.trim(),
       // No `kind`: the column is gone (20260804000100). A business's shape is
       // derived from its data, never declared (PRD §4.4).
@@ -96,7 +98,7 @@ export function useProvisioning(
   async function resendInvite(tenantId: string) {
     setResending(tenantId);
     setMessage(null);
-    const { res, json } = await postAs("/api/resend-invite", { tenantId });
+    const { res, json } = await postAs<ResendInviteResponse>("/api/resend-invite", { tenantId });
     setResending(null);
     if (!res.ok) {
       setMessage(json.error ?? "Could not resend the invite.");

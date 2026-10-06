@@ -5,6 +5,21 @@ import type { Database } from "@/lib/database.overrides";
 import { sendInviteEmail } from "@/lib/inviteEmail";
 import { mintStaffInvitation } from "@/lib/staffInvitation";
 
+// The SUCCESS body of this route, asserted below by `NextResponse.json<ProvisionTenantResponse>`
+// and read by the client through `postAs<ProvisionTenantResponse>` (platform/dao/platform.api.ts),
+// so the two cannot drift (Wave 8). A type export is erased at build.
+export type ProvisionTenantResponse = {
+  success: true;
+  tenantId: string;
+  joinCode: string;
+  slug: string;
+  adminEmail: string;
+  emailSent: boolean;
+  emailReason: string | null;
+  /** Set only when the email was NOT sent — the operator passes it on by hand. */
+  inviteLink: string | null;
+};
+
 /**
  * Provision a new business and invite its first admin. Platform admin only.
  *
@@ -172,7 +187,7 @@ export async function POST(req: NextRequest) {
     // Unlike an invoice email, a missing invite means the owner has NO way in.
     // Return the link so the operator can pass it on by hand, and let the UI
     // show that as a warning — never a plain success.
-    return NextResponse.json({
+    return NextResponse.json<ProvisionTenantResponse>({
       success: true,
       tenantId,
       joinCode,

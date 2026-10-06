@@ -18,6 +18,8 @@
 
 import { useState } from "react";
 import { postAs } from "../dao/platform.api";
+import type { SuspendTenantResponse } from "@/app/api/suspend-tenant/route";
+import type { UnsuspendTenantResponse } from "@/app/api/unsuspend-tenant/route";
 
 export function useSuspend(
   setMessage: (m: string | null) => void,
@@ -43,7 +45,7 @@ async function toggleSuspend() {
   const path = suspendModal.suspended
     ? "/api/unsuspend-tenant"
     : "/api/suspend-tenant";
-  const { res, json } = await postAs(path, {
+  const { res, json } = await postAs<SuspendTenantResponse | UnsuspendTenantResponse>(path, {
     tenantId: suspendModal.tenantId,
   });
   setSuspendBusy(false);

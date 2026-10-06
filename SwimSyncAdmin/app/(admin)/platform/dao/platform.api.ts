@@ -15,12 +15,18 @@ import { supabase } from "@/lib/supabase";
  *  ⚠ There is deliberately NO try around the fetch. `res.json().catch(() => ({}))`
  *  is the whole of the error handling and it is verbatim from the page; the
  *  Students-pilot pitfall about a try boundary moving with a call does not apply
- *  here, because there was never a try to move. `json` is `any` on purpose —
- *  every caller reads a differently-shaped body off it. */
-export async function postAs(
+ *  here, because there was never a try to move.
+ *
+ *  `T` is the route's SUCCESS body, declared beside the route (app/api/<route>/
+ *  types.ts) and asserted by the route itself, so client and server cannot drift.
+ *  Its fields are present only when `res.ok`; on a failure the body is
+ *  `{ error }`, or `{}` when it was not JSON — read `json.error` with a fallback. */
+export type ApiResult<T> = T & { error?: string };
+
+export async function postAs<T>(
   path: string,
   body: unknown
-): Promise<{ res: Response; json: any }> { // db-any-ok: api-json
+): Promise<{ res: Response; json: ApiResult<T> }> {
   const { data: sess } = await supabase.auth.getSession();
   const res = await fetch(path, {
     method: "POST",
