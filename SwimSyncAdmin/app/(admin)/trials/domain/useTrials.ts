@@ -10,6 +10,7 @@ import { needsConvertConfirmation } from "./trialConvert";
 import { setEnrolmentStart } from "@/lib/enrolmentStart.rpc";
 import { useStartsOn } from "@/components/StartsOnField";
 import type { Booking, Category, ClassRow } from "../types";
+import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
 
 // All Trials state, loads and writes (Admin L-D, BATCH_D_PLAN.md).
 //
@@ -251,16 +252,19 @@ export function useTrials() {
       setRateError("A trial price must be more than zero.");
       return;
     }
+    // No business (loadAll() stores a null tenant as is): say so and send
+    // nothing — never a NULL tenant for the database to refuse (Wave 8).
+    if (!tenantId) {
+      setRateError(NO_TENANT_MESSAGE);
+      return;
+    }
     setRateBusy(categoryId);
     setRateError(null);
     const { data: auth } = await repo.getAuthUser();
     // A new effective-dated ROW, never an update. Changing the price must not
     // re-value trials already taught (§7.3).
     const { error } = await repo.insertTrialRate({
-      // `!` is NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-      // loadAll() stores whatever it found, NULL included, and the page renders once
-      // loading ends — so a tenant-less caller sends NULL → 23502/RLS → setRateError.
-      tenant_id: tenantId!,
+      tenant_id: tenantId,
       category_id: categoryId,
       rate: value,
       effective_from: todayInSg(),
