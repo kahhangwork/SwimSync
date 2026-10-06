@@ -4,16 +4,18 @@
 -- Rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(2);
+SELECT plan(3);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code, holiday_extension_days) VALUES
   ('da000000-0000-0000-0000-0000000000c1','lb','LateBuyer','SWIM-LBY', 7);
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
-  ('00000000-0000-0000-0000-000000000000','db000000-0000-0000-0000-0000000000c1','authenticated','authenticated','lb-admin@test.local',crypt('x',gen_salt('bf')),now(),'{"provider":"email"}','{"full_name":"LB Admin","role":"tenant_admin","is_coach":true,"tenant_id":"da000000-0000-0000-0000-0000000000c1"}',now(),now(),'','','',''),
-  ('00000000-0000-0000-0000-000000000000','dc000000-0000-0000-0000-0000000000c1','authenticated','authenticated','lb-parent@test.local',crypt('x',gen_salt('bf')),now(),'{"provider":"email"}','{"full_name":"LB Parent","role":"parent"}',now(),now(),'','','','');
+  ('00000000-0000-0000-0000-000000000000','db000000-0000-0000-0000-0000000000c1','authenticated','authenticated','lb-admin@test.local',crypt('x',gen_salt('bf')),app_now(),'{"provider":"email"}','{"full_name":"LB Admin","role":"tenant_admin","is_coach":true,"tenant_id":"da000000-0000-0000-0000-0000000000c1"}',app_now(),app_now(),'','','',''),
+  ('00000000-0000-0000-0000-000000000000','dc000000-0000-0000-0000-0000000000c1','authenticated','authenticated','lb-parent@test.local',crypt('x',gen_salt('bf')),app_now(),'{"provider":"email"}','{"full_name":"LB Parent","role":"parent"}',app_now(),app_now(),'','','','');
 INSERT INTO parent_tenants (parent_id, tenant_id) SELECT p.id,'da000000-0000-0000-0000-0000000000c1' FROM parents p JOIN profiles pr ON pr.id=p.profile_id WHERE pr.email='lb-parent@test.local';
 INSERT INTO class_categories (id,tenant_id,name) VALUES ('de000000-0000-0000-0000-0000000000c1','da000000-0000-0000-0000-0000000000c1','G');
 -- classes.location_id is NOT NULL since the location contract migration

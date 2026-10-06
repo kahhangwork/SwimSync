@@ -30,6 +30,8 @@
 -- DATES ARE COMPUTED, NEVER LITERAL (§7.121). A hardcoded session date rots the
 -- moment it falls behind markable_floor(), and the failure is a thrown function
 -- rather than a failed assertion.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 --
 -- PROVEN RED (§7.25), 2026-08-10, by running supabase/rollback/20260811_multi_class_DOWN.sql
 -- and re-running this file: it dies at line 120 with `duplicate key value violates
@@ -41,8 +43,10 @@
 -- Runs on its own tenant; self-contained; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(16);
+SELECT plan(17);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -54,25 +58,25 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','ed000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','mc-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mc-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"MC Admin","role":"tenant_admin","tenant_id":"ea000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ed000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','mc-coach-x@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mc-coach-x@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"MC Coach X","role":"coach","tenant_id":"ea000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ed000000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','mc-coach-y@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mc-coach-y@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"MC Coach Y","role":"coach","tenant_id":"ea000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ed000000-0000-0000-0000-000000000004',
-   'authenticated','authenticated','mc-parent@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mc-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"MC Parent","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'ea000000-0000-0000-0000-00000000000a'
@@ -170,14 +174,14 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"ed000000-0000-0000-0000-000000000001"
 -- call took an arbitrary row and priced an invoice line from it.
 SELECT throws_ok($$
   SELECT book_makeup('ef000000-0000-0000-0000-000000000003',
-                     (date_trunc('week', CURRENT_DATE) + interval '9 days')::date,
+                     '2026-09-23'::date,
                      'e5000000-0000-0000-0000-000000000001', NULL)
 $$, 'P0001', NULL,
    'a child in two classes must have their home class named');
 
 SELECT throws_ok($$
   SELECT book_makeup('ef000000-0000-0000-0000-000000000003',
-                     (date_trunc('week', CURRENT_DATE) + interval '9 days')::date,
+                     '2026-09-23'::date,
                      'e5000000-0000-0000-0000-000000000001',
                      'ef000000-0000-0000-0000-000000000003')
 $$, 'P0001', NULL,
@@ -188,7 +192,7 @@ $$, 'P0001', NULL,
 -- through. Billing would have been right; the make-up would have been worthless.
 SELECT throws_ok($$
   SELECT book_makeup('ef000000-0000-0000-0000-000000000002',
-                     (date_trunc('week', CURRENT_DATE) + interval '13 days')::date,
+                     '2026-09-27'::date,
                      'e5000000-0000-0000-0000-000000000001',
                      'ef000000-0000-0000-0000-000000000001')
 $$, 'P0001', NULL,
@@ -196,7 +200,7 @@ $$, 'P0001', NULL,
 
 SELECT lives_ok($$
   SELECT book_makeup('ef000000-0000-0000-0000-000000000003',
-                     (date_trunc('week', CURRENT_DATE) + interval '9 days')::date,
+                     '2026-09-23'::date,
                      'e5000000-0000-0000-0000-000000000001',
                      'ef000000-0000-0000-0000-000000000001')
 $$, 'a make-up into a class the child is NOT in, with the home class named, works');
@@ -215,7 +219,7 @@ SELECT is(
 -- the one-row assumption ever breaks again it raises instead of guessing.
 SELECT lives_ok($$
   SELECT book_makeup('ef000000-0000-0000-0000-000000000003',
-                     (date_trunc('week', CURRENT_DATE) + interval '9 days')::date,
+                     '2026-09-23'::date,
                      'e5000000-0000-0000-0000-000000000002', NULL)
 $$, 'a child with ONE class still needs no home-class argument');
 

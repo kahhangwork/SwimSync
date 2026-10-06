@@ -2,15 +2,19 @@
 -- (20260818000800). The coach app never offers it; this proves the DB boundary,
 -- not the hidden button. Dates derive from today_sg() so the attendance window
 -- guard (§8.15) is always satisfied and THIS guard is the only gate. Rolls back.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(6);
+SELECT plan(7);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- Today, SGT, and its weekday as the class day_of_week enum.
 CREATE TEMP TABLE _t AS SELECT
-  (now() AT TIME ZONE 'Asia/Singapore')::date AS d,
-  lower(trim(to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'FMDay')))::day_of_week AS dow;
+  '2026-09-15'::date AS d,
+  lower(trim(to_char('2026-09-15'::date, 'FMDay')))::day_of_week AS dow;
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('da000000-0000-0000-0000-0000000000a1','hg','Holiday Guard','SWIM-HGD');
@@ -21,15 +25,15 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','db000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','hg-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','hg-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"HG Admin","role":"tenant_admin","is_coach":true,"tenant_id":"da000000-0000-0000-0000-0000000000a1"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','db000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','hg-coach@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','hg-coach@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"HG Coach","role":"coach","is_coach":true,"tenant_id":"da000000-0000-0000-0000-0000000000a1"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO class_categories (id, tenant_id, name) VALUES
   ('de000000-0000-0000-0000-0000000000a1','da000000-0000-0000-0000-0000000000a1','G');

@@ -14,6 +14,8 @@
 -- Tenant B: owner OB, student KB. Tenant N created 60 days ago, never billed (floor = LEAST(session window,
 -- creation date) = its creation date). Tenant A is never billed either until case 9 seals last month.
 -- C1 runs on TODAY's weekday 10:00–11:00; C2 overlaps it; dates are derived — d7 / d14 = 7 / 14 days ago.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 --
 -- RED-FIRST PROOF (§7.25, 2026-10-05 — each guard mutated in the live body, one at a time, then restored):
 --   D7 dropped → 6 · D8 dropped → 4 · D8 `<`→`<=` → 4 (same-day re-add) · midnight storage → 2 (UTC clause) ·
@@ -24,30 +26,34 @@
 --   00:00 UTC = 08:00 SGT, the same date for both readers. Noon storage is what is pinned (case 2).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(41);
+SELECT plan(42);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE f AS
-SELECT today_sg()                                                AS today,
-       today_sg() - 7                                            AS d7,
-       today_sg() - 14                                           AS d14,
-       session_window_start()                                    AS sws,
-       to_char(today_sg() - INTERVAL '1 month', 'YYYY-MM')       AS last_month,
-       to_char(today_sg(), 'FMday')                              AS dow;
+SELECT
+  '2026-09-15'::date AS today,
+  '2026-09-08'::date AS d7,
+  '2026-09-01'::date AS d14,
+  '2026-08-01'::date AS sws,
+  '2026-08'::text    AS last_month,
+  'tuesday'::text    AS dow;
 GRANT SELECT ON f TO PUBLIC;
 
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('e5a00000-0000-0000-0000-0000000000a0','esd-a','ESD A','SWIM-ESDA', now() - INTERVAL '120 days'),
-  ('e5a00000-0000-0000-0000-0000000000b0','esd-b','ESD B','SWIM-ESDB', now() - INTERVAL '120 days'),
-  ('e5a00000-0000-0000-0000-0000000000c0','esd-n','ESD N','SWIM-ESDN', now() - INTERVAL '60 days');
+  ('e5a00000-0000-0000-0000-0000000000a0','esd-a','ESD A','SWIM-ESDA', app_now() - INTERVAL '120 days'),
+  ('e5a00000-0000-0000-0000-0000000000b0','esd-b','ESD B','SWIM-ESDB', app_now() - INTERVAL '120 days'),
+  ('e5a00000-0000-0000-0000-0000000000c0','esd-n','ESD N','SWIM-ESDN', app_now() - INTERVAL '60 days');
 
 CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB) RETURNS VOID AS $$
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
     updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000', p_id, 'authenticated', 'authenticated',
-    p_email, crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', p_meta,
-    now(), now(), '', '', '', '') $$ LANGUAGE sql;
+    p_email, crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', p_meta,
+    app_now(), app_now(), '', '', '', '') $$ LANGUAGE sql;
 
 SELECT pg_temp.mkuser('e5a10000-0000-0000-0000-0000000000a1','esd-owner-a@test.local',
   '{"full_name":"ESD Owner A","role":"tenant_admin","tenant_id":"e5a00000-0000-0000-0000-0000000000a0"}');
@@ -98,7 +104,7 @@ INSERT INTO students (id, full_name, assignment_status, is_active, tenant_id) VA
 -- Kid3 was in C1 and left TODAY (the same-day remove → re-add case).
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, unenrolled_at, is_active)
 VALUES ('e5a30000-0000-0000-0000-000000000003','e5a20000-0000-0000-0000-000000000001',
-        now() - INTERVAL '30 days', now(), FALSE);
+        app_now() - INTERVAL '30 days', app_now(), FALSE);
 
 CREATE TEMP TABLE g AS SELECT markable_floor('e5a00000-0000-0000-0000-0000000000a0') AS floor_a;
 GRANT SELECT ON g TO PUBLIC;
@@ -209,7 +215,7 @@ SELECT throws_ok($$ SELECT set_enrolment_start('e5a30000-0000-0000-0000-00000000
 -- ── 9. in_sealed_month ──────────────────────────────────────────────────────────
 RESET ROLE;
 INSERT INTO billing_periods (tenant_id, billing_month, completed_at)
-SELECT 'e5a00000-0000-0000-0000-0000000000a0', last_month, now() FROM f;
+SELECT 'e5a00000-0000-0000-0000-0000000000a0', last_month, app_now() FROM f;
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.as_user('e5a10000-0000-0000-0000-0000000000a1');
 SELECT ok((set_enrolment_start('e5a30000-0000-0000-0000-000000000005','e5a20000-0000-0000-0000-000000000001',
@@ -246,7 +252,7 @@ SELECT 'e5a20000-0000-0000-0000-0000000000c1',
        (SELECT id FROM class_categories WHERE tenant_id = 'e5a00000-0000-0000-0000-0000000000c0' AND lower(trim(name)) = 'default group');
 SET LOCAL ROLE authenticated;
 SELECT is((enrolment_start_bounds('e5a20000-0000-0000-0000-0000000000c1') ->> 'floor')::date,
-  ((now() - INTERVAL '60 days') AT TIME ZONE 'Asia/Singapore')::date,
+  ((app_now() - INTERVAL '60 days') AT TIME ZONE 'Asia/Singapore')::date,
   '13: a never-billed business''s floor is its creation date (the UI must warn about unbilled months)');
 
 -- ── 14. The fourth path: add_unclaimed_student (D12) ────────────────────────────

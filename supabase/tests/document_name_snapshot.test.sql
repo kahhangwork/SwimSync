@@ -12,8 +12,10 @@
 -- Its own tenant, so nothing here depends on another fixture's state.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(7);
+SELECT plan(8);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 SELECT has_column('public','invoice_items','student_name',
   'invoice_items records the name as invoiced');
@@ -28,13 +30,13 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','7d000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','snap-parent@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}', '{"full_name":"Snap Parent","role":"parent"}', now(), now(), '','','',''),
+   'authenticated','authenticated','snap-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}', '{"full_name":"Snap Parent","role":"parent"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7d000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','snap-coach@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','snap-coach@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Snap Coach","role":"coach","tenant_id":"8d000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id)
 VALUES ('5d000000-0000-0000-0000-00000000aa01','Ethan Tan','2018-04-04',
@@ -82,7 +84,7 @@ VALUES ('4d000000-0000-0000-0000-00000000aa01','6d000000-0000-0000-0000-00000000
 
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by, marked_at)
 VALUES ('4d000000-0000-0000-0000-00000000aa01','5d000000-0000-0000-0000-00000000aa01',
-        'present','7d000000-0000-0000-0000-000000000002', NOW());
+        'present','7d000000-0000-0000-0000-000000000002', app_now());
 
 -- An invoice for June, naming the child as they were then.
 INSERT INTO invoices (id, parent_id, billing_month, gross_amount, credit_applied,

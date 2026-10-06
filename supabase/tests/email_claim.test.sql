@@ -7,12 +7,15 @@
 -- columns against a tenant admin; the grant posture (claims service_role only,
 -- state columns readable by authenticated). Rolled back.
 --
--- Lease ages are written directly (`now() - interval …`): a literal kill between
+-- Lease ages are written directly (`now() - interval …`, each line marked `-- clock: stamp`:
+-- the claim functions are REAL-TIME and stay on now() — Wave 7): a literal kill between
 -- claim and send is untestable, the lease expiry is what these exercise (plan §5).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(26);
+SELECT plan(27);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixture: one tenant, admin + coach + parent, one invoice, one credit note ─
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -24,16 +27,16 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','ec000000-0000-0000-0000-0000000000a1',
    'authenticated','authenticated','tap-ec-admin@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"EC Admin","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000ec"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"EC Admin","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000ec"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','ec000000-0000-0000-0000-0000000000c1',
    'authenticated','authenticated','tap-ec-coach@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"EC Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000ec"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"EC Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000ec"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','ec000000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','tap-ec-parent@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"EC Parent","role":"parent"}',
-   now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"EC Parent","role":"parent"}',
+   app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT '99999999-0000-0000-0000-0000000000ec', 'Default Group'
@@ -82,7 +85,7 @@ INSERT INTO credit_notes (id, reference_number, parent_id, student_id, student_n
 SELECT 'ec600000-0000-0000-0000-000000000001', 'CN-EC1', p.id, 'ec200000-0000-0000-0000-000000000001', 'EC Kid',
        'ec400000-0000-0000-0000-000000000001', 'ec500000-0000-0000-0000-000000000001',
        'ec300000-0000-0000-0000-000000000001', 30.00, 'present', 'absent', 'available',
-       '99999999-0000-0000-0000-0000000000ec', now() - interval '1 hour'
+       '99999999-0000-0000-0000-0000000000ec', now() - interval '1 hour'  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
 FROM parents p WHERE p.profile_id = 'ec000000-0000-0000-0000-0000000000b1';
 
 CREATE OR REPLACE FUNCTION pg_temp.set_inv(p_sent TIMESTAMPTZ, p_claimed TIMESTAMPTZ) RETURNS VOID AS $$
@@ -90,13 +93,13 @@ CREATE OR REPLACE FUNCTION pg_temp.set_inv(p_sent TIMESTAMPTZ, p_claimed TIMESTA
    WHERE id = 'ec400000-0000-0000-0000-000000000001' $$ LANGUAGE sql;
 
 -- ── 1. The five states and their boundaries ─────────────────────────────────
-SELECT is(email_delivery_state(now(), now()),                            'SENT',          'sent_at set → SENT, whatever the claim');
+SELECT is(email_delivery_state(now(), now()),                            'SENT',          'sent_at set → SENT, whatever the claim');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
 SELECT is(email_delivery_state(NULL, NULL),                              'UNSENT',        'never claimed → UNSENT');
-SELECT is(email_delivery_state(NULL, now() - interval '14 minutes'),     'SENDING',       'claimed 14 min ago → SENDING');
-SELECT is(email_delivery_state(NULL, now() - interval '15 minutes'),     'RETRYABLE',     'claimed exactly 15 min ago → RETRYABLE');
-SELECT is(email_delivery_state(NULL, now() - interval '24 hours'),       'RETRYABLE',     'claimed exactly 24 h ago → still RETRYABLE');
-SELECT is(email_delivery_state(NULL, now() - interval '24 hours 1 second'), 'MAY_HAVE_SENT', 'claimed just over 24 h ago → MAY_HAVE_SENT');
-SELECT is(email_delivery_state(NULL, now() - interval '3 days'),         'MAY_HAVE_SENT', 'claimed days ago → MAY_HAVE_SENT');
+SELECT is(email_delivery_state(NULL, now() - interval '14 minutes'),     'SENDING',       'claimed 14 min ago → SENDING');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
+SELECT is(email_delivery_state(NULL, now() - interval '15 minutes'),     'RETRYABLE',     'claimed exactly 15 min ago → RETRYABLE');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
+SELECT is(email_delivery_state(NULL, now() - interval '24 hours'),       'RETRYABLE',     'claimed exactly 24 h ago → still RETRYABLE');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
+SELECT is(email_delivery_state(NULL, now() - interval '24 hours 1 second'), 'MAY_HAVE_SENT', 'claimed just over 24 h ago → MAY_HAVE_SENT');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
+SELECT is(email_delivery_state(NULL, now() - interval '3 days'),         'MAY_HAVE_SENT', 'claimed days ago → MAY_HAVE_SENT');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
 
 -- ── 2. Invoice claim ────────────────────────────────────────────────────────
 SELECT is(
@@ -104,7 +107,7 @@ SELECT is(
   'UNSENT', 'an UNSENT invoice email is claimed');
 SELECT is(
   (SELECT invoice_email_claimed_at FROM invoices WHERE id = 'ec400000-0000-0000-0000-000000000001'),
-  now(), 'the claim stamps invoice_email_claimed_at');
+  now(), 'the claim stamps invoice_email_claimed_at');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
 SELECT is(
   (SELECT count(*)::int FROM claim_invoice_email('ec400000-0000-0000-0000-000000000001')),
   0, 'a fresh claim (SENDING) refuses a second claimer');
@@ -112,12 +115,12 @@ SELECT is(
   (SELECT count(*)::int FROM claim_invoice_email('ec400000-0000-0000-0000-000000000001', TRUE)),
   0, 'SENDING refuses even a manual resend — a double-clicked Resend sends once');
 
-SELECT pg_temp.set_inv(NULL, now() - interval '20 minutes');
+SELECT pg_temp.set_inv(NULL, now() - interval '20 minutes');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
 SELECT is(
   (SELECT prior_state FROM claim_invoice_email('ec400000-0000-0000-0000-000000000001')),
   'RETRYABLE', 'an expired lease (20 min) is re-claimed automatically');
 
-SELECT pg_temp.set_inv(NULL, now() - interval '2 days');
+SELECT pg_temp.set_inv(NULL, now() - interval '2 days');  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
 SELECT is(
   (SELECT count(*)::int FROM claim_invoice_email('ec400000-0000-0000-0000-000000000001')),
   0, 'MAY_HAVE_SENT is NEVER claimed by the automatic path');
@@ -125,7 +128,7 @@ SELECT is(
   (SELECT prior_state FROM claim_invoice_email('ec400000-0000-0000-0000-000000000001', TRUE)),
   'MAY_HAVE_SENT', 'MAY_HAVE_SENT is claimed by a manual resend, which reports it (→ new key)');
 
-SELECT pg_temp.set_inv(now(), NULL);
+SELECT pg_temp.set_inv(now(), NULL);  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
 SELECT is(
   (SELECT count(*)::int FROM claim_invoice_email('ec400000-0000-0000-0000-000000000001', TRUE)),
   0, 'a SENT invoice email is never claimed, even manually');
@@ -140,16 +143,16 @@ SELECT is(
   0, 'a fresh credit-note claim refuses a second claimer');
 
 -- An ordinary settle does NOT fire the re-issue reset.
-UPDATE credit_notes SET email_sent_at = now(), email_claimed_at = NULL
+UPDATE credit_notes SET email_sent_at = now(), email_claimed_at = NULL  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
  WHERE id = 'ec600000-0000-0000-0000-000000000001';
 SELECT isnt(
   (SELECT email_sent_at FROM credit_notes WHERE id = 'ec600000-0000-0000-0000-000000000001'),
   NULL, 'a settle that leaves issued_at alone keeps email_sent_at');
 
 -- A re-issue (new issued_at on the same row) is a new, unsent email.
-UPDATE credit_notes SET email_claimed_at = now() - interval '5 minutes'
+UPDATE credit_notes SET email_claimed_at = now() - interval '5 minutes'  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
  WHERE id = 'ec600000-0000-0000-0000-000000000001';
-UPDATE credit_notes SET issued_at = now()
+UPDATE credit_notes SET issued_at = now()  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
  WHERE id = 'ec600000-0000-0000-0000-000000000001';
 SELECT ok(
   (SELECT email_claimed_at IS NULL AND email_sent_at IS NULL
@@ -187,7 +190,7 @@ SELECT throws_ok(
   '23514', NULL,
   'invoice_email_sent_at is pinned against client writes');
 SELECT throws_ok(
-  $$ UPDATE invoices SET invoice_email_claimed_at = now()
+  $$ UPDATE invoices SET invoice_email_claimed_at = now()  -- clock: stamp — real-time lease, email_delivery_state/claim_* stay on now()
       WHERE id = 'ec400000-0000-0000-0000-000000000001' $$,
   '23514', NULL,
   'invoice_email_claimed_at is pinned against client writes');

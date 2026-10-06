@@ -23,8 +23,10 @@
 -- Runs on its own tenants; self-contained; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(26);
+SELECT plan(27);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -37,40 +39,40 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','mkp-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mkp-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Mkp Admin A","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','mkp-host-coach@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mkp-host-coach@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Mkp Host Coach","role":"coach","tenant_id":"ca000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','mkp-home-coach@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mkp-home-coach@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Mkp Home Coach","role":"coach","tenant_id":"ca000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000004',
-   'authenticated','authenticated','mkp-other-coach@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mkp-other-coach@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Mkp Other Coach","role":"coach","tenant_id":"ca000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000005',
-   'authenticated','authenticated','mkp-parent-1@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mkp-parent-1@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Mkp Parent One","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000006',
-   'authenticated','authenticated','mkp-parent-2@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mkp-parent-2@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Mkp Parent Two","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','cd000000-0000-0000-0000-000000000007',
-   'authenticated','authenticated','mkp-admin-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mkp-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Mkp Admin B","role":"tenant_admin","tenant_id":"ca000000-0000-0000-0000-00000000000b"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'ca000000-0000-0000-0000-00000000000a'
@@ -124,7 +126,7 @@ INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
                      deactivated_at)
 SELECT 'cf000000-0000-0000-0000-000000000004', co.id, 'Mkp Retired Sat', 'saturday',
        '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 40.00, 'cc000000-0000-0000-0000-000000000001', FALSE,
-       now()
+       app_now()
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'mkp-host-coach@test.local';
 
@@ -165,7 +167,7 @@ INSERT INTO student_class_enrolments (student_id, class_id) VALUES
 -- (superuser insert bypasses the client guard, like schedule_extra_lesson).
 INSERT INTO lesson_sessions (class_id, session_date, off_schedule_reason)
 VALUES ('cf000000-0000-0000-0000-000000000001',
-        current_date + ((3 - EXTRACT(DOW FROM current_date)::int + 7) % 7 + 7),
+        '2026-09-23'::date,
         'holiday shift');
 
 -- ── 1–2. R3 baseline, BEFORE any booking exists ─────────────────────────────
@@ -192,28 +194,28 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"cd000000-0000-0000-0000-000000000001"
 
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000002')$$,
   '%not enrolled in a class%',
   'an unenrolled child is refused — book a trial instead');
 
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000002',
-      current_date + ((0 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-20'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   '%child''s own class%',
   'the child''s own class is refused — that is an Extra lesson');
 
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000003',
-      current_date + ((1 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-21'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   '%own category%',
   'a Group child cannot make up in a Private class');
 
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((2 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-15'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   '%pick a day the class actually meets%',
   'a date the host class does not run (and no session exists) is refused');
@@ -226,34 +228,34 @@ SELECT throws_like(
 
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000003')$$,
   '%no longer attending%',
   'an inactive child is refused');
 
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000004',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   '%no longer running%',
   'an inactive host class is refused');
 
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000005')$$,
   '%another business%',
   'another tenant''s child is refused');
 
 SELECT lives_ok(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   'happy path: same category, host weekday, enrolled active child');
 
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   '%already booked into that lesson%',
   'a duplicate live booking is refused with a plain sentence');
@@ -268,14 +270,14 @@ SELECT lives_ok(
 
 SELECT lives_ok(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   'a cancelled slot can be re-booked (the unique index is partial)');
 
 -- ── 15. Off-schedule session date is ALLOWED ────────────────────────────────
 SELECT lives_ok(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((3 - EXTRACT(DOW FROM current_date)::int + 7) % 7 + 7),
+      '2026-09-23'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   'guesting into an admin-scheduled off-schedule extra session is allowed');
 
@@ -296,7 +298,7 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cd000000-0000-0000-0000-000000000002","role":"authenticated"}';
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000004')$$,
   '%only this business''s admin%',
   'a coach cannot book a make-up — arranging is the admin''s');
@@ -306,7 +308,7 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cd000000-0000-0000-0000-000000000007","role":"authenticated"}';
 SELECT throws_like(
   $$SELECT book_makeup('cf000000-0000-0000-0000-000000000001',
-      current_date + ((6 - EXTRACT(DOW FROM current_date)::int + 7) % 7),
+      '2026-09-19'::date,
       'c5000000-0000-0000-0000-000000000001')$$,
   '%only this business''s admin%',
   'another business''s admin cannot book into this tenant');

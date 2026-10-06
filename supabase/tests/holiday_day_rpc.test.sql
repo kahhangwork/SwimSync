@@ -4,8 +4,10 @@
 -- Plus the calendar-holiday bound and the admin-only authz. Rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(11);
+SELECT plan(12);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code, holiday_extension_days) VALUES
   ('da000000-0000-0000-0000-0000000000b1','hr','Holiday RPC','SWIM-HRP', 7);
@@ -15,18 +17,18 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','db000000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','hr-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','hr-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"HR Admin","role":"tenant_admin","is_coach":true,"tenant_id":"da000000-0000-0000-0000-0000000000b1"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','dc000000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','hr-parent@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','hr-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}','{"full_name":"HR Parent","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','dc000000-0000-0000-0000-0000000000b2',
-   'authenticated','authenticated','hr-stranger@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','hr-stranger@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}','{"full_name":"HR Stranger","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'da000000-0000-0000-0000-0000000000b1'

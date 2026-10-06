@@ -15,8 +15,10 @@
 -- service_role (§7.16) — the role the engine actually calls it as.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(29);
+SELECT plan(30);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Tenants ──────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -30,20 +32,20 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000c1',
    'authenticated','authenticated','tap-draw-coach@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Draw Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000f1"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Draw Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000f1"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','tap-draw-p1@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Draw P1","role":"parent"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Draw P1","role":"parent"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000b2',
    'authenticated','authenticated','tap-draw-p2@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Draw P2","role":"parent"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Draw P2","role":"parent"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a2000000-0000-0000-0000-0000000000b3',
    'authenticated','authenticated','tap-draw-p3@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Draw P3","role":"parent"}',
-   now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"Draw P3","role":"parent"}',
+   app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t

@@ -10,8 +10,10 @@
 -- trigger AND no index); that was verified separately (2 rows, balance 60.00).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(15);
+SELECT plan(16);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code)
 VALUES ('99999999-0000-0000-0000-0000000000d1', 'tap-cndc', 'TAP CN-DC', 'SWIM-CND1');
@@ -22,12 +24,12 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','a1000000-0000-0000-0000-0000000000c1',
    'authenticated','authenticated','tap-cndc-coach@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"CNDC Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000d1"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"CNDC Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000d1"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a1000000-0000-0000-0000-0000000000b2',
    'authenticated','authenticated','tap-cndc-parent@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"CNDC Parent","role":"parent"}',
-   now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"CNDC Parent","role":"parent"}',
+   app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
@@ -95,7 +97,7 @@ SELECT is((SELECT status FROM credit_notes WHERE lesson_session_id='d1000000-000
 SELECT is(pg_temp.bal(), 30.00, '3: balance is one lesson of credit');
 
 -- Simulate the email having been sent, to prove the re-issue resets it (RISK 3).
-UPDATE credit_notes SET email_sent_at = NOW()
+UPDATE credit_notes SET email_sent_at = app_now()
   WHERE lesson_session_id='d1000000-0000-0000-0000-000000000001';
 
 -- ── Un-correction: absent → present (voids the undrawn note) ─────────────────

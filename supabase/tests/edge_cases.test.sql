@@ -11,8 +11,10 @@
 --          (a "not assigned yet" state, not an error).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(9);
+SELECT plan(10);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- Multi-tenancy scaffolding: coaches and students now require a tenant. This
 -- fixture creates its own so the test stays independent of the seed. The rule
@@ -28,10 +30,10 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e1',
    'authenticated','authenticated','edge-coach@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Edge Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000003"}', now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"Edge Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000003"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e2',
    'authenticated','authenticated','edge-parent@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Edge Parent","role":"parent"}', now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"Edge Parent","role":"parent"}', app_now(), app_now(), '', '', '', '');
 
 -- classes.category_id is NOT NULL (20260725000400). A test creates its own
 -- tenants inside this transaction, so they have none of the categories the
@@ -120,7 +122,7 @@ $$, '22P02', NULL, '11.4: attendance has no bare ''trial'' status (must be trial
 
 -- ── 11.8  Unenrolling leaves the credit balance untouched ────────────────────
 UPDATE student_class_enrolments
-  SET is_active = FALSE, unenrolled_at = now()
+  SET is_active = FALSE, unenrolled_at = app_now()
   WHERE student_id='c0000000-0000-0000-0000-0000000000e1' AND is_active;
 
 SELECT is(

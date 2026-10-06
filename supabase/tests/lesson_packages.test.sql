@@ -14,8 +14,10 @@
 -- Runs on its own tenants; self-contained; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(30);
+SELECT plan(31);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -32,25 +34,25 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','ad000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pkg-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkg-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pkg Admin A","role":"tenant_admin","is_coach":true,"tenant_id":"aa000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ad000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','pkg-admin-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkg-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pkg Admin B","role":"tenant_admin","tenant_id":"aa000000-0000-0000-0000-000000000002"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pkg-parent-1@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkg-parent-1@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pkg Parent One","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ab000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','pkg-parent-2@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkg-parent-2@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pkg Parent Two","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 -- Parent 1 has joined tenant A.
 INSERT INTO parent_tenants (parent_id, tenant_id)
@@ -249,7 +251,7 @@ $$, 'the business''s admin confirms the request');
 -- the start defaults to the SGT confirmation date. So expiry = that date + 364d.
 SELECT is(
   (SELECT expires_on FROM parent_packages WHERE id = 'ff000000-0000-0000-0000-000000000001'),
-  ((now() AT TIME ZONE 'Asia/Singapore')::date + 52 * 7),
+  ('2026-09-15'::date + 52 * 7),
   'expiry = start date (SGT confirmation) + validity_weeks*7');
 
 SELECT throws_ok($$
@@ -304,9 +306,9 @@ RESET ROLE;
 -- reasoning in the wrong timezone.
 INSERT INTO lesson_sessions (id, class_id, session_date) VALUES
   ('66000000-0000-0000-0000-000000000001','ee000000-0000-0000-0000-000000000001',
-   (now() AT TIME ZONE 'Asia/Singapore')::date),
+   '2026-09-15'::date),
   ('66000000-0000-0000-0000-000000000002','ee000000-0000-0000-0000-000000000002',
-   (now() AT TIME ZONE 'Asia/Singapore')::date);
+   '2026-09-15'::date);
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
   ('66000000-0000-0000-0000-000000000001','55000000-0000-0000-0000-000000000001',
    'present','ad000000-0000-0000-0000-000000000001'),

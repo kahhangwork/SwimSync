@@ -23,6 +23,8 @@
 -- Every date here derives from ONE anchor so the relationships hold whatever
 -- day it runs. The anchor is written out in full rather than calling today_sg(),
 -- so a bug in that function cannot move the fixture to match itself.
+-- ⚠ Wave 7: superseded — the clock is pinned (first statement after BEGIN), so these dates are now LITERALS
+--   relative to the pin and cannot expire; the relationships described above are what the literals keep.
 --
 -- WHY d_below IS 70 DAYS BEFORE d_reopen, not an arbitrary older date: 70 is a
 -- whole number of weeks, so both fall on the class's own weekday. Otherwise the
@@ -36,8 +38,10 @@
 -- raises after writing is not a gate.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(18);
+SELECT plan(19);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── The dates, from one anchor ──────────────────────────────────────────────
 --   d_cal        1st of last month              the CALENDAR floor, today's rule
@@ -49,25 +53,17 @@ SELECT plan(18);
 --   d_below      d_reopen - 70 days             same weekday, below A's floor too
 --   m_seal_d     last month, 'YYYY-MM'          business D: seal that changes nothing
 --   d_created_b  6 months back                  business B: the created_at fallback
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE f AS
 SELECT
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '1 month')::date                                   AS d_cal,
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '3 months',
-          'YYYY-MM')                                               AS m_seal_a,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '2 months')::date                                  AS d_floor_a,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '2 months' + INTERVAL '14 days')::date             AS d_reopen,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '2 months' + INTERVAL '15 days')::date             AS d_extra,
-  (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
-     - INTERVAL '2 months' + INTERVAL '14 days' - INTERVAL '70 days')::date
-                                                                   AS d_below,
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month',
-          'YYYY-MM')                                               AS m_seal_d,
-  ((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '6 months')::date
-                                                                   AS d_created_b;
+  '2026-08-01'::date AS d_cal,
+  '2026-06'::text    AS m_seal_a,
+  '2026-07-01'::date AS d_floor_a,
+  '2026-07-15'::date AS d_reopen,
+  '2026-07-16'::date AS d_extra,
+  '2026-05-06'::date AS d_below,
+  '2026-08'::text    AS m_seal_d,
+  '2026-03-15'::date AS d_created_b;
 GRANT SELECT ON f TO PUBLIC;
 
 
@@ -77,11 +73,11 @@ GRANT SELECT ON f TO PUBLIC;
 --   C  never sealed, brand new   → floor is the calendar rule (LEAST wins)
 --   D  sealed last month         → floor is the calendar rule (LEAST wins)
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('78777777-0000-0000-0000-00000000000a','floor-a','FLOOR Business A','SWIM-FLRA', now()),
+  ('78777777-0000-0000-0000-00000000000a','floor-a','FLOOR Business A','SWIM-FLRA', app_now()),
   ('78777777-0000-0000-0000-00000000000b','floor-b','FLOOR Business B','SWIM-FLRB',
      (SELECT d_created_b FROM f)),
-  ('78777777-0000-0000-0000-00000000000c','floor-c','FLOOR Business C','SWIM-FLRC', now()),
-  ('78777777-0000-0000-0000-00000000000d','floor-d','FLOOR Business D','SWIM-FLRD', now());
+  ('78777777-0000-0000-0000-00000000000c','floor-c','FLOOR Business C','SWIM-FLRC', app_now()),
+  ('78777777-0000-0000-0000-00000000000d','floor-d','FLOOR Business D','SWIM-FLRD', app_now());
 
 INSERT INTO billing_periods (tenant_id, billing_month)
 SELECT '78777777-0000-0000-0000-00000000000a', m_seal_a FROM f;
@@ -93,11 +89,11 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','78100000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','floor-admin-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"FLOOR Admin A","role":"tenant_admin","tenant_id":"78777777-0000-0000-0000-00000000000a"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','floor-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"FLOOR Admin A","role":"tenant_admin","tenant_id":"78777777-0000-0000-0000-00000000000a"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','78100000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','floor-coach-a@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"FLOOR Coach A","role":"coach","tenant_id":"78777777-0000-0000-0000-00000000000a"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','floor-coach-a@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"FLOOR Coach A","role":"coach","tenant_id":"78777777-0000-0000-0000-00000000000a"}', app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT t.id, 'Default Group' FROM tenants t
@@ -163,7 +159,7 @@ SELECT is(
   'a business that sealed 3 months ago may mark back to the month AFTER that seal');
 
 SELECT ok(
-  (SELECT markable_floor('78777777-0000-0000-0000-00000000000a') < session_window_start()),
+  (SELECT markable_floor('78777777-0000-0000-0000-00000000000a') < '2026-08-01'::date),
   'and that floor is EARLIER than the calendar rule — this is the deadlock fix');
 
 
@@ -176,7 +172,7 @@ SELECT is(
 
 SELECT is(
   (SELECT markable_floor('78777777-0000-0000-0000-00000000000c')),
-  (SELECT session_window_start()),
+  (SELECT '2026-08-01'::date),
   'a business created today keeps the calendar floor — LEAST, not the fallback');
 
 -- If the MAX(billing_month) subquery ever lost its tenant_id filter, C would
@@ -190,7 +186,7 @@ SELECT isnt(
 
 SELECT is(
   (SELECT markable_floor('78777777-0000-0000-0000-00000000000d')),
-  (SELECT session_window_start()),
+  (SELECT '2026-08-01'::date),
   'a seal for LAST month leaves the floor exactly where it was — no behaviour change');
 
 
@@ -201,7 +197,7 @@ SELECT is(
 
 SELECT is(
   (SELECT markable_floor(NULL)),
-  (SELECT session_window_start()),
+  (SELECT '2026-08-01'::date),
   'markable_floor(NULL) is the calendar floor — fails open, not closed');
 
 
@@ -210,7 +206,7 @@ SELECT is(
 
 SELECT is(
   (SELECT COUNT(*)::INT FROM tenants t
-    WHERE markable_floor(t.id) > session_window_start()),
+    WHERE markable_floor(t.id) > '2026-08-01'::date),
   0,
   'NO tenant gets a floor later than the calendar rule — the window can only ever widen');
 
