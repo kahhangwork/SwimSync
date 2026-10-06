@@ -19,14 +19,14 @@ export function useLocations() {
     const { data } = await loadLocations();
 
     setLocations(
-      (data ?? []).map((l: any) => ({
+      (data ?? []).map((l) => ({
         id: l.id,
         name: l.name,
         address: l.address,
         notes: l.notes,
         sort_order: l.sort_order,
-        active_class_count: (l.classes ?? []).filter((c: any) => c.is_active).length,
-        retired_class_count: (l.classes ?? []).filter((c: any) => !c.is_active).length,
+        active_class_count: (l.classes ?? []).filter((c) => c.is_active).length,
+        retired_class_count: (l.classes ?? []).filter((c) => !c.is_active).length,
       }))
     );
     setLoading(false);
