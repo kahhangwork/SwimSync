@@ -68,7 +68,7 @@ export function useInvoiceDetail() {
       // Which lines the package funded — the "Package Applied" total,
       // itemised. RLS scopes the ledger to the parent's own packages; a
       // failed read just means no tags (fundingByItem is null-tolerant).
-      const itemIds = (inv.invoice_items ?? []).map((it: any) => it.id);
+      const itemIds = (inv.invoice_items ?? []).map((it) => it.id);
       const { data: apps } = itemIds.length
         ? await fetchPackageApplications(itemIds)
         : { data: [] };
@@ -80,7 +80,7 @@ export function useInvoiceDetail() {
       if (inv.invoice_items?.length > 0) {
         const firstItem = inv.invoice_items[0];
         const { data: ls } = await fetchSessionCoach(firstItem.lesson_session_id);
-        coachId = (ls as any)?.classes?.coach_id ?? null;
+        coachId = ls?.classes?.coach_id ?? null;
       }
 
       setInvoice(invoiceDetailOf(inv, cns, funded, coachId));

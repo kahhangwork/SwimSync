@@ -25,8 +25,8 @@ describe("invoiceDetailFormat (characterisation)", () => {
           { id: "a", amount: "40", class_title: "Dolphins", session_date: "2026-08-08", attendance_status: "absent_billable", student_name: "As Invoiced", students: { full_name: "Renamed" } },
           { id: "c", amount: 0, class_title: "X", session_date: "2026-08-22", attendance_status: "present", student_name: null, students: null },
         ],
-      },
-      [{ id: "cn", reference_number: "CN-1", amount: "12.5", reason: null }],
+      } as any,
+      [{ id: "cn", reference_number: "CN-1", amount: "12.5", reason: null }] as any,
       new Map([["a", "10-pack"]]),
       "coach-1"
     );
@@ -36,6 +36,6 @@ describe("invoiceDetailFormat (characterisation)", () => {
     expect(d.items[2].student_name).toBe("—");
     expect(d).toMatchObject({ business_name: "Coastal", reference_number: null, package_applied: 0, balance_adjustment: 0, paid_claimed_at: null, coach_id: "coach-1", gross_amount: 80 });
     expect(d.credit_notes).toEqual([{ id: "cn", reference_number: "CN-1", amount: 12.5, reason: null }]);
-    expect(invoiceDetailOf({ id: "z", tenants: null, invoice_items: null }, null, new Map(), null).business_name).toBe("Your coach");
+    expect(invoiceDetailOf({ id: "z", tenants: null, invoice_items: null } as any, null, new Map(), null).business_name).toBe("Your coach");
   });
 });

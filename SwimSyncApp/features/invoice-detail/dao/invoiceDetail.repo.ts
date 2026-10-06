@@ -4,6 +4,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 
 export const fetchInvoiceDetail = (id: string) =>
   supabase
@@ -58,3 +59,15 @@ export const fetchSessionCoach = (lessonSessionId: string) =>
     .select("classes(coach_id)")
     .eq("id", lessonSessionId)
     .single();
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// `tenants`, `students` and `classes` are LEFT to-one embeds: RLS nulls them (§7.344).
+// Recorded 2026-10-06 (parent JWT, real PostgREST): `tenants` is an OBJECT, or `null`
+// when RLS hides it — never an array (the screen's Array.isArray normaliser stays).
+type InvoiceDetailData = DataOf<typeof fetchInvoiceDetail>;
+export type InvoiceItemRow = RlsNullable<InvoiceDetailData["invoice_items"][number], "students">;
+export type InvoiceRow = Omit<RlsNullable<InvoiceDetailData, "tenants">, "invoice_items"> & {
+  invoice_items: InvoiceItemRow[];
+};
+export type AppliedCreditNoteRow = DataOf<typeof fetchAppliedCreditNotes>[number];
+export type SessionCoachRow = RlsNullable<DataOf<typeof fetchSessionCoach>, "classes">;
