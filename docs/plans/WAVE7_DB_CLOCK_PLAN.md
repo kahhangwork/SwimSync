@@ -386,21 +386,21 @@ proof — the lane2 batch precondition (zero unconverted functions) is the gate.
 | `class_shadow_coaches` | y | today_sg session_window_start assign_class_shadow coach_is_active_class_shadow end_class_shadow set_class_terms |  | student_class_enrolments | 2 |
 | `class_terms` | n | today_sg set_class_terms |  |  | 1 |
 | `coach_disable` | y | today_sg markable_floor assign_class_shadow disable_coach set_class_terms |  | student_class_enrolments | 2 |
-| `coach_wages` | y | today_sg sync_class_display_price |  | student_class_enrolments | 2 |
+| `coach_wages` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) | today_sg sync_class_display_price |  | student_class_enrolments | 2 |
 | `constraints` | n |  |  | credit_notes student_class_enrolments | 2 |
 | `credit_drawdown` | n |  |  | credit_notes | 2 |
-| `credit_note_double_credit` | y |  |  | credit_notes student_class_enrolments | 2 |
-| `credit_note_trigger` | y |  |  | credit_notes student_class_enrolments | 2 |
-| `document_name_snapshot` | y |  |  | credit_notes student_class_enrolments | 2 |
-| `edge_cases` | y |  |  | credit_notes student_class_enrolments | 2 |
+| `credit_note_double_credit` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | credit_notes student_class_enrolments | 2 |
+| `credit_note_trigger` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | credit_notes student_class_enrolments | 2 |
+| `document_name_snapshot` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | credit_notes student_class_enrolments | 2 |
+| `edge_cases` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | credit_notes student_class_enrolments | 2 |
 | `email_claim` | n |  |  | credit_notes student_class_enrolments | 2 |
 | `enrolment_retire_race` | n |  |  | deactivate_class | 2 (no date — G1 may mark `clock-free`) |
 | `enrolment_start_date` | y | today_sg session_window_start markable_floor enrolment_start_bounds set_enrolment_start enrolment_start_at |  | student_class_enrolments | 2 |
 | `find_roster_duplicates` | n |  |  |  | 1 |
 | `function_grants` | n |  |  | next_credit_note_ref parent_packages | 2 |
-| `holiday_admin_guard` | y | today_sg |  | student_class_enrolments | 2 |
-| `holiday_day_rpc` | y |  |  | deactivate_class parent_packages student_class_enrolments | 2 |
-| `holiday_late_buyer` | y |  |  | parent_packages student_class_enrolments | 2 |
+| `holiday_admin_guard` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) | today_sg |  | student_class_enrolments | 2 |
+| `holiday_day_rpc` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | deactivate_class parent_packages student_class_enrolments | 2 |
+| `holiday_late_buyer` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | parent_packages student_class_enrolments | 2 |
 | `lesson_packages` | y |  |  | parent_packages | 2 |
 | `level_skills` | n |  |  |  | 1 |
 | `locations` | n |  |  |  | 1 |
@@ -408,11 +408,11 @@ proof — the lane2 batch precondition (zero unconverted functions) is the gate.
 | `markable_floor` | y | today_sg session_window_start markable_floor book_makeup book_trial schedule_extra_lesson |  | student_class_enrolments | 2 |
 | `multi_class` | y | markable_floor book_makeup set_class_terms |  | close_student_enrolment student_class_enrolments | 2 |
 | `owner_transfer` | n |  | platform_tenant_overview |  | 2 |
-| `package_corrections` | y |  |  | parent_packages credit_notes | 2 |
+| `package_corrections` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | parent_packages credit_notes | 2 |
 | `package_default_products` | n |  |  |  | 1 (no date — G1 may mark `clock-free`) |
-| `package_draw_at_marking_b` | y | today_sg |  | parent_packages | 2 |
+| `package_draw_at_marking_b` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) | today_sg |  | parent_packages | 2 |
 | `package_draw_at_marking` | y | today_sg session_window_start markable_floor class_unmarked_lesson_pairs |  | parent_packages student_class_enrolments | 2 |
-| `package_holiday_extension` | y |  |  | parent_packages student_class_enrolments | 2 |
+| `package_holiday_extension` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | parent_packages student_class_enrolments | 2 |
 | `package_manual_extend` | n |  |  | parent_packages | 2 |
 | `package_offers` | n |  | package_renewal_candidates | parent_packages student_class_enrolments | 2 |
 | `package_references` | n | today_sg |  | parent_packages | 2 |
@@ -420,8 +420,8 @@ proof — the lane2 batch precondition (zero unconverted functions) is the gate.
 | `package_weeks_start_date` | n |  | suggest_package_start | parent_packages | 2 |
 | `parent_address` | n |  |  |  | 1 |
 | `parent_link_forgery` | n |  |  |  | 1 |
-| `partial_payment_followups` | y |  |  | set_students_active credit_notes student_class_enrolments | 2 |
-| `partial_payment` | y |  |  | credit_notes student_class_enrolments | 2 |
+| `partial_payment_followups` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | set_students_active credit_notes student_class_enrolments | 2 |
+| `partial_payment` | n (was y: lane2 T4 pin-shift stays green — no guarded write as authenticated; superuser fixture inserts only, or a correction / below-floor holiday that no date guard decides) |  |  | credit_notes student_class_enrolments | 2 |
 | `payment_collection` | n |  |  | student_class_enrolments | 2 |
 | `platform_overview` | y |  | platform_tenant_overview | student_class_enrolments | 2 |
 | `reassign_student_tenant` | n |  |  | reassign_student_tenant | 2 |
