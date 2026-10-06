@@ -3,6 +3,7 @@ import type { UnclaimedStudent } from "../types";
 import * as repo from "../dao/invoices.repo";
 import { settlementPayload } from "./settlementPayload";
 import { formatBillingMonth } from "./invoiceRows";
+import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
 
 /** Billable lessons with nobody to bill — they hold the month OPEN (the engine's
  *  fifth seal condition). `unclaimed` is also SET by the generation run, so the
@@ -13,6 +14,10 @@ import { formatBillingMonth } from "./invoiceRows";
  *  creation deps: those belong to useGenerate, which is created AFTER this hook
  *  (it needs this hook's `setUnclaimed`), so passing them at call time from the
  *  page's compose layer is what keeps the two slices acyclic. */
+/** Shown instead of a settlement whose child row could not be read (Wave 8). */
+export const STUDENT_NOT_FOUND_MESSAGE =
+  "That child's record couldn't be found, so nothing was saved. Refresh the page and try again.";
+
 export function useUnclaimed() {
   const [unclaimed, setUnclaimed] = useState<UnclaimedStudent[]>([]);
   const [settling, setSettling] = useState<string | null>(null);
@@ -46,19 +51,30 @@ export function useUnclaimed() {
       data: { user },
     } = await repo.getUser();
 
-    const { data: student } = await repo.fetchStudentTenant(u.student_id);
+    // Signed out, or the child's row unreadable: say which, in the modal, and
+    // send nothing — never a settlement with dropped keys for the database to
+    // refuse (Wave 8).
+    if (!user) {
+      setSettling(null);
+      setSettleError(NO_TENANT_MESSAGE);
+      return;
+    }
 
-    // Both `!` are NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-    // No student row / signed out → the key is dropped → NOT NULL/RLS refuses →
-    // setSettleError shows it in the modal.
+    const { data: student } = await repo.fetchStudentTenant(u.student_id);
+    if (!student) {
+      setSettling(null);
+      setSettleError(STUDENT_NOT_FOUND_MESSAGE);
+      return;
+    }
+
     const { error } = await repo.insertSettlement(
       settlementPayload({
-        tenantId: student?.tenant_id!,
+        tenantId: student.tenant_id,
         studentId: u.student_id,
         settledThrough: u.latest_session_date,
         kind,
         amount,
-        recordedBy: user?.id!,
+        recordedBy: user.id,
       })
     );
 
