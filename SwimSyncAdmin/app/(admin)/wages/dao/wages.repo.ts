@@ -4,6 +4,17 @@
 // trip orchestration, because its isStale() checks sit BETWEEN the awaits and
 // are load-bearing (a stale row carries an irreversible "Mark paid").
 import { supabase } from "@/lib/supabase";
+import type { DataOf } from "@/lib/database.overrides";
+
+// The rows each read returns. `profiles` is a to-one embed RLS can null (§7.344),
+// typed `| P[]` too because domain/wageRows.ts keeps its Array.isArray normaliser.
+type CoachSelected = DataOf<typeof loadCoaches>[number];
+type CoachProfile = NonNullable<CoachSelected["profiles"]>;
+export type CoachSelectRow = Omit<CoachSelected, "profiles"> & {
+  profiles: CoachProfile | CoachProfile[] | null;
+};
+export type PayoutSelectRow = DataOf<typeof loadPayouts>[number];
+export type LessonSessionSelectRow = DataOf<typeof loadLessonSessionsForClasses>[number];
 
 export function getAuthUser() {
   return supabase.auth.getUser();

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { resolveShadows } from "@/lib/lessonAttribution";
 import { useTableSort } from "@/components/Table";
 import * as repo from "../dao/wages.repo";
+import type { LessonSessionSelectRow } from "../dao/wages.repo";
 import * as rpc from "../dao/wages.rpc";
 import type { CoachRow, PayoutRow } from "../types";
 import {
@@ -56,7 +57,7 @@ export function usePayroll(
     }
 
     const itemsByPayout = new Map<string, PayoutItem[]>(
-      (data ?? []).map((p: any) => [p.id, toPayoutItems(p)])
+      (data ?? []).map((p) => [p.id, toPayoutItems(p)])
     );
 
     // One roster query for the whole month. This is what makes a cover legible:
@@ -118,12 +119,12 @@ export function usePayroll(
       // The shadowed classes are a far smaller and unbounded-safe key, and they
       // are the only classes whose lessons can possibly matter here.
       const shadowClassIds = [
-        ...new Set((assigns ?? []).map((a: any) => a.class_id as string)),
+        ...new Set((assigns ?? []).map((a) => a.class_id as string)),
       ];
       const { data: lessonRows, error: lessonErr } =
         shadowClassIds.length > 0
           ? await repo.loadLessonSessionsForClasses(shadowClassIds)
-          : { data: [] as any[], error: null };
+          : { data: [] as LessonSessionSelectRow[], error: null };
 
       if (isStale()) return;
 
@@ -140,20 +141,20 @@ export function usePayroll(
       }
 
       shadowedByCoach = resolveShadows({
-        lessons: (lessonRows ?? []).map((ls: any) => ({
+        lessons: (lessonRows ?? []).map((ls) => ({
           lesson_session_id: ls.id,
           class_id: ls.class_id,
           session_date: ls.session_date,
         })),
-        shadows: (assigns ?? []) as any[],
-        absences: (absences ?? []) as any[],
+        shadows: assigns ?? [],
+        absences: absences ?? [],
       }).shadowedByCoach;
     }
 
     setLoadError(rosterError);
 
     setPayouts(
-      (data ?? []).map((p: any) => {
+      (data ?? []).map((p) => {
         const lines = buildLessonLines(
           itemsByPayout.get(p.id) ?? [],
           rosterRows,

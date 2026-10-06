@@ -38,9 +38,6 @@ app/(admin)/trials/domain/trialRows.ts 11
 app/(admin)/trials/domain/useTrials.ts 2
 app/(admin)/unassigned/domain/unassignedRows.ts 8
 app/(admin)/unassigned/domain/useUnassigned.ts 4
-app/(admin)/wages/domain/usePayroll.ts 7
-app/(admin)/wages/domain/useWages.ts 1
-app/(admin)/wages/domain/wageRows.ts 9
 app/accept-invite/dao/acceptInvite.repo.ts 1
 app/reset-password/dao/resetPassword.repo.ts 1
 components/Table.tsx 1

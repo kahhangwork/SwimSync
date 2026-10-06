@@ -16,7 +16,7 @@ describe("money", () => {
 
 describe("toCoachRow", () => {
   const rate = (amount: string, from: string, role?: string) =>
-    ({ amount, unit_minutes: 60, effective_from: from, ...(role ? { role } : {}) });
+    ({ amount, unit_minutes: 60, effective_from: from, ...(role ? { role } : {}) }) as any; // amount as a string, role optional: pins Number() and `?? "main"`
 
   it("⚠ the MAIN rate ignores a later-dated SHADOW rate; each takes its own latest", () => {
     const c = toCoachRow({
@@ -35,7 +35,7 @@ describe("toCoachRow", () => {
   });
 
   it("no rates is 'not on payroll' (null), and a missing profile reads —", () => {
-    const c = toCoachRow({ id: "c2", profiles: null, coach_rates: null });
+    const c = toCoachRow({ id: "c2", profiles: null, coach_rates: null as any }); // pins the kept `?? []`
     expect(c).toEqual({ id: "c2", name: "—", rate: null, shadowRate: null });
   });
 });
@@ -44,10 +44,10 @@ describe("toPayoutItems", () => {
   it("numbers the amount and keeps every field", () => {
     expect(toPayoutItems({ coach_payout_items: [{ id: "i", lesson_session_id: "l", class_title: "T",
       session_date: "2026-09-01", basis: "per_minute", minutes: 45, amount: "30.00",
-      is_adjustment: false, original_period: null }] })).toEqual([{ id: "i", lesson_session_id: "l",
+      is_adjustment: false, original_period: null }] } as any)).toEqual([{ id: "i", lesson_session_id: "l",
       class_title: "T", session_date: "2026-09-01", basis: "per_minute", minutes: 45, amount: 30,
       is_adjustment: false, original_period: null }]);
-    expect(toPayoutItems({})).toEqual([]);
+    expect(toPayoutItems({} as any)).toEqual([]); // pins the kept `?? []`
   });
 });
 

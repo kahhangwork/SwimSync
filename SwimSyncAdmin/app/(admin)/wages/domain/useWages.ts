@@ -35,7 +35,7 @@ export function useWages() {
   async function loadCoaches(tid: string) {
     const { data } = await repo.loadCoaches(tid);
 
-    setCoaches((data ?? []).map((c: any) => toCoachRow(c)));
+    setCoaches((data ?? []).map((c) => toCoachRow(c)));
   }
 
   async function updateTenant(patch: Record<string, unknown>) {

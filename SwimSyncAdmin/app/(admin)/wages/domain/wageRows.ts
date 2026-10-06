@@ -1,6 +1,7 @@
 import { todayInSg } from "@/lib/lessonDates";
 import type { LessonLine, PayoutItem } from "./payoutItems";
 import type { CoachRow } from "../types";
+import type { CoachSelectRow, PayoutSelectRow } from "../dao/wages.repo";
 
 /**
  * todayInSg(), not the device's calendar. `new Date().getMonth()` is the
@@ -45,7 +46,7 @@ export function lineDetail(line: LessonLine): string {
 }
 
 /** One coaches row (with profiles + coach_rates embeds) -> the Rates table row. */
-export function toCoachRow(c: any): CoachRow {
+export function toCoachRow(c: CoachSelectRow): CoachRow {
   // The rate IN EFFECT is the latest effective_from — rates are
   // effective-dated so a raise never reprices an earlier month.
   //
@@ -55,15 +56,15 @@ export function toCoachRow(c: any): CoachRow {
   // is what this did — makes the first shadow rate dated after a main
   // rate display as that coach's rate, while payroll pays the other one.
   const mainRates = (c.coach_rates ?? []).filter(
-    (r: any) => (r.role ?? "main") === "main"
+    (r) => (r.role ?? "main") === "main"
   );
   const shadowRates = (c.coach_rates ?? []).filter(
-    (r: any) => r.role === "shadow"
+    (r) => r.role === "shadow"
   );
-  const rates = mainRates.slice().sort((a: any, b: any) =>
+  const rates = mainRates.slice().sort((a, b) =>
     b.effective_from.localeCompare(a.effective_from)
   );
-  const shadowSorted = shadowRates.slice().sort((a: any, b: any) =>
+  const shadowSorted = shadowRates.slice().sort((a, b) =>
     b.effective_from.localeCompare(a.effective_from)
   );
   const prof = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
@@ -88,8 +89,8 @@ export function toCoachRow(c: any): CoachRow {
 }
 
 /** A coach_payouts row's embedded items -> PayoutItem[] (amount numeric). */
-export function toPayoutItems(p: any): PayoutItem[] {
-  return (p.coach_payout_items ?? []).map((i: any) => ({
+export function toPayoutItems(p: PayoutSelectRow): PayoutItem[] {
+  return (p.coach_payout_items ?? []).map((i) => ({
     id: i.id,
     lesson_session_id: i.lesson_session_id,
     class_title: i.class_title,
