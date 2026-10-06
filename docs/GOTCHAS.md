@@ -32,17 +32,17 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 | Area | Items |
 |---|---|
-| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315 |
+| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337 |
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314 |
-| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
+| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334 |
 | Source-scanning guards | 230, 231, 233, 241, 247, 248, 302, 305, 309 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
@@ -2697,3 +2697,31 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     driver batch down mid-run (Wave 6 lane 2); restarted with `NODE_OPTIONS=--max-old-space-size=8192`, every
     driver passed. Restart the admin dev server before a long batch rather than trusting a day-old one.
     (2026-10-06, §8.139.)
+
+333. **pgTAP cannot prove a lock that keys on `session_user` — the proof is vacuous.** Locally `postgres` is NOT a
+    superuser, so `SET SESSION AUTHORIZATION authenticator` is refused, and `SET [LOCAL] ROLE` changes only
+    `current_user` (`session_user` stays `postgres`). Prove such a lock from a REAL login as that role:
+    `docker exec -e PGPASSWORD=postgres <db> psql -h 127.0.0.1 -U authenticator`, in a `supabase/tests/http/`
+    script wired into CI that exits non-zero if the login fails (model: `signup_trust.sh`). (Wave 7 plan-review,
+    2026-10-06.)
+
+334. **`supabase migration up` never runs `seed.sql`.** On the shared DB, anything switched on by a seed-only row
+    (Wave 7's clock-override flag) is OFF after a no-reset apply until the row is inserted by hand. Make the
+    feature fail LOUD when its switch is missing, so a skipped step raises instead of silently degrading to the
+    real behaviour while tests stay green. (Wave 7 plan-review, 2026-10-06.)
+
+335. **`DROP FUNCTION` succeeds while other functions still call it.** `sql`/`plpgsql` bodies (without `BEGIN
+    ATOMIC`) are not dependency-tracked, so a DOWN that drops a shared helper leaves every caller failing at
+    RUNTIME — on prod, not at deploy. DOWN files never drop a callee; census the callers first with
+    `prosrc ~ '<fn>\('`. (Wave 7 plan-review, 2026-10-06; sibling of §7.40.)
+
+336. **A re-bodied function is proven by a normalized diff, not by "I copied the live body".** Capture
+    `pg_get_functiondef` + `proacl`/`provolatile`/`prosecdef`/`proconfig` before, normalize the intended token
+    swap out of the after-capture, and require an empty diff. Also compare an md5 of each body on PROD with local
+    BEFORE the push (`scripts/prod-query-ro.sh`): prod may hold a body local does not, and `CREATE OR REPLACE`
+    reverts it silently. (Wave 7 plan-review, 2026-10-06; extends §7.40.)
+
+337. **An injected test clock must refuse a timestamp without an offset.** The DB server runs at UTC, so a pin of
+    `'2026-10-01 07:59'` means 15:59 SGT and the "07:59 SGT is still yesterday in UTC" edge silently stops being
+    tested. Pins carry `+08` and the clock RAISEs on an offset-less value. (Wave 7 plan-review, 2026-10-06; the
+    §7.7 family.)
