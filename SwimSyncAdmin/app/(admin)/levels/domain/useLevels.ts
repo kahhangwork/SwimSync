@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTableSort } from "@/components/Table";
 import * as repo from "../dao/levels.repo";
 import { toLevels } from "./levelRows";
+import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
 import { nextRank, describeDeleteError, type GradeLevel } from "./skillScale";
 import type { Level, Skill } from "../types";
 
@@ -41,6 +42,16 @@ export function useLevels() {
     load();
     loadScale();
   }, []);
+
+  /** The caller's business, resolved immediately before a write (RISK 6).
+   *  null when signed out or the profile has no tenant — the caller then says
+   *  so and sends nothing (Wave 8: this was two `!`s that guarded nothing, and
+   *  a signed-out press sent profileTenant an `id=eq.undefined`). */
+  async function myTenantId(): Promise<string | null> {
+    const userId = (await repo.getAuthUser()).data.user?.id;
+    if (!userId) return null;
+    return (await repo.profileTenant(userId)).data?.tenant_id ?? null;
+  }
 
   async function load() {
     setLoading(true);
@@ -94,18 +105,20 @@ export function useLevels() {
     setError(null);
     const payload = { label: trimmed, sort_order: Number(sortOrder), note: note.trim() || null };
 
-    const { error: err } = editing
-      ? await repo.updateLevel(editing.id, payload)
-      : await repo.insertLevel({
-          ...payload,
-          // The caller's own business. RLS refuses any other value anyway; this
-          // is what makes the insert satisfy the WITH CHECK in the first place.
-          // Both `!` are NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-          // No user / no tenant → key dropped → 23502/RLS → "Could not save. Please try again."
-          tenant_id: (
-            await repo.profileTenant((await repo.getAuthUser()).data.user?.id!)
-          ).data?.tenant_id!,
-        });
+    let err;
+    if (editing) {
+      ({ error: err } = await repo.updateLevel(editing.id, payload));
+    } else {
+      // The caller's own business. RLS refuses any other value anyway; this is
+      // what makes the insert satisfy the WITH CHECK in the first place.
+      const tenant_id = await myTenantId();
+      if (!tenant_id) {
+        setBusy(false);
+        setError(NO_TENANT_MESSAGE);
+        return;
+      }
+      ({ error: err } = await repo.insertLevel({ ...payload, tenant_id }));
+    }
 
     setBusy(false);
 
@@ -149,16 +162,18 @@ export function useLevels() {
     if (!trimmed) return;
     setScaleBusy(true);
     setScaleError(null);
+    // The caller's own business — RLS refuses any other value; this is what
+    // satisfies the WITH CHECK (same pattern as the level insert).
+    const tenant_id = await myTenantId();
+    if (!tenant_id) {
+      setScaleBusy(false);
+      setScaleError(NO_TENANT_MESSAGE);
+      return;
+    }
     const { error: err } = await repo.insertGrade({
       label: trimmed,
       rank: nextRank(gradeScale),
-      // The caller's own business — RLS refuses any other value; this is what
-      // satisfies the WITH CHECK (same pattern as the level insert).
-      // Both `!` are NOT A GUARD (Wave 8, option A — lane2 replaces it with an explicit guard + message, as a fix(wave8)).
-      // No user / no tenant → key dropped → 23502/RLS → "Could not add that grade."
-      tenant_id: (
-        await repo.profileTenant((await repo.getAuthUser()).data.user?.id!)
-      ).data?.tenant_id!,
+      tenant_id,
     });
     setScaleBusy(false);
     if (err) {
