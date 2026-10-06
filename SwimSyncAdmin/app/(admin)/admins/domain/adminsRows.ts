@@ -1,9 +1,13 @@
 // Admins page — pure mapping. No React, no network. Carries unit tests.
 
 import type { AdminRow } from "../types";
+import type { DataOf } from "@/lib/database.overrides";
+import type { loadProfiles } from "../dao/admins.repo";
+
+type AdminProfileRow = DataOf<typeof loadProfiles>[number];
 
 export function toAdminRows(
-  profiles: any[],
+  profiles: AdminProfileRow[],
   ownerId: string | null,
   coachIds: Set<string>
 ): AdminRow[] {

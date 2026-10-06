@@ -11,7 +11,7 @@ describe("admins domain — pure mapping", () => {
       { id: "p1", full_name: "Owner", email: "o@x.sg", phone: "1", admin_disabled_at: null },
       { id: "p2", full_name: "Coach Admin", email: "c@x.sg", phone: null, admin_disabled_at: null },
       { id: "p3", full_name: "Gone", email: "g@x.sg", phone: null, admin_disabled_at: "2026-01-01" },
-    ];
+    ] as any; // no admin_role_id: pins the `?? null`
     const rows = toAdminRows(profiles, "p1", new Set(["p2"]));
     expect(rows[0]).toMatchObject({ id: "p1", isOwner: true, isCoach: false, status: null });
     expect(rows[1]).toMatchObject({ id: "p2", isOwner: false, isCoach: true, status: null });
