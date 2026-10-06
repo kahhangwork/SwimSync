@@ -164,7 +164,7 @@ GRANT EXECUTE ON FUNCTION public.app_now(), public.app_today() TO authenticated,
 
 - **⚠ RISK 4 MITIGATION — G1 checks the pin's exact form, not its presence (assertion).** A file passes G1 only if:
   - the first non-comment statement after `BEGIN;` matches `^SELECT set_config\('swimsync\.now', '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}(:[0-9]{2})?[+-][0-9]{2}(:?[0-9]{2})?', true\);$`. That rules out a missing offset, `false`, and a pin placed before `BEGIN` or in a comment.
-  - the next statement is `SELECT is(app_today(), '<same date>'::date, 'clock pinned');`, which is red if the pin is silently ignored.
+  - the first assertion after `SELECT plan(N);` is `SELECT is(app_today(), '<same date>'::date, 'clock pinned');`, which is red if the pin is silently ignored. *(Corrected at T1 by lane2: pgTAP refuses any assertion before `plan()`, so the form is `BEGIN;` → pin → [`CREATE EXTENSION IF NOT EXISTS pgtap;`] → `SELECT plan(N);` → `clock pinned`. `scripts/lib/pgtap-pin.sh` holds it.)*
   - outside lines marked `-- clock: stamp`, the file contains no raw `now()`, `CURRENT_DATE`, `CURRENT_TIMESTAMP` or `session_window_start()` arithmetic. Tests read `app_now()`/`app_today()` or literals only.
 - **⚠ RISK 6 MITIGATION — G2 token list (assertion).** G2's token list = the census list: `now()`, `CURRENT_DATE`, `CURRENT_TIMESTAMP`, `CURRENT_TIME`, `LOCALTIMESTAMP`, `clock_timestamp`, `statement_timestamp`, `transaction_timestamp`, `'now'`, `'today'`, case-insensitive. Proven red on a synthetic migration for **each** token. G2 is the early warning; the pgTAP clock census is the backstop that cannot be routed around.
 - **⚠ RISK 9 MITIGATION — G4 uses G1's predicate (prohibition).** Do NOT give G4 its own "is pinned" test. G4 sources the one function from G1 (`scripts/lib/pgtap-pin.sh` or equivalent), so a file skips G4 only if it passes G1's full form. Red-proof: a file with `set_config('swimsync.now'` only in a comment and a future literal → G4 red.
@@ -337,6 +337,115 @@ decision-feeding defaults move with (a).
 ## Appendix B — file → function map (lane1 builds at T1, hands to lane2 with T3)
 
 Each row: file · functions exercised · **guarded path? (y/n)**, which drives the pin-shift expectation · tables inserted that carry a choice-(b) default.
+
+**Built 2026-10-06 (lane1, T1), by text scan of each file for the Appendix A function names.** It is a dependency map, not a
+proof — the lane2 batch precondition (zero unconverted functions) is the gate.
+
+- **Batch 1 (releasable once M1 is on prod — it is, `f072685`):** files that touch only M1-converted functions. The billing
+  guards (`assert_markable_date`, `guard_attendance_date`, `guard_session_date`, `guard_package_draw_order`,
+  `enrolment_start_bounds`) have 0 raw clock tokens and read only the helpers, so their files ride batch 1 rather than waiting
+  for a batch 3 behind M4. If M4 finds a straggler, the files that exercise it move to a batch 3.
+- **Batch 2 (after M3 on prod):** files that touch any M2 function, any M3 function, or insert into a table whose
+  decision-feeding default moves in M3 (`student_class_enrolments.enrolled_at`, `parent_packages.requested_at`) — or
+  `credit_notes` (`next_credit_note_ref`'s year). Conservative on purpose: a file that inserts an enrolment with no explicit
+  `enrolled_at` reads the REAL clock there until M3.
+- **Guarded = y** when the file writes attendance / sessions / bookings, or calls a date-guarded RPC — the pin-shift (+3
+  months) must turn those red. Choice-(b) column: empty for every file (Appendix A).
+- **No date (5 by this scan; lane2's G1 found 8 date-free files with the authoritative predicate):** G1 decides `clock-free`.
+
+| File | Guarded | M1 functions | M2 functions | M3 functions / defaulted tables | Batch |
+|---|---|---|---|---|---|
+| `accounting_package_revenue` | n |  | referral | parent_packages | 2 |
+| `accounting_summary` | n |  |  |  | 1 |
+| `active_inactive` | n |  |  | set_students_active student_class_enrolments | 2 |
+| `admin_management` | n |  | platform_tenant_overview |  | 2 |
+| `admin_marks_attendance` | y | today_sg |  | credit_notes student_class_enrolments | 2 |
+| `admin_sees_member_parent` | n |  |  |  | 1 |
+| `advance_cancel_lesson` | y | today_sg markable_floor book_trial cancel_lesson restore_lesson schedule_extra_lesson | tenant_unmarked_lesson_count | student_class_enrolments | 2 |
+| `app_settings_dead_keys` | n |  |  |  | 1 |
+| `attendance_window` | y | today_sg session_window_start schedule_extra_lesson |  | student_class_enrolments | 2 |
+| `audit_log_tenant` | y | book_makeup book_trial schedule_extra_lesson |  | close_student_enrolment | 2 |
+| `billing_runs` | n |  |  |  | 1 |
+| `booking_class_active` | y | markable_floor book_trial schedule_extra_lesson |  | deactivate_class | 2 |
+| `booking_retire_race` | y | book_makeup book_trial |  | deactivate_class | 2 (no date — G1 may mark `clock-free`) |
+| `cancel_package_extension` | y | today_sg cancel_lesson restore_lesson |  | parent_packages student_class_enrolments | 2 |
+| `class_capacity_colour` | n |  |  |  | 1 |
+| `class_capacity_limit` | y | today_sg markable_floor book_makeup book_trial |  | close_student_enrolment student_class_enrolments | 2 |
+| `class_capacity_lock` | y | book_makeup book_trial |  |  | 1 (no date — G1 may mark `clock-free`) |
+| `class_coach_terms` | n |  |  |  | 1 |
+| `class_deactivation` | y | markable_floor |  | deactivate_class student_class_enrolments | 2 |
+| `class_retirement_guard` | y | markable_floor assert_class_retirable |  | deactivate_class student_class_enrolments | 2 |
+| `class_shadow_coaches` | y | today_sg session_window_start assign_class_shadow coach_is_active_class_shadow end_class_shadow set_class_terms |  | student_class_enrolments | 2 |
+| `class_terms` | n | today_sg set_class_terms |  |  | 1 |
+| `coach_disable` | y | today_sg markable_floor assign_class_shadow disable_coach set_class_terms |  | student_class_enrolments | 2 |
+| `coach_wages` | y | today_sg sync_class_display_price |  | student_class_enrolments | 2 |
+| `constraints` | n |  |  | credit_notes student_class_enrolments | 2 |
+| `credit_drawdown` | n |  |  | credit_notes | 2 |
+| `credit_note_double_credit` | y |  |  | credit_notes student_class_enrolments | 2 |
+| `credit_note_trigger` | y |  |  | credit_notes student_class_enrolments | 2 |
+| `document_name_snapshot` | y |  |  | credit_notes student_class_enrolments | 2 |
+| `edge_cases` | y |  |  | credit_notes student_class_enrolments | 2 |
+| `email_claim` | n |  |  | credit_notes student_class_enrolments | 2 |
+| `enrolment_retire_race` | n |  |  | deactivate_class | 2 (no date — G1 may mark `clock-free`) |
+| `enrolment_start_date` | y | today_sg session_window_start markable_floor enrolment_start_bounds set_enrolment_start enrolment_start_at |  | student_class_enrolments | 2 |
+| `find_roster_duplicates` | n |  |  |  | 1 |
+| `function_grants` | n |  |  | next_credit_note_ref parent_packages | 2 |
+| `holiday_admin_guard` | y | today_sg |  | student_class_enrolments | 2 |
+| `holiday_day_rpc` | y |  |  | deactivate_class parent_packages student_class_enrolments | 2 |
+| `holiday_late_buyer` | y |  |  | parent_packages student_class_enrolments | 2 |
+| `lesson_packages` | y |  |  | parent_packages | 2 |
+| `level_skills` | n |  |  |  | 1 |
+| `locations` | n |  |  |  | 1 |
+| `makeup_bookings` | y | book_makeup schedule_extra_lesson |  | student_class_enrolments | 2 |
+| `markable_floor` | y | today_sg session_window_start markable_floor book_makeup book_trial schedule_extra_lesson |  | student_class_enrolments | 2 |
+| `multi_class` | y | markable_floor book_makeup set_class_terms |  | close_student_enrolment student_class_enrolments | 2 |
+| `owner_transfer` | n |  | platform_tenant_overview |  | 2 |
+| `package_corrections` | y |  |  | parent_packages credit_notes | 2 |
+| `package_default_products` | n |  |  |  | 1 (no date — G1 may mark `clock-free`) |
+| `package_draw_at_marking_b` | y | today_sg |  | parent_packages | 2 |
+| `package_draw_at_marking` | y | today_sg session_window_start markable_floor class_unmarked_lesson_pairs |  | parent_packages student_class_enrolments | 2 |
+| `package_holiday_extension` | y |  |  | parent_packages student_class_enrolments | 2 |
+| `package_manual_extend` | n |  |  | parent_packages | 2 |
+| `package_offers` | n |  | package_renewal_candidates | parent_packages student_class_enrolments | 2 |
+| `package_references` | n | today_sg |  | parent_packages | 2 |
+| `package_refunds` | n | today_sg record_package_refund |  | parent_packages | 2 |
+| `package_weeks_start_date` | n |  | suggest_package_start | parent_packages | 2 |
+| `parent_address` | n |  |  |  | 1 |
+| `parent_link_forgery` | n |  |  |  | 1 |
+| `partial_payment_followups` | y |  |  | set_students_active credit_notes student_class_enrolments | 2 |
+| `partial_payment` | y |  |  | credit_notes student_class_enrolments | 2 |
+| `payment_collection` | n |  |  | student_class_enrolments | 2 |
+| `platform_overview` | y |  | platform_tenant_overview | student_class_enrolments | 2 |
+| `reassign_student_tenant` | n |  |  | reassign_student_tenant | 2 |
+| `recurring_gotchas` | n |  |  | parent_packages credit_notes | 2 |
+| `referrals` | n |  | grant_referral_reward referral | parent_packages | 2 |
+| `rename_student` | n |  |  |  | 1 |
+| `rls_isolation` | n |  |  | student_class_enrolments | 2 |
+| `roles_admins` | n |  |  |  | 1 |
+| `roles_money` | n | set_class_terms |  | student_class_enrolments | 2 |
+| `roles_operations` | n |  | tenant_unmarked_lesson_count | deactivate_class student_class_enrolments | 2 |
+| `roles_permissions` | n |  |  |  | 1 |
+| `session_coach_roster` | y | session_window_start assign_class_shadow |  | set_students_active student_class_enrolments | 2 |
+| `sessions_i_am_main_on` | n |  |  | student_class_enrolments | 2 |
+| `skill_progress` | n |  |  | student_class_enrolments | 2 |
+| `stranger_isolation` | y | today_sg |  | student_class_enrolments | 2 |
+| `student_claims` | y |  |  |  | 1 |
+| `student_identity` | n |  |  |  | 1 |
+| `student_merge` | y |  |  |  | 1 |
+| `student_package_coverage` | n |  | student_package_coverage | parent_packages student_class_enrolments | 2 |
+| `student_tenant_pin` | n |  |  | reassign_student_tenant | 2 |
+| `students_audit` | n |  |  |  | 1 |
+| `table_grants` | n |  |  |  | 1 (no date — G1 may mark `clock-free`) |
+| `tenant_isolation` | n |  |  | student_class_enrolments | 2 |
+| `tenant_levels` | n |  |  |  | 1 |
+| `tenant_provisioning` | n |  | platform_tenant_overview |  | 2 |
+| `tenant_public_holidays` | n |  |  |  | 1 |
+| `tenant_suspension` | y | disable_coach | platform_tenant_overview | parent_packages credit_notes student_class_enrolments | 2 |
+| `tenant_unmarked_lesson_count` | y | today_sg markable_floor | tenant_unmarked_lesson_count | student_class_enrolments | 2 |
+| `trial_onboarding` | y | session_window_start markable_floor book_trial |  | student_class_enrolments | 2 |
+| `unbilled_sealed_lessons` | y |  |  |  | 1 |
+| `void_credit_note` | y |  |  | credit_notes student_class_enrolments | 2 |
+
 
 ## Pre-commit gate (walk before every commit in this wave; an unticked box is a blocker)
 
