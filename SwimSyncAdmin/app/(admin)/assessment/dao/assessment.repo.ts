@@ -3,6 +3,21 @@
 // No mapping, no logic: the checklist rows are built in domain/assessmentRows.ts,
 // orchestration (Promise.all, the error bail-outs) in domain/useAssessmentIndex.ts.
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The rows each read returns. Every to-one embed is widened to `| null` — RLS nulls
+// a hidden embed whatever the generated type says (§7.344) — and the domain keeps
+// its `?.` / `??` on each.
+export type LevelRow = DataOf<typeof loadLevels>[number];
+type ClassSelected = DataOf<typeof loadActiveClasses>[number];
+export type ClassRowIn = RlsNullable<
+  Omit<ClassSelected, "coaches"> & {
+    coaches: RlsNullable<NonNullable<ClassSelected["coaches"]>, "profiles"> | null;
+  },
+  "locations"
+>;
+export type EnrolmentRow = RlsNullable<DataOf<typeof loadEnrolments>[number], "students">;
+export type ProgressRow = DataOf<typeof loadProgress>[number];
 
 export function loadLevels() {
   return supabase

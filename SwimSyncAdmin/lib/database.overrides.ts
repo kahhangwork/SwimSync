@@ -152,6 +152,17 @@ export type Views<V extends keyof Public["Views"]> = Public["Views"][V]["Row"];
 export type Enums<E extends keyof Public["Enums"]> = Public["Enums"][E];
 export type Rpc<F extends keyof Public["Functions"]> = Public["Functions"][F];
 
+/** The non-null `data` of a dao function returning a query builder — the row type the
+ *  select string actually produces. `DataOf<typeof fetchX>[number]` for one row. */
+export type DataOf<F extends (...args: never[]) => PromiseLike<{ data: unknown }>> = NonNullable<
+  Awaited<ReturnType<F>>["data"]
+>;
+
+/** A LEFT to-one embed the generator types non-null, widened to `| null`: RLS nulls
+ *  an embedded row the caller may not see, with no error (§7.212, §7.344). Not for an
+ *  `!inner` embed — an inner join drops the parent row instead. */
+export type RlsNullable<T, K extends keyof T> = Omit<T, K> & { [P in K]: T[P] | null };
+
 /** Every role a `profiles.role` can hold — including the retired `superadmin`. */
 export type UserRole = Enums<"user_role">;
 

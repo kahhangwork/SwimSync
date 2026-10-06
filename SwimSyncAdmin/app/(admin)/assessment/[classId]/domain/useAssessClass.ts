@@ -64,13 +64,14 @@ export function useAssessClass() {
       return;
     }
 
-    setInfo(toClassInfo(classRes.data as any));
+    // `!`: guarded by `failed` above — a `.single()` with no error always carries its row.
+    setInfo(toClassInfo(classRes.data!));
 
     setLevels(toLevels(levelsRes.data));
-    setScale((scaleRes.data ?? []) as GradeLevel[]);
+    setScale(scaleRes.data ?? []);
 
     const students = studentsOf(enrolRes.data);
-    const ids = students.map((s: any) => s.id);
+    const ids = students.map((s) => s.id);
 
     const progRes = ids.length
       ? await repo.loadProgress(ids)

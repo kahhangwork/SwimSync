@@ -7,10 +7,16 @@ import {
   type Level,
   type RosterStudent,
 } from "@/lib/assessment";
+import type {
+  ClassRowIn,
+  EnrolmentRow,
+  LevelRow,
+  ProgressRow,
+} from "../dao/assessment.repo";
 import type { ClassRow } from "../types";
 
-export function toLevels(data: any[] | null): Level[] {
-  return (data ?? []).map((l: any) => ({
+export function toLevels(data: LevelRow[] | null): Level[] {
+  return (data ?? []).map((l) => ({
     id: l.id,
     label: l.label,
     sort_order: l.sort_order,
@@ -18,45 +24,45 @@ export function toLevels(data: any[] | null): Level[] {
   }));
 }
 
-export function studentIdsOf(enrolments: any[] | null): string[] {
+export function studentIdsOf(enrolments: EnrolmentRow[] | null): string[] {
   return Array.from(
-    new Set((enrolments ?? []).map((e: any) => e.students?.id).filter(Boolean))
-  );
+    new Set((enrolments ?? []).map((e) => e.students?.id).filter(Boolean))
+  ) as string[]; // census: ui-cast (Wave 8) — `.filter(Boolean)` drops the undefined ids; TS does not narrow through it
 }
 
 /** `today` is the SGT day of week (dayOfWeekOf(todayInSg())), passed in so this
  *  never reads a clock (§7.7). */
 export function buildClassRows(
-  classes: any[],
-  enrolments: any[] | null,
-  progressRows: any[] | null,
+  classes: ClassRowIn[],
+  enrolments: EnrolmentRow[] | null,
+  progressRows: ProgressRow[] | null,
   levels: Level[],
   scale: GradeLevel[],
   since: string,
   today: string | null
 ): ClassRow[] {
-  const progressByStudent = new Map<string, any[]>();
+  const progressByStudent = new Map<string, ProgressRow[]>();
   for (const p of progressRows ?? []) {
-    const list = progressByStudent.get((p as any).student_id) ?? [];
+    const list = progressByStudent.get(p.student_id) ?? [];
     list.push(p);
-    progressByStudent.set((p as any).student_id, list);
+    progressByStudent.set(p.student_id, list);
   }
 
   const rosterByClass = new Map<string, RosterStudent[]>();
   for (const e of enrolments ?? []) {
-    const s = (e as any).students;
+    const s = e.students;
     if (!s) continue;
-    const list = rosterByClass.get((e as any).class_id) ?? [];
+    const list = rosterByClass.get(e.class_id) ?? [];
     list.push({
       id: s.id,
       full_name: s.full_name,
       level_id: s.level_id,
-      progress: (progressByStudent.get(s.id) ?? []) as any,
+      progress: progressByStudent.get(s.id) ?? [],
     });
-    rosterByClass.set((e as any).class_id, list);
+    rosterByClass.set(e.class_id, list);
   }
 
-  const built: ClassRow[] = classes.map((c: any) => {
+  const built: ClassRow[] = classes.map((c) => {
     const roster = rosterByClass.get(c.id) ?? [];
     const p = roundProgress(groupRosterByLevel(roster, levels, scale, since));
     return {

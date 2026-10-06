@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { percentGraded, studentsOf, toClassInfo, toLevels, toRoster } from "./assessClassRows";
+import type { ClassInfoRow } from "../dao/assessClass.repo";
 
 // Characterisation: pins what the page's load() and render computed before
 // they moved here (Admin L-D). A change is a behaviour change, not a refactor.
 
 describe("toClassInfo", () => {
   it("flattens the location embed, null when absent", () => {
-    const row = { title: "Sat", day_of_week: "saturday", start_time: "08:00:00", tenant_id: "t1", locations: { name: "Pool A" } };
+    const row: ClassInfoRow = { title: "Sat", day_of_week: "saturday", start_time: "08:00:00", tenant_id: "t1", locations: { name: "Pool A" } };
     expect(toClassInfo(row)).toEqual({ title: "Sat", day_of_week: "saturday", start_time: "08:00:00", location: "Pool A", tenant_id: "t1" });
     expect(toClassInfo({ ...row, locations: null }).location).toBeNull();
   });
@@ -14,7 +15,7 @@ describe("toClassInfo", () => {
 
 describe("toLevels", () => {
   it("maps tenant_level_skills to skills, null to []", () => {
-    expect(toLevels([{ id: "L1", label: "A", sort_order: 1, tenant_level_skills: null }])).toEqual([
+    expect(toLevels([{ id: "L1", label: "A", sort_order: 1, tenant_level_skills: null as any /* pins the kept `?? []` */ }])).toEqual([
       { id: "L1", label: "A", sort_order: 1, skills: [] },
     ]);
     expect(toLevels(null)).toEqual([]);

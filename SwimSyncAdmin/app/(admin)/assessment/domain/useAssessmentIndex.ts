@@ -41,11 +41,11 @@ export function useAssessmentIndex() {
     }
 
     const levels = toLevels(levelsRes.data);
-    const scale = (scaleRes.data ?? []) as GradeLevel[];
+    const scale: GradeLevel[] = scaleRes.data ?? [];
     const classes = classesRes.data ?? [];
 
     // Enrolments and progress for every listed class, in two more flat reads.
-    const classIds = classes.map((c: any) => c.id);
+    const classIds = classes.map((c) => c.id);
     const enrolRes = classIds.length
       ? await repo.loadEnrolments(classIds)
       : { data: [], error: null };

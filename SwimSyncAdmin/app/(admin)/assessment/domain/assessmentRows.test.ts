@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildClassRows, studentIdsOf, toLevels } from "./assessmentRows";
+import type { ClassRowIn } from "../dao/assessment.repo";
 import type { GradeLevel } from "@/lib/assessment";
 
 // Characterisation: pins what the page's load() computed before it moved here
@@ -11,13 +12,13 @@ const SCALE: GradeLevel[] = [
 ];
 const LEVELS = toLevels([
   { id: "L1", label: "Seahorse", sort_order: 1, tenant_level_skills: [{ id: "k1", label: "Kick", sort_order: 1 }] },
-  { id: "L2", label: "Dolphin", sort_order: 2, tenant_level_skills: null },
+  { id: "L2", label: "Dolphin", sort_order: 2, tenant_level_skills: null as any }, // pins the kept `?? []`
 ]);
 
-const classes = [
-  { id: "c-mon", title: "Mon 9am", day_of_week: "monday", start_time: "09:00:00", locations: { name: "Pool A" }, coaches: { profiles: { full_name: "Coach K" } } },
-  { id: "c-sat-late", title: "Sat 11am", day_of_week: "saturday", start_time: "11:00:00", locations: null, coaches: null },
-  { id: "c-sat-early", title: "Sat 8am", day_of_week: "saturday", start_time: "08:00:00", locations: null, coaches: null },
+const classes: ClassRowIn[] = [
+  { id: "c-mon", title: "Mon 9am", day_of_week: "monday", start_time: "09:00:00", is_active: true, locations: { name: "Pool A" }, coaches: { profiles: { full_name: "Coach K" } } },
+  { id: "c-sat-late", title: "Sat 11am", day_of_week: "saturday", start_time: "11:00:00", is_active: true, locations: null, coaches: null },
+  { id: "c-sat-early", title: "Sat 8am", day_of_week: "saturday", start_time: "08:00:00", is_active: true, locations: null, coaches: null },
 ];
 const enrolments = [
   { class_id: "c-mon", students: { id: "s1", full_name: "Fresh", level_id: "L1" } },

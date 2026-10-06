@@ -1,9 +1,16 @@
 // Pure: raw rows -> the class header and the grid's inputs. Lifted verbatim from
 // the page's load() (Admin L-D, BATCH_D_PLAN.md).
 import type { Level, RosterStudent } from "@/lib/assessment";
+import type {
+  ClassInfoRow,
+  EnrolmentRow,
+  LevelRow,
+  ProgressRow,
+  StudentRow,
+} from "../dao/assessClass.repo";
 import type { ClassInfo } from "../types";
 
-export function toClassInfo(c: any): ClassInfo {
+export function toClassInfo(c: ClassInfoRow): ClassInfo {
   return {
     title: c.title,
     day_of_week: c.day_of_week,
@@ -13,8 +20,8 @@ export function toClassInfo(c: any): ClassInfo {
   };
 }
 
-export function toLevels(data: any[] | null): Level[] {
-  return (data ?? []).map((l: any) => ({
+export function toLevels(data: LevelRow[] | null): Level[] {
+  return (data ?? []).map((l) => ({
     id: l.id,
     label: l.label,
     sort_order: l.sort_order,
@@ -22,23 +29,23 @@ export function toLevels(data: any[] | null): Level[] {
   }));
 }
 
-export function studentsOf(enrolments: any[] | null): any[] {
-  return (enrolments ?? []).map((e: any) => e.students).filter(Boolean);
+export function studentsOf(enrolments: EnrolmentRow[] | null): StudentRow[] {
+  return (enrolments ?? []).map((e) => e.students).filter(Boolean) as StudentRow[]; // census: ui-cast (Wave 8) — `.filter(Boolean)` drops the RLS-hidden nulls; TS does not narrow through it
 }
 
-export function toRoster(students: any[], progressRows: any[] | null): RosterStudent[] {
-  const byStudent = new Map<string, any[]>();
+export function toRoster(students: StudentRow[], progressRows: ProgressRow[] | null): RosterStudent[] {
+  const byStudent = new Map<string, ProgressRow[]>();
   for (const p of progressRows ?? []) {
-    const list = byStudent.get((p as any).student_id) ?? [];
+    const list = byStudent.get(p.student_id) ?? [];
     list.push(p);
-    byStudent.set((p as any).student_id, list);
+    byStudent.set(p.student_id, list);
   }
 
-  return students.map((s: any) => ({
+  return students.map((s) => ({
     id: s.id,
     full_name: s.full_name,
     level_id: s.level_id,
-    progress: (byStudent.get(s.id) ?? []) as any,
+    progress: byStudent.get(s.id) ?? [],
   }));
 }
 

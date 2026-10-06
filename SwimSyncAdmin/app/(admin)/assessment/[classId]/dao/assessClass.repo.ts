@@ -9,6 +9,16 @@
 // piece of orchestration around them (dedupe, snapshot, rollback, reload).
 import { supabase } from "@/lib/supabase";
 import type { StrokeCell } from "@/lib/assessment";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The rows each read returns. Every to-one embed is widened to `| null` — RLS nulls
+// a hidden embed whatever the generated type says (§7.344) — and the domain keeps
+// its `?.` / `??` / filter on each.
+export type ClassInfoRow = RlsNullable<DataOf<typeof loadClass>, "locations">;
+export type LevelRow = DataOf<typeof loadLevels>[number];
+export type EnrolmentRow = RlsNullable<DataOf<typeof loadEnrolments>[number], "students">;
+export type StudentRow = NonNullable<EnrolmentRow["students"]>;
+export type ProgressRow = DataOf<typeof loadProgress>[number];
 
 export function loadClass(classId: string) {
   return supabase
