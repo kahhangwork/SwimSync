@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-06 (night) — **Wave 8 SHIPPED** (§8.141): generated Supabase `Database` types in both apps; *Generate real Supabase `Database` types* removed (shipped). Filed *Extend G3 to the apps* (S). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-07 — **G3-apps SHIPPED** (§8.142): *Extend G3 to the apps* removed (shipped). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1637,20 +1637,6 @@ real tenant asks — that is the one honest reason, and nobody has.
 
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
-
-### Extend G3 to the apps — **S** — _filed 2026-10-06 (§8.141)_
-A CI grep over `SwimSyncApp/` and `SwimSyncAdmin/` (non-test) that fails on `.split("T")[0]` / `.slice(0, 10)` /
-`.substring(0, 10)` applied to a `*_at` value, mirroring G3 (`scripts/check-functions-sg-date.sh`, functions only).
-
-**Why:** §7.7 has now bitten in the engine (§8.138) and in three app screens at once (§8.141, Bug ledger #3–#5:
-Credit Notes + CSV, admin Claims, the parent's "Waiting since"), each a day early before 08:00 SGT. PostgREST returns
-every timestamptz in UTC, so every new screen that formats an `issued_at` can reintroduce it, and a `+08:00` test
-fixture hides it (§7.25).
-
-**Notes:** the safe forms are `toSgDate(x)` (logic; guard a nullable first — `toSgDate(null)` is "1970-01-01",
-§7.229) and `formatSgStamp(x, opts)` (display). A `date` column (`date_of_birth`, `session_date`) is a bare
-YYYY-MM-DD and is fine — match on the `_at` suffix, allow an inline `// sg-date-ok: <reason>` marker. Prove red on the
-three fixed sites' old bodies. G3's parser lessons apply (§7.230).
 
 ### Pin the clock for UI drivers — **L** — _filed 2026-10-06 (§8.140, Wave 7 D2)_
 Let a Playwright driver replay a fixed day, the way every pgTAP file now does (Wave 7, ARCHITECTURE §6af).

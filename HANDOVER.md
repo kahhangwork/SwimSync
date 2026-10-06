@@ -1,10 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-06 (night) — **§8.141: Wave 8 SHIPPED in two lanes — both apps typed from the generated schema,
-no database `any` left; G5/G6/runtime-identity in CI; five bugs the types exposed fixed (Bug ledger #1–#5, one migration
-`20261006000600`, deploy #77). The nightly gate was skipped on the user's word — read the next nightly first.**_
+_Last updated: 2026-10-07 — **§8.142: G3-apps SHIPPED — `scripts/check-apps-sg-date.sh` in CI fails any app code that cuts a
+timestamp to its UTC date (§7.7). CI-only, `7c270d6`, CI green. The next nightly is still unread.**_
 
-_Previously (§8.140, 2026-10-06) — Wave 7: the injectable database clock, G1–G4 required._
+_Previously (§8.141, 2026-10-06) — Wave 8: generated Supabase `Database` types, five bugs fixed._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -349,6 +348,18 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.142 (2026-10-07) — G3-apps: neither app takes the UTC date of a timestamp
+
+**Shipped BACKLOG *Extend G3 to the apps* (S) as one CI-only commit, `7c270d6`; CI green on all five jobs.** No app
+code, migration or deploy — today's tree has 0 hits across 815 files.
+
+- **Shipped:** `scripts/check-apps-sg-date.sh`, a repo-invariants step beside G3 — TESTING §5 (rule, proofs), GOTCHAS
+  index + §7.7's Wave 8 note. Matches ANY receiver, not just `*_at`, deliberately (the parent-side bug read
+  `createdAtIso`); marker `// sg-date-ok: <why>`, no allowlist.
+- **Found in-unit:** the first cut was vacuous — macOS `paste -d '\001'` misread the delimiter, so the old buggy bodies
+  passed; the red proof caught it (§7.283's new bullet). A canary now exits 2 on a broken scanner.
+- **Not done:** nightly still unread (none has run since `37398088721`). PRD untouched — no user-visible change.
+
 ## 8.141 (2026-10-06) — Wave 8: generated Supabase `Database` types (two lanes, root orchestrating)
 
 **Shipped from the committed plan (D1–D6) as lane1 (root: F0, the coach/parent app, every probe, the migration, the
@@ -363,24 +374,7 @@ units → `6f24eea`; handoff `b67ebcc`.
 - **Gotchas:** §7.351–§7.353; *Hit again* on §7.7, §7.344; edges on §7.229; §7.76 durable fix shipped.
   **Not done:** nightly over Wave 8 unread (gate skipped); BACKLOG *Extend G3 to the apps* (S) filed.
 
-## 8.140 (2026-10-06) — Wave 7: the injectable database clock (two lanes, root orchestrating)
-
-**Planned earlier the same day (`/plan-with-confidence` D1–D6 → `/plan-review`, 9 risks), shipped by this session as
-lane1 (root: classification, every migration, every prod step, the docs) with lane2 (worktree `wave7-tests`, closed:
-G1–G4 + converting 82 pgTAP files + the edge-day suite), coordinated by cross-session TASK/DONE/HOLD messages.**
-Commits `f072685` (M1) · `64b678a` (M2) · `d93d9c0` (M3) · `fe5223a` (census, G2 required) · `4d8cc90` (G1 required) ·
-lane2 `fec8dc5` `0e258d1` `9f70b69` `6d2c75a` `5e2e2de` `73004ed` `8c44c54` · `16a33ab` (handoff).
-
-- **Shipped:** ARCHITECTURE §6af (the clock, its two locks, the prohibitions); DEPLOYMENT #74–#76; TESTING §5
-  *Wave 7* + the G1–G3 notes; plan Appendix A (all 71 clock readers classified) and B (file map, 16 re-marks).
-  pgTAP 91/1882 → 92/1991; Deno 292 ×2 after every migration; vitest 1093, jest 680, tsc, fixture roundtrip green.
-- **Found and fixed in-wave:** `app_clock.test.sql` tripped the date-literal check on `main` (red one push,
-  `7868133`); M3's trigger made the invoker-ACL check flag `anon` (§7.342); the conversion made two assertions
-  tautologies (§7.338). M4 needed no migration and M5 is the frozen census (plan *Outcome*).
-- **Gotchas:** §7.338–§7.343; §7.333 refined. **Not done (D2):** UI drivers still run on the real clock → BACKLOG
-  *Pin the clock for UI drivers*. PRD untouched — no user-visible change. Nightly not dispatched.
-
-_(§8.139 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.140 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -445,9 +439,9 @@ which mutate shared seed state — are in the same section.
    settled* for the 15 pilot children (PRD §7.17) — **and now Brayden Ong** (unlinked from the Ang family 2026-10-06,
    his 6 + 13 Sep lessons unclaimed: invite his parent or settle). The Ang family's package lessons are already paid
    (drawn at B), so they need no Generate. Coach Kah Hang's September is billed and sealed.
-3. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8. Cheapest high-value S-items:
-   *Extend G3 to the apps* (§7.7 bit three app screens), the three Wave 6 follow-ups; *Pin the clock for UI drivers*
-   (L) is filed, unranked. **A schema migration now regenerates the types in the SAME commit** (CLAUDE.md, §7.350).
+3. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8; G3-apps shipped (§8.142).
+   Cheapest high-value S-items: the three Wave 6 follow-ups; *Pin the clock for UI drivers* (L) is filed, unranked.
+   **A schema migration now regenerates the types in the SAME commit** (CLAUDE.md, §7.350).
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).

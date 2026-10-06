@@ -2355,6 +2355,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     (197/181/199 chars) as 204. **Measure characters with `perl -CSD -nle 'print length if …'`** (present on macOS
     and the Linux CI images alike). Every copy of the command — HANDOVER §9, `/update-docs`, BACKLOG, §7.119 —
     was switched the same day. (2026-09-27.)
+    - **Same family, another tool (2026-10-07, §8.142): macOS `paste -d '\001'` does NOT mean byte 0x01** — `-d`
+      takes `\0` as "empty delimiter", so the list became `"", "0", "1"` and an `awk -F '\001'` split never fired.
+      A guard built on it read every file clean — caught only by the red proof (§7.25). Don't pipe two views of a
+      file through `paste`; do both in one `awk` pass (`scripts/check-apps-sg-date.sh`), and give a scanner a canary.
 
 284. **Postgres `LPAD` TRUNCATES input longer than the target width — `lpad('10000', 4, '0')` is `'1000'`.** A
     reference counter padded with a fixed width silently reuses an old number past 9,999 (wrong on a bank
