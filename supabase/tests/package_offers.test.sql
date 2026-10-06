@@ -9,8 +9,10 @@
 -- Self-contained; rolls back. Runs under pg_prove (no psql backslash commands).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(21);
+SELECT plan(22);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code, low_package_lessons,
@@ -25,34 +27,34 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','c1d00000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','po-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','po-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"PO Admin A","role":"tenant_admin","is_coach":true,"tenant_id":"c1000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','c1b00000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','po-p1@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"PO P1","role":"parent","phone":"91230001"}', now(), now(),'','','',''),
+   'authenticated','authenticated','po-p1@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}','{"full_name":"PO P1","role":"parent","phone":"91230001"}', app_now(), app_now(),'','','',''),
   ('00000000-0000-0000-0000-000000000000','c1b00000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','po-p2@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"PO P2","role":"parent","phone":"91230002"}', now(), now(),'','','',''),
+   'authenticated','authenticated','po-p2@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}','{"full_name":"PO P2","role":"parent","phone":"91230002"}', app_now(), app_now(),'','','',''),
   ('00000000-0000-0000-0000-000000000000','c1b00000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','po-p3@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"PO P3","role":"parent","phone":"91230003"}', now(), now(),'','','',''),
+   'authenticated','authenticated','po-p3@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}','{"full_name":"PO P3","role":"parent","phone":"91230003"}', app_now(), app_now(),'','','',''),
   ('00000000-0000-0000-0000-000000000000','c1b00000-0000-0000-0000-000000000004',
-   'authenticated','authenticated','po-p4@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"PO P4","role":"parent","phone":"91230004"}', now(), now(),'','','',''),
+   'authenticated','authenticated','po-p4@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}','{"full_name":"PO P4","role":"parent","phone":"91230004"}', app_now(), app_now(),'','','',''),
   ('00000000-0000-0000-0000-000000000000','c1b00000-0000-0000-0000-000000000005',
-   'authenticated','authenticated','po-p5@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"PO P5","role":"parent","phone":"91230005"}', now(), now(),'','','',''),
+   'authenticated','authenticated','po-p5@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}','{"full_name":"PO P5","role":"parent","phone":"91230005"}', app_now(), app_now(),'','','',''),
   ('00000000-0000-0000-0000-000000000000','c1b00000-0000-0000-0000-000000000006',
-   'authenticated','authenticated','po-p6@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"PO P6","role":"parent","phone":"91230006"}', now(), now(),'','','',''),
+   'authenticated','authenticated','po-p6@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}','{"full_name":"PO P6","role":"parent","phone":"91230006"}', app_now(), app_now(),'','','',''),
   ('00000000-0000-0000-0000-000000000000','c1b00000-0000-0000-0000-000000000007',
-   'authenticated','authenticated','po-p7@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"PO P7","role":"parent","phone":"91230007"}', now(), now(),'','','',''),
+   'authenticated','authenticated','po-p7@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}','{"full_name":"PO P7","role":"parent","phone":"91230007"}', app_now(), app_now(),'','','',''),
   ('00000000-0000-0000-0000-000000000000','c1b00000-0000-0000-0000-000000000008',
-   'authenticated','authenticated','po-p8@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"PO P8","role":"parent","phone":"91230008"}', now(), now(),'','','','');
+   'authenticated','authenticated','po-p8@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}','{"full_name":"PO P8","role":"parent","phone":"91230008"}', app_now(), app_now(),'','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'c1000000-0000-0000-0000-000000000001'
@@ -106,7 +108,7 @@ SELECT 'c1700000-0000-0000-0000-000000000001',
        'c1000000-0000-0000-0000-000000000001', parent_id,
        'c1e00000-0000-0000-0000-000000000001',
        'deadbeefdeadbeefdeadbeefdeadbeef',
-       'c1d00000-0000-0000-0000-000000000001', now()
+       'c1d00000-0000-0000-0000-000000000001', app_now()
 FROM po_pid WHERE email = 'po-p1@test.local';
 RESET ROLE;
 
@@ -127,11 +129,11 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"c1b00000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_ok($$UPDATE parent_packages SET public_token='ffffffffffffffffffffffffffffffff' WHERE id='c1700000-0000-0000-0000-000000000001'$$,
   '23514', NULL, 'RISK 4: parent cannot UPDATE public_token');
-SELECT throws_ok($$UPDATE parent_packages SET paid_claimed_at=now() WHERE id='c1700000-0000-0000-0000-000000000001'$$,
+SELECT throws_ok($$UPDATE parent_packages SET paid_claimed_at=app_now() WHERE id='c1700000-0000-0000-0000-000000000001'$$,
   '23514', NULL, 'RISK 4: parent cannot UPDATE paid_claimed_at');
 SELECT throws_ok($$UPDATE parent_packages SET offered_by='c1d00000-0000-0000-0000-000000000001' WHERE id='c1700000-0000-0000-0000-000000000001'$$,
   '23514', NULL, 'RISK 4: parent cannot UPDATE offered_by');
-SELECT throws_ok($$UPDATE parent_packages SET offered_at=now() WHERE id='c1700000-0000-0000-0000-000000000001'$$,
+SELECT throws_ok($$UPDATE parent_packages SET offered_at=app_now() WHERE id='c1700000-0000-0000-0000-000000000001'$$,
   '23514', NULL, 'RISK 4: parent cannot UPDATE offered_at');
 SELECT throws_ok($$UPDATE parent_packages SET superseded_by='c1700000-0000-0000-0000-000000000001' WHERE id='c1700000-0000-0000-0000-000000000001'$$,
   '23514', NULL, 'RISK 4: parent cannot UPDATE superseded_by');
@@ -145,19 +147,19 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"c1d00000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT lives_ok($$SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p2@test.local'),
-  'c1e00000-0000-0000-0000-000000000001', CURRENT_DATE)$$,
+  'c1e00000-0000-0000-0000-000000000001', '2026-09-15'::date)$$,
   'RISK 12: first offer for a family succeeds');
 SELECT throws_ok($$SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p2@test.local'),
-  'c1e00000-0000-0000-0000-000000000001', CURRENT_DATE)$$,
+  'c1e00000-0000-0000-0000-000000000001', '2026-09-15'::date)$$,
   '23505', NULL, 'RISK 12: a second open offer for the same family raises');
 SELECT throws_ok($$SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p3@test.local'),
-  'c1e00000-0000-0000-0000-000000000002', CURRENT_DATE)$$,
+  'c1e00000-0000-0000-0000-000000000002', '2026-09-15'::date)$$,
   '23514', NULL, 'create_package_offer rejects a retired product');
 SELECT throws_ok($$SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p3@test.local'),
-  'c1e00000-0000-0000-0000-000000000003', CURRENT_DATE)$$,
+  'c1e00000-0000-0000-0000-000000000003', '2026-09-15'::date)$$,
   '42501', NULL, 'create_package_offer rejects a product in a business I do not admin');
 -- Decline P2's open offer, then a fresh one succeeds.
 UPDATE parent_packages SET status='cancelled'
@@ -165,7 +167,7 @@ UPDATE parent_packages SET status='cancelled'
    AND status='pending' AND offered_by IS NOT NULL;
 SELECT lives_ok($$SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p2@test.local'),
-  'c1e00000-0000-0000-0000-000000000001', CURRENT_DATE)$$,
+  'c1e00000-0000-0000-0000-000000000001', '2026-09-15'::date)$$,
   'RISK 12: after Decline, a fresh offer succeeds');
 RESET ROLE;
 
@@ -177,10 +179,10 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"c1d00000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p4@test.local'),
-  'c1e00000-0000-0000-0000-000000000001', CURRENT_DATE);
+  'c1e00000-0000-0000-0000-000000000001', '2026-09-15'::date);
 RESET ROLE;
 -- service/postgres stamps the claim (bypasses the client pin).
-UPDATE parent_packages SET paid_claimed_at = now()
+UPDATE parent_packages SET paid_claimed_at = app_now()
  WHERE parent_id=(SELECT parent_id FROM po_pid WHERE email='po-p4@test.local')
    AND offered_by IS NOT NULL AND status='pending';
 SET LOCAL ROLE authenticated;
@@ -202,7 +204,7 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"c1d00000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p5@test.local'),
-  'c1e00000-0000-0000-0000-000000000001', CURRENT_DATE);
+  'c1e00000-0000-0000-0000-000000000001', '2026-09-15'::date);
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"c1b00000-0000-0000-0000-000000000005","role":"authenticated"}';
@@ -224,10 +226,10 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"c1d00000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p6@test.local'),
-  'c1e00000-0000-0000-0000-000000000001', CURRENT_DATE);
+  'c1e00000-0000-0000-0000-000000000001', '2026-09-15'::date);
 INSERT INTO parent_packages (tenant_id, parent_id, product_id, status, start_date)
 SELECT 'c1000000-0000-0000-0000-000000000001', parent_id,
-       'c1e00000-0000-0000-0000-000000000001', 'active', CURRENT_DATE
+       'c1e00000-0000-0000-0000-000000000001', 'active', '2026-09-15'::date
 FROM po_pid WHERE email='po-p6@test.local';
 RESET ROLE;
 SELECT is(
@@ -249,7 +251,7 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"c1d00000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p7@test.local'),
-  'c1e00000-0000-0000-0000-000000000001', CURRENT_DATE);
+  'c1e00000-0000-0000-0000-000000000001', '2026-09-15'::date);
 RESET ROLE;
 SELECT is(
   (SELECT status FROM parent_packages WHERE id='c1700000-0000-0000-0000-000000000007'),
@@ -271,7 +273,7 @@ INSERT INTO student_class_enrolments (student_id, class_id) VALUES
 -- Active package that STARTED 21 days ago; 4-week validity => expires in ~7 days.
 INSERT INTO parent_packages (tenant_id, parent_id, product_id, status, start_date)
 SELECT 'c1000000-0000-0000-0000-000000000001', parent_id,
-       'c1e00000-0000-0000-0000-000000000001', 'active', CURRENT_DATE - 21
+       'c1e00000-0000-0000-0000-000000000001', 'active', '2026-08-25'::date
 FROM po_pid WHERE email='po-p8@test.local';
 
 SET LOCAL ROLE authenticated;
@@ -284,7 +286,7 @@ SELECT is(
 -- Now open an offer for them; they must drop out of candidates.
 SELECT create_package_offer(
   (SELECT parent_id FROM po_pid WHERE email='po-p8@test.local'),
-  'c1e00000-0000-0000-0000-000000000001', CURRENT_DATE);
+  'c1e00000-0000-0000-0000-000000000001', '2026-09-15'::date);
 SELECT is(
   (SELECT count(*)::int FROM package_renewal_candidates()
     WHERE parent_id=(SELECT parent_id FROM po_pid WHERE email='po-p8@test.local')),

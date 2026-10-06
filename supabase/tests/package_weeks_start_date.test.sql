@@ -14,8 +14,10 @@
 -- Self-contained; own tenants; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(15);
+SELECT plan(16);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -27,15 +29,15 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','bd000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pkgw-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkgw-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Weeks Admin","role":"tenant_admin","is_coach":true,"tenant_id":"bb000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','be000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pkgw-parent@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkgw-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Weeks Parent","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'bb000000-0000-0000-0000-000000000001'
@@ -68,19 +70,19 @@ SELECT is(
 -- ── 3-5. Active sale: weeks-based expiry, snapshot, and start_date honoured ──
 INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status, start_date)
 SELECT 'bf000000-0000-0000-0000-000000000001','bb000000-0000-0000-0000-000000000001',
-       p.id,'bd100000-0000-0000-0000-000000000001','active','2026-09-01'  -- date-literal-ok: superuser insert; lifecycle trigger reads no clock for a supplied start_date
+       p.id,'bd100000-0000-0000-0000-000000000001','active','2026-09-01'
 FROM parents p JOIN profiles pr ON pr.id = p.profile_id
 WHERE pr.email = 'pkgw-parent@test.local';
 
 SELECT is(
   (SELECT start_date FROM parent_packages WHERE id='bf000000-0000-0000-0000-000000000001'),
-  DATE '2026-09-01', 'active sale keeps the supplied start_date');  -- date-literal-ok: expected value of the superuser insert above; no clock on the path
+  DATE '2026-09-01', 'active sale keeps the supplied start_date');
 SELECT is(
   (SELECT validity_weeks FROM parent_packages WHERE id='bf000000-0000-0000-0000-000000000001'),
   10, 'validity_weeks snapshotted from the product');
 SELECT is(
   (SELECT expires_on FROM parent_packages WHERE id='bf000000-0000-0000-0000-000000000001'),
-  DATE '2026-11-10', 'expires_on = start_date + validity_weeks*7 (2026-09-01 + 70d)');  -- date-literal-ok: expected value of the superuser insert above; no clock on the path
+  DATE '2026-11-10', 'expires_on = start_date + validity_weeks*7 (2026-09-01 + 70d)');
 
 -- ── 6. suggest_package_start: coverage end + 1 day (no enrolments ⇒ by expiry)
 SELECT is(
@@ -88,12 +90,12 @@ SELECT is(
     (SELECT p.id FROM parents p JOIN profiles pr ON pr.id=p.profile_id
       WHERE pr.email='pkgw-parent@test.local'),
     'bd100000-0000-0000-0000-000000000001'),
-  DATE '2026-11-11', 'suggested start = current coverage expiry + 1 day');  -- date-literal-ok: suggest_package_start reads today ONLY with enrolments; this file has none
+  DATE '2026-11-11', 'suggested start = current coverage expiry + 1 day');
 
 -- A pending package (admin-recorded) to prove pending start_date is editable.
 INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status, start_date)
 SELECT 'bf000000-0000-0000-0000-000000000002','bb000000-0000-0000-0000-000000000001',
-       p.id,'bd100000-0000-0000-0000-000000000001','pending','2026-12-01'  -- date-literal-ok: superuser insert; lifecycle trigger reads no clock for a supplied start_date
+       p.id,'bd100000-0000-0000-0000-000000000001','pending','2026-12-01'
 FROM parents p JOIN profiles pr ON pr.id = p.profile_id
 WHERE pr.email = 'pkgw-parent@test.local';
 
@@ -131,14 +133,14 @@ SELECT throws_ok($$
    WHERE id='bf000000-0000-0000-0000-000000000001'
 $$, '23514', NULL, 'parent cannot edit the validity_weeks snapshot');
 SELECT throws_ok($$
-  UPDATE parent_packages SET start_date = '2027-01-01'  -- date-literal-ok: start_date edit rule is role + status, never a date (audited 2026-10-01)
+  UPDATE parent_packages SET start_date = '2027-01-01'
    WHERE id='bf000000-0000-0000-0000-000000000001'
 $$, '23514', NULL, 'parent cannot move start_date on an active package');
 
 -- ⚠ #2: a parent cannot set a start date on their own PENDING request either —
 -- otherwise the admin's confirm step would adopt the parked date.
 SELECT throws_ok($$
-  UPDATE parent_packages SET start_date = '2027-02-01'  -- date-literal-ok: start_date edit rule is role + status, never a date (audited 2026-10-01)
+  UPDATE parent_packages SET start_date = '2027-02-01'
    WHERE id='bf000000-0000-0000-0000-000000000002'
 $$, '23514', NULL, 'parent cannot set start_date on a pending package');
 
@@ -150,11 +152,11 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"bd000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
 SELECT throws_ok($$
-  UPDATE parent_packages SET start_date = '2027-01-01'  -- date-literal-ok: start_date edit rule is role + status, never a date (audited 2026-10-01)
+  UPDATE parent_packages SET start_date = '2027-01-01'
    WHERE id='bf000000-0000-0000-0000-000000000001'
 $$, '23514', NULL, 'admin cannot move start_date on an active package');
 SELECT lives_ok($$
-  UPDATE parent_packages SET start_date = '2026-12-15'  -- date-literal-ok: start_date edit rule is role + status, never a date (audited 2026-10-01)
+  UPDATE parent_packages SET start_date = '2026-12-15'
    WHERE id='bf000000-0000-0000-0000-000000000002'
 $$, 'admin may adjust start_date while the package is still pending');
 

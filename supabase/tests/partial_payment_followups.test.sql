@@ -19,8 +19,10 @@
 -- the guard assertions are red (no trigger), and write_off is red (no function).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(33);
+SELECT plan(34);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixture ──────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -33,20 +35,20 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','af000000-0000-0000-0000-0000000000a1',
    'authenticated','authenticated','tap-ppf-admin@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"PPF Admin","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000a7"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"PPF Admin","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000a7"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','af000000-0000-0000-0000-0000000000c1',
    'authenticated','authenticated','tap-ppf-coach@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"PPF Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000a7"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"PPF Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000a7"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','af000000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','tap-ppf-parent@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"PPF Parent","role":"parent"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"PPF Parent","role":"parent"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','af000000-0000-0000-0000-0000000000a2',
    'authenticated','authenticated','tap-ppf-adminB@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"PPF Admin B","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000a8"}',
-   now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"PPF Admin B","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000a8"}',
+   app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT '99999999-0000-0000-0000-0000000000a7', 'Default Group'
@@ -121,17 +123,17 @@ BEGIN
     VALUES (p_lesson, 'cf000000-0000-0000-0000-000000000001', 'present', 'af000000-0000-0000-0000-0000000000c1');
   END IF;
   INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status, paid_at, paid_marked_by)
-  VALUES ('99999999-0000-0000-0000-0000000000a7', p_inv, pg_temp.pid(), p_month, p_item_amt, p_item_amt, 0.00, 'paid', now(), 'af000000-0000-0000-0000-0000000000a1');
+  VALUES ('99999999-0000-0000-0000-0000000000a7', p_inv, pg_temp.pid(), p_month, p_item_amt, p_item_amt, 0.00, 'paid', app_now(), 'af000000-0000-0000-0000-0000000000a1');
   INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
   VALUES (p_inv, 'cf000000-0000-0000-0000-000000000001', p_lesson, 'present', p_item_amt, 'PPF Class', p_date)
   RETURNING id INTO v_item;
   INSERT INTO credit_notes (reference_number, parent_id, student_id, student_name, invoice_id,
     invoice_item_id, lesson_session_id, amount, original_status, corrected_status, status, tenant_id, issued_at, reversed_at)
   VALUES (p_cn_ref, pg_temp.pid(), 'cf000000-0000-0000-0000-000000000001', 'PPF Kid', p_inv,
-    v_item, p_lesson, p_item_amt, 'present','absent','reversed','99999999-0000-0000-0000-0000000000a7', now(), now())
+    v_item, p_lesson, p_item_amt, 'present','absent','reversed','99999999-0000-0000-0000-0000000000a7', app_now(), app_now())
   RETURNING id INTO v_cn;
   INSERT INTO credit_applications (credit_note_id, invoice_id, amount, debited_at, debited_by)
-  VALUES (v_cn, p_inv, p_draw, now(), 'af000000-0000-0000-0000-0000000000a1');
+  VALUES (v_cn, p_inv, p_draw, app_now(), 'af000000-0000-0000-0000-0000000000a1');
 END $$;
 
 CREATE OR REPLACE FUNCTION pg_temp.recorrect(p_lesson UUID) RETURNS VOID AS $$
@@ -143,23 +145,23 @@ CREATE OR REPLACE FUNCTION pg_temp.app_folded(p_ref TEXT) RETURNS TIMESTAMPTZ AS
   SELECT ca.folded_at FROM credit_applications ca JOIN credit_notes cn ON cn.id=ca.credit_note_id
    WHERE cn.reference_number=p_ref ORDER BY ca.folded_at NULLS LAST LIMIT 1 $$ LANGUAGE sql;
 CREATE OR REPLACE FUNCTION pg_temp.mark_folded(p_ref TEXT, p_inv UUID) RETURNS VOID AS $$
-  UPDATE credit_applications ca SET folded_at=now(), folded_invoice_id=p_inv
+  UPDATE credit_applications ca SET folded_at=app_now(), folded_invoice_id=p_inv
     FROM credit_notes cn WHERE cn.id=ca.credit_note_id AND cn.reference_number=p_ref $$ LANGUAGE sql;
 CREATE OR REPLACE FUNCTION pg_temp.mark_writtenoff(p_ref TEXT) RETURNS VOID AS $$
-  UPDATE credit_applications ca SET written_off_at=now(), written_off_by='af000000-0000-0000-0000-0000000000a1'
+  UPDATE credit_applications ca SET written_off_at=app_now(), written_off_by='af000000-0000-0000-0000-0000000000a1'
     FROM credit_notes cn WHERE cn.id=ca.credit_note_id AND cn.reference_number=p_ref $$ LANGUAGE sql;
 
 -- ══ A: partial draw → 'available', remainder SPENDABLE (RISK 1) ═════════════════
 SELECT pg_temp.reset_pending_debits();
 SELECT pg_temp.setbals(0.00, 12.00);
 SELECT pg_temp.mk_debited('CN-fa', 'daf00000-0000-0000-0000-0000000000a1',
-  'eaf00000-0000-0000-0000-0000000000a1', '2027-01', '2027-01-10', 20.00, 12.00, TRUE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
+  'eaf00000-0000-0000-0000-0000000000a1', '2027-01', '2027-01-10', 20.00, 12.00, TRUE);
 SELECT pg_temp.recorrect('daf00000-0000-0000-0000-0000000000a1');
 SELECT is(pg_temp.dbal(), 0.00, 'A1: the pending debit is unwound to 0');
 SELECT is(pg_temp.cbal(), 8.00, 'A2: the $8 undrawn remainder returns to the pool');
 SELECT is(pg_temp.cn_status('CN-fa'), 'available', 'A3: a partially-drawn note goes back to AVAILABLE');
 -- the $8 must be SPENDABLE by the FIFO loop (RISK 1: 'applied' would strand it):
-SELECT pg_temp.mkinv('eaf00000-0000-0000-0000-0000000000a2', 50.00, '2027-02');  -- date-literal-ok: superuser invoice insert; billing_month only names the ref year
+SELECT pg_temp.mkinv('eaf00000-0000-0000-0000-0000000000a2', 50.00, '2027-02');
 SET LOCAL ROLE service_role;
 SELECT is(apply_credit_to_invoice('eaf00000-0000-0000-0000-0000000000a2'), 8.00,
   'A4: the restored note''s $8 remainder draws against a fresh invoice');
@@ -171,9 +173,9 @@ SELECT is(pg_temp.cbal(), 0.00, 'A5: credit_balance consumed to 0');
 SELECT pg_temp.reset_pending_debits();
 SELECT pg_temp.setbals(0.00, 22.00);
 SELECT pg_temp.mk_debited('CN-fb1', 'daf00000-0000-0000-0000-0000000000b1',
-  'eaf00000-0000-0000-0000-0000000000b1', '2027-03', '2027-03-07', 12.00, 12.00, TRUE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
+  'eaf00000-0000-0000-0000-0000000000b1', '2027-03', '2027-03-07', 12.00, 12.00, TRUE);
 SELECT pg_temp.mk_debited('CN-fb2', 'daf00000-0000-0000-0000-0000000000b2',
-  'eaf00000-0000-0000-0000-0000000000b2', '2027-04', '2027-04-04', 10.00, 10.00, TRUE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
+  'eaf00000-0000-0000-0000-0000000000b2', '2027-04', '2027-04-04', 10.00, 10.00, TRUE);
 SELECT pg_temp.recorrect('daf00000-0000-0000-0000-0000000000b1');
 SELECT is(pg_temp.dbal(), 10.00, 'B1: only CN-fb1''s $12 was unwound — $10 remains');
 SELECT is(pg_temp.cn_status('CN-fb1'), 'applied', 'B2: the fully-drawn note goes to APPLIED');
@@ -182,7 +184,7 @@ SELECT is(pg_temp.cn_status('CN-fb1'), 'applied', 'B2: the fully-drawn note goes
 SELECT pg_temp.reset_pending_debits();
 SELECT pg_temp.setbals(0.00, 20.00);
 SELECT pg_temp.mk_debited('CN-fc', 'daf00000-0000-0000-0000-0000000000c1',
-  'eaf00000-0000-0000-0000-0000000000c1', '2027-05', '2027-05-02', 20.00, 20.00, TRUE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
+  'eaf00000-0000-0000-0000-0000000000c1', '2027-05', '2027-05-02', 20.00, 20.00, TRUE);
 SELECT pg_temp.recorrect('daf00000-0000-0000-0000-0000000000c1');
 SELECT is(pg_temp.dbal(), 0.00, 'C1: debit unwound');
 SELECT is(pg_temp.cbal(), 0.00, 'C2: no remainder, so no credit added');
@@ -196,8 +198,8 @@ SELECT isnt((SELECT applied_at FROM credit_notes WHERE reference_number='CN-fc')
 SELECT pg_temp.reset_pending_debits();
 SELECT pg_temp.setbals(0.00, 15.00);
 SELECT pg_temp.mk_debited('CN-fd', 'daf00000-0000-0000-0000-0000000000d1',
-  'eaf00000-0000-0000-0000-0000000000d1', '2027-06', '2027-06-06', 15.00, 15.00, FALSE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
-SELECT pg_temp.mkinv('eaf00000-0000-0000-0000-0000000000d9', 30.00, '2027-07');  -- date-literal-ok: superuser invoice insert; billing_month only names the ref year
+  'eaf00000-0000-0000-0000-0000000000d1', '2027-06', '2027-06-06', 15.00, 15.00, FALSE);
+SELECT pg_temp.mkinv('eaf00000-0000-0000-0000-0000000000d9', 30.00, '2027-07');
 SET LOCAL ROLE service_role;
 SELECT lives_ok($$SELECT apply_credit_to_invoice('eaf00000-0000-0000-0000-0000000000d9')$$,
   'D0: the fold reconciles (stamped 15 = consumed 15)');
@@ -210,9 +212,9 @@ SELECT is((SELECT balance_adjustment FROM invoices WHERE id='eaf00000-0000-0000-
 -- ══ D2: a fold whose stamp ≠ the consumed debit RAISES (RISK 5 drift) ══════════
 SELECT pg_temp.reset_pending_debits();
 SELECT pg_temp.mk_debited('CN-fe', 'daf00000-0000-0000-0000-0000000000e1',
-  'eaf00000-0000-0000-0000-0000000000e1', '2027-08', '2027-08-01', 10.00, 10.00, FALSE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
+  'eaf00000-0000-0000-0000-0000000000e1', '2027-08', '2027-08-01', 10.00, 10.00, FALSE);
 SELECT pg_temp.setbals(0.00, 15.00);   -- LIE: balance 15 but only a 10 draw traces
-SELECT pg_temp.mkinv('eaf00000-0000-0000-0000-0000000000e9', 30.00, '2027-09');  -- date-literal-ok: superuser invoice insert; billing_month only names the ref year
+SELECT pg_temp.mkinv('eaf00000-0000-0000-0000-0000000000e9', 30.00, '2027-09');
 SET LOCAL ROLE service_role;
 SELECT throws_ok($$SELECT apply_credit_to_invoice('eaf00000-0000-0000-0000-0000000000e9')$$,
   'P0001', NULL, 'D4: fold reconciliation drift is refused');
@@ -221,7 +223,7 @@ RESET ROLE;
 -- ══ E: a FOLDED or WRITTEN-OFF debit still refuses re-correction (CN002) ═══════
 SELECT pg_temp.reset_pending_debits();
 SELECT pg_temp.mk_debited('CN-ff', 'daf00000-0000-0000-0000-0000000000f1',
-  'eaf00000-0000-0000-0000-0000000000f1', '2027-10', '2027-10-03', 20.00, 20.00, TRUE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
+  'eaf00000-0000-0000-0000-0000000000f1', '2027-10', '2027-10-03', 20.00, 20.00, TRUE);
 SELECT pg_temp.mark_folded('CN-ff', 'eaf00000-0000-0000-0000-0000000000d9');
 SELECT pg_temp.setbals(0.00, 4.00);   -- a known unrelated balance, to prove it is untouched
 SELECT throws_ok($$SELECT pg_temp.recorrect('daf00000-0000-0000-0000-0000000000f1')$$,
@@ -232,7 +234,7 @@ SELECT is(pg_temp.dbal(), 4.00, 'E2b: the refusal touched no balance (Risk 7)');
 
 SELECT pg_temp.reset_pending_debits();
 SELECT pg_temp.mk_debited('CN-fg', 'daf00000-0000-0000-0000-0000000000f2',
-  'eaf00000-0000-0000-0000-0000000000f2', '2027-11', '2027-11-07', 20.00, 20.00, TRUE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
+  'eaf00000-0000-0000-0000-0000000000f2', '2027-11', '2027-11-07', 20.00, 20.00, TRUE);
 SELECT pg_temp.mark_writtenoff('CN-fg');
 SELECT throws_ok($$SELECT pg_temp.recorrect('daf00000-0000-0000-0000-0000000000f2')$$,
   'CN002', NULL, 'E3: a WRITTEN-OFF debit still refuses (CN002)');
@@ -240,7 +242,7 @@ SELECT throws_ok($$SELECT pg_temp.recorrect('daf00000-0000-0000-0000-0000000000f
 -- ══ F: write_off_parent_balance zeroes + stamps + reconciles, then offboard OK ═
 SELECT pg_temp.reset_pending_debits();
 SELECT pg_temp.mk_debited('CN-fh', 'daf00000-0000-0000-0000-0000000000f3',
-  'eaf00000-0000-0000-0000-0000000000f3', '2027-12', '2027-12-05', 20.00, 20.00, FALSE);  -- date-literal-ok: pg_temp helper inserts as superuser; guards skip non-authenticated
+  'eaf00000-0000-0000-0000-0000000000f3', '2027-12', '2027-12-05', 20.00, 20.00, FALSE);
 SELECT pg_temp.setbals(0.00, 20.00);
 -- Authority reads auth.uid() from the JWT claim, not the DB role — so we set only
 -- the claim (switching to the authenticated role would deny the pg_temp helpers).

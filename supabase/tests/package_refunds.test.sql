@@ -30,17 +30,20 @@
 --   accounting_summary: reversed refunds counted → 32-33
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(39);
+SELECT plan(40);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE f AS
 SELECT
-  (now() AT TIME ZONE 'Asia/Singapore')::date                                                      AS today,
-  date_trunc('month', now() AT TIME ZONE 'Asia/Singapore')::date                                   AS this1,
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month','YYYY-MM')                     AS mS,
-  to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '2 month','YYYY-MM')                     AS mP,
-  date_trunc('month',(now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date              AS mS1,
-  date_trunc('month',(now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '2 month')::date              AS mP1;
+  '2026-09-15'::date AS today,
+  '2026-09-01'::date AS this1,
+  '2026-08'::text    AS ms,
+  '2026-07'::text    AS mp,
+  '2026-08-01'::date AS ms1,
+  '2026-07-01'::date AS mp1;
 GRANT SELECT ON f TO PUBLIC;
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -52,8 +55,8 @@ CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB)
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
     updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000', p_id, 'authenticated', 'authenticated',
-    p_email, crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', p_meta,
-    now(), now(), '', '', '', '') $$ LANGUAGE sql;
+    p_email, crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', p_meta,
+    app_now(), app_now(), '', '', '', '') $$ LANGUAGE sql;
 
 -- The owners first: the first tenant_admin of a business claims it.
 SELECT pg_temp.mkuser('88d10000-0000-0000-0000-0000000000a1','pkrf-owner-a@test.local',
@@ -122,7 +125,7 @@ SELECT v.id, '88d00000-0000-0000-0000-0000000000a0', '88d50000-0000-0000-0000-00
        '88d10000-0000-0000-0000-0000000000a1', v.rev, v.revby
 FROM f, LATERAL (VALUES
   ('88d60000-0000-0000-0000-000000000001'::uuid, 150.00, NULL::timestamptz, NULL::uuid),
-  ('88d60000-0000-0000-0000-000000000002'::uuid, 999.00, now(), '88d10000-0000-0000-0000-0000000000a1'::uuid)
+  ('88d60000-0000-0000-0000-000000000002'::uuid, 999.00, app_now(), '88d10000-0000-0000-0000-0000000000a1'::uuid)
 ) AS v(id, amt, rev, revby);
 
 INSERT INTO billing_periods (billing_month, tenant_id, invoices_issued)

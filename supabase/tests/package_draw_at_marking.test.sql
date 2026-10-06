@@ -18,14 +18,24 @@
 -- on TODAY's weekday; dN = N days ago. Families: P (Ava, Ben), Q (Cai), R (Dee, Eli), S (Fay), B (Gus).
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(61);
+SELECT plan(62);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE f AS
-SELECT today_sg() AS d0, today_sg() - 7 AS d7, today_sg() - 14 AS d14, today_sg() - 21 AS d21,
-       today_sg() - 28 AS d28, today_sg() - 35 AS d35, today_sg() - 42 AS d42, today_sg() - 49 AS d49,
-       session_window_start() AS sws,
-       to_char(today_sg(), 'FMday') AS dow;
+SELECT
+  '2026-09-15'::date AS d0,
+  '2026-09-08'::date AS d7,
+  '2026-09-01'::date AS d14,
+  '2026-08-25'::date AS d21,
+  '2026-08-18'::date AS d28,
+  '2026-08-11'::date AS d35,
+  '2026-08-04'::date AS d42,
+  '2026-07-28'::date AS d49,
+  '2026-08-01'::date AS sws,
+  'tuesday'::text    AS dow;
 -- X: the latest class day BEFORE session_window_start() (so in the month before it); Y = X + 7 (≥ sws).
 ALTER TABLE f ADD COLUMN x DATE;
 UPDATE f SET x = sws - 1 - ((EXTRACT(DOW FROM sws - 1)::int - EXTRACT(DOW FROM d0)::int + 7) % 7);
@@ -33,16 +43,16 @@ GRANT SELECT ON f TO PUBLIC;
 
 -- The switch is set EXPLICITLY (off): since migration B the column DEFAULT is on.
 INSERT INTO tenants (id, slug, display_name, join_code, created_at, package_draw_at_marking) VALUES
-  ('f6000000-0000-0000-0000-0000000000a0','w6-t','W6 T','SWIM-W6TT', now() - INTERVAL '200 days', FALSE),
-  ('f6000000-0000-0000-0000-0000000000b0','w6-t2','W6 T2','SWIM-W6T2', now() - INTERVAL '200 days', FALSE);
+  ('f6000000-0000-0000-0000-0000000000a0','w6-t','W6 T','SWIM-W6TT', app_now() - INTERVAL '200 days', FALSE),
+  ('f6000000-0000-0000-0000-0000000000b0','w6-t2','W6 T2','SWIM-W6T2', app_now() - INTERVAL '200 days', FALSE);
 
 CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB) RETURNS VOID AS $$
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
     updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000', p_id, 'authenticated', 'authenticated',
-    p_email, crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', p_meta,
-    now(), now(), '', '', '', '') $$ LANGUAGE sql;
+    p_email, crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', p_meta,
+    app_now(), app_now(), '', '', '', '') $$ LANGUAGE sql;
 
 SELECT pg_temp.mkuser('f6100000-0000-0000-0000-0000000000a1','w6-owner@test.local',
   '{"full_name":"W6 Owner","role":"tenant_admin","tenant_id":"f6000000-0000-0000-0000-0000000000a0"}');
@@ -93,7 +103,7 @@ SELECT v.id, 'f6000000-0000-0000-0000-0000000000a0', pg_temp.id(v.coach), v.titl
     ('f6500000-0000-0000-0000-000000000004'::uuid,'coach1','W6 Retired','11:00'::time,'12:00'::time,'f6400000-0000-0000-0000-000000000001'::uuid)
   ) v(id, coach, title, st, et, cat);
 -- W6 Retired was deactivated 45 days ago: none of its later dates may count for the guard.
-UPDATE classes SET is_active = FALSE, deactivated_at = now() - INTERVAL '45 days'
+UPDATE classes SET is_active = FALSE, deactivated_at = app_now() - INTERVAL '45 days'
  WHERE id = 'f6500000-0000-0000-0000-000000000004';
 
 INSERT INTO students (id, full_name, assignment_status, is_active, tenant_id) VALUES
@@ -301,7 +311,7 @@ INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_acti
 SELECT 'f6300000-0000-0000-0000-000000000002', 'f6500000-0000-0000-0000-000000000004',
        ((SELECT d49 FROM f)::timestamp + TIME '12:00') AT TIME ZONE 'Asia/Singapore', FALSE, NULL;
 DELETE FROM attendance WHERE lesson_session_id = pg_temp.s('f6500000-0000-0000-0000-000000000003', (SELECT d14 FROM f));
-UPDATE lesson_sessions SET status = 'cancelled', cancelled_at = now(), cancelled_by = 'f6100000-0000-0000-0000-0000000000a1', cancellation_reason = 'w6 test'
+UPDATE lesson_sessions SET status = 'cancelled', cancelled_at = app_now(), cancelled_by = 'f6100000-0000-0000-0000-0000000000a1', cancellation_reason = 'w6 test'
  WHERE id = pg_temp.s('f6500000-0000-0000-0000-000000000003', (SELECT d14 FROM f));
 INSERT INTO makeup_bookings (tenant_id, student_id, class_id, session_date, category_id, home_class_id, booked_by)
 VALUES ('f6000000-0000-0000-0000-0000000000a0', 'f6300000-0000-0000-0000-000000000002', 'f6500000-0000-0000-0000-000000000003',
@@ -344,7 +354,7 @@ VALUES ('f6a00000-0000-0000-0000-000000000001', 'f6000000-0000-0000-0000-0000000
 SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d0 FROM f), 'f6300000-0000-0000-0000-000000000006', 'present');
 SELECT is(pg_temp.apps('f6500000-0000-0000-0000-000000000001', (SELECT d0 FROM f), 'f6300000-0000-0000-0000-000000000006'),
   0, '22: a lesson covered by a live settlement is not drawn');
-UPDATE student_settlements SET reversed_at = now(), reversed_by = 'f6100000-0000-0000-0000-0000000000a1' WHERE id = 'f6a00000-0000-0000-0000-000000000001';
+UPDATE student_settlements SET reversed_at = app_now(), reversed_by = 'f6100000-0000-0000-0000-0000000000a1' WHERE id = 'f6a00000-0000-0000-0000-000000000001';
 SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d0 FROM f), 'f6300000-0000-0000-0000-000000000006', 'absent');
 SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d0 FROM f), 'f6300000-0000-0000-0000-000000000006', 'present');
 SELECT is(pg_temp.live('f6500000-0000-0000-0000-000000000001', (SELECT d0 FROM f), 'f6300000-0000-0000-0000-000000000006'),
@@ -479,7 +489,7 @@ SELECT is((SELECT count(*)::int FROM unbilled_sealed_lessons('f6000000-0000-0000
             WHERE student_id = 'f6300000-0000-0000-0000-000000000007'),
   0, '42: a drawn lesson in a sealed month is not an orphan');
 RESET ROLE;
-UPDATE package_applications SET reversed_at = now() WHERE student_id = 'f6300000-0000-0000-0000-000000000007';
+UPDATE package_applications SET reversed_at = app_now() WHERE student_id = 'f6300000-0000-0000-0000-000000000007';
 SELECT pg_temp.as_user('f6100000-0000-0000-0000-0000000000a1');
 SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*)::int FROM unbilled_sealed_lessons('f6000000-0000-0000-0000-0000000000a0')
@@ -537,7 +547,7 @@ SELECT throws_ok($$ SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', 
   'PK001', NULL, '50: (control) Dee on d7 is refused while Eli''s d14 is unmarked and one lesson is left');
 CREATE OR REPLACE FUNCTION public.class_unmarked_lesson_pairs(p_class_id UUID)
 RETURNS TABLE (session_date DATE, student_id UUID) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$ SELECT (CASE WHEN 1 / (SELECT 0) = 1 THEN today_sg() END), NULL::uuid $$;
+AS $$ SELECT (CASE WHEN 1 / (SELECT 0) = 1 THEN '2026-09-15'::date END), NULL::uuid $$;
 SELECT lives_ok($$ SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d7 FROM f),
                                        'f6300000-0000-0000-0000-000000000004', 'present') $$,
   '51: with the guard''s derivation broken, the mark SAVES (fail open, §7.324)');

@@ -41,8 +41,10 @@
 -- inlined, so the assertion numbers the sabotage records cite stay true.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(27);
+SELECT plan(28);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixture: two businesses; owner + live co-admin + disabled co-admin + coach
 -- ── + parent in A; an admin in B; a platform admin ───────────────────────────
@@ -55,29 +57,29 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','0e000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','ot-owner@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Owner Wanda","role":"tenant_admin","tenant_id":"0e000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ot-owner@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Owner Wanda","role":"tenant_admin","tenant_id":"0e000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','0e000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','ot-coadmin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Coadmin Casey","role":"tenant_admin","tenant_id":"0e000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ot-coadmin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Coadmin Casey","role":"tenant_admin","tenant_id":"0e000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','0e000000-0000-0000-0000-0000000000a3',
-   'authenticated','authenticated','ot-disabled@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Disabled Dana","role":"tenant_admin","tenant_id":"0e000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ot-disabled@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Disabled Dana","role":"tenant_admin","tenant_id":"0e000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','0e000000-0000-0000-0000-0000000000c1',
-   'authenticated','authenticated','ot-coach@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Coach Cal","role":"coach","tenant_id":"0e000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ot-coach@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Coach Cal","role":"coach","tenant_id":"0e000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','0e000000-0000-0000-0000-0000000000d1',
-   'authenticated','authenticated','ot-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ot-parent@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','0f000000-0000-0000-0000-0000000000b1',
-   'authenticated','authenticated','ot-other-admin@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Other Ollie","role":"tenant_admin","tenant_id":"0f000000-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','ot-other-admin@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Other Ollie","role":"tenant_admin","tenant_id":"0f000000-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','0e000000-0000-0000-0000-0000000000e1',
-   'authenticated','authenticated','ot-platform@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"Platform Pat","role":"platform_admin"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','ot-platform@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"Platform Pat","role":"platform_admin"}', app_now(), app_now(), '', '', '', '');
 
 -- Disable Dana while still postgres (the guard refuses only 'authenticated').
-UPDATE profiles SET admin_disabled_at = now()
+UPDATE profiles SET admin_disabled_at = app_now()
  WHERE id = '0e000000-0000-0000-0000-0000000000a3';
 
 -- ============================================================

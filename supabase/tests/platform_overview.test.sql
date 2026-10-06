@@ -17,8 +17,10 @@
 -- superuser, and every assertion "passes" — including the ones that must fail.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(24);
+SELECT plan(25);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Two tenants, so a count that leaked across the boundary is visible ──────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -30,23 +32,23 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','44000000-0000-0000-0000-0000000000a1',
-   'authenticated','authenticated','pov-adminA@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"POV Admin A","role":"tenant_admin","tenant_id":"44444444-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','pov-adminA@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"POV Admin A","role":"tenant_admin","tenant_id":"44444444-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','44000000-0000-0000-0000-0000000000a2',
-   'authenticated','authenticated','pov-coachA@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"POV Coach A","role":"coach","tenant_id":"44444444-0000-0000-0000-000000000001"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','pov-coachA@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"POV Coach A","role":"coach","tenant_id":"44444444-0000-0000-0000-000000000001"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','44000000-0000-0000-0000-0000000000b2',
-   'authenticated','authenticated','pov-coachB@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"POV Coach B","role":"coach","tenant_id":"44444444-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','pov-coachB@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"POV Coach B","role":"coach","tenant_id":"44444444-0000-0000-0000-000000000002"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','44000000-0000-0000-0000-0000000000a3',
-   'authenticated','authenticated','pov-parentA@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"POV Parent A","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','pov-parentA@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"POV Parent A","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','44000000-0000-0000-0000-0000000000d9',
-   'authenticated','authenticated','pov-stranded@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"POV Stranded","role":"parent"}', now(), now(), '', '', '', ''),
+   'authenticated','authenticated','pov-stranded@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"POV Stranded","role":"parent"}', app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','44000000-0000-0000-0000-0000000000f1',
-   'authenticated','authenticated','pov-platform@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"POV Platform","role":"platform_admin"}', now(), now(), '', '', '', '');
+   'authenticated','authenticated','pov-platform@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+   '{"full_name":"POV Platform","role":"platform_admin"}', app_now(), app_now(), '', '', '', '');
 
 -- Tenant A: a class, one student, one attendance-marked session.
 -- classes.category_id is NOT NULL (20260725000400). A test creates its own
@@ -97,12 +99,12 @@ SELECT p.id, '44444444-0000-0000-0000-000000000001' FROM parents p
 WHERE p.profile_id = '44000000-0000-0000-0000-0000000000a3';
 
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-VALUES ('44000000-0000-0000-0000-00000000a5a1','44000000-0000-0000-0000-00000000a5c1', TRUE, now() - INTERVAL '60 days');
+VALUES ('44000000-0000-0000-0000-00000000a5a1','44000000-0000-0000-0000-00000000a5c1', TRUE, app_now() - INTERVAL '60 days');
 
 -- A session THIS month, fully marked (one active enrolment, one attendance row).
 INSERT INTO lesson_sessions (id, class_id, session_date, status)
 VALUES ('44000000-0000-0000-0000-00000000a5e1','44000000-0000-0000-0000-00000000a5c1',
-        date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))::date, 'completed');
+        '2026-09-01'::date, 'completed');
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 VALUES ('44000000-0000-0000-0000-00000000a5e1','44000000-0000-0000-0000-00000000a5a1',
         'present','44000000-0000-0000-0000-0000000000a2');
@@ -121,8 +123,8 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES ('00000000-0000-0000-0000-000000000000','44000000-0000-0000-0000-0000000000c9',
-  'authenticated','authenticated','pov-solo@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-  '{"full_name":"POV Solo","role":"tenant_admin","tenant_id":"44444444-0000-0000-0000-000000000003"}', now(), now(), '', '', '', '');
+  'authenticated','authenticated','pov-solo@test.local', crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}',
+  '{"full_name":"POV Solo","role":"tenant_admin","tenant_id":"44444444-0000-0000-0000-000000000003"}', app_now(), app_now(), '', '', '', '');
 -- The auth trigger makes a tenant_admin's profile but no coaches row, so add
 -- the coach half by hand: a private coach is BOTH, which is the whole point.
 INSERT INTO coaches (profile_id, tenant_id)

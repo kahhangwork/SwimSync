@@ -2,8 +2,10 @@
 -- Self-contained; own tenant; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(9);
+SELECT plan(10);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('ea000000-0000-0000-0000-000000000001','mx','Manual Ext','SWIM-MXT');
@@ -13,14 +15,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','eb000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','mx-admin@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mx-admin@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"MX Admin","role":"tenant_admin","tenant_id":"ea000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','ec000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','mx-parent@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','mx-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}','{"full_name":"MX Parent","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'ea000000-0000-0000-0000-000000000001'

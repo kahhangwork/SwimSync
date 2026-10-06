@@ -15,8 +15,10 @@
 -- INVOKER granted to service_role, so its calls run under SET LOCAL ROLE service_role.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(17);
+SELECT plan(18);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Tenant / users / class / student / parent ────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -28,16 +30,16 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','af000000-0000-0000-0000-0000000000a1',
    'authenticated','authenticated','tap-pp-admin@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"PP Admin","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000a7"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"PP Admin","role":"tenant_admin","tenant_id":"99999999-0000-0000-0000-0000000000a7"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','af000000-0000-0000-0000-0000000000c1',
    'authenticated','authenticated','tap-pp-coach@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"PP Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000a7"}',
-   now(), now(), '', '', '', ''),
+   app_now(), '{"provider":"email"}','{"full_name":"PP Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-0000000000a7"}',
+   app_now(), app_now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','af000000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','tap-pp-parent@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"PP Parent","role":"parent"}',
-   now(), now(), '', '', '', '');
+   app_now(), '{"provider":"email"}','{"full_name":"PP Parent","role":"parent"}',
+   app_now(), app_now(), '', '', '', '');
 
 INSERT INTO class_categories (tenant_id, name)
 SELECT '99999999-0000-0000-0000-0000000000a7', 'Default Group'
@@ -115,7 +117,7 @@ INSERT INTO credit_notes (reference_number, parent_id, student_id, student_name,
   invoice_item_id, lesson_session_id, amount, original_status, corrected_status, status, tenant_id, issued_at)
 SELECT 'CN-pp2', pg_temp.pid(), 'cf000000-0000-0000-0000-000000000001', 'PP Kid',
   'ef000000-0000-0000-0000-000000000002', ii.id, 'df000000-0000-0000-0000-0000000000d2',
-  50.00, 'present', 'absent', 'available', '99999999-0000-0000-0000-0000000000a7', now()
+  50.00, 'present', 'absent', 'available', '99999999-0000-0000-0000-0000000000a7', app_now()
 FROM invoice_items ii WHERE ii.lesson_session_id='df000000-0000-0000-0000-0000000000d2';
 SET LOCAL ROLE service_role;
 SELECT is(apply_credit_to_invoice('ef000000-0000-0000-0000-000000000002'), 50.00,
@@ -152,7 +154,7 @@ VALUES ('df000000-0000-0000-0000-000000000004','bf000000-0000-0000-0000-00000000
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 VALUES ('df000000-0000-0000-0000-000000000004','cf000000-0000-0000-0000-000000000001','present','af000000-0000-0000-0000-0000000000c1');
 INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status, paid_at, paid_marked_by)
-VALUES ('99999999-0000-0000-0000-0000000000a7','ef000000-0000-0000-0000-000000000004', pg_temp.pid(), '2026-08', 30.00, 30.00, 0.00, 'paid', now(), 'af000000-0000-0000-0000-0000000000a1');
+VALUES ('99999999-0000-0000-0000-0000000000a7','ef000000-0000-0000-0000-000000000004', pg_temp.pid(), '2026-08', 30.00, 30.00, 0.00, 'paid', app_now(), 'af000000-0000-0000-0000-0000000000a1');
 INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
 VALUES ('ef000000-0000-0000-0000-000000000004','cf000000-0000-0000-0000-000000000001','df000000-0000-0000-0000-000000000004','present', 30.00, 'PP Class', '2026-08-01');
 -- The note as a paid-void would leave it: reversed, its draw debited. The draw is
@@ -162,11 +164,11 @@ INSERT INTO credit_notes (reference_number, parent_id, student_id, student_name,
   invoice_item_id, lesson_session_id, amount, original_status, corrected_status, status, tenant_id, reversed_at)
 SELECT 'CN-pp4', pg_temp.pid(), 'cf000000-0000-0000-0000-000000000001', 'PP Kid',
   'ef000000-0000-0000-0000-000000000004', ii.id, 'df000000-0000-0000-0000-000000000004',
-  30.00, 'present', 'absent', 'reversed', '99999999-0000-0000-0000-0000000000a7', now()
+  30.00, 'present', 'absent', 'reversed', '99999999-0000-0000-0000-0000000000a7', app_now()
 FROM invoice_items ii WHERE ii.invoice_id='ef000000-0000-0000-0000-000000000004';
 INSERT INTO credit_applications (credit_note_id, invoice_id, amount, debited_at, debited_by, folded_at, folded_invoice_id)
-SELECT cn.id, 'ef000000-0000-0000-0000-000000000004', 30.00, now(), 'af000000-0000-0000-0000-0000000000a1',
-       now(), 'ef000000-0000-0000-0000-000000000004'
+SELECT cn.id, 'ef000000-0000-0000-0000-000000000004', 30.00, app_now(), 'af000000-0000-0000-0000-0000000000a1',
+       app_now(), 'ef000000-0000-0000-0000-000000000004'
 FROM credit_notes cn WHERE cn.reference_number='CN-pp4';
 
 SELECT throws_ok(

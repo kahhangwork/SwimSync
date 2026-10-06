@@ -19,23 +19,33 @@
 -- Tenant U (switch OFF throughout) holds the same shape for one lesson — must be untouched.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(8);
+SELECT plan(9);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
+-- Wave 7: literals = the former derivation evaluated at the pinned clock (2026-09-15 10:00+08).
 CREATE TEMP TABLE f AS
-SELECT today_sg() AS d0, today_sg() - 7 AS d7, today_sg() - 14 AS d14, today_sg() - 21 AS d21,
-       today_sg() - 28 AS d28, today_sg() - 35 AS d35, today_sg() - 77 AS d77, today_sg() - 84 AS d84,
-       to_char(today_sg(), 'FMday') AS dow;
+SELECT
+  '2026-09-15'::date AS d0,
+  '2026-09-08'::date AS d7,
+  '2026-09-01'::date AS d14,
+  '2026-08-25'::date AS d21,
+  '2026-08-18'::date AS d28,
+  '2026-08-11'::date AS d35,
+  '2026-06-30'::date AS d77,
+  '2026-06-23'::date AS d84,
+  'tuesday'::text    AS dow;
 
 INSERT INTO tenants (id, slug, display_name, join_code, created_at, package_draw_at_marking) VALUES
-  ('f7000000-0000-0000-0000-0000000000a0','w6b-t','W6B T','SWIM-W6BT', now() - INTERVAL '200 days', FALSE),
-  ('f7000000-0000-0000-0000-0000000000b0','w6b-u','W6B U','SWIM-W6BU', now() - INTERVAL '200 days', FALSE);
+  ('f7000000-0000-0000-0000-0000000000a0','w6b-t','W6B T','SWIM-W6BT', app_now() - INTERVAL '200 days', FALSE),
+  ('f7000000-0000-0000-0000-0000000000b0','w6b-u','W6B U','SWIM-W6BU', app_now() - INTERVAL '200 days', FALSE);
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token,
   email_change_token_new, email_change)
 SELECT '00000000-0000-0000-0000-000000000000', v.id, 'authenticated', 'authenticated', v.email,
-       crypt('x', gen_salt('bf')), now(), '{"provider":"email"}', v.meta, now(), now(), '', '', '', ''
+       crypt('x', gen_salt('bf')), app_now(), '{"provider":"email"}', v.meta, app_now(), app_now(), '', '', '', ''
   FROM (VALUES
     ('f7100000-0000-0000-0000-0000000000c1'::uuid, 'w6b-coach@test.local',
      '{"full_name":"W6B Coach","role":"coach","tenant_id":"f7000000-0000-0000-0000-0000000000a0"}'::jsonb),

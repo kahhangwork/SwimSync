@@ -22,8 +22,10 @@
 -- Runs on its own tenants; self-contained; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(24);
+SELECT plan(25);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -36,30 +38,30 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','fd000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pay-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pay-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pay Admin A","role":"tenant_admin","tenant_id":"fa000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','fd000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','pay-parent-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pay-parent-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pay Parent A","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','fd000000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','pay-parent-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pay-parent-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pay Parent B","role":"parent"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','fd000000-0000-0000-0000-000000000004',
-   'authenticated','authenticated','pay-coach-serving@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pay-coach-serving@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pay Serving Coach","role":"coach","tenant_id":"fa000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','fd000000-0000-0000-0000-000000000005',
-   'authenticated','authenticated','pay-coach-other@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pay-coach-other@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pay Unrelated Coach","role":"coach","tenant_id":"fa000000-0000-0000-0000-00000000000a"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 -- The serving coach's class, with Pay Parent A's child enrolled — what makes
 -- coach_serves_parent() true for exactly one of the two coaches.
@@ -185,7 +187,7 @@ SELECT throws_ok(
 
 -- reminded_at is deliberately NOT pinned: stamping the click-through is the
 -- admin's normal write path (design RISK 7 governs only the UI copy).
-UPDATE invoices SET reminded_at = now()
+UPDATE invoices SET reminded_at = app_now()
  WHERE id='f5000000-0000-0000-0000-0000000000a1';
 
 SELECT isnt(

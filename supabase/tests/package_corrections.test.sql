@@ -13,8 +13,10 @@
 -- rather than by running the TS engine — what is under test is the trigger.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(12);
+SELECT plan(13);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -28,15 +30,15 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','bd000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pkc-coach@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkc-coach@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pkc Coach","role":"tenant_admin","is_coach":true,"tenant_id":"ba000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','bb000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pkc-parent@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkc-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"Pkc Parent","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 CREATE TEMP TABLE pkc AS
 SELECT
@@ -96,7 +98,7 @@ VALUES ('bd100000-0000-0000-0000-000000000001','ba000000-0000-0000-0000-00000000
 INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status, confirmed_at)
 SELECT 'bf000000-0000-0000-0000-000000000001','ba000000-0000-0000-0000-000000000001',
        parent_id, 'bd100000-0000-0000-0000-000000000001', 'active',
-       now() - interval '30 days'
+       app_now() - interval '30 days'
 FROM pkc;
 UPDATE parent_packages SET value_remaining = 360.00
  WHERE id = 'bf000000-0000-0000-0000-000000000001';
@@ -104,9 +106,9 @@ UPDATE parent_packages SET value_remaining = 360.00
 -- Two invoiced sessions: one package-funded ($40 line), one ad-hoc ($50 line).
 INSERT INTO lesson_sessions (id, class_id, session_date) VALUES
   ('b6000000-0000-0000-0000-000000000001','be000000-0000-0000-0000-000000000001',
-   (now() AT TIME ZONE 'Asia/Singapore')::date - 14),
+   '2026-09-01'::date),
   ('b6000000-0000-0000-0000-000000000002','be000000-0000-0000-0000-000000000001',
-   (now() AT TIME ZONE 'Asia/Singapore')::date - 7);
+   '2026-09-08'::date);
 
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
   ('b6000000-0000-0000-0000-000000000001','b5000000-0000-0000-0000-000000000001',
@@ -118,7 +120,7 @@ INSERT INTO invoices (id, parent_id, tenant_id, billing_month, gross_amount,
                       package_applied, credit_applied, net_amount, status)
 SELECT 'b7000000-0000-0000-0000-000000000001', parent_id,
        'ba000000-0000-0000-0000-000000000001',
-       to_char(now() - interval '1 month', 'YYYY-MM'),
+       '2026-08',
        90.00, 40.00, 0.00, 50.00, 'outstanding'
 FROM pkc;
 
@@ -128,11 +130,11 @@ VALUES
   ('b8000000-0000-0000-0000-000000000001','b7000000-0000-0000-0000-000000000001',
    'b5000000-0000-0000-0000-000000000001','b6000000-0000-0000-0000-000000000001',
    'present', 40.00, 'Corr Class',
-   (now() AT TIME ZONE 'Asia/Singapore')::date - 14, 'Corr Kid'),
+   '2026-09-01'::date, 'Corr Kid'),
   ('b8000000-0000-0000-0000-000000000002','b7000000-0000-0000-0000-000000000001',
    'b5000000-0000-0000-0000-000000000001','b6000000-0000-0000-0000-000000000002',
    'present', 50.00, 'Corr Class',
-   (now() AT TIME ZONE 'Asia/Singapore')::date - 7, 'Corr Kid');
+   '2026-09-08'::date, 'Corr Kid');
 
 -- The $40 line is package-funded.
 INSERT INTO package_applications (id, parent_package_id, invoice_item_id, amount)
@@ -226,7 +228,7 @@ UPDATE parent_packages SET value_remaining = 360.00
 
 INSERT INTO lesson_sessions (id, class_id, session_date) VALUES
   ('b6000000-0000-0000-0000-000000000003','be000000-0000-0000-0000-000000000001',
-   (now() AT TIME ZONE 'Asia/Singapore')::date - 21);
+   '2026-08-25'::date);
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
   ('b6000000-0000-0000-0000-000000000003','b5000000-0000-0000-0000-000000000001',
    'present','bd000000-0000-0000-0000-000000000001');
@@ -235,13 +237,13 @@ INSERT INTO invoice_items (id, invoice_id, student_id, lesson_session_id,
 VALUES ('b8000000-0000-0000-0000-000000000003','b7000000-0000-0000-0000-000000000001',
         'b5000000-0000-0000-0000-000000000001','b6000000-0000-0000-0000-000000000003',
         'present', 40.00, 'Corr Class',
-        (now() AT TIME ZONE 'Asia/Singapore')::date - 21, 'Corr Kid');
+        '2026-08-25'::date, 'Corr Kid');
 INSERT INTO package_applications (parent_package_id, invoice_item_id, amount)
 VALUES ('bf000000-0000-0000-0000-000000000001','b8000000-0000-0000-0000-000000000003', 40.00);
 
 -- Expire it (postgres may move these fields; clients may not).
 UPDATE parent_packages
-   SET expires_on = (now() AT TIME ZONE 'Asia/Singapore')::date - 1
+   SET expires_on = '2026-09-14'::date
  WHERE id = 'bf000000-0000-0000-0000-000000000001';
 
 UPDATE attendance SET status = 'absent', edit_reason = 'late correction'

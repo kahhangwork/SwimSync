@@ -15,8 +15,10 @@
 -- Its own tenants/users, so nothing here depends on another fixture's state.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(13);
+SELECT plan(14);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Two businesses, and a level ladder that belongs only to A ────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -32,20 +34,20 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','7d000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','rsa-p1@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}', '{"full_name":"RSA Parent One","role":"parent"}', now(), now(), '','','',''),
+   'authenticated','authenticated','rsa-p1@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}', '{"full_name":"RSA Parent One","role":"parent"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7d000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','rsa-p2@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}', '{"full_name":"RSA Parent Two","role":"parent"}', now(), now(), '','','',''),
+   'authenticated','authenticated','rsa-p2@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}', '{"full_name":"RSA Parent Two","role":"parent"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7d000000-0000-0000-0000-000000000003',
-   'authenticated','authenticated','rsa-p3@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}', '{"full_name":"RSA Parent Three","role":"parent"}', now(), now(), '','','',''),
+   'authenticated','authenticated','rsa-p3@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}', '{"full_name":"RSA Parent Three","role":"parent"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7d000000-0000-0000-0000-000000000004',
-   'authenticated','authenticated','rsa-p4@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}', '{"full_name":"RSA Parent Four","role":"parent"}', now(), now(), '','','',''),
+   'authenticated','authenticated','rsa-p4@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}', '{"full_name":"RSA Parent Four","role":"parent"}', app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','7d000000-0000-0000-0000-0000000000ff',
-   'authenticated','authenticated','rsa-plat@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}', '{"full_name":"RSA Platform","role":"platform_admin"}', now(), now(), '','','','');
+   'authenticated','authenticated','rsa-plat@test.local', crypt('x', gen_salt('bf')), app_now(),
+   '{"provider":"email"}', '{"full_name":"RSA Platform","role":"platform_admin"}', app_now(), app_now(), '','','','');
 
 -- ── Students at A ────────────────────────────────────────────────────────────
 -- S1 is LEVELLED (the production bug); S2 has TWO parents; S3 has NONE

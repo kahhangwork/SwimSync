@@ -36,8 +36,10 @@
 -- Runs on its own tenants; self-contained; rolls back.
 
 BEGIN;
+SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(12);
+SELECT plan(13);
+SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -50,20 +52,20 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','a8000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pkgref-admin-a@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkgref-admin-a@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"PkgRef Admin A","role":"tenant_admin","tenant_id":"a9000000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','a8000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','pkgref-admin-b@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkgref-admin-b@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"PkgRef Admin B","role":"tenant_admin","tenant_id":"a9000000-0000-0000-0000-000000000002"}',
-   now(), now(), '','','',''),
+   app_now(), app_now(), '','','',''),
   ('00000000-0000-0000-0000-000000000000','a7000000-0000-0000-0000-000000000001',
-   'authenticated','authenticated','pkgref-parent@test.local', crypt('x', gen_salt('bf')), now(),
+   'authenticated','authenticated','pkgref-parent@test.local', crypt('x', gen_salt('bf')), app_now(),
    '{"provider":"email"}',
    '{"full_name":"PkgRef Parent","role":"parent"}',
-   now(), now(), '','','','');
+   app_now(), app_now(), '','','','');
 
 -- The parent has joined tenant A — parent_packages_insert requires it.
 INSERT INTO parent_tenants (parent_id, tenant_id)
@@ -105,7 +107,7 @@ SELECT is(
 
 SELECT is(
   (SELECT reference_number FROM parent_packages WHERE id='f9000000-0000-0000-0000-000000000001'),
-  'PKG-' || to_char(now() AT TIME ZONE 'Asia/Singapore', 'YYYY') || '-0001',
+  'PKG-' || to_char(app_now() AT TIME ZONE 'Asia/Singapore', 'YYYY') || '-0001',
   'the first package in a tenant reads PKG-<SGT year>-0001');
 
 -- ── 4. A CLIENT-SUPPLIED REFERENCE IS DISCARDED ────────────────────────────
@@ -131,7 +133,7 @@ $$, 'a client may name a reference_number on insert without erroring');
 
 SELECT is(
   (SELECT reference_number FROM parent_packages WHERE id='f9000000-0000-0000-0000-0000000000ff'),
-  'PKG-' || to_char(now() AT TIME ZONE 'Asia/Singapore', 'YYYY') || '-0002',
+  'PKG-' || to_char(app_now() AT TIME ZONE 'Asia/Singapore', 'YYYY') || '-0002',
   'and it is DISCARDED — the row takes the next counter draw, so no client can squat a number');
 
 -- ── 5. THE PIN: not rewritable either ──────────────────────────────────────
