@@ -131,8 +131,10 @@ export const updateProductActive = (id: string, active: boolean) =>
 
 // ── Purchase writes + the confirm/offer read-backs ───────────────────────────
 
+// Returns the new id: a sale is inserted already active, and the backdated
+// check (Wave 6 D5) needs the package to preview against.
 export const insertPurchase = (row: Record<string, unknown>) =>
-  supabase.from("parent_packages").insert(row);
+  supabase.from("parent_packages").insert(row).select("id").single();
 
 // WHERE status='pending' makes a double-click (or two admins) collapse to
 // one confirmation — the second update matches zero rows and is a no-op.

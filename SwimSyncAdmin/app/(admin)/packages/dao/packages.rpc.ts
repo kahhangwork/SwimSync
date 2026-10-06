@@ -113,3 +113,14 @@ export const recordPackageRefund = (
 
 export const reversePackageRefund = (refundId: string) =>
   supabase.rpc("reverse_package_refund", { p_refund: refundId });
+
+// Backdated activation (Wave 6 D5, migration A). Called only AFTER the
+// activation write succeeded — the preview reads the package as active.
+// ⚠ RISK 8: the preview is a dry run of the SAME matcher the draw uses, and the
+// draw takes NO lesson list — it re-derives at call time and returns the count
+// it drew (a second call draws 0). Never pass the preview rows back to it.
+export const packageBacklogPreview = (packageId: string) =>
+  supabase.rpc("package_backlog_preview", { p_package: packageId });
+
+export const drawPackageBacklog = (packageId: string) =>
+  supabase.rpc("draw_package_backlog", { p_package: packageId });

@@ -17,9 +17,13 @@ type Shared = {
   setBusy: (b: boolean) => void;
   setError: (e: string | null) => void;
   reload: () => void;
+  /** Wave 6 D5: the backdated check, run AFTER the sale is recorded (active). */
+  onActivated?: (packageId: string, packageName: string) => void;
+  /** The product's name, for the dialog's title line. */
+  productName?: (productId: string) => string;
 };
 
-export function useSale({ setBusy, setError, reload }: Shared) {
+export function useSale({ setBusy, setError, reload, onActivated, productName }: Shared) {
   const [saleModal, setSaleModal] = useState(false);
   const [saleParent, setSaleParent] = useState("");
   const [saleProduct, setSaleProduct] = useState("");
@@ -48,7 +52,7 @@ export function useSale({ setBusy, setError, reload }: Shared) {
     // Directly active: the admin recording an offline sale IS the
     // confirmation. The DB snapshots the product's terms and dates expiry from
     // the start date (defaulting to today if the admin cleared the field).
-    const { error: err } = await repo.insertPurchase({
+    const { data: created, error: err } = await repo.insertPurchase({
       parent_id: saleParent,
       product_id: saleProduct,
       status: "active",
@@ -60,11 +64,15 @@ export function useSale({ setBusy, setError, reload }: Shared) {
       setError("Could not record the sale.");
       return;
     }
+    const soldProduct = saleProduct;
     setSaleModal(false);
     setSaleParent("");
     setSaleProduct("");
     setSaleStart("");
     reload();
+    // A sale's start date can be in the past: lessons already marked since then
+    // were not drawn at marking — ask (Wave 6 D5).
+    if (created?.id) onActivated?.(created.id, productName?.(soldProduct) ?? "The package");
   }
 
   return {

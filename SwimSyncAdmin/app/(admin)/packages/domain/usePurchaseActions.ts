@@ -14,9 +14,11 @@ type Shared = {
   setBusy: (b: boolean) => void;
   setError: (e: string | null) => void;
   reload: () => void;
+  /** Wave 6 D5: the backdated check, run AFTER the package is active. */
+  onActivated?: (packageId: string, packageName: string) => void;
 };
 
-export function usePurchaseActions({ setBusy, setError, reload }: Shared) {
+export function usePurchaseActions({ setBusy, setError, reload, onActivated }: Shared) {
   const [confirming, setConfirming] = useState<Purchase | null>(null);
   const [cancelling, setCancelling] = useState<Purchase | null>(null);
   const [confirmStart, setConfirmStart] = useState("");
@@ -67,6 +69,10 @@ export function usePurchaseActions({ setBusy, setError, reload }: Shared) {
     })().catch(() => {});
 
     reload();
+    // Lessons the family already had marked since the start date are not
+    // drawn by the marking trigger — ask (Wave 6 D5). After the write: the
+    // preview must see the package active.
+    onActivated?.(p.id, p.name);
   }
 
   async function cancelPurchase(p: Purchase) {

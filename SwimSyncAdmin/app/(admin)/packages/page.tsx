@@ -27,6 +27,7 @@ import { usePurchaseActions } from "./domain/usePurchaseActions";
 import { useProductForm } from "./domain/useProductForm";
 import { useExtend } from "./domain/useExtend";
 import { useSale } from "./domain/useSale";
+import { useBacklogDraw } from "./domain/useBacklogDraw";
 import { useGenerateOffers } from "./domain/useGenerateOffers";
 import { useLowSettings } from "./domain/useLowSettings";
 import { useRefund } from "./domain/useRefund";
@@ -38,6 +39,7 @@ import { GenerateOffersModal } from "./ui/GenerateOffersModal";
 import { CategoriesSection } from "./ui/CategoriesSection";
 import { ConfirmPaymentModal } from "./ui/ConfirmPaymentModal";
 import { CancelModal } from "./ui/CancelModal";
+import { BacklogDrawModal } from "./ui/BacklogDrawModal";
 import { PendingPanel } from "./ui/PendingPanel";
 import { ProductsTable } from "./ui/ProductsTable";
 import { HeldTable } from "./ui/HeldTable";
@@ -79,6 +81,10 @@ export default function PackagesPage() {
     setProductActive,
   } = usePackageList();
 
+  // Wave 6 D5 — the backdated-activation question. Declared before the two
+  // activation slices (confirm-payment, record-a-sale) that call its offer().
+  const backlog = useBacklogDraw({ setError, reload: load });
+
   // Slices 2, 5, 6 — categories, confirm-payment, cancel. Each takes the shared
   // busy/error and load() from list-core (⚠ RISK 2).
   const {
@@ -100,7 +106,7 @@ export default function PackagesPage() {
     setConfirmStart,
     confirmPurchase,
     cancelPurchase,
-  } = usePurchaseActions({ setBusy, setError, reload: load });
+  } = usePurchaseActions({ setBusy, setError, reload: load, onActivated: backlog.offer });
 
   // Slice 3 — the "Add package" product form.
   const productForm = useProductForm({ setBusy, reload: load });
@@ -111,7 +117,13 @@ export default function PackagesPage() {
   const { openExtend } = extend;
 
   // Slice 4 — record a sale + price preview.
-  const sale = useSale({ setBusy, setError, reload: load });
+  const sale = useSale({
+    setBusy,
+    setError,
+    reload: load,
+    onActivated: backlog.offer,
+    productName: (id) => products.find((p) => p.id === id)?.name ?? "The package",
+  });
   const { setSaleModal } = sale;
 
   // Slice 8 — generate renewal offers (⚠ RISK 9: list-core state as params).
@@ -223,6 +235,8 @@ export default function PackagesPage() {
         setConfirming={setConfirming}
         confirmPurchase={confirmPurchase}
       />
+
+      <BacklogDrawModal form={backlog} />
 
       <CancelModal
         cancelling={cancelling}
