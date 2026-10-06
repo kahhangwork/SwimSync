@@ -2,6 +2,7 @@
 // time formatter and the class-row mapping, moved VERBATIM out of
 // app/(coach)/classes/index.tsx and pinned by classesFormat.test.ts.
 import type { CoachClass } from "../types";
+import type { CoachClassRow } from "../dao/coachClasses.repo";
 
 export function formatTime(time: string): string {
   const [h, m] = time.split(":");
@@ -11,8 +12,8 @@ export function formatTime(time: string): string {
   return `${hour12}:${m} ${ampm}`;
 }
 
-export function classesOf(data: any[] | null): CoachClass[] {
-  return (data ?? []).map((cls: any) => ({
+export function classesOf(data: CoachClassRow[] | null): CoachClass[] {
+  return (data ?? []).map((cls) => ({
     id: cls.id,
     title: cls.title,
     day_of_week: cls.day_of_week,
@@ -22,7 +23,7 @@ export function classesOf(data: any[] | null): CoachClass[] {
     location_name: cls.locations?.name ?? "—",
     price_per_lesson: Number(cls.price_per_lesson),
     student_count: (cls.student_class_enrolments ?? []).filter(
-      (e: any) => e.is_active
+      (e) => e.is_active
     ).length,
   }));
 }

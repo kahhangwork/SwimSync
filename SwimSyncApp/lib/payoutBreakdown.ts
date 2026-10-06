@@ -45,7 +45,18 @@ export type PayoutBreakdown = {
 
 const EMPTY: PayoutBreakdown = { lessons: 0, lessonTotal: 0, adjustments: [] };
 
-export function parsePayoutItems(rows: readonly any[] | null): PayoutItem[] {
+/** What parsePayoutItems accepts: every field UNCHECKED (`unknown`) — each is
+ *  validated below and a bad row is skipped (Wave 8: was `any`). */
+export type PayoutItemIn = {
+  payout_id?: unknown;
+  amount?: unknown;
+  class_title?: unknown;
+  session_date?: unknown;
+  is_adjustment?: unknown;
+  original_period?: unknown;
+};
+
+export function parsePayoutItems(rows: readonly PayoutItemIn[] | null): PayoutItem[] {
   const out: PayoutItem[] = [];
   for (const row of rows ?? []) {
     if (typeof row?.payout_id !== "string") continue;

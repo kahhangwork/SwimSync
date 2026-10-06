@@ -11,6 +11,7 @@ import {
 import { ITEM_LIMIT } from "../constants";
 import { fetchMyPayouts, fetchPayoutItems } from "../dao/coachPay.repo";
 import type { MyPayout } from "../types";
+import type { PayoutItemRow } from "../dao/coachPay.repo";
 
 export function useMyPay() {
   const [myPayouts, setMyPayouts] = useState<MyPayout[]>([]);
@@ -27,7 +28,7 @@ export function useMyPay() {
     // is not reachable even by asking for it.
     const { data: payoutRows } = await fetchMyPayouts();
 
-    const payouts = (payoutRows ?? []).map((p: any) => ({
+    const payouts = (payoutRows ?? []).map((p) => ({
       id: p.id,
       period_month: p.period_month,
       gross_amount: Number(p.gross_amount),
@@ -46,7 +47,7 @@ export function useMyPay() {
     const { data: itemRows } =
       payouts.length > 0
         ? await fetchPayoutItems(payouts.map((p) => p.id))
-        : { data: [] as any[] };
+        : { data: [] as PayoutItemRow[] };
     // ⚠ A TRUNCATED RESPONSE MEANS NO BREAKDOWN AT ALL, NOT A SHORT ONE.
     // PostgREST caps every response and does it silently, and these lines are
     // the numbers a coach checks their total AGAINST — "11 lessons" under a

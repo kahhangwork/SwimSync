@@ -42,7 +42,7 @@ export default function MarkAttendanceScreen() {
   const exitHref = exitHrefOf(from, id);
 
   function leaveScreen() {
-    router.replace(exitHref as any);
+    router.replace(exitHref as any); // db-any-ok: href
   }
 
   const {

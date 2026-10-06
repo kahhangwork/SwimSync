@@ -62,7 +62,16 @@ export function lessonKey(classId: string, date: string): string {
  * here: a dropped assignment costs a coach a card they can chase, while a
  * malformed one would put a lesson on the wrong date, which is the §7.64 shape.
  */
-export function parseAssignments(rows: readonly any[] | null): RosterAssignment[] {
+/** What parseAssignments accepts: every field UNCHECKED (`unknown`), because it
+ *  validates each one below — the typed roster read fits, and so does a malformed
+ *  row, which is dropped rather than trusted (Wave 8: was `any`). */
+type SessionEmbedIn = { id?: unknown; class_id?: unknown; session_date?: unknown };
+export type AssignmentRowIn = {
+  lesson_session_id?: unknown;
+  lesson_sessions?: SessionEmbedIn | SessionEmbedIn[] | null;
+};
+
+export function parseAssignments(rows: readonly AssignmentRowIn[] | null): RosterAssignment[] {
   const out: RosterAssignment[] = [];
   for (const row of rows ?? []) {
     const embed = Array.isArray(row?.lesson_sessions)

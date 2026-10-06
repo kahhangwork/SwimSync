@@ -95,7 +95,7 @@ function Row({
 }) {
   return (
     <View className="flex-row items-center gap-3 py-1.5">
-      <Ionicons name={icon as any} size={16} color="#9ca3af" />
+      <Ionicons name={icon as any /* db-any-ok: icon */} size={16} color="#9ca3af" />
       <Text className="text-sm text-gray-500 w-14">{label}</Text>
       <Text className="text-sm font-medium text-gray-800 flex-1">{value}</Text>
     </View>
@@ -121,7 +121,7 @@ function MenuItem({
         !last ? "border-b border-gray-100" : ""
       }`}
     >
-      <Ionicons name={icon as any} size={20} color="#6b7280" />
+      <Ionicons name={icon as any /* db-any-ok: icon */} size={20} color="#6b7280" />
       <Text className="flex-1 text-sm text-gray-700">{label}</Text>
       <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
     </TouchableOpacity>

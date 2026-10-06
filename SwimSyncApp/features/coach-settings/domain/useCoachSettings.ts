@@ -146,7 +146,7 @@ export function useCoachSettings() {
 
       setPaynowUrl(publicUrl);
       showToast("Your PayNow QR code has been updated.", "success");
-    } catch (e: any) {
+    } catch (e: any) { // db-any-ok: catch
       showToast(e?.message ?? "Upload failed. Please try again.", "error");
     } finally {
       setUploading(false);

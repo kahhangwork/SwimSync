@@ -16,7 +16,7 @@ export function Row({
 }) {
   return (
     <View className="flex-row items-center gap-3 py-1.5">
-      <Ionicons name={icon as any} size={16} color="#9ca3af" />
+      <Ionicons name={icon as any /* db-any-ok: icon */} size={16} color="#9ca3af" />
       <Text className="text-sm text-gray-500 w-14">{label}</Text>
       <Text className="text-sm font-medium text-gray-800 flex-1">{value}</Text>
     </View>

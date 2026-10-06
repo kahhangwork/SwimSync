@@ -4,6 +4,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { DataOf } from "@/lib/database.overrides";
 import { ITEM_LIMIT } from "../constants";
 
 export const fetchMyPayouts = () =>
@@ -22,3 +23,7 @@ export const fetchPayoutItems = (payoutIds: string[]) =>
       payoutIds
     )
     .limit(ITEM_LIMIT);
+
+// Row types (Wave 8), from the selects above.
+export type MyPayoutRow = DataOf<typeof fetchMyPayouts>[number];
+export type PayoutItemRow = DataOf<typeof fetchPayoutItems>[number];

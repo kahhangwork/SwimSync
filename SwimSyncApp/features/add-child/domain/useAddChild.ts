@@ -13,6 +13,7 @@ import type { ClaimCandidate } from "@/lib/claimCandidates";
 import { fetchActiveJoinedTenants } from "../dao/addChild.repo";
 import { addChildOrClaim } from "../dao/addChild.rpc";
 import type { JoinedTenant } from "../types";
+import type { JoinedTenantRow } from "../dao/addChild.repo";
 
 export function useAddChild() {
   // Which business this child is being added to. A child belongs to exactly one
@@ -60,9 +61,11 @@ export function useAddChild() {
         const { data } = await fetchActiveJoinedTenants();
         if (cancelled) return;
 
-        const list: JoinedTenant[] = (data ?? [])
-          .map((r: any) => r.tenants)
-          .filter(Boolean);
+        const list: JoinedTenant[] = ((data ?? []) as JoinedTenantRow[])
+          .map((r) => r.tenants)
+          // census: ui-cast (Wave 8) — `.filter(Boolean)` drops the RLS-hidden
+          // (null) tenants; TS does not narrow through Boolean.
+          .filter(Boolean) as JoinedTenant[];
         setTenants(list);
         // One business is the overwhelmingly common case — select it rather
         // than making every parent tap a single-option picker.

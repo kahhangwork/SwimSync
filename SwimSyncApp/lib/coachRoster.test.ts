@@ -47,7 +47,7 @@ describe("parseAssignments", () => {
 
   it("drops a row whose lesson did not come back rather than placing it wrongly", () => {
     expect(
-      parseAssignments([{ role: "main", lesson_session_id: "s1" }])
+      parseAssignments([{ role: "main", lesson_session_id: "s1" }] as any)
     ).toEqual([]);
   });
 

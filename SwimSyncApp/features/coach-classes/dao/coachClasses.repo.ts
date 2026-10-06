@@ -7,6 +7,7 @@
 //
 // dao/ is transport only (fence check 2).
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 
 type Session = { id: string };
 
@@ -35,3 +36,6 @@ export const fetchCoachClasses = (coachId: string) =>
     .eq("is_active", true)
     .order("day_of_week", { ascending: true })
     .order("start_time", { ascending: true });
+
+// Row type (Wave 8). `locations` is a LEFT to-one embed RLS can null (§7.344).
+export type CoachClassRow = RlsNullable<DataOf<typeof fetchCoachClasses>[number], "locations">;

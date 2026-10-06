@@ -24,7 +24,7 @@ export function MenuItem({
         !last ? "border-b border-gray-100" : ""
       }`}
     >
-      <Ionicons name={icon as any} size={20} color="#6b7280" />
+      <Ionicons name={icon as any /* db-any-ok: icon */} size={20} color="#6b7280" />
       <Text className="flex-1 text-sm text-gray-700">{label}</Text>
       <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
     </TouchableOpacity>

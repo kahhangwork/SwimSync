@@ -1,7 +1,11 @@
 // CHARACTERISATION test (docs/refactor/BATCH_FGH_PLAN.md, App L-H): pins what the
 // coach Classes tab's mapping already did when it moved out of the route file.
 // §7.25's prove-it-red rule does not apply — there is no fix, only a move.
-import { formatTime, classesOf } from "./classesFormat";
+import { formatTime } from "./classesFormat";
+import * as F from "./classesFormat";
+
+// Loose fixtures on purpose (Wave 8): string prices and null embeds pin the fallbacks.
+const classesOf = (rows: any) => F.classesOf(rows);
 
 describe("classesFormat (characterisation)", () => {
   it("formatTime: 24h -> 12h with AM/PM, midnight/noon as 12", () => {
