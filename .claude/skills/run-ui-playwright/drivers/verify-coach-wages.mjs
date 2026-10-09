@@ -1,3 +1,4 @@
+// clock: pinnable
 // Phase 5: coach wages, admin → coach, through both real UIs.
 //
 // The seed coach is a PRIVATE coach (tenant_admin who also teaches), so they

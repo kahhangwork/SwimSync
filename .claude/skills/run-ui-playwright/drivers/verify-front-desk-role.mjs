@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-front-desk-role.mjs — the Front-desk hire's day, done AS the hire.
 //
 // Fixture: fixtures-front-desk-role.sql   Teardown: fixtures-front-desk-role-teardown.sql
@@ -59,9 +60,9 @@ const sql = (q) =>
   execFileSync("docker", ["exec", "-i", DB, "psql", "-U", "postgres", "-d", "postgres",
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -76,7 +77,7 @@ const CARA = "f0de0000-0000-0000-0000-00000000a003";
 const COACH = "FD Coach Wen";
 
 const [TODAY, LESSON, NEXT] = sql(
-  `SELECT t||'|'||(t-1)||'|'||(t+7) FROM (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS t) s`
+  `SELECT t||'|'||(t-1)||'|'||(t+7) FROM (SELECT app_today() AS t) s`
 ).split("|");
 console.log(`today ${TODAY}, marked lesson ${LESSON}, make-up lesson ${NEXT}`);
 

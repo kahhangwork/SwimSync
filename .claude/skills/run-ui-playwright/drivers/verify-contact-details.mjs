@@ -1,3 +1,4 @@
+// clock: pinnable
 // The parent's contact details, from the admin Students page.
 //
 // WHY THIS EXISTS. `provisional_contact_phone` and `_email` are the top two

@@ -61,16 +61,8 @@ OWN_LITERAL=(verify-edit-child.mjs verify-student-identity.mjs verify-tz-saturda
 # ⚠ THE SWEEP RATCHETS. Remove a file the commit that converts it; lower the
 # constant with it. Both lists — and both constants — are deleted at the close of
 # the sweep, after which an unmarked driver or a raw-clock fixture is simply red.
-UNSWEPT_MAX=44
+UNSWEPT_MAX=36
 UNSWEPT=(
-  verify-coach-schedule-roles.mjs
-  verify-coach-wages.mjs
-  verify-contact-details.mjs
-  verify-edit-child.mjs
-  verify-enrolment-start.mjs
-  verify-front-desk-role.mjs
-  verify-grading-admin.mjs
-  verify-invoice-admin.mjs
   verify-invoice-controls.mjs
   verify-join-code.mjs
   verify-lesson-detail-guests.mjs
@@ -108,14 +100,8 @@ UNSWEPT=(
   verify-trials.mjs
   verify-tz-saturday.mjs
 )
-UNSWEPT_FIXTURES_MAX=22
+UNSWEPT_FIXTURES_MAX=15
 UNSWEPT_FIXTURES=(
-  fixtures-coach-schedule-roles.sql
-  fixtures-contact-details.sql
-  fixtures-enrolment-start.sql
-  fixtures-front-desk-role.sql
-  fixtures-grading-admin.sql
-  fixtures-invoice-admin.sql
   fixtures-lesson-detail-guests.sql
   fixtures-money-admin.sql
   fixtures-multi-class.sql
@@ -129,7 +115,6 @@ UNSWEPT_FIXTURES=(
   fixtures-phase4-billing.sql
   fixtures-platform-controls.sql
   fixtures-roles.sql
-  fixtures-student-identity.sql
   fixtures-tenant-suspension.sql
   fixtures-trial-visibility.sql
 )

@@ -1,3 +1,4 @@
+// clock: own-literal
 // Drives the parent edit-child screen and the two invariants it depends on.
 //
 // The screen is small; the reason it needed its own verification is that it is

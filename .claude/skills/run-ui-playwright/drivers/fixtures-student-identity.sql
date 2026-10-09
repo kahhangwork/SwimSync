@@ -33,8 +33,8 @@ BEGIN
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
     confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-00000000ade1',
-    'authenticated','authenticated','identity@test.local', crypt('password123', gen_salt('bf')), now(),
-    '{"provider":"email"}', '{"full_name":"Identity Parent","role":"parent"}', now(), now(), '','','','')
+    'authenticated','authenticated','identity@test.local', crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
+    '{"provider":"email"}', '{"full_name":"Identity Parent","role":"parent"}', now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
   ON CONFLICT (id) DO NOTHING;
 
   SELECT id INTO v_parent FROM parents WHERE profile_id='a0000000-0000-0000-0000-00000000ade1';

@@ -26,10 +26,10 @@ INSERT INTO auth.users (
 ) VALUES (
   '00000000-0000-0000-0000-000000000000','e5e50000-0000-0000-0000-0000000000c1',
   'authenticated','authenticated','es-coach-ana@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"ES Coach Ana","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO locations (id, tenant_id, name) VALUES
@@ -41,7 +41,7 @@ INSERT INTO classes (
   location_id, price_per_lesson, category_id, capacity, colour
 )
 SELECT 'e5e50000-0000-0000-0000-000000000001', co.id, 'ES Squad',
-       lower(trim(to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'FMDay')))::day_of_week,
+       lower(trim(to_char(app_today(), 'FMDay')))::day_of_week,
        '06:00'::time, '06:45'::time, 'e5e50000-0000-0000-0000-0000000010c1', 30.00,
        '7c000000-0000-0000-0000-000000000002', 6, 'sky'
   FROM coaches co
@@ -56,7 +56,7 @@ ON CONFLICT (id) DO NOTHING;
 DO $$
 DECLARE
   t  uuid := '70000000-0000-0000-0000-000000000001';
-  d2 date := (now() AT TIME ZONE 'Asia/Singapore')::date - 14;
+  d2 date := app_today() - 14;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM classes WHERE id = 'e5e50000-0000-0000-0000-000000000001') THEN
     RAISE EXCEPTION 'fixtures-enrolment-start: the class did not load';

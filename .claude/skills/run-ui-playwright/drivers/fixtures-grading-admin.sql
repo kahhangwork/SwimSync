@@ -41,10 +41,10 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES ('00000000-0000-0000-0000-000000000000','c3000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','grading-admin-owner@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"GradAdm Owner","role":"tenant_admin","is_coach":true,"tenant_id":"c3000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 UPDATE tenants SET owner_profile_id = 'c3000000-0000-0000-0000-0000000000a1'
@@ -136,7 +136,7 @@ INSERT INTO trial_bookings (tenant_id, student_id, class_id, session_date, categ
 SELECT 'c3000000-0000-0000-0000-000000000001', 'c3000000-0000-0000-0000-0000000000d1',
        'c3000000-0000-0000-0000-0000000000c1', v.d,
        'c3000000-0000-0000-0000-00000000cc01', 'c3000000-0000-0000-0000-0000000000a1'
-  FROM (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS t) sg,
+  FROM (SELECT app_today() AS t) sg,
   LATERAL (VALUES
     (sg.t - ((EXTRACT(DOW FROM sg.t)::int - 2 + 7) % 7)
           - CASE WHEN EXTRACT(DOW FROM sg.t)::int = 2 THEN 7 ELSE 0 END),
@@ -154,7 +154,9 @@ SELECT 'c3000000-0000-0000-0000-000000000001', 'c3000000-0000-0000-0000-00000000
   FROM tenant_level_skills s WHERE s.level_id = 'c3000000-0000-0000-0000-0000000001e1';
 
 ALTER TABLE student_skill_progress DISABLE TRIGGER trg_skill_progress_tenant;
-UPDATE student_skill_progress SET graded_at = now() - interval '90 days'
+-- From app_now(), not now(): "stale" is graded_at (a REAL stamp) against the browser's
+-- SGT today, which --now pins; a real-clock backdate reads as fresh under a pin > 90 days old.
+UPDATE student_skill_progress SET graded_at = app_now() - interval '90 days'
  WHERE student_id = 'c3000000-0000-0000-0000-0000000000d3';
 ALTER TABLE student_skill_progress ENABLE TRIGGER trg_skill_progress_tenant;
 

@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-coach-schedule-roles.mjs — the coach Schedule tab, (coach)/schedule,
 // on the three things no driver asserted:
 //
@@ -55,7 +56,7 @@
 // edit and not after each revert, where `return "Shadowing"` / `…&from=schedule` were back.)
 
 import { execFileSync } from "node:child_process";
-import { launch, loginExpo, pressByText, visibleText, sgLabel, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, pressByText, visibleText, sgLabel, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API_URL = "http://127.0.0.1:54321";
@@ -76,9 +77,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll the VISIBLE screen's text until `ok` — never a bare sleep (rule 13).
 async function screenUntil(page, ok, ms = 20000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let t = await visibleText(page);
-  while (!ok(t) && Date.now() < end) {
+  while (!ok(t) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await page.waitForTimeout(300);
     t = await visibleText(page);
   }
@@ -158,7 +159,7 @@ async function openCoach(email) {
   const { browser, ctx, page } = await launch({ mobile: true });
   opened.push({ browser, page });
   page.setDefaultTimeout(15000);
-  await ctx.clock.install({ time: new Date(`${todaySg}T12:00:00+08:00`) });
+  await installDerivedClock(ctx, new Date(`${todaySg}T12:00:00+08:00`)); // DB today (follows --now), noon SGT
   page.removeAllListeners("dialog");
   page.on("dialog", (d) => { dialogs.push(d.message()); d.dismiss().catch(() => {}); });
   page.on("request", (r) => {
@@ -255,7 +256,7 @@ try {
   // ── 5. The clamp: North loses its only class while North is selected ─────
   try {
     clampTouched = true;
-    sql(`UPDATE classes SET is_active = false, deactivated_at = now() WHERE id = '${COVERED}'`);
+    sql(`UPDATE classes SET is_active = false, deactivated_at = app_now() WHERE id = '${COVERED}'`); // as deactivate_class stamps it
     check("DB: the North class is retired (is_active false, deactivated_at set)",
       sql(activeQ) === `${T_COV}:false:false,${T_SH}:true:true`, sql(activeQ));
     t = await refocusSchedule(page, (x) => todayCard(x, T_SH) !== "");

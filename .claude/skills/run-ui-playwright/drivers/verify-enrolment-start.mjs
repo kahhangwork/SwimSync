@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-enrolment-start.mjs — "Starts on" on add-to-class, and "Change start date"
 // on the class roster (Wave 4; migration 20261005000100; plan
 // docs/plans/WAVE4_START_DATE_FRONT_DESK_PLAN.md §1.5).
@@ -36,9 +37,9 @@ const sql = (q) =>
   execFileSync("docker", ["exec", "-i", DB, "psql", "-U", "postgres", "-d", "postgres",
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -48,7 +49,7 @@ async function dbUntil(q, ok, ms = 10000) {
 const CLASS = "e5e50000-0000-0000-0000-000000000001";
 const DANA = "e5e50000-0000-0000-0000-00000000d001";
 const [TODAY, D1, D2] = sql(
-  `SELECT t||'|'||(t-7)||'|'||(t-14) FROM (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS t) s`
+  `SELECT t||'|'||(t-7)||'|'||(t-14) FROM (SELECT app_today() AS t) s`
 ).split("|");
 console.log(`today ${TODAY}, D1 ${D1}, D2 ${D2}`);
 

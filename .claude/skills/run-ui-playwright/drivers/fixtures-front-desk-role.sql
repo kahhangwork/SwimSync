@@ -30,7 +30,7 @@
 --                       from the Students page (check 6). Her start is today, so
 --                       her first expected lesson is 6 days out.
 --
--- Dates are derived from now() AT TIME ZONE 'Asia/Singapore' (no literals,
+-- Dates are derived from app_now() AT TIME ZONE 'Asia/Singapore' (no literals,
 -- §7.305); D = yesterday is always ≥ session_window_start() (the 1st of LAST
 -- month) — the self-check below also asserts D ≥ markable_floor(tenant).
 --
@@ -49,10 +49,10 @@ INSERT INTO auth.users (
   ('00000000-0000-0000-0000-000000000000',
    'f0de0000-0000-0000-0000-00000000ad01',
    'authenticated', 'authenticated', 'frontdesk@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"FD Frontdesk","role":"tenant_admin","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- handle_new_user put them on "Co-admin (as before)"; move them to Front desk.
@@ -70,10 +70,10 @@ INSERT INTO auth.users (
 ) VALUES (
   '00000000-0000-0000-0000-000000000000','f0de0000-0000-0000-0000-0000000000c1',
   'authenticated','authenticated','fd-coach-wen@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"FD Coach Wen","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO locations (id, tenant_id, name) VALUES
@@ -86,7 +86,7 @@ INSERT INTO classes (
   location_id, price_per_lesson, category_id, capacity, colour
 )
 SELECT v.id, co.id, v.title,
-       lower(trim(to_char((now() AT TIME ZONE 'Asia/Singapore')::date + v.day_offset, 'FMDay')))::day_of_week,
+       lower(trim(to_char(app_today() + v.day_offset, 'FMDay')))::day_of_week,
        '07:00'::time, '07:45'::time, 'f0de0000-0000-0000-0000-0000000010c1', 30.00,
        '7c000000-0000-0000-0000-000000000002', 6, 'sky'
 FROM coaches co,
@@ -108,7 +108,7 @@ ON CONFLICT (id) DO NOTHING;
 -- UTC and SGT dates agree for every reader (plan D10).
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
 SELECT v.sid, 'f0de0000-0000-0000-0000-000000000001', TRUE,
-       (((now() AT TIME ZONE 'Asia/Singapore')::date - 1) + TIME '12:00') AT TIME ZONE 'Asia/Singapore'
+       ((app_today() - 1) + TIME '12:00') AT TIME ZONE 'Asia/Singapore'
 FROM (VALUES ('f0de0000-0000-0000-0000-00000000a001'::uuid),
              ('f0de0000-0000-0000-0000-00000000a002'::uuid)) AS v(sid)
 WHERE NOT EXISTS (
@@ -120,7 +120,7 @@ WHERE NOT EXISTS (
 DO $$
 DECLARE
   t      uuid := '70000000-0000-0000-0000-000000000001';
-  d      date := (now() AT TIME ZONE 'Asia/Singapore')::date - 1;
+  d      date := app_today() - 1;
   v_role uuid;
   v_bad  text;
   n      int;

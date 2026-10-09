@@ -42,10 +42,10 @@ INSERT INTO auth.users (
   '00000000-0000-0000-0000-000000000000',
   'cd000000-0000-0000-0000-0000000000a1',
   'authenticated', 'authenticated', 'cdparenta@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Priya Raman","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ── Parent B: has a child with NO enrolment, and nothing else ──────────────
@@ -58,10 +58,10 @@ INSERT INTO auth.users (
   '00000000-0000-0000-0000-000000000000',
   'cd000000-0000-0000-0000-0000000000b1',
   'authenticated', 'authenticated', 'cdparentb@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Marcus Chen","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ── Parent C: the SECOND parent of Xavier ──────────────────────────────────
@@ -78,10 +78,10 @@ INSERT INTO auth.users (
   '00000000-0000-0000-0000-000000000000',
   'cd000000-0000-0000-0000-0000000000c1',
   'authenticated', 'authenticated', 'cdparentc@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Devi Raman","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 UPDATE profiles SET full_name = 'Devi Raman', phone = '8222 3333'

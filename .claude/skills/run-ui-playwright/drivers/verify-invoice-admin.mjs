@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-invoice-admin.mjs — the four Invoices-page actions no other driver
 // presses: the PayNow UEN / mobile save (on blur) and its 8-digit advisory,
 // the run-day save, its 1–28 clamp and a REFUSED save, the CSV export (a real download, then
@@ -72,9 +73,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -126,9 +127,9 @@ const runDay = page.locator("#run-day");
 // The one line handleSavePaynow writes (saved / saved-with-warning / error).
 const payMsg = page.locator("p", { hasText: /^(PayNow details saved\.|Saved — ⚠|Error: )/ });
 async function payMsgUntil(re, ms = 8000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = flat(await payMsg.innerText({ timeout: 500 }).catch(() => "(no message)"));
-  while (!re.test(v) && Date.now() < end) {
+  while (!re.test(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await page.waitForTimeout(200);
     v = flat(await payMsg.innerText({ timeout: 500 }).catch(() => "(no message)"));
   }
@@ -251,9 +252,9 @@ try {
     await page.route(isTenantPatch, handler);
     await runDay.fill(typed);
     await runDay.blur();
-    const end = Date.now() + 8000;
+    const end = Date.now() + 8000; // clock-real: a poll deadline (elapsed time, not a date)
     let msg = "";
-    while (Date.now() < end) {
+    while (Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
       msg = await runDayMsg.innerText({ timeout: 250 }).catch(() => "");
       if (want.test(flat(msg))) break;
       await page.waitForTimeout(200);
@@ -325,8 +326,8 @@ try {
   // Wait for the REAL three rows, not for the note to hide: load() sets
   // loading=true first, which hides the note while the 1000 rows still stand
   // — an Export pressed then is (rightly) refused.
-  const endReal = Date.now() + 10000;
-  while ((await rowSig()) !== ROWS && Date.now() < endReal) await page.waitForTimeout(250);
+  const endReal = Date.now() + 10000; // clock-real: a poll deadline (elapsed time, not a date)
+  while ((await rowSig()) !== ROWS && Date.now() < endReal) await page.waitForTimeout(250); // clock-real: a poll deadline (elapsed time, not a date)
   const uncapped = (await rowSig()) === ROWS && !(await cappedNote.isVisible());
   const again = await exportAndCatch();
   check("back on the real list, Export downloads again and the banner clears",

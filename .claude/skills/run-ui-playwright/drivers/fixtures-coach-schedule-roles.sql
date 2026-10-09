@@ -53,22 +53,22 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
  ('00000000-0000-0000-0000-000000000000','d8000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','coach-sched-owner@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"CoachSched Owner","role":"coach","tenant_id":"d8000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','d8000000-0000-0000-0000-0000000000a2',
   'authenticated','authenticated','coach-sched-sub@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"CoachSched Sub","role":"coach","tenant_id":"d8000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','d8000000-0000-0000-0000-0000000000a3',
   'authenticated','authenticated','coach-sched-shadow@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"CoachSched Shadow","role":"coach","tenant_id":"d8000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO class_categories (id, tenant_id, name)

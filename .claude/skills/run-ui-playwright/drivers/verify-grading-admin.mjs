@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-grading-admin.mjs — the admin grading actions no other driver presses:
 // Trials (Convert's two-press guard, Cancel), Make-ups (the multi-class "which
 // class is this making up?" select, Change, Cancel), Levels (grading-scale
@@ -52,9 +53,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -123,7 +124,7 @@ try {
   await upcomingRow.getByRole("button", { name: "Cancel" }).click();
   const futureCancelled = await dbUntil(
     `SELECT count(*) FROM trial_bookings WHERE student_id='${TRIALKID}' AND cancelled_at IS NOT NULL
-        AND session_date > (now() AT TIME ZONE 'Asia/Singapore')::date`, (v) => v === "1");
+        AND session_date > app_today()`, (v) => v === "1");
   check("Cancel on the upcoming trial cancels THAT booking", futureCancelled === "1", `cancelled future ${futureCancelled}`);
   check("…and leaves the past trial live (it still needs marking)", sql(liveQ) === "1", `live ${sql(liveQ)}`);
 
@@ -158,7 +159,7 @@ try {
   await lesson.locator("option").nth(1).waitFor({ state: "attached", timeout: 10000 });
   // Strictly AFTER today: a make-up dated today sits under "needs marking", not
   // in the Upcoming table this driver cancels it from. Today comes from the DB.
-  const todaySg = sql(`SELECT (now() AT TIME ZONE 'Asia/Singapore')::date`);
+  const todaySg = sql(`SELECT app_today()`);
   const dates = await lesson.locator("option").evaluateAll((os) => os.map((o) => o.value));
   const futureDate = dates.find((d) => d > todaySg);
   if (!futureDate) throw new Error(`no make-up date after ${todaySg} offered: ${dates}`);

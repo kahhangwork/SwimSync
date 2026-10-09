@@ -45,22 +45,22 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
  ('00000000-0000-0000-0000-000000000000','d3000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','invoice-admin-owner@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"InvAdm Owner","role":"tenant_admin","is_coach":true,"tenant_id":"d3000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','d3000000-0000-0000-0000-0000000000f1',
   'authenticated','authenticated','invoice-admin-leaver@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"InvAdm Leaver","role":"parent"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','d3000000-0000-0000-0000-0000000000f2',
   'authenticated','authenticated','invoice-admin-stayer@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"InvAdm Stayer","role":"parent"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- Reset the tenant-level settings the driver writes (rule 12: these are ours).
@@ -88,7 +88,7 @@ DECLARE
   v_p1   uuid;
   v_p2   uuid;
   v_co   uuid;
-  v_sg   date := (now() AT TIME ZONE 'Asia/Singapore')::date;
+  v_sg   date := app_today();
   v_last date;      -- the 10th of LAST month (SGT)
   v_prev date;      -- four weeks earlier: same weekday, the month before
 BEGIN
@@ -186,15 +186,15 @@ BEGIN
           'd3000000-0000-0000-0000-0000000000d1','d3000000-0000-0000-0000-0000000000b1',
           'd3000000-0000-0000-0000-0000000001b1','d3000000-0000-0000-0000-0000000000e1',
           40.00,'present','cancelled_rain','InvAdm rain correction', t,
-          'InvAdm Leaverkid','reversed','d3000000-0000-0000-0000-0000000000b2', now(), now(),
-          now(), 'd3000000-0000-0000-0000-0000000000a1')
+          'InvAdm Leaverkid','reversed','d3000000-0000-0000-0000-0000000000b2', now(), now(),  -- clock-real: applied_at, email_sent_at are real stamps (apply_credit_to_invoice / delivery)
+          now(), 'd3000000-0000-0000-0000-0000000000a1')  -- clock-real: reversed_at is a real stamp (void_credit_note writes NOW())
   ON CONFLICT (id) DO UPDATE SET status = 'reversed';
 
   INSERT INTO credit_applications (id, credit_note_id, invoice_id, amount, debited_at, debited_by)
   VALUES ('d3000000-0000-0000-0000-0000000002b1','d3000000-0000-0000-0000-0000000002a1',
-          'd3000000-0000-0000-0000-0000000000b2', 40.00, now(), 'd3000000-0000-0000-0000-0000000000a1')
+          'd3000000-0000-0000-0000-0000000000b2', 40.00, now(), 'd3000000-0000-0000-0000-0000000000a1')  -- clock-real: debited_at is a real stamp (void_credit_note writes NOW())
   ON CONFLICT (id) DO UPDATE SET reversed_at = NULL, reversed_by = NULL,
-                                 debited_at = COALESCE(credit_applications.debited_at, now()),
+                                 debited_at = COALESCE(credit_applications.debited_at, now()),  -- clock-real: the same real debited_at stamp
                                  debited_by = 'd3000000-0000-0000-0000-0000000000a1',
                                  folded_at = NULL, folded_invoice_id = NULL,
                                  written_off_at = NULL, written_off_by = NULL;
