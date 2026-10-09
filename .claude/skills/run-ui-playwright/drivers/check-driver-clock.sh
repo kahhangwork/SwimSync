@@ -13,8 +13,8 @@
 #   M  every verify-*.mjs carries, in its first 40 lines, EXACTLY one of
 #        // clock: pinnable      reads now only through lib.mjs
 #        // clock: own-literal   pins its own literal world, ignores DRIVER_NOW
-#      — matched exactly, so a typo is "no marker". Until the sweep finishes, a
-#      driver on UNSWEPT may be unmarked; nothing else may.
+#      — matched exactly, so a typo is "no marker", and no marker is red. (The
+#      2026-10-09 sweep converted all 73 drivers; there is no unmarked state.)
 #   O  own-literal is a CLOSED list of three (OWN_LITERAL). A fourth is red until
 #      this file is edited — which shows in review.
 #   P  in a pinnable driver (and _TEMPLATE.mjs):
@@ -25,10 +25,7 @@
 #   L  in EVERY marked driver: no `chromium.launch(` and no `playwright` import —
 #      every browser is launch()'s wrapped one, so every context on it is pinned.
 #   F  in every fixtures-*.sql (teardowns too) and _TEMPLATE-fixture.sql: no raw
-#      SQL clock token (P4's list). Until the sweep finishes, UNSWEPT_FIXTURES may.
-#   U  the UNSWEPT ratchets: a listed file that is now converted (or gone) must be
-#      removed from its list, and each list's length must equal its constant —
-#      lower the constant as you sweep; raising it is the edit review must refuse.
+#      SQL clock token (P4's list).
 #   R  prod reach — the local-only API pin can never ship:
 #        R1 in supabase/migrations, supabase/seed.sql, scripts/: only
 #           <ts>_api_clock_pin.sql (at most one) and scripts/clock-unpin.sh name
@@ -57,16 +54,6 @@ cd "$(dirname "$0")"
 ROOT="$(cd ../../../.. && pwd)"
 
 OWN_LITERAL=(verify-edit-child.mjs verify-student-identity.mjs verify-tz-saturday.mjs)
-
-# ⚠ THE SWEEP RATCHETS. Remove a file the commit that converts it; lower the
-# constant with it. Both lists — and both constants — are deleted at the close of
-# the sweep, after which an unmarked driver or a raw-clock fixture is simply red.
-UNSWEPT_MAX=0
-UNSWEPT=(
-)
-UNSWEPT_FIXTURES_MAX=0
-UNSWEPT_FIXTURES=(
-)
 
 # The rules' patterns. SQL_RE is G2's token list (scripts/check-migration-clock.sh)
 # and the pgTAP census's; app_now()/app_today() never match.
@@ -167,22 +154,10 @@ for t in _TEMPLATE.mjs _TEMPLATE-fixture.sql; do
   [[ -f $t ]] || { echo "✗ $t is missing — the template a new driver copies must exist" >&2; exit 2; }
 done
 
-# ── U: the ratchets ──
-((${#UNSWEPT[@]} == UNSWEPT_MAX)) \
-  || flag U "UNSWEPT holds ${#UNSWEPT[@]} drivers but UNSWEPT_MAX=$UNSWEPT_MAX — lower the constant with the list; never raise it"
-((${#UNSWEPT_FIXTURES[@]} == UNSWEPT_FIXTURES_MAX)) \
-  || flag U "UNSWEPT_FIXTURES holds ${#UNSWEPT_FIXTURES[@]} but UNSWEPT_FIXTURES_MAX=$UNSWEPT_FIXTURES_MAX — lower the constant with the list; never raise it"
-for u in ${UNSWEPT[@]+"${UNSWEPT[@]}"}; do [[ -f $u ]] || flag U "UNSWEPT names $u, which does not exist — remove it"; done
-for u in ${UNSWEPT_FIXTURES[@]+"${UNSWEPT_FIXTURES[@]}"}; do [[ -f $u ]] || flag U "UNSWEPT_FIXTURES names $u, which does not exist — remove it"; done
-
 # ── M, O, P, L: the drivers ──
-NP=0; NO=0; NU=0
+NP=0; NO=0
 for f in "${DRIVERS[@]}"; do
   m=$(marker_of "$f")
-  if in_list "$f" ${UNSWEPT[@]+"${UNSWEPT[@]}"}; then
-    if [[ $m == none ]]; then NU=$((NU + 1)); continue; fi
-    flag U "$f is marked but still on UNSWEPT — remove it from the list (and lower UNSWEPT_MAX)"
-  fi
   case $m in
     none) flag M "$f has no clock marker — add '// clock: pinnable' in its first 40 lines (see _TEMPLATE.mjs)"; continue ;;
     many) flag M "$f has more than one clock marker"; continue ;;
@@ -203,15 +178,8 @@ check_pinnable_rules _TEMPLATE.mjs
 report L _TEMPLATE.mjs "$(mjs_hits _TEMPLATE.mjs "$L_RE")"
 
 # ── F: the fixtures (teardowns too) ──
-NFU=0
 for f in "${FIXTURES[@]}" _TEMPLATE-fixture.sql; do
-  h=$(sql_hits "$f")
-  if in_list "$f" ${UNSWEPT_FIXTURES[@]+"${UNSWEPT_FIXTURES[@]}"}; then
-    if [[ -n $h ]]; then NFU=$((NFU + 1)); continue; fi
-    flag U "$f reads no raw clock any more but is still on UNSWEPT_FIXTURES — remove it (and lower UNSWEPT_FIXTURES_MAX)"
-    continue
-  fi
-  report F "$f" "$h"
+  report F "$f" "$(sql_hits "$f")"
 done
 
 # ── R: prod reach — the local-only API pin can never ship ──
@@ -244,7 +212,7 @@ for f in "${REACH[@]}"; do
 done
 ((NMIG <= 1)) || flag R1 "$NMIG migrations named *_api_clock_pin.sql name $API_TABLE — there is exactly one"
 
-echo "scanned ${#DRIVERS[@]} drivers ($NP pinnable, $NO own-literal, $NU unswept), ${#FIXTURES[@]} fixtures ($NFU unswept), ${#REACH[@]} prod-reach files"
+echo "scanned ${#DRIVERS[@]} drivers ($NP pinnable, $NO own-literal), ${#FIXTURES[@]} fixtures, ${#REACH[@]} prod-reach files"
 
 if [[ -n $FAIL ]]; then
   echo "✗ a UI driver or fixture reads the clock outside the pinnable path:"
