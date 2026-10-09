@@ -358,8 +358,7 @@ migration → 3 functions → apps per `/deploy`.** `58b532c` `fe33d5f` `32a6ad0
 - **Guards:** `sg_date_label.test.sql` (pg_proc census) + `scripts/check-sept.sh` (G-Sept) — TESTING §5.
 - **Found:** CI went red on `main` after prod had the migration — G2 saw its copied `now()` stamps (§7.354; exact
   `file:line` exemption, user's call; `/deploy` Step 0 now runs repo-invariants first).
-- **Not done:** live admin chunk unconfirmed (login-gated) — open Packages and look for the button. Nightly over these
-  commits unread.
+- **Not done:** nightly over these commits unread. (Live admin `/packages` chunk carries the button — DEPLOYMENT #79.)
 
 ## 8.142 (2026-10-07) — G3-apps: neither app takes the UTC date of a timestamp
 
@@ -429,8 +428,7 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over §8.143. Red → fix first. Also open the live
-   admin **Packages** page once: the *Check marked lessons* button is the one §8.143 change no grep could confirm.
+1. **Read the next nightly** (never dispatch it unasked) — the first over §8.143. Red → fix first.
 2. **Little Orcas September is the OWNER's** (WhatsApp sent 2026-10-05; still unbilled on prod 2026-10-09): *Generate
    Sep 2026*, then *Record it as settled* for the 15 pilot children (PRD §7.17) — **and Brayden Ong** (unlinked from
    the Ang family 2026-10-06, his 6 + 13 Sept lessons unclaimed: invite his parent or settle). The Ang family's package

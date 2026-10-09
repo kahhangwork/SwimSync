@@ -278,10 +278,14 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
       policies, and no blanket grant.
     - **Verifying the served bundle differs by app.** The Expo app is one bundle, so
       `curl https://swimsync.sg` + grep for a new string is a real check. The Next.js admin
-      code-splits per route and every protected route redirects to `/login` first, so the only
-      reachable chunks are login-shared — a grep there is **vacuous**, and the control proves
-      it: the *old* string is absent from those chunks too. Confirm the admin by opening the
-      screen, or by a query the page must have made (§7.31, §7.101).
+      code-splits per route, so grep **that route's own chunk**: the login redirect is
+      client-side, so an unauthenticated `curl https://admin.swimsync.sg/<route>` returns 200
+      with `/_next/static/chunks/app/(admin)/<route>/page-<hash>.js` (and its siblings) in the
+      HTML — fetch those and grep. *Corrected 2026-10-09:* this said every route redirected
+      first, leaving only login-shared chunks (a vacuous grep); measured on `/packages`,
+      `/dashboard`, `/students`, `/invoices`, `/platform`, all 200 with their page chunk. A
+      grep of `/login`'s chunks alone is still vacuous. Control: the string must not exist
+      before the change (§7.31, §7.101).
     - **The shim removal shipped on schedule: `20260812000300` (2026-08-12), applied to
       production.** The gate was honoured as written — the user opened the live Classes
       drawer and saw the shadow section (the Expo bundle was also grepped, which counts
@@ -1153,5 +1157,5 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `anon` no EXECUTE (read-only catalog query). Functions deployed one at a time: generate-invoices v34,
     package-emails v6, credit-note-emails v5 — downloaded source greps `"Sept"`. Apps `fe33d5f`, `32a6ad0`, `0bd161a`,
     `4f29867`; Expo bundle carries the new guard regex and month list. **CI went red on `main` from `58b532c` (G2,
-    §7.354) after prod already had it** — fixed by `bf1b406`, CI green. Admin chunk not greppable (login-gated, §11
-    note above): confirm on the live Packages page.
+    §7.354) after prod already had it** — fixed by `bf1b406`, CI green. Admin `/packages` page chunk greps *Check marked
+    lessons* / *Nothing to draw…* (1 each; new strings).
