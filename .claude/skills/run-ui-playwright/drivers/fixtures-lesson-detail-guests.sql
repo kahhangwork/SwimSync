@@ -48,16 +48,16 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
  ('00000000-0000-0000-0000-000000000000','b3000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','lesson-guests-owner@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"LGuest Owner","role":"tenant_admin","is_coach":true,"tenant_id":"b3000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','b3000000-0000-0000-0000-0000000000a2',
   'authenticated','authenticated','lesson-guests-sub@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"LGuest Sub","role":"coach","tenant_id":"b3000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 UPDATE tenants SET owner_profile_id = 'b3000000-0000-0000-0000-0000000000a1'
@@ -90,7 +90,7 @@ DELETE FROM student_class_enrolments WHERE student_id::text LIKE 'b3000000-%';
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time,
                      end_time, location_id, price_per_lesson, category_id, capacity, is_active)
 SELECT v.id, 'b3000000-0000-0000-0000-000000000001', co.id, v.title,
-       lower(trim(to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'FMDay')))::day_of_week,
+       lower(trim(to_char(app_today(), 'FMDay')))::day_of_week,
        v.st::time, v.et::time, 'b3000000-0000-0000-0000-0000000010c1', 30.00,
        'b3000000-0000-0000-0000-00000000cc01', v.cap, TRUE
   FROM (VALUES
@@ -117,7 +117,7 @@ ON CONFLICT (id) DO UPDATE SET is_active = TRUE, assignment_status = EXCLUDED.as
 
 -- Active enrolments, back-dated 30 days so last week's lesson expects them.
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-SELECT v.sid, v.cid, TRUE, now() - interval '30 days'
+SELECT v.sid, v.cid, TRUE, app_now() - interval '30 days'
   FROM (VALUES
     ('b3000000-0000-0000-0000-0000000000d3'::uuid,'b3000000-0000-0000-0000-0000000000c2'::uuid),
     ('b3000000-0000-0000-0000-0000000000d3'::uuid,'b3000000-0000-0000-0000-0000000000c3'::uuid),
@@ -129,7 +129,7 @@ SELECT v.sid, v.cid, TRUE, now() - interval '30 days'
 -- CLOSED enrolments for the two trial children (RLS visibility only).
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at)
 SELECT v.sid, 'b3000000-0000-0000-0000-0000000000c5'::uuid, FALSE,
-       now() - interval '90 days', now() - interval '80 days'
+       app_now() - interval '90 days', app_now() - interval '80 days'
   FROM (VALUES
     ('b3000000-0000-0000-0000-0000000000d1'::uuid),
     ('b3000000-0000-0000-0000-0000000000d2'::uuid)
@@ -138,7 +138,7 @@ SELECT v.sid, 'b3000000-0000-0000-0000-0000000000c5'::uuid, FALSE,
 -- ── Last week's Host lesson has a TRIAL guest (Pasttrial) ──────────────────
 INSERT INTO trial_bookings (tenant_id, student_id, class_id, session_date, category_id, booked_by)
 VALUES ('b3000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-0000000000d2',
-        'b3000000-0000-0000-0000-0000000000c1', (now() AT TIME ZONE 'Asia/Singapore')::date - 7,
+        'b3000000-0000-0000-0000-0000000000c1', app_today() - 7,
         'b3000000-0000-0000-0000-00000000cc01', 'b3000000-0000-0000-0000-0000000000a1');
 
 -- ── Postconditions — fail at load time, not twenty checks later ────────────
@@ -147,7 +147,7 @@ DECLARE v_classes int; v_active int; v_trials int; v_homes int; v_coaches int; v
 BEGIN
   SELECT count(*) INTO v_classes FROM classes
    WHERE tenant_id = 'b3000000-0000-0000-0000-000000000001'
-     AND day_of_week::text = lower(trim(to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'FMDay')));
+     AND day_of_week::text = lower(trim(to_char(app_today(), 'FMDay')));
   SELECT count(*) INTO v_active FROM student_class_enrolments
    WHERE student_id::text LIKE 'b3000000-%' AND is_active;
   SELECT count(*) INTO v_trials FROM trial_bookings

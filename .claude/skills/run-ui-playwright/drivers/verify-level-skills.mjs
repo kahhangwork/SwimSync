@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives level skills: the admin enters a curriculum, the coach and parent read it.
 //
 // Uses REAL curriculum text from the user's own level table (Toddler 1), because

@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-levels-table.mjs — the Swimming Levels table's COLUMN GEOMETRY.
 //
 // WHY GEOMETRY AND NOT TEXT. levels/page.tsx wrapped its <Th>s in a <Tr> while

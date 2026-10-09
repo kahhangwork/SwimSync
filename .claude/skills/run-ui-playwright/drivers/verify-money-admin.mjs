@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-money-admin.mjs — the admin money actions no other driver presses:
 // Credit Notes (Void — the drawn-note warning, Cancel, the blank-reason
 // refusal, the confirmed void that REOPENS the drawn invoice; the scoped
@@ -71,9 +72,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -91,7 +92,7 @@ const P1 = sql(`SELECT id FROM parents WHERE profile_id='c4000000-0000-0000-0000
 const P2 = sql(`SELECT id FROM parents WHERE profile_id='c4000000-0000-0000-0000-0000000000f2'`);
 const COACH = sql(`SELECT id FROM coaches WHERE profile_id='c4000000-0000-0000-0000-0000000000a2'`);
 if (!P1 || !P2 || !COACH) throw new Error("fixture not loaded — load fixtures-money-admin.sql first");
-const TODAY = sql(`SELECT (now() AT TIME ZONE 'Asia/Singapore')::date`);
+const TODAY = sql(`SELECT app_today()`);
 const LAST_MONTH = sql(`SELECT to_char(session_date,'YYYY-MM') FROM lesson_sessions
                          WHERE id='c4000000-0000-0000-0000-0000000000e1'`);
 
@@ -130,9 +131,9 @@ const refsNow = async () =>
   [...new Set(((await page.locator("tbody").first().innerText().catch(() => "")).match(/CN-MA-\d{4}/g) ?? []))]
     .sort().join(",");
 async function refsUntil(want, ms = 8000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = await refsNow();
-  while (v !== want && Date.now() < end) { await page.waitForTimeout(250); v = await refsNow(); }
+  while (v !== want && Date.now() < end) { await page.waitForTimeout(250); v = await refsNow(); } // clock-real: a poll deadline (elapsed time, not a date)
   return v;
 }
 

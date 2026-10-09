@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-lesson-detail-guests.mjs — the admin lesson page's actions no other
 // driver presses (/lessons/[classId]/[date]): book a TRIAL into a lesson and
 // Cancel booking on the guest row; a make-up for a child with TWO same-category
@@ -66,9 +67,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -88,7 +89,7 @@ const FORCED = "forced by driver";
 
 // Dates from the DB (rule 4 / §7.7), never from JS local time.
 const [TODAY, NEXT, LAST] = sql(
-  `SELECT t||'|'||(t+7)||'|'||(t-7) FROM (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS t) s`
+  `SELECT t||'|'||(t+7)||'|'||(t-7) FROM (SELECT app_today() AS t) s`
 ).split("|");
 console.log(`today ${TODAY}, next week ${NEXT}, last week ${LAST}`);
 

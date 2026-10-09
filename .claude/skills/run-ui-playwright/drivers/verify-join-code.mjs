@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives the phase-3 join-code flow end to end, across both apps.
 //
 //   admin  → the tenant admin can see their join code
@@ -17,7 +18,7 @@ const check = (name, ok, detail = "") => {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? " — " + detail : ""}`);
 };
 
-const EMAIL = `join-${Date.now()}@test.local`;
+const EMAIL = `join-${Date.now()}@test.local`; // clock-real: a unique suffix, not a date
 let joinCode = null;
 
 // ── 1. Admin: read the join code off the dashboard ─────────────────────────

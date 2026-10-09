@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives the per-business Locations page: the admin defines locations, they
 // appear in sort_order with their address, a duplicate is refused in English,
 // the class form's Location dropdown is populated from them, and removing one

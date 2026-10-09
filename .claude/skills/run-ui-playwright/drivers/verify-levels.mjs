@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives per-business swimming levels: the admin defines a ladder, places a
 // student on it, and the coach + parent see the label.
 //

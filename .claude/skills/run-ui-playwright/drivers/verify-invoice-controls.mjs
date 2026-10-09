@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives the admin Invoices page controls: the billing-month picker and the
 // automatic-generation toggle.
 //
@@ -22,7 +23,7 @@
 // tenant. Both are exercised — the null-state only appears for the latter.
 
 import os from "node:os";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, nowSg, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 
@@ -77,7 +78,7 @@ try {
   // Billing month: default and cap. Invoices cover a COMPLETE month, so the
   // latest billable month is always the one before today in SGT.
   const sgToday = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Singapore" }) // date-label-ok: SGT clock, never compared as text
+    nowSg().toLocaleString("en-US", { timeZone: "Asia/Singapore" }) // date-label-ok: SGT clock, never compared as text
   );
   const expected = `${sgToday.getFullYear()}-${String(sgToday.getMonth()).padStart(2, "0")}`;
   const expectedMonth =

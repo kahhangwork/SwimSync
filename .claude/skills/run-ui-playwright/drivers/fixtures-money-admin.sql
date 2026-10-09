@@ -49,28 +49,28 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
  ('00000000-0000-0000-0000-000000000000','c4000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','money-admin-owner@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"MoneyAdm Owner","role":"tenant_admin","is_coach":false,"tenant_id":"c4000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','c4000000-0000-0000-0000-0000000000a2',
   'authenticated','authenticated','money-admin-coach@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"MoneyAdm Coach","role":"coach","tenant_id":"c4000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','c4000000-0000-0000-0000-0000000000f1',
   'authenticated','authenticated','money-admin-parent1@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"MoneyAdm Parent One","role":"parent"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','c4000000-0000-0000-0000-0000000000f2',
   'authenticated','authenticated','money-admin-parent2@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"MoneyAdm Parent Two","role":"parent"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- Reset the tenant-level settings the driver writes (rule 12: these are ours).
@@ -105,7 +105,7 @@ DECLARE
   v_p1   uuid;
   v_p2   uuid;
   v_co   uuid;
-  v_sg   date := (now() AT TIME ZONE 'Asia/Singapore')::date;
+  v_sg   date := app_today();
   v_last date;      -- the lesson: the 10th of LAST month (SGT)
   v_lm   char(7);   -- last month, YYYY-MM
   v_tm   char(7);   -- this month, YYYY-MM
@@ -196,7 +196,7 @@ BEGIN
           'c4000000-0000-0000-0000-0000000000d1','c4000000-0000-0000-0000-0000000000b1',
           'c4000000-0000-0000-0000-0000000001b1','c4000000-0000-0000-0000-0000000000e1',
           40.00,'present','cancelled_rain','MoneyAdm rain correction', t,
-          'MoneyAdm Drawnkid','applied','c4000000-0000-0000-0000-0000000000b3', now(), now()),
+          'MoneyAdm Drawnkid','applied','c4000000-0000-0000-0000-0000000000b3', now(), now()),  -- clock-real: applied_at, email_sent_at are real stamps (apply_credit_to_invoice / delivery)
          ('c4000000-0000-0000-0000-0000000002a2','CN-MA-0002', v_p2,
           'c4000000-0000-0000-0000-0000000000d2','c4000000-0000-0000-0000-0000000000b2',
           'c4000000-0000-0000-0000-0000000001b2','c4000000-0000-0000-0000-0000000000e1',
