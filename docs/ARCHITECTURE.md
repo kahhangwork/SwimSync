@@ -983,9 +983,20 @@ stamp stays `now()`; a **security / delivery window stays `now()` and must never
 
 **Prod can never move it — two locks (D3).** Lock 1: `private.clock_override_enabled` (schema not exposed, no API
 grant) holds a row only where `seed.sql` ran — local and CI. A pin without the row RAISEs; **never insert that row on
-prod.** Lock 2: `session_user = 'authenticator'` (PostgREST, edge functions) ignores any pin — so the engine and the
-UI drivers always run on the real clock. A pin must carry a UTC offset (§7.337). Nothing but `app_now()` may mention
-`swimsync.now` or call `set_config`.
+prod.** Lock 2: `session_user = 'authenticator'` (PostgREST, edge functions) ignores any pin **unless the local-only
+row `private.clock_api_pin_enabled` exists** (2026-10-09, `20261009000200`). A pin must carry a UTC offset (§7.337).
+Nothing but `app_now()` may mention `swimsync.now` or call `set_config`.
+
+**Addendum (2026-10-09) — the API and the engine can follow a pin, locally only** (`PIN_DRIVER_CLOCK_PLAN.md`). The
+engine no longer reads the edge runtime's clock: `generate-invoices` passes `app_now()` (RPC, `clock.ts`) as
+`opts.now`, so on prod it is `now()` and under a local pin it is the pin. It fails closed off a local stack if the DB
+and wall clocks disagree by over 120 s. A UI run is pinned by **`run-all-drivers.sh --now`** alone: it sets
+`swimsync.now` at DATABASE level **as `supabase_admin`** (`postgres` cannot, §7.355), inserts the API row, and
+restarts rest + kong for a fresh pool (§7.356); its trap deletes the row first, then RESETs. The fixture roundtrip
+pins with **`PGOPTIONS`** (session-only, sibling-safe), never `ALTER DATABASE`. Prod stays real three times over: no
+pin is ever set there (line 1 returns first), no migration or seed inserts the API row, and lock 1 still RAISEs —
+checked after the API line. **Never** insert `clock_api_pin_enabled` from a migration, seed or anything that can reach
+`--linked`; pgTAP is red on a row or a database/role-level pin left behind (`scripts/clock-unpin.sh` clears both).
 
 **Kept true by checks, not memory:** G2 refuses a raw clock in a new migration (`-- clock: stamp` / `-- clock-real:`
 to opt a line out); the **frozen clock census** in `app_clock.test.sql` is red on any change to which public function
