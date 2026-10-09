@@ -405,3 +405,10 @@ Deno.test("blockedNoticeRecipients: coaches, platform, owner and operations:edit
   ).map((r) => r.id);
   assertEquals(got, ["coach", "platform", "owner", "ops"]);
 });
+
+// September is "Sept" — the apps' en-SG spelling, and the DB's since 20261009000100 (§7.302).
+Deno.test("formatSessionDate writes September as Sept; formatBillingMonth keeps the long name", () => {
+  assertEquals(formatSessionDate("2026-09-06"), "6 Sept 2026");
+  assertEquals(formatSessionDate("2026-08-06"), "6 Aug 2026");
+  assertEquals(formatBillingMonth("2026-09"), "September 2026");
+});

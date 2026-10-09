@@ -34,7 +34,7 @@ const MONTHS_LONG = [
 ];
 const MONTHS_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jul", "Aug", "Sept", "Oct", "Nov", "Dec",
 ];
 
 const DEFAULT_FROM = "SwimSync <noreply@swimsync.sg>";

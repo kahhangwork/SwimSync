@@ -298,13 +298,15 @@ describe("attentionSummary — the Dashboard line", () => {
 
 it("monthLabel is timezone-proof", () => {
   expect(monthLabel("2026-01")).toBe("Jan 2026");
+  // September is "Sept" — the apps' en-SG spelling, and the DB's since 20261009000100 (§7.302).
+  expect(monthLabel("2026-09")).toBe("Sept 2026");
   expect(monthLabel("garbage")).toBe("garbage");
 });
 
 it("formatRunStamp shows SINGAPORE time, not the viewer's", () => {
-  // 01:49Z = 09:49 SGT on 14 Sep.
+  // 01:49Z = 09:49 SGT on 14 Sept.
   const s = formatRunStamp("2026-09-14T01:49:00Z");
-  expect(s).toContain("14 Sep");
+  expect(s).toContain("14 Sept");
   expect(s).toContain("09:49");
   expect(formatRunStamp("nonsense")).toBe("nonsense");
 });

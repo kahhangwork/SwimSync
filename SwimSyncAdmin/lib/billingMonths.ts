@@ -116,7 +116,7 @@ const NOTHING = "nothing_to_bill";
 const ERROR = "error";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
 
 /** "2026-08" → "Aug 2026". Built from the string, so no timezone can move it. */
 export function monthLabel(ym: string): string {
@@ -158,7 +158,7 @@ export function reasonFor(run: BillingRun): string {
 }
 
 const PRE_FEATURE_REASON =
-  "Reason not recorded (last run was before 22 Sep 2026) — generate again to see why";
+  "Reason not recorded (last run was before 22 Sept 2026) — generate again to see why";
 
 export type DeriveInput = {
   periods: BillingPeriod[];
@@ -363,7 +363,7 @@ export function attentionSummary(rows: BillingMonthRow[]): string | null {
   return due.length > 1 ? `${head} (+${due.length - 1} more)` : head;
 }
 
-/** DISPLAY ONLY: a run's timestamptz as "14 Sep, 09:49" in Singapore time,
+/** DISPLAY ONLY: a run's timestamptz as "14 Sept, 09:49" in Singapore time,
  *  whatever the viewer's zone (§7.229's rule — display pins the zone). Degrades
  *  to the raw string rather than throwing. */
 export function formatRunStamp(iso: string): string {

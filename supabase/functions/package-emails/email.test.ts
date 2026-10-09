@@ -56,7 +56,7 @@ Deno.test("offered: subject + body carry the terms, start date and pay link", ()
   );
   const html = buildOfferedHtml(d);
   assertStringIncludes(html, "S$400.00");
-  assertStringIncludes(html, "1 Sep 2026");
+  assertStringIncludes(html, "1 Sept 2026");
   assertStringIncludes(
     html,
     "https://swimsync.sg/package/deadbeefdeadbeefdeadbeefdeadbeef",
@@ -190,6 +190,8 @@ Deno.test("discounted offer/confirm show amount_payable + a discount line", () =
 
 Deno.test("formatDate never shifts across a timezone (string in, string out)", () => {
   assertEquals(formatDate("2027-01-01"), "1 Jan 2027");
+  // September is "Sept" — the apps' en-SG spelling, and the DB's since 20261009000100 (§7.302).
+  assertEquals(formatDate("2026-09-06"), "6 Sept 2026");
   assertEquals(formatDate("not-a-date"), "not-a-date");
 });
 

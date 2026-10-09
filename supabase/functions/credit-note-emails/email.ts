@@ -248,7 +248,7 @@ function escapeHtml(s: string): string {
 // "2027-07-10" → "10 Jul 2027", no Date object → no timezone drift (⚠ RISK 13).
 const MONTHS_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jul", "Aug", "Sept", "Oct", "Nov", "Dec",
 ];
 export function formatDate(dateStr: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);

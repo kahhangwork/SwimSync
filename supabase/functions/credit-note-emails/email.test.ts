@@ -118,6 +118,8 @@ Deno.test("⚠ RISK 13: formatDate parses the string, no Date object, no drift",
   assertEquals(formatDate("2026-08-15"), "15 Aug 2026");
   assertEquals(formatDate("2026-01-01"), "1 Jan 2026");
   assertEquals(formatDate("2026-12-31"), "31 Dec 2026");
+  // September is "Sept" — the apps' en-SG spelling, and the DB's since 20261009000100 (§7.302).
+  assertEquals(formatDate("2026-09-06"), "6 Sept 2026");
   // Malformed input degrades to itself rather than to "Invalid Date".
   assertEquals(formatDate("not-a-date"), "not-a-date");
   assertEquals(formatDate("2026-13-01"), "2026-13-01");
