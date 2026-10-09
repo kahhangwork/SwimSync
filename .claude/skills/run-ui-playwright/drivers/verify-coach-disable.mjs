@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drive coach disable/reactivate end to end (Wave 5 chunk 2, 20260813000200).
 //
 // What only THIS driver can prove (pgTAP owns the RLS/RPC layer): the BAN half

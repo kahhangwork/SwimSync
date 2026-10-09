@@ -1,3 +1,4 @@
+// clock: pinnable
 // Admin class create/edit — day is now a required explicit choice (no silent
 // Saturday default), and existing classes can be edited in-app (no dashboard SQL).
 //

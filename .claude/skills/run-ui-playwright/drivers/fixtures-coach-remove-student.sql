@@ -39,10 +39,10 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES ('00000000-0000-0000-0000-000000000000','b4000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','coach-remove-coach@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"CoachRm Coach","role":"coach","tenant_id":"b4000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO class_categories (id, tenant_id, name)

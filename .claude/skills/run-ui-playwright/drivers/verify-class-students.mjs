@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-class-students.mjs — the admin Classes page's "See students" drawer
 // and its "2+1" count badge.
 //
@@ -80,7 +81,7 @@ function sql(q) {
     SELECT string_agg(s.full_name, ',')
       FROM trial_bookings tb JOIN students s ON s.id = tb.student_id
      WHERE tb.class_id = '${CLASS_ID}' AND tb.cancelled_at IS NULL
-       AND tb.session_date >= (now() AT TIME ZONE 'Asia/Singapore')::date`);
+       AND tb.session_date >= app_today()`);
   check("one UPCOMING live trial exists (Dev)",
     upcoming === "ClsRoster Dev", `got "${upcoming}"`);
 
@@ -88,7 +89,7 @@ function sql(q) {
     SELECT string_agg(s.full_name, ',')
       FROM trial_bookings tb JOIN students s ON s.id = tb.student_id
      WHERE tb.class_id = '${CLASS_ID}' AND tb.cancelled_at IS NULL
-       AND tb.session_date < (now() AT TIME ZONE 'Asia/Singapore')::date`);
+       AND tb.session_date < app_today()`);
   check("a PAST trial exists (Eve) — the date control",
     past === "ClsRoster Eve", `got "${past}"`);
 
@@ -96,7 +97,7 @@ function sql(q) {
     SELECT string_agg(s.full_name, ',')
       FROM trial_bookings tb JOIN students s ON s.id = tb.student_id
      WHERE tb.class_id = '${CLASS_ID}' AND tb.cancelled_at IS NOT NULL
-       AND tb.session_date >= (now() AT TIME ZONE 'Asia/Singapore')::date`);
+       AND tb.session_date >= app_today()`);
   check("a CANCELLED but future-dated trial exists (Finn) — the cancel control",
     cancelled === "ClsRoster Finn", `got "${cancelled}"`);
 

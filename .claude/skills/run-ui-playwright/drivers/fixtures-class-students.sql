@@ -55,7 +55,7 @@ SELECT 'c5000000-0000-0000-0000-0000000000C1'::uuid,
        '70000000-0000-0000-0000-000000000001',
        co.id,
        'ClsRoster Class',
-       lower(to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'FMday'))::day_of_week,
+       lower(to_char(app_today(), 'FMday'))::day_of_week,
        '09:00', '10:00', 'c5000000-0000-0000-0000-0000000010c1', 30.00,
        '7c000000-0000-0000-0000-000000000002',
        TRUE
@@ -129,20 +129,20 @@ SELECT '70000000-0000-0000-0000-000000000001', v.student_id, v.class_id,
   FROM (VALUES
     ('c5000000-0000-0000-0000-0000000000D1'::uuid,
      'c5000000-0000-0000-0000-0000000000C1'::uuid,
-     (now() AT TIME ZONE 'Asia/Singapore')::date + 7,
+     app_today() + 7,
      NULL::timestamptz, NULL::uuid),
     -- Past: the count is "who is still coming", so this drops out the day
     -- after its lesson. Chased on the Trials page's "Past — needs marking".
     ('c5000000-0000-0000-0000-0000000000E1'::uuid,
      'c5000000-0000-0000-0000-0000000000C1'::uuid,
-     (now() AT TIME ZONE 'Asia/Singapore')::date - 7,
+     app_today() - 7,
      NULL::timestamptz, NULL::uuid),
     -- Cancelled but FUTURE-dated: the date alone would let this one through,
     -- which is exactly why it is here.
     ('c5000000-0000-0000-0000-0000000000F1'::uuid,
      'c5000000-0000-0000-0000-0000000000C1'::uuid,
-     (now() AT TIME ZONE 'Asia/Singapore')::date + 7,
-     now(), 'c0000000-0000-0000-0000-000000000001'::uuid)
+     app_today() + 7,
+     now(), 'c0000000-0000-0000-0000-000000000001'::uuid)  -- clock-real: trial_bookings.cancelled_at is a real stamp (cancel_trial_booking writes NOW())
   ) AS v(student_id, class_id, session_date, cancelled_at, cancelled_by)
  WHERE NOT EXISTS (
    SELECT 1 FROM trial_bookings tb
@@ -154,7 +154,7 @@ SELECT s.full_name,
        e.is_active                       AS enrolment_active,
        tb.session_date,
        (tb.cancelled_at IS NOT NULL)     AS booking_cancelled,
-       CASE WHEN tb.session_date >= (now() AT TIME ZONE 'Asia/Singapore')::date
+       CASE WHEN tb.session_date >= app_today()
             THEN 'UPCOMING' ELSE 'PAST' END AS when_
   FROM students s
   LEFT JOIN student_class_enrolments e

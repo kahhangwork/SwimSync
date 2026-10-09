@@ -54,7 +54,7 @@
 -- today_sg(), not CURRENT_DATE: CURRENT_DATE is the server's UTC date, a day
 -- behind before 08:00 SGT (§7.7).
 CREATE TEMP TABLE rc AS
-WITH t AS (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS today)
+WITH t AS (SELECT app_today() AS today)
 SELECT
   today,
   (today - 7)                                    AS lesson_date,
@@ -82,16 +82,16 @@ INSERT INTO auth.users (
 ) VALUES
   ('00000000-0000-0000-0000-000000000000','c7000000-0000-0000-0000-000000000001',
    'authenticated','authenticated','roster-sub@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"RosterCov Sub","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   ('00000000-0000-0000-0000-000000000000','c7000000-0000-0000-0000-000000000002',
    'authenticated','authenticated','roster-shadow@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"RosterCov Shadow","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- Both need a rate, or generate_coach_payouts skips them entirely — not
@@ -253,19 +253,19 @@ BEGIN
   SELECT c.day_of_week, c.end_time INTO v_dow, v_end
     FROM classes c WHERE c.id = 'c7000000-0000-0000-0000-00000000000a';
   SELECT lesson_date INTO v_date FROM rc;
-  v_now := (now() AT TIME ZONE 'Asia/Singapore')::time;
+  v_now := (app_now() AT TIME ZONE 'Asia/Singapore')::time;
 
   -- The class must run on TODAY'S weekday, or its lesson is not in the current
   -- week and the week card renders it as Upcoming rather than as a straggler.
   IF v_dow <> (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
-              )[EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 1]::day_of_week THEN
+              )[EXTRACT(DOW FROM app_today())::int + 1]::day_of_week THEN
     RAISE EXCEPTION 'fixture: the class weekday (%) is not today''s in SGT — '
                     'the lesson would render as Upcoming, not as a straggler.', v_dow;
   END IF;
 
   -- RISK 4. The whole of part C is vacuous if the lesson has not ended, which is
   -- why it is LAST week's and not today's. Re-proven rather than assumed.
-  IF v_date >= (now() AT TIME ZONE 'Asia/Singapore')::date THEN
+  IF v_date >= app_today() THEN
     RAISE EXCEPTION 'fixture: the lesson under test (%) is not in the past. '
                     'It would be Upcoming, on nobody''s NEEDS MARKING list, and '
                     'the replaced-coach checks would pass while testing nothing.', v_date;

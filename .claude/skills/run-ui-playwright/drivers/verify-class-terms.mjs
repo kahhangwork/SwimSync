@@ -1,3 +1,4 @@
+// clock: pinnable
 // Admin class terms — effective-dated price/coach via set_class_terms
 // (migrations 20260719000700–001000).
 //

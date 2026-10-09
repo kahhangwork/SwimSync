@@ -61,16 +61,8 @@ OWN_LITERAL=(verify-edit-child.mjs verify-student-identity.mjs verify-tz-saturda
 # ⚠ THE SWEEP RATCHETS. Remove a file the commit that converts it; lower the
 # constant with it. Both lists — and both constants — are deleted at the close of
 # the sweep, after which an unmarked driver or a raw-clock fixture is simply red.
-UNSWEPT_MAX=52
+UNSWEPT_MAX=44
 UNSWEPT=(
-  verify-class-deactivation.mjs
-  verify-class-edit.mjs
-  verify-class-students.mjs
-  verify-class-terms.mjs
-  verify-coach-disable.mjs
-  verify-coach-marking.mjs
-  verify-coach-remove-student.mjs
-  verify-coach-roster.mjs
   verify-coach-schedule-roles.mjs
   verify-coach-wages.mjs
   verify-contact-details.mjs
@@ -116,14 +108,8 @@ UNSWEPT=(
   verify-trials.mjs
   verify-tz-saturday.mjs
 )
-UNSWEPT_FIXTURES_MAX=28
+UNSWEPT_FIXTURES_MAX=22
 UNSWEPT_FIXTURES=(
-  fixtures-class-deactivation.sql
-  fixtures-class-students.sql
-  fixtures-coach-disable.sql
-  fixtures-coach-marking.sql
-  fixtures-coach-remove-student.sql
-  fixtures-coach-roster.sql
   fixtures-coach-schedule-roles.sql
   fixtures-contact-details.sql
   fixtures-enrolment-start.sql

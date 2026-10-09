@@ -30,7 +30,7 @@
 \set ON_ERROR_STOP on
 
 CREATE TEMP TABLE dc AS
-WITH t AS (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS today)
+WITH t AS (SELECT app_today() AS today)
 SELECT
   today,
   (today - 7) AS override_date,
@@ -47,16 +47,16 @@ INSERT INTO auth.users (
 ) VALUES
   ('00000000-0000-0000-0000-000000000000','dcaa0000-0000-0000-0000-000000000001',
    'authenticated','authenticated','dc-target@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"DisableCov Target","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   ('00000000-0000-0000-0000-000000000000','dcaa0000-0000-0000-0000-000000000002',
    'authenticated','authenticated','dc-replace@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"DisableCov Replacement","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- Rates for both — generate_coach_payouts skips a coach with none, and a

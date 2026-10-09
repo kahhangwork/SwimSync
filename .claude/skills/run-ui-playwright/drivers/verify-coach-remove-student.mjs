@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-coach-remove-student.mjs — the coach roster's Remove (cancel AND
 // accept, proved in the DATABASE) and the level curriculum's Hide, on
 // (coach)/classes/[id]/roster. Before this driver neither was pressed by
@@ -44,7 +45,7 @@
 // (2026-09-26, both reverted.)
 
 import { execFileSync } from "node:child_process";
-import { launch, loginExpo, pressByText, visibleText, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, pressByText, visibleText, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 for (const u of [ADMIN, EXPO]) {
@@ -64,9 +65,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -74,9 +75,9 @@ async function dbUntil(q, ok, ms = 10000) {
 }
 // Poll the VISIBLE screen's text until `ok` — never a bare sleep (rule 13).
 async function screenUntil(page, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let t = await visibleText(page);
-  while (!ok(t) && Date.now() < end) {
+  while (!ok(t) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await page.waitForTimeout(300);
     t = await visibleText(page);
   }
@@ -124,10 +125,10 @@ const pressRemoveFor = (page, childName) =>
     return "no Remove in the card";
   }, childName);
 
-const todaySg = sql(`SELECT (now() AT TIME ZONE 'Asia/Singapore')::date`);
+const todaySg = sql(`SELECT app_today()`);
 const { browser, ctx, page } = await launch({ mobile: true });
 page.setDefaultTimeout(15000);
-await ctx.clock.install({ time: new Date(`${todaySg}T12:00:00+08:00`) });
+await installDerivedClock(ctx, new Date(`${todaySg}T12:00:00+08:00`)); // DB today (follows --now), noon SGT
 
 // Answer every dialog ourselves: `mode` says how, `dialogs` records what fired.
 page.removeAllListeners("dialog");

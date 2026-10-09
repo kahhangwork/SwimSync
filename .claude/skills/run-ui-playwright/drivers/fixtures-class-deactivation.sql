@@ -101,7 +101,7 @@ SELECT
   'c9500000-0000-0000-0000-000000000002',
   'c9000000-0000-0000-0000-0000000000e3',
   -- +7 days in SGT, so it is future whatever hour the nightly sweep runs at.
-  ((now() AT TIME ZONE 'Asia/Singapore')::date + 7),
+  (app_today() + 7),
   (SELECT category_id FROM classes WHERE id = 'c9000000-0000-0000-0000-0000000000e3'),
   (SELECT id FROM profiles WHERE email = 'coach@swimsync.test')
 ON CONFLICT (id) DO NOTHING;

@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-coach-roster.mjs — the coach roster, end to end.
 //
 // TWO DIFFERENT ARRANGEMENTS, AND THE DRIVER'S JOB IS THAT THEY STAY DIFFERENT:
@@ -133,7 +134,7 @@ function sql(q) {
 // resolves-or-creates, and the coach's first save would too — so it is COMPUTED,
 // never read back from a table that may legitimately be empty.
 const PATTERN_DATE = sql(
-  `SELECT ((now() AT TIME ZONE 'Asia/Singapore')::date - 7)::text`
+  `SELECT (app_today() - 7)::text`
 );
 const MONTH = PATTERN_DATE.slice(0, 7);
 // "Tue, 11 Aug" — how formatSgDate renders a lesson date in the admin table

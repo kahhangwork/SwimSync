@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-coach-marking.mjs — the coach marking screen,
 // (coach)/classes/[id]/attendance, on the three things no driver asserted:
 //
@@ -54,7 +55,7 @@
 // shadowing notice ABOVE a Save button — the notice alone would not have caught it.
 
 import { execFileSync } from "node:child_process";
-import { launch, loginExpo, pressByText, visibleText, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, pressByText, visibleText, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API_URL = "http://127.0.0.1:54321";
@@ -75,9 +76,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -85,9 +86,9 @@ async function dbUntil(q, ok, ms = 10000) {
 }
 // Poll the VISIBLE screen's text until `ok` — never a bare sleep (rule 13).
 async function screenUntil(page, ok, ms = 20000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let t = await visibleText(page);
-  while (!ok(t) && Date.now() < end) {
+  while (!ok(t) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await page.waitForTimeout(300);
     t = await visibleText(page);
   }
@@ -167,7 +168,7 @@ const apiOrigins = new Set();
 async function openCoach(email) {
   const { browser, ctx, page } = await launch({ mobile: true });
   page.setDefaultTimeout(15000);
-  await ctx.clock.install({ time: new Date(`${todaySg}T12:00:00+08:00`) });
+  await installDerivedClock(ctx, new Date(`${todaySg}T12:00:00+08:00`)); // DB today (follows --now), noon SGT
   page.removeAllListeners("dialog");
   page.on("dialog", (d) => { dialogs.push(d.message()); d.dismiss().catch(() => {}); });
   page.on("request", (r) => {
@@ -203,9 +204,9 @@ async function saveAndToast(page) {
 }
 
 async function pathUntil(page, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let p = new URL(page.url()).pathname;
-  while (!ok(p) && Date.now() < end) {
+  while (!ok(p) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await page.waitForTimeout(300);
     p = new URL(page.url()).pathname;
   }

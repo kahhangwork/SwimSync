@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-class-deactivation.mjs — retiring and restoring a class from the admin
 // Classes page (Wave 1 item #6, Chunk 4).
 //
@@ -102,7 +103,7 @@ function rowFor(page, title) {
     SELECT s.full_name FROM trial_bookings tb
       JOIN students s ON s.id = tb.student_id
      WHERE tb.class_id = '${BOOKED}' AND tb.cancelled_at IS NULL
-       AND tb.session_date >= (now() AT TIME ZONE 'Asia/Singapore')::date`);
+       AND tb.session_date >= app_today()`);
   check("the booked class really has a FUTURE trial (Noah)",
     guest === "ClsRetire Noah", `got "${guest}"`);
 
