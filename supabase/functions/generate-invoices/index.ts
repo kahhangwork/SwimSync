@@ -21,6 +21,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateInvoices, type GenerateOptions } from "./core.ts";
 import { recordRuns, toErrorRows, toRunRows } from "./runLog.ts";
+import { withDbNow } from "./clock.ts";
 import {
   emailCreatedInvoices,
   notifyGenerationBlocked,
@@ -77,6 +78,10 @@ Deno.serve(async (req: Request) => {
   // (an alert or email step) cannot add an "error" row for a run that billed.
   let runRecorded = false;
   try {
+    // The engine's "now" is the DATABASE's app_now() — the real clock on prod,
+    // a driver's pinned moment locally (clock.ts, PIN_DRIVER_CLOCK_PLAN D3).
+    // Inside the try so a failure records an error run for a scoped run.
+    opts = await withDbNow(opts, supabase, { supabaseUrl: Deno.env.get("SUPABASE_URL") });
     const result = await generateInvoices(supabase, opts);
 
     // Record the attempt BEFORE any email: billing has committed, and a slow or
