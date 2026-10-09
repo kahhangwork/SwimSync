@@ -49,8 +49,8 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 SELECT '00000000-0000-0000-0000-000000000000', v.id::uuid, 'authenticated','authenticated',
-       v.email, crypt('password123', gen_salt('bf')), now(),
-       '{"provider":"email","providers":["email"]}', v.meta::jsonb, now(), now(), '','','',''
+       v.email, crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
+       '{"provider":"email","providers":["email"]}', v.meta::jsonb, now(), now(), '','','',''  -- clock-real: auth.users stamps are real time
   FROM (VALUES
     ('d5000000-0000-0000-0000-0000000000a1','platform-ctl-a-owner@swimsync.test',
      '{"full_name":"PlatCtl Alpha Owner","role":"tenant_admin","is_coach":true,"tenant_id":"d5000000-0000-0000-0000-000000000001"}'),
@@ -129,7 +129,7 @@ DELETE FROM parent_tenants pt USING parents p
    AND pt.tenant_id = 'd5000000-0000-0000-0000-000000000002';
 
 INSERT INTO parent_tenants (parent_id, tenant_id, is_active, inactivated_at)
-SELECT p.id, v.tid, v.active, CASE WHEN v.active THEN NULL ELSE now() END
+SELECT p.id, v.tid, v.active, CASE WHEN v.active THEN NULL ELSE now() END  -- clock-real: inactivated_at is a real stamp (set_parent_tenant_active writes NOW())
   FROM (VALUES
     ('d5000000-0000-0000-0000-0000000000f2'::uuid,'d5000000-0000-0000-0000-000000000001'::uuid,TRUE),
     ('d5000000-0000-0000-0000-0000000000f3'::uuid,'d5000000-0000-0000-0000-000000000001'::uuid,TRUE),

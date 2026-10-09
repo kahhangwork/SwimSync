@@ -23,10 +23,10 @@ INSERT INTO auth.users (
   '00000000-0000-0000-0000-000000000000',
   'c1a00000-0000-0000-0000-00000000d001',
   'authenticated', 'authenticated', 'claimparent@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Claim Parent","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 -- The phone the coach also wrote on the poolside form, in the OTHER format:
@@ -61,8 +61,8 @@ INSERT INTO students (
 INSERT INTO lesson_sessions (id, class_id, session_date)
 SELECT 'c1a00000-0000-0000-0000-00000000f001',
        c.id,
-       (now() AT TIME ZONE 'Asia/Singapore')::date
-         - ((EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 1) % 7)
+       app_today()
+         - ((EXTRACT(DOW FROM app_today())::int + 1) % 7)
   FROM classes c
  WHERE c.title = 'Saturday Beginners'
    AND c.tenant_id = '70000000-0000-0000-0000-000000000001'

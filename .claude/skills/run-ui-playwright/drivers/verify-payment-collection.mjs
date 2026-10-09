@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-payment-collection.mjs — payment collection end to end (PRD §7.21).
 //
 // WHAT THIS PROVES (and deliberately does not):

@@ -1,3 +1,4 @@
+// clock: pinnable
 // A parent claiming the child their coach already added — end to end, both UIs.
 //
 // WHAT THIS PROVES, AND WHAT IT DELIBERATELY DOES NOT.

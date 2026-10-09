@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives the platform-admin surfaces: the cross-tenant business list and the
 // student rescue tool (moving a child who joined with the wrong code).
 //
@@ -34,14 +35,14 @@ const svc = createClient(
 // otherwise share the label, and selectOption({ label }) picks the FIRST match
 // — which silently moved the child into the wrong (old) tenant and made the
 // database assertion fail while the UI reported success.
-const RESCUE_NAME = `Rescue Swim Academy ${String(Date.now()).slice(-5)}`;
+const RESCUE_NAME = `Rescue Swim Academy ${String(Date.now()).slice(-5)}`; // clock-real: a unique suffix, not a date
 
 const { data: t2 } = await svc
   .from("tenants")
   .insert({
-    slug: `rescue-${Date.now()}`,
+    slug: `rescue-${Date.now()}`, // clock-real: a unique suffix, not a date
     display_name: RESCUE_NAME,
-    join_code: `SWIM-RS${String(Date.now()).slice(-2)}`,
+    join_code: `SWIM-RS${String(Date.now()).slice(-2)}`, // clock-real: a unique suffix, not a date
   })
   .select("id")
   .single();

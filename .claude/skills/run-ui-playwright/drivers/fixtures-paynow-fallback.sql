@@ -36,20 +36,20 @@ INSERT INTO auth.users (
   ('00000000-0000-0000-0000-000000000000',
    'b1000000-0000-0000-0000-0000000000f1',
    'authenticated', 'authenticated', 'parent-pnfb@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Pat Fallback","role":"parent"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   -- A PLAIN coach — not an admin. The persona for "the admin-panel link must
   -- be ABSENT, not merely disabled": a disabled link still leaks that the
   -- panel exists to a role that cannot use it (§7.91).
   ('00000000-0000-0000-0000-000000000000',
    'b1000000-0000-0000-0000-0000000000f2',
    'authenticated', 'authenticated', 'coach-pnfb@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Pnfb Coach","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO parent_tenants (parent_id, tenant_id)

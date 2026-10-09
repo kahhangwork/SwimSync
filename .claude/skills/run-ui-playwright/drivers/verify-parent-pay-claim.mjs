@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-parent-pay-claim.mjs — Pay and claim from the parent's invoice LIST.
 //
 // WHY THIS EXISTS. Until 2026-08-08 both controls lived only inside the invoice

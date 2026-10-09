@@ -27,14 +27,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','da100000-0000-0000-0000-0000000000a1',
    'authenticated','authenticated','pay-driver-admin@swimsync.test',
-   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',
+   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',  -- clock-real: auth.users stamps are real time
    '{"full_name":"Pay Driver Admin","role":"tenant_admin","tenant_id":"da100000-0000-0000-0000-000000000001"}',
-   now(), now(), '','','',''),
+   now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
   ('00000000-0000-0000-0000-000000000000','da100000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','pay-driver-parent@swimsync.test',
-   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',
+   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',  -- clock-real: auth.users stamps are real time
    '{"full_name":"Pay Driver Parent","role":"parent"}',
-   now(), now(), '','','','')
+   now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- The parent's phone is what the WhatsApp button dials — set it on the

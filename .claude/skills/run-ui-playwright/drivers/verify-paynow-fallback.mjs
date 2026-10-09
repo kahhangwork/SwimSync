@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives the PayNow fallback chain (Wave 1 Chunk 2, plan RISK 3).
 //
 // WHY THIS DRIVER EXISTS, AND WHY IT IS NOT OPTIONAL. Chunk 2 made the

@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives the parent REFERRAL discount end to end on the admin UI
 // (REFERRAL_PLAN.md, Phase 4).
 //
@@ -80,9 +81,9 @@ function seedUser(authu, email, name, phone) {
         email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,
         confirmation_token,recovery_token,email_change_token_new,email_change)
        VALUES ('00000000-0000-0000-0000-000000000000','${authu}','authenticated',
-        'authenticated','${email}',crypt('x',gen_salt('bf')),now(),
+        'authenticated','${email}',crypt('x',gen_salt('bf')),now(), /* clock-real: auth.users stamps are real time */
         '{"provider":"email"}','{"full_name":"${name}","role":"parent","phone":"${phone}"}',
-        now(),now(),'','','','')`);
+        now(),now(),'','','','')`); /* clock-real: auth.users stamps are real time */
   sql(`INSERT INTO parent_tenants (parent_id, tenant_id)
        SELECT id, '${T}' FROM parents WHERE profile_id='${authu}'`);
 }
@@ -114,7 +115,7 @@ function seed() {
        SELECT id, '${STU_E}' FROM parents WHERE profile_id='${E}'`);
   sql(`INSERT INTO student_class_enrolments (student_id, class_id) VALUES ('${STU_E}','${CLASS}')`);
   sql(`INSERT INTO parent_packages (tenant_id, parent_id, product_id, status, start_date)
-       SELECT '${T}', id, '${PROD}', 'active', CURRENT_DATE - 21
+       SELECT '${T}', id, '${PROD}', 'active', app_today() - 21
        FROM parents WHERE profile_id='${E}'`);
 
   // E was referred by R → a pending referral + E's first-package reward.
@@ -210,7 +211,7 @@ try {
        VALUES ('${T}', ${parentId(H)}, 'manual', NULL, 'available')`);
   sql(`INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status)
        SELECT '${CLAIMED_PKG}', '${T}', ${parentId(H)}, '${PROD}', 'pending'`);
-  sql(`UPDATE parent_packages SET paid_claimed_at=now() WHERE id='${CLAIMED_PKG}'`);
+  sql(`UPDATE parent_packages SET paid_claimed_at=now() /* clock-real: claim_invoice_paid stamps it NOW() */ WHERE id='${CLAIMED_PKG}'`);
   const rewId = sql(`SELECT referral_reward_id FROM parent_packages WHERE id='${CLAIMED_PKG}'`);
   // Call AS the admin (jwt claims) so can_admin_tenant passes and we reach the
   // claim-refusal, not the authorization guard (as postgres auth.uid() is null).
@@ -233,7 +234,7 @@ try {
        VALUES ('${T}', ${parentId(R)}, ${parentId(H)}, 'REF-SEEDED')`);
   sql(`INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status)
        SELECT '${H_PKG}', '${T}', ${parentId(H)}, '${PROD}', 'pending'`);
-  sql(`UPDATE parent_packages SET status='active', start_date=CURRENT_DATE WHERE id='${H_PKG}'`);
+  sql(`UPDATE parent_packages SET status='active', start_date=app_today() WHERE id='${H_PKG}'`);
   const hRefStatus = sql(`SELECT status||':'||COALESCE(void_reason,'') FROM referrals
     WHERE referee_parent_id=${parentId(H)}`);
   check(hRefStatus === "void:same_household",

@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-platform-controls.mjs — the five Platform surfaces no other driver
 // opens: the stranded-parents panel ("Signed up but not in any business"), the
 // `N unpaid` staff_without_rate chip, the Change / Set owner modal AND its
@@ -67,9 +68,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }

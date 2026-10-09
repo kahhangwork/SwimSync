@@ -1,3 +1,4 @@
+// clock: pinnable
 // The admin panel is scoped by AUDIENCE: pages that show one business refuse an
 // account that has none.
 //
