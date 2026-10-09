@@ -1,3 +1,4 @@
+// clock: pinnable
 // Make-ups as bookings, end to end through both real UIs.
 //
 // THE LOAD-BEARING ASSERTIONS mirror verify-trials.mjs: the booked guest
@@ -22,7 +23,7 @@
 // SwimSyncAdmin npm run dev; SwimSyncApp expo web.
 import os from "node:os";
 import path from "node:path";
-import { launch, loginAdmin, loginExpo, gotoAuthed, tap, sgLabel, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, gotoAuthed, tap, sgLabel, todaySg, ADMIN, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -41,8 +42,7 @@ const HOME_TITLE = "Makeup Home Sunday";
 // off-schedule host session on today's date, which the picker offers and
 // book_makeup() accepts — so the coach marking-screen checks run on every
 // run, whatever the weekday.
-const sgNow = new Date(Date.now() + 8 * 3600 * 1000); // SGT = UTC+8, no DST
-const BOOK_ISO = sgNow.toISOString().slice(0, 10);
+const BOOK_ISO = todaySg(); // the fixture's app_today(): the same day, pinned or not
 const BOOK_LABEL = sgLabel(BOOK_ISO);
 
 const { browser, page } = await launch();

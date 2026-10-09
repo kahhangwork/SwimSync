@@ -20,10 +20,10 @@ INSERT INTO auth.users (
 ) VALUES (
   '00000000-0000-0000-0000-000000000000','7e000000-0000-0000-0000-0000000000d1',
   'authenticated','authenticated','makeupvis-parent@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Makeupvis Parent","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
@@ -86,7 +86,7 @@ WHERE NOT EXISTS (
 -- in SGT, never CURRENT_DATE (UTC is yesterday before 08:00 SGT).
 INSERT INTO lesson_sessions (class_id, session_date, off_schedule_reason)
 VALUES ('7e0c1a55-0000-0000-0000-000000000002',
-        (now() AT TIME ZONE 'Asia/Singapore')::date,
+        app_today(),
         'driver: make-up marking today')
 ON CONFLICT (class_id, session_date) DO NOTHING;
 

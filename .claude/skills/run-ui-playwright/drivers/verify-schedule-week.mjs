@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-schedule-week.mjs — the coach's Schedule tab and its week selector.
 //
 // WHAT THIS OWNS, AND WHY IT IS A SEPARATE DRIVER.
@@ -81,7 +82,7 @@ function sql(q) {
   ).trim();
 }
 
-const TODAY = sql("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date");
+const TODAY = sql("SELECT app_today()");
 const D_PREV = sql(`SELECT '${TODAY}'::date - 7`);
 const PREV_LABEL = sgLabel(D_PREV);
 // The fixture's own lesson NEXT week — the COMING UP day this driver drives.
@@ -308,7 +309,7 @@ try {
   const floorWeek = sql(
     `SELECT to_char(date_trunc('week', LEAST(
         markable_window_start(),
-        (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date) - interval '1 month')::date
+        (date_trunc('month', app_today()) - interval '1 month')::date
      ))::date, 'FMDD Mon')`
   ).trim();
   check(

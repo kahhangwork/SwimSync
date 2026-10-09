@@ -125,6 +125,19 @@ export async function pinBrowser(context) {
   return context;
 }
 
+/** Set a context's browser clock to a moment the DRIVER DERIVED from the
+ *  database — e.g. "the Wednesday after the fixture's missing Saturday" — rather
+ *  than to now. The fixture's dates follow app_today(), so under --now the moment
+ *  follows the pin and the run is the one the real clock gives on that day. It is
+ *  exactly `context.clock.install({ time })` (a flowing clock), overriding
+ *  pinBrowser's fixed pin for this context; check-driver-clock.sh refuses a bare
+ *  clock.install in a pinnable driver, so this is the one sanctioned way. Never
+ *  pass a moment derived from the real clock — that is what nowSg() is for. */
+export async function installDerivedClock(context, time) {
+  await context.clock.install({ time });
+  return context;
+}
+
 /** The browser, WRAPPED: every context made by newContext() / newPage() is
  *  pinned before the driver sees it. Pinning is a property of the handle, not a
  *  call a driver must remember — 14 drivers open extra contexts. */

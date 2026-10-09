@@ -67,7 +67,7 @@ BEGIN
 
   -- First day of the PREVIOUS month, in SGT. Derived from the DB clock only
   -- because a fixture is allowed to; the PRODUCT never does this (§7.7).
-  v_month := date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date) - INTERVAL '1 month';
+  v_month := date_trunc('month', app_today()) - INTERVAL '1 month';
 
   -- Clean up any previous run so re-running is safe.
   DELETE FROM attendance a USING students s

@@ -1,3 +1,4 @@
+// clock: pinnable
 // Unmarked-lessons backlog + admin pre-generation coverage check.
 //
 // Proves the hole this feature closes: a lesson the coach never marked has no
@@ -28,12 +29,14 @@
 //
 // The fake is KEPT, because pinning the weekday is what makes the run identical
 // on any day — but it is derived: the Wednesday after the missing Saturday.
+// Under `run-all-drivers.sh --now` the fixture follows the pin, so this derived
+// moment does too, and installDerivedClock (lib.mjs) is how it is set.
 //
 // Run order matters: the admin gap check runs BEFORE the coach fixes the gap.
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, loginAdmin, tap, dumpText, sgLabel, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, loginAdmin, tap, dumpText, sgLabel, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(
@@ -82,7 +85,7 @@ const adminCtx = await browser.newContext({
   viewport: { width: 1280, height: 1000 },
   timezoneId: "Asia/Singapore",
 });
-await adminCtx.clock.install({ time: TODAY_SGT });
+await installDerivedClock(adminCtx, TODAY_SGT);
 const admin = await adminCtx.newPage();
 // coach@swimsync.test is the TENANT admin (superadmin@ became the cross-tenant
 // platform admin on 2026-07-19 and is refused the tenant pages — §8.7).
@@ -91,8 +94,8 @@ await loginAdmin(admin, "coach@swimsync.test", "password123");
 async function openCoverageModal() {
   await admin.goto(`${ADMIN}/invoices`);
   await admin.waitForTimeout(2500);
-  // The billing month must TRACK the fixture, which derives its dates from now()
-  // (fixtures-unmarked-lessons.sql:38). This read a hardcoded "2026-07" and so
+  // The billing month must TRACK the fixture, which derives its dates from
+  // app_today() (fixtures-unmarked-lessons.sql:38). This read a hardcoded "2026-07" and so
   // checked the wrong month once the real calendar left July — red every night
   // from 2026-09-01 (§7.73). missingIso is already derived from the fixture row.
   await admin.fill('input[type="month"]', missingIso.slice(0, 7));
@@ -125,7 +128,7 @@ const coachCtx = await browser.newContext({
   hasTouch: true,
   timezoneId: "Asia/Singapore",
 });
-await coachCtx.clock.install({ time: TODAY_SGT });
+await installDerivedClock(coachCtx, TODAY_SGT);
 const coach = await coachCtx.newPage();
 coach.on("dialog", (d) => d.accept());
 await loginExpo(coach, "coach@swimsync.test", "password123");

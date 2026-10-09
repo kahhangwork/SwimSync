@@ -57,7 +57,7 @@
 
 -- ── The anchor, and everything derived from it ─────────────────────────────
 CREATE TEMP TABLE g AS
-WITH t AS (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS today)
+WITH t AS (SELECT app_today() AS today)
 SELECT
   today,
   -- The most recent Saturday on or before today. DOW: Saturday = 6.
@@ -109,10 +109,10 @@ INSERT INTO auth.users (
   '00000000-0000-0000-0000-000000000000',
   'd0000000-0000-0000-0000-0000000000aa',
   'authenticated','authenticated','parent-guard@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Guard Parent","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 );
 
 INSERT INTO students (id, full_name, assignment_status, tenant_id)
