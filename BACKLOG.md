@@ -1111,16 +1111,6 @@ message already names the floor date. The admin panel shows the DB text; the coa
 **Notes:** `SwimSyncApp/lib/attendanceSaveError.ts` (byte-identical with the admin copy — the drift test pins it).
 P0001 is a generic RAISE code: pass through only messages from `guard_attendance_date`, not every P0001.
 
-### The guard message says "Sep" where the apps say "Sept" — **S** _(filed 2026-10-06, Wave 6 lane 2)_
-Format the PK001 date the way the apps do.
-
-**Why:** the D6 guard's text is built in Postgres (`to_char(…, 'FMDD Mon')` → "Mark 27 Sep first") and shown
-verbatim, while every app label is en-SG ("27 Sept") — §7.302's display split, now inside a DB message. Only
-September differs; cosmetic.
-
-**Notes:** a migration redefining `guard_package_draw_order` from its DB body (§7.40) with a CASE for September, or
-return the date in the message and format client-side. The driver matches the day number only.
-
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
 the admin sending a renewal offer.

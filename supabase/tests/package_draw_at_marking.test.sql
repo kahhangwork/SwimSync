@@ -274,7 +274,7 @@ SELECT pg_temp.sell('f6700000-0000-0000-0000-000000000002','P1','f6600000-0000-0
 SELECT throws_ok($$ SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d14 FROM f),
                                         'f6300000-0000-0000-0000-000000000001', 'present') $$,
   'PK001',
-  'Mark ' || to_char((SELECT d28 FROM f), 'FMDD Mon') || ' first — the package has 2 lessons left. (W6 Ava · W6 Dolphins) Nothing was saved.',
+  'Mark 18 Aug first — the package has 2 lessons left. (W6 Ava · W6 Dolphins) Nothing was saved.',
   '15: present on d14 with 4 earlier unmarked lessons and 2 left is refused, naming the earliest lesson');
 SELECT lives_ok($$ SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d14 FROM f),
                                        'f6300000-0000-0000-0000-000000000001', 'absent') $$,
@@ -299,7 +299,7 @@ SELECT throws_ok($$
   VALUES ((SELECT id FROM lesson_sessions WHERE class_id = 'f6500000-0000-0000-0000-000000000001' AND session_date = (SELECT d7 FROM f)),
           'f6300000-0000-0000-0000-000000000001', 'present', 'f6100000-0000-0000-0000-0000000000c1') $$,
   'PK001',
-  'Mark ' || to_char((SELECT d42 FROM f), 'FMDD Mon') || ' first — the package has 1 lesson left. (W6 Ben · W6 Sharks) Nothing was saved.',
+  'Mark 4 Aug first — the package has 1 lesson left. (W6 Ben · W6 Sharks) Nothing was saved.',
   '18: as the COACH, a sibling''s unmarked lesson in ANOTHER coach''s class is counted');
 RESET ROLE;
 

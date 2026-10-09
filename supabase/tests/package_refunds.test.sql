@@ -199,7 +199,7 @@ SELECT throws_ok($$ SELECT record_package_refund('88d50000-0000-0000-0000-000000
   'P0001', 'That month is closed — refunds can only be dated in an open month.',
   'the LAST day of the sealed month is refused — closed figures never change');
 SELECT throws_ok($$ SELECT record_package_refund('88d50000-0000-0000-0000-000000000002', 10, (SELECT today - 1 FROM f)) $$,
-  'P0001', 'A refund cannot be dated before the package was paid (' || to_char((SELECT today FROM f), 'FMDD Mon YYYY') || ').',
+  'P0001', 'A refund cannot be dated before the package was paid (15 Sept 2026).',
   'K2 paid today 07:30 SGT (yesterday in UTC): a refund dated yesterday is refused');
 SELECT lives_ok($$ SELECT record_package_refund('88d50000-0000-0000-0000-000000000002', 10, (SELECT today FROM f)) $$,
   'K2: a refund dated today (its SGT paid date) is allowed');

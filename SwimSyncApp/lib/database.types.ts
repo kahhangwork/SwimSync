@@ -2166,6 +2166,9 @@ isOneToOne: false
 "set_students_active":
 { Args: { "p_active": boolean,"p_student_ids": (string)[] }; Returns: undefined
                            },
+"sg_date_label":
+{ Args: { "p_date": string,"p_format": string }; Returns: string
+                           },
 "student_package_coverage":
 { Args: Record<PropertyKey, never>; Returns: {
               "coverage": string,"expires_on": string,"lessons_remaining": number,"low": boolean,"package_id": string,"package_name": string,"parent_id": string,"student_id": string,"tenant_id": string
