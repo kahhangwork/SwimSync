@@ -1556,6 +1556,33 @@ in auto mode and its email-retry skip (§7.265, §7.266). No run-day test writes
 - **Fixture shape (§7.7 *Hit again*):** a test of a `timestamptz` value must use the shape PostgREST sends
   (`…+00:00`). The pre-existing `waitingSince` test used `+08:00` and passed for the wrong reason.
 
+### Pin the clock for UI drivers — `--now` (2026-10-09, `docs/plans/PIN_DRIVER_CLOCK_PLAN.md`)
+
+- **Replay a moment:** `run-all-drivers.sh --only <driver> --now '2026-10-01 07:59+08'` runs one driver with the
+  browser, PostgREST, driver SQL, fixtures and the billing engine all at that instant. The pin must carry an offset and
+  be in the PAST (a future pin makes gotrue refresh-loop); Postgres canonicalises it to `…Z`. Per driver: unpin → `db
+  reset` → pin (`ALTER DATABASE` as `supabase_admin` + the API row) → restart rest, kong → 3 consecutive service-key
+  `rpc/app_now` proofs → fixture → `DRIVER_NOW=<…Z>`. A failed proof is **CANNOT SAY**, never PASS. Without `--now`
+  the runner is unchanged apart from the `Real clock` line (proven: unpinned `--only attendance-guard` 22/22 before
+  and after).
+- **Markers:** a driver header carries `// clock: pinnable` (reads time only via `lib.mjs` `nowSg`/`todaySg`/
+  `addDaysIso`/`sql`) or `// clock: own-literal` (closed list of three); anything else is **SKIPPED (not pinnable)**
+  under `--now`, a pinned run with any skip exits 3, and `--only <unmarked> --now` exits 2 before any reset.
+  `check-driver-clock.sh` (repo-invariants) enforces the rules and holds the `UNSWEPT` ratchet until the sweep ends.
+- **`lib.mjs` refuses half-pinned** at import: `DRIVER_NOW` set but the stack not pinned, or a stale pin with no
+  `DRIVER_NOW` → throw. Every context on `launch()`'s wrapped browser is fixed to the pin and asserted.
+- **Stale pin** (a killed `--now` run): `scripts/clock-unpin.sh` clears it (API row first, then RESET);
+  `--check` is read-only and is called by the runner, `check-fixture-roundtrip.sh`, `generate-invoices/test.sh` and
+  `app_clock_locks.sh`, which all refuse (exit 2) on a pinned stack. pgTAP `app_clock` (31) is red on a leftover API
+  row or a database/role-level pin.
+- **CI:** the fixture roundtrip runs twice — unpinned, and `--now '2026-10-01 07:59+08'` with the pin carried by
+  `PGOPTIONS` (session-only; never `ALTER DATABASE`, so it stays sibling-safe). `app_clock_locks.sh` grew checks 4–6
+  (API row → pinned; row without lock 1 → RAISE; row without pin → real) — check 4 red-proven on the old body.
+- **Engine:** `generate-invoices/clock.test.ts` (12, stubbed RPC) — Invalid Date, prod-URL skew, retry; each guard
+  red-proven. HTTP proof: pinned at `2026-08-01 00:30+08` the default billing month is `2026-07`, unpinned `2026-09`.
+- A **new driver's first commit includes one pinned `--only` run** at a past moment (vigilance — CI makes the code
+  right; this makes the behaviour proven).
+
 ### Reading a RED nightly sweep — the four triage rules
 
 *(Graduated from `HANDOVER.md` §9 on 2026-09-18. They had sat inside "Next steps", which is
