@@ -35,6 +35,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # so "M4's timestamp" in the plan is M3's. Raised at T5, when G2 went required. Never
 # raise it again: a later migration marks its stamps `-- clock: stamp` instead.
 CUTOFF=20261006000500
+# EXEMPT — exact file:line pairs, never whole files. Each is an applied migration that
+# re-bodied functions from pg_get_functiondef() (the M3 case) and so carried pre-Wave-7
+# audit stamps verbatim, unmarked; it can never be edited now. Every entry is a pure
+# stamp, never read back to decide a date. A NEW migration marks its stamps instead.
+#   20261009000100 (Sept date labels, §7.302): cancel_lesson's lesson_sessions insert
+#   and cancelled_at stamp, set_enrolment_start's updated_at. Exempted 2026-10-09 (user).
+EXEMPT=(
+  "supabase/migrations/20261009000100_sept_date_labels.sql:722"
+  "supabase/migrations/20261009000100_sept_date_labels.sql:726"
+  "supabase/migrations/20261009000100_sept_date_labels.sql:1332"
+)
 
 TOKENS_RE="(^|[^a-z0-9_])now[[:space:]]*\([[:space:]]*\)|(^|[^a-z0-9_])current_date([^a-z0-9_]|$)|(^|[^a-z0-9_])current_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])current_time([^a-z0-9_]|$)|(^|[^a-z0-9_])localtimestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])clock_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])statement_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])transaction_timestamp([^a-z0-9_]|$)|'now'|'today'"
 MARK_RE='-- clock: stamp|-- clock-real:[[:space:]]*[^[:space:]]'
@@ -68,6 +79,8 @@ for f in "${FILES[@]}"; do
   ((10#$ts > 10#$CUTOFF)) || continue
   N=$((N + 1))
   while IFS= read -r m; do
+    rel="${f#"$ROOT"/}:${m%%:*}"
+    for x in "${EXEMPT[@]}"; do [[ "$rel" == "$x" ]] && continue 2; done
     hits+="    ${f#"$ROOT"/}:${m%%:*}: $(sed -E 's/^[0-9]+://; s/^[[:space:]]+//' <<< "$m" | cut -c1-100)"$'\n'
   done < <(grep -vnE -- "$MARK_RE" "$f" | sed -E 's/--.*$//' | grep -iE -- "^[0-9]+:.*($TOKENS_RE)" || true)
 done
