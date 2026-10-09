@@ -98,7 +98,7 @@ if [[ $code != 000 ]]; then
   got="$(curl -s --max-time 10 -X POST "$API_URL/rest/v1/rpc/app_now" \
     -H "apikey: $key" -H "Authorization: Bearer $key" -H "Content-Type: application/json" -d '{}' || true)"
   # Compared by Postgres, which parses PostgREST's timestamptz; the value goes in as a variable, never spliced.
-  real="$(printf '%s\n' "SELECT abs(extract(epoch FROM (:'v')::jsonb #>> '{}')::timestamptz - pg_catalog.now())) < 60;" \
+  real="$(printf '%s\n' "SELECT abs(extract(epoch FROM ((:'v')::jsonb #>> '{}')::timestamptz - pg_catalog.now())) < 60;" \
     | docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -Atq -v v="$got" 2>/dev/null || true)"
   api_checked=", rpc/app_now on the real clock"
   [[ $real == t ]] || left+="${left:+; }rpc/app_now is not the real time (got: ${got:0:80})"
