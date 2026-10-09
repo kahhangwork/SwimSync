@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-assessment.mjs — the admin Assessment tab.
 //
 // Fixture: fixtures-assessment.sql   Teardown: fixtures-assessment-teardown.sql

@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-app-money.mjs — the parent money actions no other driver presses.
 //
 // WHY THIS EXISTS. Promoted from the App L-G hand-check

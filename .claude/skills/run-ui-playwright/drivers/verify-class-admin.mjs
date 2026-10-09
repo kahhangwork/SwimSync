@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-class-admin.mjs — the Classes-page shadow-coach actions no other driver
 // presses: the roster drawer's failed shadow load (an error, never an empty
 // list), the rate-less-coach warning (and its "late rate" sibling, and the
@@ -70,9 +71,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -135,8 +136,8 @@ async function openDrawer() {
 }
 // Wait until the section shows its assignment rows (or the error line).
 async function sectionSettled(ms = 10000) {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
+  while (Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     if ((await rows.count()) > 0 || (await errLine.count()) > 0) return;
     await page.waitForTimeout(200);
   }
@@ -247,9 +248,9 @@ try {
     `${sql(shadowQ)} · history ${sql(histQ)}`);
 
   const gotReload = !!(await reloaded);
-  const endT = Date.now() + 8000;
+  const endT = Date.now() + 8000; // clock-real: a poll deadline (elapsed time, not a date)
   let after = await rowTexts();
-  while (!after[0]?.endsWith(" ended") && Date.now() < endT) { await page.waitForTimeout(200); after = await rowTexts(); }
+  while (!after[0]?.endsWith(" ended") && Date.now() < endT) { await page.waitForTimeout(200); after = await rowTexts(); } // clock-real: a poll deadline (elapsed time, not a date)
   check("the drawer re-reads and shows it ENDED today — no End button left, no error",
     gotReload && after.length === 2 &&
       after[0] === `ClsAdm Shadow ${fmt(ONGOING_FROM)} – ${fmt(TODAY)} ended` &&

@@ -49,28 +49,28 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
  ('00000000-0000-0000-0000-000000000000','d4000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','class-admin-owner@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"ClsAdm Owner","role":"tenant_admin","is_coach":true,"tenant_id":"d4000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','d4000000-0000-0000-0000-0000000000a2',
   'authenticated','authenticated','class-admin-shadow@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"ClsAdm Shadow","role":"coach","tenant_id":"d4000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','d4000000-0000-0000-0000-0000000000a3',
   'authenticated','authenticated','class-admin-norate@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"ClsAdm Norate","role":"coach","tenant_id":"d4000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','d4000000-0000-0000-0000-0000000000a4',
   'authenticated','authenticated','class-admin-late@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"ClsAdm Late","role":"coach","tenant_id":"d4000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 UPDATE tenants SET owner_profile_id = 'd4000000-0000-0000-0000-0000000000a1'
@@ -137,7 +137,7 @@ BEGIN
                                     effective_to, assigned_by, ended_by, ended_at)
   VALUES ('d4000000-0000-0000-0000-0000000005a1', t, 'd4000000-0000-0000-0000-0000000000c1',
           v_sh, v_sg - 120, v_sg - 60, 'd4000000-0000-0000-0000-0000000000a1',
-          'd4000000-0000-0000-0000-0000000000a1', now()),
+          'd4000000-0000-0000-0000-0000000000a1', now()),  -- clock-real: ended_at is a real stamp (end_class_shadow writes NOW())
          ('d4000000-0000-0000-0000-0000000005a2', t, 'd4000000-0000-0000-0000-0000000000c1',
           v_sh, v_sg - 14, NULL, 'd4000000-0000-0000-0000-0000000000a1', NULL, NULL)
   ON CONFLICT (id) DO UPDATE SET effective_from = EXCLUDED.effective_from,

@@ -1,3 +1,4 @@
+// clock: pinnable
 // Advance-cancel a lesson (cancel_lesson / restore_lesson, 20260821000700) through
 // the real UI — docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md Phase B, Step B6.
 //
@@ -28,7 +29,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, sgLabel, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, sgLabel, todaySg, ADMIN, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -74,7 +75,7 @@ async function pressAfterDone(pg, pattern, { first = false } = {}) {
 const ROSE = "ca1c1a55-0000-0000-0000-000000000001";
 const REASON = "Driver: pool closed for maintenance";
 
-const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+const today = todaySg();
 const shift = (d, n) => {
   const [y, m, dd] = d.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, dd + n)).toISOString().slice(0, 10);

@@ -29,9 +29,9 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','ac300000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','app-money-parent@swimsync.test',
-   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',
+   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',  -- clock-real: auth.users stamps are real time
    '{"full_name":"App Money Parent","role":"parent"}',
-   now(), now(), '','','','')
+   now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO parent_tenants (parent_id, tenant_id)

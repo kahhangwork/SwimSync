@@ -19,9 +19,9 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','ac200000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','app-home-parent@swimsync.test',
-   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',
+   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',  -- clock-real: auth.users stamps are real time
    '{"full_name":"App Home Parent","role":"parent"}',
-   now(), now(), '','','','')
+   now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
@@ -46,7 +46,7 @@ INSERT INTO student_claims (id, tenant_id, student_id, parent_id, claimed_name,
                             certainty, match_reason, status, decided_at)
 SELECT 'ac200000-0000-0000-0000-00000000c1a1', '70000000-0000-0000-0000-000000000001',
        'ac200000-0000-0000-0000-0000000000d2', p.id,
-       'Zed Claimed', 'confirmed', 'name_only', 'declined', now()
+       'Zed Claimed', 'confirmed', 'name_only', 'declined', now()  -- clock-real: decided_at is a real stamp (approve/decline_student_claim write NOW())
   FROM parents p WHERE p.profile_id = 'ac200000-0000-0000-0000-0000000000b1'
 ON CONFLICT (id) DO NOTHING;
 

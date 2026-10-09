@@ -21,9 +21,9 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','ac100000-0000-0000-0000-0000000000b1',
    'authenticated','authenticated','app-auth-parent@swimsync.test',
-   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',
+   crypt('password123', gen_salt('bf')), now(), '{"provider":"email"}',  -- clock-real: auth.users stamps are real time
    '{"full_name":"App Auth Parent","role":"parent"}',
-   now(), now(), '','','','')
+   now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- recovery_sent_at too: GoTrue refuses a second recovery mail inside
@@ -62,7 +62,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM student_class_enrolments
                   WHERE student_id = 'ac100000-0000-0000-0000-0000000000d1' AND is_active) THEN
     INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
-    VALUES ('ac100000-0000-0000-0000-0000000000d1', v_class, now() - interval '30 days', TRUE);
+    VALUES ('ac100000-0000-0000-0000-0000000000d1', v_class, app_now() - interval '30 days', TRUE);
   END IF;
 END $$;
 

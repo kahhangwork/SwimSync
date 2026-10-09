@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-app-home-writes.mjs — the two parent Home writes no other driver reaches.
 //
 // WHY THIS EXISTS. Promoted from the App L-F hand-check

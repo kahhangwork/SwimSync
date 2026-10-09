@@ -1,3 +1,4 @@
+// clock: pinnable
 // Bulk "Set all to…" on the coach attendance screen (BACKLOG #1).
 //
 // Verifies the new header "Set all ▾" menu: the no-confirm path (fresh screen,
@@ -31,7 +32,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, tap, dumpText, sgLabel, EXPO } from "./lib.mjs";
+import { launch, loginExpo, tap, dumpText, sgLabel, installDerivedClock, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(
@@ -73,7 +74,7 @@ const coachCtx = await browser.newContext({
   hasTouch: true,
   timezoneId: "Asia/Singapore",
 });
-await coachCtx.clock.install({ time: TODAY_SGT });
+await installDerivedClock(coachCtx, TODAY_SGT);
 const coach = await coachCtx.newPage();
 
 const dialogs = [];

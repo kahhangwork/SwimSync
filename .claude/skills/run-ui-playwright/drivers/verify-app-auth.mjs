@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-app-auth.mjs — the app's auth paths a driver either hides or never reaches.
 //
 // WHY THIS EXISTS. Promoted from the App L-F/G/H fence hand-check
@@ -148,11 +149,11 @@ try {
     if (form) {
       await page.getByPlaceholder("you@email.com").fill(email);
       await page.locator('input[type="password"]').fill("password123");
-      const t0 = Date.now();
+      const t0 = Date.now(); // clock-real: elapsed time of the login, not a date
       await pressByText(page, "Sign In", 1); // [0] is the card heading, [1] the button
       const left = await waitOk(page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 10000 }));
       const path = new URL(page.url()).pathname;
-      check(`1: ${name} ONE-SHOT login leaves /login and lands on ${landing.source.replace(/[\\^$]/g, "")}`, left && landing.test(path), `${Date.now() - t0} ms → ${path}`);
+      check(`1: ${name} ONE-SHOT login leaves /login and lands on ${landing.source.replace(/[\\^$]/g, "")}`, left && landing.test(path), `${Date.now() - t0} ms → ${path}`); // clock-real: elapsed time of the login, not a date
     }
     await page.screenshot({ path: shot(`1-${name}`) });
     await browser.close();
@@ -205,7 +206,7 @@ try {
     // Count only mail to this parent that arrived after the press. The slack
     // absorbs clock skew between the host and the Docker VM that stamps
     // `Created`; a previous run's mail is older than any sane skew.
-    const since = Date.now() - 30000;
+    const since = Date.now() - 30000; // clock-real: compared with Inbucket's real delivery stamps
     const { browser, page } = await fresh();
     // Reached by TAP from /login, as a parent does.
     await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });

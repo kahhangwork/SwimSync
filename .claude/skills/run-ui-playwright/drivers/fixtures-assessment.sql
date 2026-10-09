@@ -146,8 +146,11 @@ SELECT '70000000-0000-0000-0000-000000000001'::uuid,
 -- UPDATE is clobbered to NOW() by trg_skill_progress_tenant and the fixture
 -- would then assert nothing.
 ALTER TABLE student_skill_progress DISABLE TRIGGER trg_skill_progress_tenant;
+-- From app_now(), not now(): the admin calls a grade fresh against the browser's SGT
+-- today, which `run-all-drivers.sh --now` pins. graded_at itself is a real stamp, so
+-- backdating from the real clock reads as FRESH under any pin older than 90 days.
 UPDATE student_skill_progress
-   SET graded_at = NOW() - interval '90 days'
+   SET graded_at = app_now() - interval '90 days'
  WHERE student_id = '12200000-0000-0000-0000-000000000001'::uuid;
 ALTER TABLE student_skill_progress ENABLE TRIGGER trg_skill_progress_tenant;
 
@@ -157,7 +160,7 @@ ALTER TABLE student_skill_progress ENABLE TRIGGER trg_skill_progress_tenant;
 SELECT s.full_name,
        COALESCE(l.label, '(no level)')                    AS level,
        count(p.id)                                        AS graded,
-       count(p.id) FILTER (WHERE p.graded_at >= CURRENT_DATE) AS graded_today
+       count(p.id) FILTER (WHERE p.graded_at >= app_today()) AS graded_today
   FROM students s
   LEFT JOIN tenant_levels l ON l.id = s.level_id
   LEFT JOIN student_skill_progress p ON p.student_id = s.id

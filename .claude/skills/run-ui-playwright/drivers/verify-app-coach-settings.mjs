@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-app-coach-settings.mjs — the coach Settings writes no other driver presses.
 //
 // WHY THIS EXISTS. Promoted from the App L-H hand-check
