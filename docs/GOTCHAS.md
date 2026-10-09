@@ -2899,3 +2899,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     user-typed moment in Postgres once (`to_char(x::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`) and
     pass only the `…Z` string onward; any JS that parses a time checks `Number.isFinite(d.getTime())`. PostgREST's
     `"…T23:59:00.123456+00:00"` does parse (truncated to ms). (Node v25.8.0, 2026-10-09.)
+
+358. **A red proof against a fake `docker`/`psql` proves the shell, never the SQL.** 2026-10-09 (pin-clock T1/T2): 81
+    red proofs passed in a scratch mirror with fakes on `PATH`, and two SQL strings were still wrong — the first live
+    pinned run found both. `clock-unpin.sh`'s `extract(epoch FROM (:'v')::jsonb #>> '{}')::timestamptz - …` closed
+    `extract()` before the cast (syntax error → the "real clock" check always failed → every pinned run aborted
+    "could not unpin" with a false `STACK LEFT PINNED`); `lib.mjs` concatenated a boolean into text (`'true'`) and
+    compared it with psql's `'t'` (`-At` prints `t` only for a bare boolean column) → it always counted 0 API rows.
+    Rule: every SQL string a script or lib adds is executed once by the real Postgres before the change counts as
+    proven — read-only against the shared DB is enough. In SQL that is concatenated, spell booleans
+    (`CASE WHEN … THEN 't' ELSE 'f' END`).
