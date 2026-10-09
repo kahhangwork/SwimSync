@@ -86,7 +86,8 @@ export const addDaysIso = (iso, n) => {
   try {
     const [setting, epoch, hasTable] = sql(
       "SELECT coalesce(current_setting('swimsync.now', true), '') || '|' || extract(epoch FROM app_now()) || '|' || " +
-        "(to_regclass('private.clock_api_pin_enabled') IS NOT NULL)"
+        // A boolean concatenated into text is 'true'/'false', never psql's 't' — spell it.
+        "CASE WHEN to_regclass('private.clock_api_pin_enabled') IS NOT NULL THEN 't' ELSE 'f' END"
     ).split("|");
     const apiRows = hasTable === "t" ? Number(sql("SELECT count(*) FROM private.clock_api_pin_enabled")) : 0;
     state = { setting, epochMs: Math.round(Number(epoch) * 1000), apiRows };
