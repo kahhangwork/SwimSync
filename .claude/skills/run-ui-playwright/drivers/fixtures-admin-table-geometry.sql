@@ -125,8 +125,8 @@ BEGIN
     confirmation_token, recovery_token, email_change_token_new, email_change)
   VALUES ('00000000-0000-0000-0000-000000000000','a6000000-0000-0000-0000-0000000000b1',
     'authenticated','authenticated','admgeo-parent@test.local',
-    crypt('password123', gen_salt('bf')), now(),
-    '{"provider":"email"}', '{"full_name":"AdmGeo Parent","role":"parent"}', now(), now(),
+    crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
+    '{"provider":"email"}', '{"full_name":"AdmGeo Parent","role":"parent"}', now(), now(),  -- clock-real: auth.users stamps are real time
     '','','','')
   ON CONFLICT (id) DO NOTHING;
 
@@ -192,7 +192,7 @@ BEGIN
                                value_remaining, status, confirmed_at, expires_on)
   VALUES ('a6000000-0000-0000-0000-0000000000d2'::uuid, v_tenant, v_parent,
           'a6000000-0000-0000-0000-0000000000d1'::uuid, 'AdmGeo 10-lesson pack',
-          10, 40.00, 400.00, 6, 400.00, 'active', now(),
+          10, 40.00, 400.00, 6, 400.00, 'active', app_now(),
           (today_sg() + interval '6 months')::date)
   ON CONFLICT (id) DO NOTHING;
 

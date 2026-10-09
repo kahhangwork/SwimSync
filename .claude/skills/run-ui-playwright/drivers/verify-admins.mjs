@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drive co-admin management end to end (§8.31, 20260806000100).
 //
 // What only THIS driver can prove (pgTAP owns the RLS/RPC layer): the ban

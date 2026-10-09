@@ -1,3 +1,4 @@
+// clock: pinnable
 // The admin Calendar (/calendar), end to end through the real UI.
 //
 // THE LOAD-BEARING ASSERTIONS:
@@ -18,7 +19,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, todaySg, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -53,7 +54,7 @@ try {
 
   // Today in SGT, computed here — the page derives a missing `date` param per
   // render and deliberately does not write it into the URL.
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+  const today = todaySg();
   const rose = page.getByTestId("lesson-card").filter({ hasText: "Cal Rose Full" }).first();
   const emerald = page.getByTestId("lesson-card").filter({ hasText: "Cal Emerald Open" }).first();
   check("day view shows both fixture classes", (await rose.count()) === 1 && (await emerald.count()) === 1);

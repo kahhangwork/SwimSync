@@ -31,14 +31,14 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES ('00000000-0000-0000-0000-000000000000','d6000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','admin-reset-owner@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"AdmReset Owner","role":"tenant_admin","tenant_id":"d6000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO UPDATE
    SET encrypted_password = crypt('password123', gen_salt('bf')),
        recovery_token     = '',
-       updated_at         = now();
+       updated_at         = now();  -- clock-real: auth.users stamps are real time
 
 UPDATE tenants SET owner_profile_id = 'd6000000-0000-0000-0000-0000000000a1'
  WHERE id = 'd6000000-0000-0000-0000-000000000001'

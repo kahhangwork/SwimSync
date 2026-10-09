@@ -1,3 +1,4 @@
+// clock: pinnable
 // The admin lesson page's prev/next strip — prev/next lesson (same teaching
 // coach, same date) and prev/next coach — driven IN-APP, which is the only way
 // to exercise it: a deep link always mounts a fresh page, and the bug this
@@ -36,7 +37,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, todaySg, ADMIN } from "./lib.mjs";
 
 // A skipped or added check fails the run, not just a failed one.
 const EXPECTED_CHECKS = 23;
@@ -59,7 +60,7 @@ const KID_OF = {
 };
 const NAV_EARLY = "e9000000-0000-0000-0000-000000000001";
 
-const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+const today = todaySg();
 const shift = (d, n) => {
   const [y, m, dd] = d.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, dd + n)).toISOString().slice(0, 10);

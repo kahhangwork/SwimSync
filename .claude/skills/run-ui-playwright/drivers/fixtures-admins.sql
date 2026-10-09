@@ -25,35 +25,35 @@ INSERT INTO auth.users (
   ('00000000-0000-0000-0000-000000000000',
    'ad100000-0000-0000-0000-00000000a001',
    'authenticated', 'authenticated', 'adminpure@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Pure Co-admin","role":"tenant_admin","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   -- An admin who also coaches: deactivation must NOT ban, and "delete" means
   -- demotion to coach.
   ('00000000-0000-0000-0000-000000000000',
    'ad100000-0000-0000-0000-00000000a002',
    'authenticated', 'authenticated', 'admincoach@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Coaching Co-admin","role":"tenant_admin","tenant_id":"70000000-0000-0000-0000-000000000001","is_coach":true}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   -- The disposable one: unreferenced, never signs in, exists to be deleted.
   ('00000000-0000-0000-0000-000000000000',
    'ad100000-0000-0000-0000-00000000a003',
    'authenticated', 'authenticated', 'admindelete@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Deletable Admin","role":"tenant_admin","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   -- A plain coach — NOT an admin. The role gate's persona.
   ('00000000-0000-0000-0000-000000000000',
    'ad100000-0000-0000-0000-00000000a004',
    'authenticated', 'authenticated', 'gatecoach@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Gate Coach","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   -- The one with HISTORY: pure admin, identical in every respect to a003
   -- except that an audit row names them as ACTOR. Since 20260813000400 that
   -- alone refuses the hard delete, and this persona exists because without it
@@ -63,10 +63,10 @@ INSERT INTO auth.users (
   ('00000000-0000-0000-0000-000000000000',
    'ad100000-0000-0000-0000-00000000a005',
    'authenticated', 'authenticated', 'adminhistory@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Historic Admin","role":"tenant_admin","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- The history itself. entity_type 'Profile' so audit_log_tenant_of() can derive

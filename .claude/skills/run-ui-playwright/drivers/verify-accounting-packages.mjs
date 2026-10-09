@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drive package revenue on the Accounting page (PACKAGE_REVENUE_REFUNDS_PLAN.md U1;
 // migration 20260928000100).
 //

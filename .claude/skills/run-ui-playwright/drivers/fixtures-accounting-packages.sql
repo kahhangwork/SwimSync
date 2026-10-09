@@ -27,15 +27,15 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   confirmation_token, recovery_token, email_change_token_new, email_change)
 VALUES
   ('00000000-0000-0000-0000-000000000000','ac700000-0000-0000-0000-00000000a001',
-   'authenticated','authenticated','acctpkg-owner@swimsync.test', crypt('password123', gen_salt('bf')), NOW(),
+   'authenticated','authenticated','acctpkg-owner@swimsync.test', crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"AcctPkg Owner","role":"tenant_admin","tenant_id":"ac700000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   ('00000000-0000-0000-0000-000000000000','ac700000-0000-0000-0000-00000000b001',
-   'authenticated','authenticated','acctpkg-parent@swimsync.test', crypt('password123', gen_salt('bf')), NOW(),
+   'authenticated','authenticated','acctpkg-parent@swimsync.test', crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"AcctPkg Parent","role":"parent"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
@@ -55,7 +55,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Superuser insert: confirmed_at is honoured as written (the pin is `authenticated`-only, §7.300).
 INSERT INTO parent_packages (id, parent_id, product_id, status, confirmed_at)
 SELECT 'ac700000-0000-0000-0000-00000000e001', p.id, 'ac700000-0000-0000-0000-00000000d001', 'active',
-       ((date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date + 9) + TIME '12:00')
+       ((date_trunc('month', (app_now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date + 9) + TIME '12:00')
          AT TIME ZONE 'Asia/Singapore'
   FROM parents p WHERE p.profile_id = 'ac700000-0000-0000-0000-00000000b001'
 ON CONFLICT (id) DO NOTHING;
@@ -66,7 +66,7 @@ UPDATE parent_packages SET discount_amount = 30.00, amount_payable = 270.00
 INSERT INTO invoices (id, parent_id, billing_month, gross_amount, package_applied, credit_applied,
                       balance_adjustment, net_amount, status, tenant_id, reference_number, public_token)
 SELECT 'ac700000-0000-0000-0000-00000000f001', p.id,
-       to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month','YYYY-MM'),
+       to_char((app_now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month','YYYY-MM'),
        200.00, 60.00, 0, 0, 140.00, 'paid', 'ac700000-0000-0000-0000-000000000001',
        'INV-2026-9701', 'acctpkg-tok-0001'
   FROM parents p WHERE p.profile_id = 'ac700000-0000-0000-0000-00000000b001'
@@ -77,12 +77,12 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO package_refunds (id, tenant_id, parent_package_id, amount, refunded_on, recorded_by)
 VALUES ('ac700000-0000-0000-0000-00000000f101','ac700000-0000-0000-0000-000000000001',
         'ac700000-0000-0000-0000-00000000e001', 50.00,
-        date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date + 19,
+        date_trunc('month', (app_now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date + 19,
         'ac700000-0000-0000-0000-00000000a001')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO billing_periods (billing_month, tenant_id, invoices_issued)
-VALUES (to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month','YYYY-MM'),
+VALUES (to_char((app_now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month','YYYY-MM'),
         'ac700000-0000-0000-0000-000000000001', 1)
 ON CONFLICT DO NOTHING;
 

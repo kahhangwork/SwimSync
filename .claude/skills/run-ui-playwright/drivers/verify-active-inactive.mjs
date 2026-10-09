@@ -1,3 +1,4 @@
+// clock: pinnable
 // Active/inactive for families and children (backlog #1, phases 1–3).
 //
 // The parts that only exist in the UI and cannot be asserted in SQL: the

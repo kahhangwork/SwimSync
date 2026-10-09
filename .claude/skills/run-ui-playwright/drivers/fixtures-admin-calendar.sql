@@ -26,10 +26,10 @@ INSERT INTO auth.users (
 ) VALUES (
   '00000000-0000-0000-0000-000000000000','ca100000-0000-0000-0000-0000000000c2',
   'authenticated','authenticated','calendar-sub@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Calendar Sub","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ---- The location the classes sit at (contract: classes.location_id FK) ----
@@ -43,7 +43,7 @@ INSERT INTO classes (
   location_id, price_per_lesson, category_id, capacity, colour
 )
 SELECT v.id, co.id, v.title,
-       lower(trim(to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'FMDay')))::day_of_week,
+       lower(trim(to_char(app_today(), 'FMDay')))::day_of_week,
        v.t1::time, v.t2::time, 'ca1c1a55-0000-0000-0000-0000000010c1', 25.00,
        '7c000000-0000-0000-0000-000000000002', v.cap, v.colour
 FROM coaches co,
@@ -68,7 +68,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Alpha, Bravo, Charlie → Rose (full). Delta → Emerald. Back-dated 30 days so
 -- last week's lesson has an expected roster.
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-SELECT v.sid, v.cid, TRUE, now() - INTERVAL '30 days'
+SELECT v.sid, v.cid, TRUE, app_now() - INTERVAL '30 days'
 FROM (VALUES
   ('ca199999-0000-0000-0000-000000000001'::uuid, 'ca1c1a55-0000-0000-0000-000000000001'::uuid),
   ('ca199999-0000-0000-0000-000000000002'::uuid, 'ca1c1a55-0000-0000-0000-000000000001'::uuid),
@@ -84,7 +84,7 @@ INSERT INTO makeup_bookings (tenant_id, student_id, class_id, session_date, cate
 SELECT '70000000-0000-0000-0000-000000000001',
        'ca199999-0000-0000-0000-000000000001',
        'ca1c1a55-0000-0000-0000-000000000002',
-       (now() AT TIME ZONE 'Asia/Singapore')::date,
+       app_today(),
        '7c000000-0000-0000-0000-000000000002',
        'ca1c1a55-0000-0000-0000-000000000001',
        'c0000000-0000-0000-0000-000000000001'
@@ -92,28 +92,28 @@ WHERE NOT EXISTS (
   SELECT 1 FROM makeup_bookings
    WHERE student_id = 'ca199999-0000-0000-0000-000000000001'
      AND class_id   = 'ca1c1a55-0000-0000-0000-000000000002'
-     AND session_date = (now() AT TIME ZONE 'Asia/Singapore')::date
+     AND session_date = app_today()
      AND cancelled_at IS NULL
 );
 
 -- ---- Today's Emerald lesson exists (seeded as postgres) with a SUBSTITUTE ----
 INSERT INTO lesson_sessions (id, class_id, session_date)
 VALUES ('ca15e555-0000-0000-0000-000000000002','ca1c1a55-0000-0000-0000-000000000002',
-        (now() AT TIME ZONE 'Asia/Singapore')::date)
+        app_today())
 ON CONFLICT (class_id, session_date) DO NOTHING;
 
 INSERT INTO session_coaches (tenant_id, lesson_session_id, coach_id, assigned_by)
 SELECT '70000000-0000-0000-0000-000000000001', ls.id, co.id, 'c0000000-0000-0000-0000-000000000001'
 FROM lesson_sessions ls, coaches co
 WHERE ls.class_id = 'ca1c1a55-0000-0000-0000-000000000002'
-  AND ls.session_date = (now() AT TIME ZONE 'Asia/Singapore')::date
+  AND ls.session_date = app_today()
   AND co.profile_id = 'ca100000-0000-0000-0000-0000000000c2'
 ON CONFLICT (lesson_session_id, coach_id) DO NOTHING;
 
 -- ---- Last week's Rose lesson: two of three marked (partial) ----
 INSERT INTO lesson_sessions (id, class_id, session_date)
 VALUES ('ca15e555-0000-0000-0000-000000000001','ca1c1a55-0000-0000-0000-000000000001',
-        (now() AT TIME ZONE 'Asia/Singapore')::date - 7)
+        app_today() - 7)
 ON CONFLICT (class_id, session_date) DO NOTHING;
 
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
@@ -122,7 +122,7 @@ FROM lesson_sessions ls,
      (VALUES ('ca199999-0000-0000-0000-000000000001'::uuid, 'present'),
              ('ca199999-0000-0000-0000-000000000002'::uuid, 'absent')) AS v(sid, st)
 WHERE ls.class_id = 'ca1c1a55-0000-0000-0000-000000000001'
-  AND ls.session_date = (now() AT TIME ZONE 'Asia/Singapore')::date - 7
+  AND ls.session_date = app_today() - 7
 ON CONFLICT (lesson_session_id, student_id) DO NOTHING;
 
 
@@ -138,10 +138,10 @@ INSERT INTO auth.users (
 ) VALUES (
   '00000000-0000-0000-0000-000000000000','ca100000-0000-0000-0000-0000000000d1',
   'authenticated','authenticated','calendar-parent@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Calendar Parent","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, '70000000-0000-0000-0000-000000000001' FROM parents p
@@ -154,7 +154,7 @@ ON CONFLICT (parent_id, student_id) DO NOTHING;
 
 INSERT INTO lesson_sessions (id, class_id, session_date, status)
 VALUES ('ca15e555-0000-0000-0000-000000000003','ca1c1a55-0000-0000-0000-000000000001',
-        (now() AT TIME ZONE 'Asia/Singapore')::date - 140, 'completed')
+        app_today() - 140, 'completed')
 ON CONFLICT (class_id, session_date) DO NOTHING;
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 VALUES ('ca15e555-0000-0000-0000-000000000003','ca199999-0000-0000-0000-000000000002','present',
@@ -162,13 +162,13 @@ VALUES ('ca15e555-0000-0000-0000-000000000003','ca199999-0000-0000-0000-00000000
 ON CONFLICT (lesson_session_id, student_id) DO NOTHING;
 INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status)
 SELECT '70000000-0000-0000-0000-000000000001','ca100000-0000-0000-0000-0000000000e1', p.id,
-       to_char((now() AT TIME ZONE 'Asia/Singapore')::date - 140, 'YYYY-MM'), 25.00, 0.00, 25.00, 'outstanding'
+       to_char(app_today() - 140, 'YYYY-MM'), 25.00, 0.00, 25.00, 'outstanding'
   FROM parents p WHERE p.profile_id = 'ca100000-0000-0000-0000-0000000000d1'
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
 SELECT 'ca100000-0000-0000-0000-0000000000e1','ca199999-0000-0000-0000-000000000002',
        'ca15e555-0000-0000-0000-000000000003','present', 25.00, 'Cal Rose Full',
-       (now() AT TIME ZONE 'Asia/Singapore')::date - 140
+       app_today() - 140
 WHERE NOT EXISTS (SELECT 1 FROM invoice_items WHERE lesson_session_id = 'ca15e555-0000-0000-0000-000000000003');
 -- The correction mints the credit note (trigger); then draw it down.
 UPDATE attendance SET status = 'absent', edit_reason = 'fixture: CN001 setup'

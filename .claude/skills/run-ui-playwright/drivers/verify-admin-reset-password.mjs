@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-admin-reset-password.mjs — the admin panel's password RECOVERY path,
 // through a REAL GoTrue recovery link: `/reset-password` parses the session
 // from the URL hash (detectSessionInUrl → getSession / onAuthStateChange),
@@ -71,9 +72,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: the same poll deadline
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -103,7 +104,7 @@ const signsIn = async (email, password) => {
 
 const ADMIN_ID = "d6000000-0000-0000-0000-0000000000a1";
 const EMAIL = "admin-reset-owner@swimsync.test";
-const NEW_PASSWORD = `reset-${Date.now()}`;
+const NEW_PASSWORD = `reset-${Date.now()}`; // clock-real: a unique suffix, not a date
 const hashQ = `SELECT encrypted_password FROM auth.users WHERE id='${ADMIN_ID}'`;
 
 const results = [];
@@ -213,9 +214,9 @@ try {
   check("⚠ the NEW password signs in (fresh anon client)", await signsIn(EMAIL, NEW_PASSWORD), NEW_PASSWORD);
   check("⚠ password123 no longer signs in", !(await signsIn(EMAIL, "password123")));
   const left = await (async () => {
-    const end = Date.now() + 5000;
+    const end = Date.now() + 5000; // clock-real: a poll deadline (elapsed time, not a date)
     let n = await storedSessions(rp);
-    while (n !== 0 && Date.now() < end) { await rp.waitForTimeout(250); n = await storedSessions(rp); }
+    while (n !== 0 && Date.now() < end) { await rp.waitForTimeout(250); n = await storedSessions(rp); } // clock-real: the same poll deadline
     return n;
   })();
   check("the recovery session is signed out afterwards (clean re-login)", left === 0, `stored sessions ${left}`);

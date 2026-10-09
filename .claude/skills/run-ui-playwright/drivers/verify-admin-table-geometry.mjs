@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-admin-table-geometry.mjs — COLUMN GEOMETRY across every admin table.
 //
 // WHY THIS EXISTS. The Swimming Levels table shipped with its header row nested

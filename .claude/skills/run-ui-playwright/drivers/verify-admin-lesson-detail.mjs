@@ -1,3 +1,4 @@
+// clock: pinnable
 // The admin lesson page (/lessons/[classId]/[date]) and the Lessons list
 // (/lessons), end to end through the real UI — plus the coach-app round trip.
 //
@@ -26,7 +27,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, todaySg, ADMIN, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -45,7 +46,7 @@ const BRAVO = "ca199999-0000-0000-0000-000000000002";
 const CHARLIE = "ca199999-0000-0000-0000-000000000003";
 const DELTA = "ca199999-0000-0000-0000-000000000004";
 
-const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+const today = todaySg();
 const shift = (d, n) => {
   const [y, m, dd] = d.split("-").map(Number);
   const t = new Date(Date.UTC(y, m - 1, dd + n));
