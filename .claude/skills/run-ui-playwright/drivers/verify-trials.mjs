@@ -1,3 +1,4 @@
+// clock: pinnable
 // Trials as bookings, end to end through both real UIs.
 //
 // THE LOAD-BEARING ASSERTIONS are the two halves of "expected at ONE lesson":
@@ -19,6 +20,7 @@ import {
   tap,
   pressByTextMatch,
   visibleText,
+  todaySg as todaySgLib,
   ADMIN,
 } from "./lib.mjs";
 
@@ -30,7 +32,7 @@ const check = (l, p, d = "") => {
   console.log(`${p ? "PASS" : "FAIL"}  ${l}${d ? ` — ${d}` : ""}`);
 };
 
-const KID = `Trial Kid ${Date.now()}`;
+const KID = `Trial Kid ${Date.now()}`; // clock-real: a unique suffix, not a date
 const { browser, page } = await launch();
 
 // ── ADMIN: the reminder, then book ──────────────────────────────────────────
@@ -91,9 +93,7 @@ const dateValues = await selects
   .nth(1)
   .locator("option")
   .evaluateAll((os) => os.map((o) => o.value));
-const todaySg = new Date().toLocaleDateString("en-CA", {
-  timeZone: "Asia/Singapore",
-});
+const todaySg = todaySgLib();
 let targetIdx = -1;
 for (let i = 1; i < dateValues.length; i++) {
   // STRICTLY before today: on the class's own weekday the most recent lesson

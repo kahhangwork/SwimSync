@@ -32,7 +32,7 @@
 \set ON_ERROR_STOP on
 
 CREATE TEMP TABLE tsx AS
-WITH t AS (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS today)
+WITH t AS (SELECT app_today() AS today)
 SELECT
   today,
   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
@@ -58,22 +58,22 @@ INSERT INTO auth.users (
 ) VALUES
   ('00000000-0000-0000-0000-000000000000','e6aa0000-0000-0000-0000-000000000001',
    'authenticated','authenticated','ts-admin@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"SuspendCov Admin","role":"tenant_admin","tenant_id":"e6aa0000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   ('00000000-0000-0000-0000-000000000000','e6aa0000-0000-0000-0000-000000000002',
    'authenticated','authenticated','ts-coach@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"SuspendCov Coach","role":"coach","tenant_id":"e6aa0000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   ('00000000-0000-0000-0000-000000000000','e6aa0000-0000-0000-0000-000000000003',
    'authenticated','authenticated','ts-parent@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"SuspendCov Parent"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- The fixture tenant was created directly above, so handle_new_user's
@@ -87,11 +87,11 @@ UPDATE tenants SET owner_profile_id = 'e6aa0000-0000-0000-0000-000000000001'
 -- The same end-state /api/disable-coach leaves: coaches.disabled_at set (the
 -- RLS half) and the auth account banned (the login half). Written directly —
 -- postgres passes the coaches guard, exactly as the SECURITY DEFINER RPC does.
-UPDATE coaches SET disabled_at = COALESCE(disabled_at, NOW())
+UPDATE coaches SET disabled_at = COALESCE(disabled_at, NOW())  -- clock-real: disabled_at is a real stamp (disable_coach writes NOW())
  WHERE profile_id = 'e6aa0000-0000-0000-0000-000000000002';
-UPDATE auth.users SET banned_until = NOW() + INTERVAL '100 years'
+UPDATE auth.users SET banned_until = NOW() + INTERVAL '100 years'  -- clock-real: an auth ban is a REAL-TIME window (§6af)
  WHERE id = 'e6aa0000-0000-0000-0000-000000000002'
-   AND (banned_until IS NULL OR banned_until <= NOW());
+   AND (banned_until IS NULL OR banned_until <= NOW());  -- clock-real: the same real ban window
 
 -- ── One class + child per tenant for the parent ─────────────────────────────
 -- The fixture-tenant class keeps the disabled coach as its (historical)
@@ -181,7 +181,7 @@ BEGIN
      AND disabled_at IS NOT NULL;
   SELECT count(*) INTO v_ban FROM auth.users
    WHERE id = 'e6aa0000-0000-0000-0000-000000000002'
-     AND banned_until > NOW();
+     AND banned_until > NOW();  -- clock-real: the same real ban window
   IF v_dis <> 1 OR v_ban <> 1 THEN
     RAISE EXCEPTION 'fixture: ts-coach must be disabled (%) AND banned (%) '
                     'BEFORE the suspend — they are the ⚠ RISK 3 subject.',

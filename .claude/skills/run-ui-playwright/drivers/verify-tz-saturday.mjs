@@ -1,3 +1,4 @@
+// clock: own-literal
 // §7.7 — THE SGT/UTC SPLIT THAT SHIPPED A REAL DOUBLE-BILLING BUG.
 //
 // A coach opening the app at 07:30 SGT on a Saturday. Before the fix the screen

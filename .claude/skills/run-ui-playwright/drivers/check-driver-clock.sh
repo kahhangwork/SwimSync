@@ -61,17 +61,11 @@ OWN_LITERAL=(verify-edit-child.mjs verify-student-identity.mjs verify-tz-saturda
 # ⚠ THE SWEEP RATCHETS. Remove a file the commit that converts it; lower the
 # constant with it. Both lists — and both constants — are deleted at the close of
 # the sweep, after which an unmarked driver or a raw-clock fixture is simply red.
-UNSWEPT_MAX=4
+UNSWEPT_MAX=0
 UNSWEPT=(
-  verify-tenant-suspension.mjs
-  verify-trial-visibility.mjs
-  verify-trials.mjs
-  verify-tz-saturday.mjs
 )
-UNSWEPT_FIXTURES_MAX=2
+UNSWEPT_FIXTURES_MAX=0
 UNSWEPT_FIXTURES=(
-  fixtures-tenant-suspension.sql
-  fixtures-trial-visibility.sql
 )
 
 # The rules' patterns. SQL_RE is G2's token list (scripts/check-migration-clock.sh)

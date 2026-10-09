@@ -27,10 +27,10 @@ INSERT INTO auth.users (
 ) VALUES (
   '00000000-0000-0000-0000-000000000000','7d000000-0000-0000-0000-0000000000d1',
   'authenticated','authenticated','trialvis-parent@swimsync.test',
-  crypt('password123', gen_salt('bf')), NOW(),
+  crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Trial Vis Parent","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
@@ -68,19 +68,19 @@ SELECT '70000000-0000-0000-0000-000000000001', v.student_id, c.id, v.d,
   FROM classes c,
   LATERAL (VALUES
     ('7d099999-0000-0000-0000-000000000001'::uuid,
-     ((now() AT TIME ZONE 'Asia/Singapore')::date
-        + (6 - EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 7) % 7
-        + CASE WHEN EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int = 6
+     (app_today()
+        + (6 - EXTRACT(DOW FROM app_today())::int + 7) % 7
+        + CASE WHEN EXTRACT(DOW FROM app_today())::int = 6
                THEN 7 ELSE 0 END)),
     ('7d099999-0000-0000-0000-000000000002'::uuid,
-     ((now() AT TIME ZONE 'Asia/Singapore')::date
-        + (6 - EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 7) % 7
-        + CASE WHEN EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int = 6
+     (app_today()
+        + (6 - EXTRACT(DOW FROM app_today())::int + 7) % 7
+        + CASE WHEN EXTRACT(DOW FROM app_today())::int = 6
                THEN 7 ELSE 0 END)),
     ('7d099999-0000-0000-0000-000000000003'::uuid,
-     ((now() AT TIME ZONE 'Asia/Singapore')::date
-        - ((EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 1) % 7)
-        - CASE WHEN EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int = 6
+     (app_today()
+        - ((EXTRACT(DOW FROM app_today())::int + 1) % 7)
+        - CASE WHEN EXTRACT(DOW FROM app_today())::int = 6
                THEN 7 ELSE 0 END))
   ) AS v(student_id, d)
  WHERE c.title = 'Saturday Beginners'
@@ -88,7 +88,7 @@ SELECT '70000000-0000-0000-0000-000000000001', v.student_id, c.id, v.d,
 ON CONFLICT DO NOTHING;
 
 SELECT s.full_name, tb.session_date,
-       CASE WHEN tb.session_date >= (now() AT TIME ZONE 'Asia/Singapore')::date
+       CASE WHEN tb.session_date >= app_today()
             THEN 'UPCOMING' ELSE 'PAST' END AS when_
   FROM students s LEFT JOIN trial_bookings tb ON tb.student_id = s.id
  WHERE s.full_name LIKE 'Trialvis%' ORDER BY s.full_name;

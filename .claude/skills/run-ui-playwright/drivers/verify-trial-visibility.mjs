@@ -1,3 +1,4 @@
+// clock: pinnable
 // A booked trial, seen from all three sides — parent, coach, admin.
 //
 // WHY THIS EXISTS. A trial is a BOOKING, not an enrolment, so a booked child
@@ -167,9 +168,9 @@ const before = sql("SELECT count(*) FROM student_class_enrolments");
 
 sql(`INSERT INTO trial_bookings (tenant_id, student_id, class_id, session_date, category_id, booked_by)
      SELECT '70000000-0000-0000-0000-000000000001','7d099999-0000-0000-0000-000000000004',
-            c.id, (now() AT TIME ZONE 'Asia/Singapore')::date
-                  + (6 - EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 7) % 7
-                  + CASE WHEN EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int = 6 THEN 7 ELSE 0 END,
+            c.id, app_today()
+                  + (6 - EXTRACT(DOW FROM app_today())::int + 7) % 7
+                  + CASE WHEN EXTRACT(DOW FROM app_today())::int = 6 THEN 7 ELSE 0 END,
             c.category_id,'c0000000-0000-0000-0000-000000000001'
        FROM classes c WHERE c.title = 'Saturday Beginners'
         AND c.tenant_id = '70000000-0000-0000-0000-000000000001'`);

@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drive tenant suspension end to end (Wave 5 chunk 3, 20260813000300).
 //
 // What only THIS driver can prove (pgTAP owns the RLS/RPC layer): the BULK
