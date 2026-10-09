@@ -1146,3 +1146,12 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     green, then F0 and ~40 per-folder commits; every `types(wave8)` commit proven runtime-identical in CI. `fix(wave8)`
     pushes verified by served bundle: the admin `/holidays` chunk carries the new NO_TENANT message. Vercel app build
     failed once at `6f24eea` (transient; the next commit, same app code, built green).
+79. **Deploy record (2026-10-09): `20261009000100_sept_date_labels` (`58b532c`) → 3 edge functions → apps.** ADD-only
+    helper `sg_date_label` + 13 bodies re-made from `pg_get_functiondef` with `'Mon'` calls renamed. Rollback rehearsed
+    (DOWN 13/13 byte-identical to the pre-migration bodies, UP 13/13, pgTAP green). The user ran the `main` push and
+    `db push` (auto mode refuses a prod deploy); `migration list --linked` 0 pending; prod `proacl` authenticated only,
+    `anon` no EXECUTE (read-only catalog query). Functions deployed one at a time: generate-invoices v34,
+    package-emails v6, credit-note-emails v5 — downloaded source greps `"Sept"`. Apps `fe33d5f`, `32a6ad0`, `0bd161a`,
+    `4f29867`; Expo bundle carries the new guard regex and month list. **CI went red on `main` from `58b532c` (G2,
+    §7.354) after prod already had it** — fixed by `bf1b406`, CI green. Admin chunk not greppable (login-gated, §11
+    note above): confirm on the live Packages page.

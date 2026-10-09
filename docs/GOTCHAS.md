@@ -41,9 +41,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331 |
-| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
+| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352 |
-| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353 |
+| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
 `supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` + `scripts/check-sept.sh` + `sg_date_label.test.sql` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
@@ -2863,3 +2863,14 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 353. **`grep -c` exits 1 when it counts ZERO**, so `npx tsc … | grep -c "error TS" && git push …` never pushes on a CLEAN
     typecheck — a merge silently did not land (2026-10-06; caught by `git log origin/main`). Capture counts with
     `N=$(… | grep -c …; true)` and compare the text; confirm every push with `git log -1 origin/main`.
+
+354. **A migration that re-bodies functions from `pg_get_functiondef` carries their raw `now()` stamps UNMARKED — and
+    G2 sees it only on `main`, after prod already has it.** `20261009000100` (Sept labels) copied 13 live bodies;
+    three held pre-Wave-7 audit stamps (`cancel_lesson`'s insert + `cancelled_at`, `set_enrolment_start`'s
+    `updated_at`). The local check was `supabase test db` + the app suites — repo-invariants never ran — and CI runs
+    after the push, so `main` went red with the migration already applied and unfixable (applied ⇒ never edited; G2's
+    CUTOFF ⇒ never raised). Fixed by an exact `file:line` EXEMPT list in `check-migration-clock.sh` (user's call).
+    **Before pushing any migration, run every `repo-invariants` step from `ci.yml` locally** — `/deploy` Step 0 now
+    says so. When re-bodying, mark each copied stamp `-- clock: stamp` in the NEW file before applying it.
+    (2026-10-09, §8.143.)
+

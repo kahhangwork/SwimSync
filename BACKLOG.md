@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-07 — **G3-apps SHIPPED** (§8.142): *Extend G3 to the apps* removed (shipped). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-09 — **all three Wave 6 follow-ups SHIPPED** (§8.143): *Re-offer the backdated draw*, *Coach app shows the window guard's own words*, *The guard message says "Sep"…* removed. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —

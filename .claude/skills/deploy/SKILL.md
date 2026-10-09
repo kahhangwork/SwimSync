@@ -37,6 +37,9 @@ git log --oneline -5 origin/main      # what is already on main = live for web a
 
 - **`git log origin/main` is the honest answer to "what's live for the web apps"** —
   never a SHA written in prose (§7.60). Trust the command.
+- **A migration in the set? Run every `repo-invariants` step from `.github/workflows/ci.yml`
+  locally first** (`check-migration-clock.sh`, `check-sept.sh`, …). CI runs only after the push,
+  and once `db push` has applied the migration it can never be edited to fix a red (§7.354).
 - If the working tree is dirty with changes that belong in this deploy, commit
   them first (`/commit-review`). This skill deploys **committed** work.
 - **Worktree?** A worktree never authors a migration, and splitting one change

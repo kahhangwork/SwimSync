@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-07 — **§8.142: G3-apps SHIPPED — `scripts/check-apps-sg-date.sh` in CI fails any app code that cuts a
-timestamp to its UTC date (§7.7). CI-only, `7c270d6`, CI green. The next nightly is still unread.**_
+_Last updated: 2026-10-09 — **§8.143: all three Wave 6 follow-ups SHIPPED + "Sept" on every surface** — migration
+`20261009000100` (prod), 3 edge functions, apps; two new guards (pgTAP census, G-Sept). CI green at `bf1b406`.**_
 
-_Previously (§8.141, 2026-10-06) — Wave 8: generated Supabase `Database` types, five bugs fixed._
+_Previously (§8.142, 2026-10-07) — G3-apps: neither app takes the UTC date of a timestamp (CI-only)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -348,6 +348,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.143 (2026-10-09) — Wave 6 follow-ups ×3, and "Sept" everywhere, with a guard for each half
+
+**Shipped the three Wave 6 S-items plus the wider "Sep" sweep the user chose (13 DB functions, not 1); deployed
+migration → 3 functions → apps per `/deploy`.** `58b532c` `fe33d5f` `32a6ad0` `0bd161a` `4f29867` `bf1b406`.
+
+- **Shipped:** *Check marked lessons* (PRD §7.16, driven in Chrome on the Wave 6 fixture); the coach sees the window
+  guard's words (PRD §7.6); every DB message, email and app label says "Sept" (§7.302's new note). Record: DEPLOYMENT #79.
+- **Guards:** `sg_date_label.test.sql` (pg_proc census) + `scripts/check-sept.sh` (G-Sept) — TESTING §5.
+- **Found:** CI went red on `main` after prod had the migration — G2 saw its copied `now()` stamps (§7.354; exact
+  `file:line` exemption, user's call; `/deploy` Step 0 now runs repo-invariants first).
+- **Not done:** live admin chunk unconfirmed (login-gated) — open Packages and look for the button. Nightly over these
+  commits unread.
+
 ## 8.142 (2026-10-07) — G3-apps: neither app takes the UTC date of a timestamp
 
 **Shipped BACKLOG *Extend G3 to the apps* (S) as one CI-only commit, `7c270d6`; CI green on all five jobs.** No app
@@ -360,21 +373,7 @@ code, migration or deploy — today's tree has 0 hits across 815 files.
   passed; the red proof caught it (§7.283's new bullet). A canary now exits 2 on a broken scanner.
 - **Not done:** nightly still unread (none has run since `37398088721`). PRD untouched — no user-visible change.
 
-## 8.141 (2026-10-06) — Wave 8: generated Supabase `Database` types (two lanes, root orchestrating)
-
-**Shipped from the committed plan (D1–D6) as lane1 (root: F0, the coach/parent app, every probe, the migration, the
-merges) + lane2 (worktree `wave8-admin`, closed: the admin panel + the 11 NOT-A-GUARD fixes), lane2 reporting each
-unit for review and merge.** F0 `5e0fa74`…`f937c65` (hardened after two independent Opus reviews) → ~40 per-folder
-units → `6f24eea`; handoff `b67ebcc`.
-
-- **Shipped:** ARCHITECTURE §6ag (generated types, widen-only overrides, `fromJson`, the four guards, past pupils);
-  TESTING §5 *Wave 8*; DEPLOYMENT #77–#78; PRD §4.3 + §7.6 notes. Census: App 8 / Admin 3 `db-any-ok` only.
-- **Bugs the types exposed (plan Bug ledger):** #1 contact id — reclassified type-only; #2 coach marking hung on a
-  removed child (migration, user decision: coaches see past pupils); #3–#5 timestamptz sliced to its UTC date.
-- **Gotchas:** §7.351–§7.353; *Hit again* on §7.7, §7.344; edges on §7.229; §7.76 durable fix shipped.
-  **Not done:** nightly over Wave 8 unread (gate skipped); BACKLOG *Extend G3 to the apps* (S) filed.
-
-_(§8.140 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.141 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -417,13 +416,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-06: nightly `37398088721` (on `cb2025f`) was 71/72** — the first over #61/#63/#65/#67 and both
-Wave 4 drivers, all green; the one red, `app-coach-settings` (CI file-chooser timeout, code untouched for weeks), re-ran
-6/6 locally (§8.139). **The NEXT nightly is the first over all of Wave 6** (#69–#73) and the first run of
-`verify-package-draw-at-marking` (33), so expect 73 drivers — and the first over Wave 7's DB (prod-identical: drivers
-log in as `authenticator`, which never pins). Read first: that one, then `packages-admin`, `packages`,
-`package-renewal`, `accounting-packages`, `attendance-guard`, `cancel-lesson`, the invoice/billing-months drivers
-(*Nothing to bill*), and `app-coach-settings` again (a second red there is a real driver problem, not a flake).
+**State on 2026-10-09: three nightlies in a row GREEN, 73/73** (latest `37861091530` on `f67178e`) — the first over
+all of Waves 6, 7 and 8, so the §7.1 gate they held is cleared. **The NEXT nightly is the first over §8.143** (#1
+*Check marked lessons*, #2 the coach's guard message, the "Sept" sweep): read `packages-admin`,
+`package-draw-at-marking`, `attendance-guard`, `cancel-lesson` and the billing-months drivers first.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -433,15 +429,15 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over all of Waves 6, 7 AND 8 (Wave 8 merged
-   without the nightly gate, on the user's word). Red → fix first; a red on a surface Wave 8 touched is Wave 8's.
-2. **Little Orcas September is the OWNER's** (WhatsApp sent 2026-10-05): *Generate Sep 2026*, then *Record it as
-   settled* for the 15 pilot children (PRD §7.17) — **and now Brayden Ong** (unlinked from the Ang family 2026-10-06,
-   his 6 + 13 Sep lessons unclaimed: invite his parent or settle). The Ang family's package lessons are already paid
-   (drawn at B), so they need no Generate. Coach Kah Hang's September is billed and sealed.
-3. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8; G3-apps shipped (§8.142).
-   Cheapest high-value S-items: the three Wave 6 follow-ups; *Pin the clock for UI drivers* (L) is filed, unranked.
-   **A schema migration now regenerates the types in the SAME commit** (CLAUDE.md, §7.350).
+1. **Read the next nightly** (never dispatch it unasked) — the first over §8.143. Red → fix first. Also open the live
+   admin **Packages** page once: the *Check marked lessons* button is the one §8.143 change no grep could confirm.
+2. **Little Orcas September is the OWNER's** (WhatsApp sent 2026-10-05; still unbilled on prod 2026-10-09): *Generate
+   Sep 2026*, then *Record it as settled* for the 15 pilot children (PRD §7.17) — **and Brayden Ong** (unlinked from
+   the Ang family 2026-10-06, his 6 + 13 Sept lessons unclaimed: invite his parent or settle). The Ang family's package
+   lessons are already paid (drawn at B). Coach Kah Hang's September is billed and sealed.
+3. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8 and every Wave 6 follow-up shipped
+   (§8.143); *Pin the clock for UI drivers* (L) is filed, unranked. **A schema migration regenerates the types in the
+   SAME commit** (§7.350), and **runs every repo-invariants step locally before its push** (§7.354, `/deploy` Step 0).
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).
@@ -455,8 +451,8 @@ which mutate shared seed state — are in the same section.
 
 **GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20261006000600` (Wave 8, coach sees past pupils), on prod,
-0 pending (2026-10-06). **B's rollback is valid only until the first seal of a month containing draws** (its header).
+**No migration is HELD or in flight.** Latest applied is `20261009000100` (Sept date labels), on prod, 0 pending
+(2026-10-09). **B's rollback is valid only until the first seal of a month containing draws** (its header).
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
