@@ -39,7 +39,9 @@
 #           migration or seed.sql calls set_config('swimsync.now', …).
 #
 # The per-line opt-out is `// clock-real: <why>` (driver) / `-- clock-real: <why>`
-# (fixture) — e.g. elapsed timing, or a REAL-TIME window (§6af) — argued once per
+# (fixture). Inside a SQL string in a driver use `/* clock-real: <why> */`: a
+# `//` would become part of the SQL, and several drivers' sql() helpers collapse
+# newlines, so a `--` comment would swallow the rest of the query — e.g. elapsed timing, or a REAL-TIME window (§6af) — argued once per
 # line, in review.
 #
 # BLIND SPOTS — a text scan: a clock read split across lines; a `--` inside a SQL
@@ -167,7 +169,7 @@ P2_RE='Date\.now[[:space:]]*\('
 P3_RE='clock\.install|setFixedTime|setSystemTime'
 L_RE="chromium\.launch[[:space:]]*\(|(from|import|require)[[:space:]]*\(?[[:space:]]*[\"']playwright"
 MARK_RE='^// clock: (pinnable|own-literal)$'
-OPT_MJS='// clock-real:[[:space:]]*[^[:space:]]'
+OPT_MJS='(//|/\*) clock-real:[[:space:]]*[^[:space:]*]'
 OPT_SQL='-- clock-real:[[:space:]]*[^[:space:]]'
 API_TABLE='clock_api_pin_enabled'
 R2_RE="insert[[:space:]]+into[[:space:]]+(\"?private\"?[[:space:]]*\.[[:space:]]*)?\"?$API_TABLE"
@@ -201,6 +203,7 @@ for p in "// clock: pinable" "// clock: pinnable " "//clock: pinnable" " // cloc
   st miss "$MARK_RE" -E "$p"
 done
 st hit "$OPT_MJS" -E "x(new Date()); // clock-real: elapsed timing"; st miss "$OPT_MJS" -E "x; // clock-real:"
+st hit "$OPT_MJS" -E "  now(), now(), '', '') /* clock-real: auth.users stamps are real time */"; st miss "$OPT_MJS" -E "x /* clock-real: */"
 st hit "$R2_RE" -iE "INSERT INTO private.clock_api_pin_enabled VALUES (true);"
 st hit "$R2_RE" -iE 'insert  into "private"."clock_api_pin_enabled" values (true)'
 st miss "$R2_RE" -iE "DELETE FROM private.clock_api_pin_enabled;"
@@ -262,14 +265,14 @@ done
   || flag U "UNSWEPT holds ${#UNSWEPT[@]} drivers but UNSWEPT_MAX=$UNSWEPT_MAX — lower the constant with the list; never raise it"
 ((${#UNSWEPT_FIXTURES[@]} == UNSWEPT_FIXTURES_MAX)) \
   || flag U "UNSWEPT_FIXTURES holds ${#UNSWEPT_FIXTURES[@]} but UNSWEPT_FIXTURES_MAX=$UNSWEPT_FIXTURES_MAX — lower the constant with the list; never raise it"
-for u in "${UNSWEPT[@]}"; do [[ -f $u ]] || flag U "UNSWEPT names $u, which does not exist — remove it"; done
-for u in "${UNSWEPT_FIXTURES[@]}"; do [[ -f $u ]] || flag U "UNSWEPT_FIXTURES names $u, which does not exist — remove it"; done
+for u in ${UNSWEPT[@]+"${UNSWEPT[@]}"}; do [[ -f $u ]] || flag U "UNSWEPT names $u, which does not exist — remove it"; done
+for u in ${UNSWEPT_FIXTURES[@]+"${UNSWEPT_FIXTURES[@]}"}; do [[ -f $u ]] || flag U "UNSWEPT_FIXTURES names $u, which does not exist — remove it"; done
 
 # ── M, O, P, L: the drivers ──
 NP=0; NO=0; NU=0
 for f in "${DRIVERS[@]}"; do
   m=$(marker_of "$f")
-  if in_list "$f" "${UNSWEPT[@]}"; then
+  if in_list "$f" ${UNSWEPT[@]+"${UNSWEPT[@]}"}; then
     if [[ $m == none ]]; then NU=$((NU + 1)); continue; fi
     flag U "$f is marked but still on UNSWEPT — remove it from the list (and lower UNSWEPT_MAX)"
   fi
@@ -296,7 +299,7 @@ report L _TEMPLATE.mjs "$(mjs_hits _TEMPLATE.mjs "$L_RE")"
 NFU=0
 for f in "${FIXTURES[@]}" _TEMPLATE-fixture.sql; do
   h=$(sql_hits "$f")
-  if in_list "$f" "${UNSWEPT_FIXTURES[@]}"; then
+  if in_list "$f" ${UNSWEPT_FIXTURES[@]+"${UNSWEPT_FIXTURES[@]}"}; then
     if [[ -n $h ]]; then NFU=$((NFU + 1)); continue; fi
     flag U "$f reads no raw clock any more but is still on UNSWEPT_FIXTURES — remove it (and lower UNSWEPT_FIXTURES_MAX)"
     continue
