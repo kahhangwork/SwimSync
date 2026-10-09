@@ -1,5 +1,6 @@
 // Reusable Playwright helpers for driving SwimSync's UIs against installed Chrome.
 // See ../SKILL.md for the gotchas these encode.
+import { execFileSync } from "node:child_process";
 import { chromium } from "playwright-core";
 
 // Overridable because Next picks the next free port when 3000 is taken (a
@@ -22,9 +23,138 @@ export const sgLabel = (iso, opts = { weekday: "short", day: "numeric", month: "
 /** "Sept 2026" for a billing month "2026-09" — the admin's formatBillingMonth. */
 export const sgMonthLabel = (ym) => sgLabel(`${ym.slice(0, 7)}-01`, { month: "short", year: "numeric" });
 
-/** Launch Chrome. mobile=true gives a phone viewport for the Expo app. */
+// ─────────────────────────────────────────────────────────────────────────────
+// THE CLOCK — the ONE place a driver reads "now" (docs/plans/PIN_DRIVER_CLOCK_PLAN.md)
+//
+// `run-all-drivers.sh --now '<ts+offset>'` pins the whole stack to one past
+// moment: Postgres (a database-level swimsync.now, so fixtures, sql() and the API
+// all read it through app_now()), the billing engine (it asks the DB), and the
+// browser (every context on launch()'s browser is fixed to the same instant).
+// The runner passes the pin here as DRIVER_NOW, already canonicalised by Postgres
+// to "YYYY-MM-DDTHH:MM:SSZ" — Node never parses a user-typed pin ("…T07:59+08"
+// is an Invalid Date in V8).
+//
+// Unpinned (no DRIVER_NOW) every helper is exactly the real clock: nowSg() IS
+// new Date(), so the nightly is unchanged.
+//
+// check-driver-clock.sh fails CI if a `// clock: pinnable` driver reads the
+// clock any other way — new Date() / Date.now(), its own chromium.launch(), a
+// clock.install, or a raw now()/CURRENT_DATE in its SQL.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DB_CONTAINER = "supabase_db_SwimSync";
+
+/** Run one SQL statement as postgres on the local stack; trimmed `-At` output.
+ *  No shell, so a query needs no quote-escaping. Under --now this session is
+ *  pinned by the database-level default: read the time with app_now() /
+ *  app_today(), never now() / CURRENT_DATE. */
+export const sql = (q) =>
+  execFileSync(
+    "docker",
+    ["exec", "-i", DB_CONTAINER, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-Atc", q],
+    { encoding: "utf8" }
+  ).trim();
+
+export const PIN = process.env.DRIVER_NOW ?? null;
+const PIN_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+const PIN_MS = PIN === null ? null : Date.parse(PIN);
+
+/** The current instant: the pin under --now, otherwise exactly `new Date()`. */
+export const nowSg = () => (PIN_MS === null ? new Date() : new Date(PIN_MS));
+/** Today's date in Singapore, "YYYY-MM-DD" (en-CA is ISO-shaped). */
+export const todaySg = () => nowSg().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+/** Pure calendar arithmetic on a "YYYY-MM-DD"; n may be negative. */
+export const addDaysIso = (iso, n) => {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+// ⚠ REFUSE TO RUN HALF-PINNED, AT IMPORT, IN BOTH DIRECTIONS. A browser on the
+// pin beside a database on the real clock (or the reverse) produces a world that
+// never existed, and its PASS means nothing. So every driver — they all import
+// this file — checks the stack before its first step:
+//   DRIVER_NOW set   → the DB's app_now() IS the pin AND the API row is present
+//                      (else the browser would be pinned and PostgREST real).
+//   DRIVER_NOW unset → no swimsync.now default AND no API row: a killed --now run
+//                      leaves the stack pinned, and the dev apps would silently
+//                      run on a fake day.
+// to_regclass: the API-row table arrives with its own migration; before it
+// exists there is no row, by definition.
+{
+  let state;
+  try {
+    const [setting, epoch, hasTable] = sql(
+      "SELECT coalesce(current_setting('swimsync.now', true), '') || '|' || extract(epoch FROM app_now()) || '|' || " +
+        "(to_regclass('private.clock_api_pin_enabled') IS NOT NULL)"
+    ).split("|");
+    const apiRows = hasTable === "t" ? Number(sql("SELECT count(*) FROM private.clock_api_pin_enabled")) : 0;
+    state = { setting, epochMs: Math.round(Number(epoch) * 1000), apiRows };
+  } catch (e) {
+    throw new Error(`lib.mjs: could not read the stack's clock state (is the local stack up?) — ${e.message}`);
+  }
+  if (PIN !== null) {
+    if (!PIN_RE.test(PIN) || !Number.isFinite(PIN_MS) || state.epochMs !== PIN_MS || state.apiRows !== 1) {
+      throw new Error(
+        `DRIVER_NOW is set but the stack is not pinned — use run-all-drivers.sh --now ` +
+          `(DRIVER_NOW=${JSON.stringify(PIN)}, db app_now epoch ms=${state.epochMs}, API rows=${state.apiRows})`
+      );
+    }
+  } else if (state.setting !== "" || state.apiRows !== 0) {
+    throw new Error(
+      `a stale clock pin is on this stack — run scripts/clock-unpin.sh ` +
+        `(swimsync.now=${JSON.stringify(state.setting)}, API rows=${state.apiRows})`
+    );
+  }
+}
+
+/** Fix a browser context to the pin (no-op unpinned), then PROVE it: a page of
+ *  this context must read Date.now() === the pin. Frozen, not flowing — the DB
+ *  pin is a fixed instant, and a flowing browser beside it could cross 08:00 or
+ *  midnight mid-driver. Timers still run (setFixedTime holds only Date). */
+export async function pinBrowser(context) {
+  if (PIN_MS === null) return context;
+  await context.clock.setFixedTime(PIN_MS);
+  const probe = await context.newPage();
+  try {
+    const seen = await probe.evaluate(() => Date.now());
+    if (seen !== PIN_MS) throw new Error(`pinBrowser: browser Date.now()=${seen}, want the pin ${PIN_MS} (${PIN})`);
+  } finally {
+    await probe.close();
+  }
+  return context;
+}
+
+/** The browser, WRAPPED: every context made by newContext() / newPage() is
+ *  pinned before the driver sees it. Pinning is a property of the handle, not a
+ *  call a driver must remember — 14 drivers open extra contexts. */
+function pinnedBrowser(browser) {
+  return new Proxy(browser, {
+    get(target, prop) {
+      if (prop === "newContext") {
+        return async (...args) => pinBrowser(await target.newContext(...args));
+      }
+      if (prop === "newPage") {
+        // browser.newPage() makes its own one-page context: pin that context
+        // before the page loads anything, and close it with the page, as
+        // Playwright's own newPage() does.
+        return async (...args) => {
+          const ctx = await pinBrowser(await target.newContext(...args));
+          const page = await ctx.newPage();
+          page.once("close", () => ctx.close().catch(() => {}));
+          return page;
+        };
+      }
+      const v = Reflect.get(target, prop, target);
+      return typeof v === "function" ? v.bind(target) : v;
+    },
+  });
+}
+
+/** Launch Chrome. mobile=true gives a phone viewport for the Expo app. The
+ *  returned browser is the wrapped, pinned one — never call chromium.launch(). */
 export async function launch({ mobile = false, headless = true } = {}) {
-  const browser = await chromium.launch({ channel: "chrome", headless });
+  const browser = pinnedBrowser(await chromium.launch({ channel: "chrome", headless }));
   const ctx = await browser.newContext(
     mobile
       ? { viewport: { width: 420, height: 900 }, isMobile: true }
