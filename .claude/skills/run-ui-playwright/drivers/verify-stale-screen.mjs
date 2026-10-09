@@ -1,3 +1,4 @@
+// clock: pinnable
 // §7.64 — ATTENDANCE MUST LAND ON THE LESSON THE COACH IS LOOKING AT.
 //
 // This is the one thing no unit test in this repo can reach, and the reason is
@@ -56,7 +57,7 @@ function sql(q) {
 
 const CLASS_ID = "e1000000-0000-0000-0000-0000000000c1";
 const CLASS_B  = "e1000000-0000-0000-0000-0000000000c2";
-const TODAY = sql("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date");
+const TODAY = sql("SELECT app_today()");
 const D_PREV = sql(`SELECT '${TODAY}'::date - 7`);
 
 /** Statuses on one lesson, as "Name=status" pairs, ordered. The ground truth. */
@@ -223,7 +224,7 @@ try {
   // nothing to collect — and showing that to a coach would say a class was done
   // when nobody had touched it. §7.66-adjacent; the display layer owns this.
   const seedEmpty = sql(
-    `SELECT count(*) FROM classes c WHERE c.day_of_week = (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 1]::day_of_week AND NOT EXISTS (SELECT 1 FROM student_class_enrolments e WHERE e.class_id = c.id AND e.is_active)`
+    `SELECT count(*) FROM classes c WHERE c.day_of_week = (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM app_today())::int + 1]::day_of_week AND NOT EXISTS (SELECT 1 FROM student_class_enrolments e WHERE e.class_id = c.id AND e.is_active)`
   );
   check(
     "no class with an empty roster is labelled Marked",

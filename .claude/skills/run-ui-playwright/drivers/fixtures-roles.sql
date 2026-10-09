@@ -19,8 +19,8 @@ INSERT INTO auth.users (
   ('00000000-0000-0000-0000-000000000000',
    'ad200000-0000-0000-0000-00000000b001',
    'authenticated', 'authenticated', 'rolesdesk@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Roles Desk","role":"tenant_admin","tenant_id":"70000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;

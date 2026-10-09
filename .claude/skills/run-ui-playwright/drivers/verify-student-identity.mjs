@@ -1,3 +1,4 @@
+// clock: own-literal
 // Drives the student-identity + derived-age work (HANDOVER §8, PRD §5.1/§7.4).
 //
 // Why this exists rather than trusting the unit tests: ageFromDob is covered by

@@ -1,3 +1,4 @@
+// clock: pinnable
 // SMOKE: open EVERY admin route once and prove it rendered — the right page,
 // not a refusal, not a crash. Nothing else.
 //
@@ -34,7 +35,7 @@
 // SERVICE_ROLE_KEY is read from the env (run-all-drivers.sh exports it) and
 // falls back to `supabase status`, so a hand run needs no exported secret.
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, nowSg, ADMIN } from "./lib.mjs";
 
 // Resolved relative to this file, not an absolute path — the checkout lives
 // somewhere else on the CI runner (same as verify-platform-admin.mjs).
@@ -99,7 +100,7 @@ const AUTH_ROUTES = [
 // lesson page renders a real lesson rather than the "runs on Saturdays" notice.
 const DOW = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 function nextDateFor(dayOfWeek) {
-  const sg = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Singapore" })); // date-label-ok: SGT clock → ISO
+  const sg = new Date(nowSg().toLocaleString("en-US", { timeZone: "Asia/Singapore" })); // date-label-ok: SGT clock → ISO
   const want = DOW.indexOf(dayOfWeek);
   const ahead = (want - sg.getDay() + 7) % 7 || 7;
   sg.setDate(sg.getDate() + ahead);

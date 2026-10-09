@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives the admin panel after the multi-tenancy role split.
 //
 // `superadmin` no longer exists — it became `tenant_admin` (one business) and

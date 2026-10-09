@@ -1,3 +1,4 @@
+// clock: pinnable
 // SMOKE, app twin: open EVERY coach / parent / public screen once and prove it
 // rendered — the right screen, not a crash. The admin twin is
 // verify-smoke-admin.mjs; read its header for why these exist (playbook §7.3:
@@ -38,7 +39,7 @@
 //
 // run-all-drivers.sh maps this driver to fixtures-payment-collection.sql.
 import { execSync } from "node:child_process";
-import { launch, loginExpo, gotoAuthed, pressByText, EXPO } from "./lib.mjs";
+import { launch, loginExpo, gotoAuthed, pressByText, nowSg, EXPO } from "./lib.mjs";
 
 const OUT = process.env.SHOT_DIR || "/tmp";
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:54321";
@@ -72,7 +73,7 @@ const IGNORED_ERRORS = [];
 
 const DOW = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 function nextDateFor(dayOfWeek) {
-  const sg = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Singapore" })); // date-label-ok: SGT clock → ISO
+  const sg = new Date(nowSg().toLocaleString("en-US", { timeZone: "Asia/Singapore" })); // date-label-ok: SGT clock → ISO
   const want = DOW.indexOf(dayOfWeek);
   const ahead = (want - sg.getDay() + 7) % 7 || 7;
   sg.setDate(sg.getDate() + ahead);

@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drive owner-defined roles end to end (ROLES_PERMISSIONS_PLAN.md step 7;
 // migrations 20260927000300–000600).
 //

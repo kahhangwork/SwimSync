@@ -50,10 +50,10 @@ BEGIN
       'f4000000-0000-0000-0000-000000000001',
       'authenticated', 'authenticated', 'phase4-parent@test.local',
       crypt('password123', gen_salt('bf')),
-      NOW(),
+      NOW(),  -- clock-real: auth.users stamps are real time
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Phase4 Parent","role":"parent"}',
-      NOW(), NOW(), '', '', '', ''
+      NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
     );
     -- handle_new_user fans this out into profiles + parents in the same
     -- transaction, so the lookup below finds it.

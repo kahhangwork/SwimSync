@@ -1,3 +1,4 @@
+// clock: pinnable
 // Platform-admin tenant provisioning, end to end through the real UI.
 //
 // The load-bearing assertion is the LAST one: that the invited business owner
@@ -24,7 +25,7 @@ const check = (label, pass, detail = "") => {
   console.log(`${pass ? "PASS" : "FAIL"}  ${label}${detail ? ` — ${detail}` : ""}`);
 };
 
-const STAMP = Date.now();
+const STAMP = Date.now(); // clock-real: a unique suffix, not a date
 const BIZ = `Dolphin Academy ${STAMP}`;
 const ADMIN_EMAIL = `owner-${STAMP}@dolphin.test`;
 const NEW_PASSWORD = "dolphin-pass-123";
