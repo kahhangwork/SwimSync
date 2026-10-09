@@ -1159,3 +1159,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `4f29867`; Expo bundle carries the new guard regex and month list. **CI went red on `main` from `58b532c` (G2,
     §7.354) after prod already had it** — fixed by `bf1b406`, CI green. Admin `/packages` page chunk greps *Check marked
     lessons* / *Nothing to draw…* (1 each; new strings).
+
+80. **Deploy record (2026-10-09): `20261009000200_api_clock_pin` (`75a8b14`) → prod; engine source `ba620c3` on `main`,
+    NOT deployed.** `app_now()` re-bodied from `pg_get_functiondef` (BEFORE md5 `6b0147dc…`, local = prod) with three
+    edits; new private table, no grants. Rollback rehearsed (DOWN byte-identical to BEFORE, pre-migration pgTAP green
+    under it, UP re-applied). Every repo-invariants step run locally first (§7.354). The user ran `db push` (auto mode
+    refuses a prod deploy). Prod probes: md5 `679d6cd1…` = local, owner/ACL/volatility/secdef/config unchanged, 0 API
+    rows, 0 lock-1 rows, service_role EXECUTE, `app_now()` within 1 s of `now()`; `migration list --linked` 0 pending;
+    remote grant dump: no grant on `private.clock_api_pin_enabled`. **DORMANT:** `generate-invoices` on `main` is ahead
+    of prod (v34) from `ba620c3` — deploy only at the plan's step 4 (after Little Orcas' Sep 2026 run, no run in
+    flight); rollback = revert `ba620c3` → `functions deploy`.
