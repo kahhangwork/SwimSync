@@ -2,6 +2,8 @@
 // Opens only when package_backlog_preview returned rows, after the package is
 // already active. Two answers, and neither is a default: Draw from package /
 // Keep as ad-hoc. After a draw it shows the DRAW's own count, not the preview's.
+// Also opened by the Held table's "Check marked lessons" (source "check"), which
+// can come back empty — then it says so, with Close only.
 
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
@@ -20,6 +22,7 @@ export function BacklogDrawModal({ form }: { form: BacklogDraw }) {
   const { backlog, drawing, draw, dismiss } = form;
   const s = backlog ? summariseBacklog(backlog.rows) : null;
   const done = backlog?.drawn != null;
+  const empty = backlog !== null && backlog.rows.length === 0;
 
   return (
     <Modal
@@ -27,14 +30,36 @@ export function BacklogDrawModal({ form }: { form: BacklogDraw }) {
       onClose={dismiss}
       title="Lessons already marked"
     >
-      {backlog && s && (
+      {backlog && empty && (
         <>
-          <p className="text-sm text-gray-600">
-            <strong>{backlog.packageName}</strong> is active.{" "}
-            {lessonCount(s.total)} since its start date{" "}
-            {s.total === 1 ? "was" : "were"} marked before it was, and{" "}
-            {s.total === 1 ? "hasn't" : "haven't"} been billed yet.
+          <p className="text-sm text-gray-600" data-testid="backlog-empty">
+            Nothing to draw. No lesson marked since{" "}
+            <strong>{backlog.packageName}</strong>&rsquo;s start date is waiting
+            — each one is already drawn from a package, billed, or outside what
+            this package covers.
           </p>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={dismiss}>Close</Button>
+          </div>
+        </>
+      )}
+      {backlog && s && !empty && (
+        <>
+          {backlog.source === "check" ? (
+            <p className="text-sm text-gray-600">
+              {lessonCount(s.total)} marked since{" "}
+              <strong>{backlog.packageName}</strong>&rsquo;s start date{" "}
+              {s.total === 1 ? "hasn't" : "haven't"} been drawn from a package
+              or billed yet.
+            </p>
+          ) : (
+            <p className="text-sm text-gray-600">
+              <strong>{backlog.packageName}</strong> is active.{" "}
+              {lessonCount(s.total)} since its start date{" "}
+              {s.total === 1 ? "was" : "were"} marked before it was, and{" "}
+              {s.total === 1 ? "hasn't" : "haven't"} been billed yet.
+            </p>
+          )}
           <ul className="mt-2 space-y-0.5 text-xs text-gray-600" data-testid="backlog-summary">
             {s.thisPackage > 0 && <li>{lessonCount(s.thisPackage)} from this package</li>}
             {s.otherPackage > 0 && <li>{lessonCount(s.otherPackage)} from another package of the family</li>}

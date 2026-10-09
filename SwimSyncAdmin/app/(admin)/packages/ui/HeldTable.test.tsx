@@ -111,6 +111,8 @@ function setup(over: Partial<Props> = {}) {
     canEdit: true,
     openRefund: vi.fn(),
     openReverse: vi.fn(),
+    checkBacklog: vi.fn(),
+    checking: null,
     ...over,
   };
   const utils = render(<HeldTable {...props} />);
@@ -180,6 +182,30 @@ describe("HeldTable", () => {
     expect(props.setCancelling).toHaveBeenCalledWith(ALICE);
     expect(props.openExtend).toHaveBeenCalledTimes(1);
     expect(props.setCancelling).toHaveBeenCalledTimes(1);
+  });
+
+  // PRD §7.16, "Check marked lessons" — the activation question is asked once;
+  // this re-asks it. Draw needs packages:edit, so the button does too.
+  it("Check marked lessons: active rows only, packages:edit only, acts on that row", () => {
+    const { props, unmount } = setup();
+    const CHECK = { name: "Check marked lessons" };
+    expect(row("Bob Lim").queryByRole("button", CHECK)).toBeNull();
+    fireEvent.click(row("Carol Ng").getByRole("button", CHECK));
+    expect(props.checkBacklog).toHaveBeenCalledWith(CAROL);
+    expect(props.checkBacklog).toHaveBeenCalledTimes(1);
+    unmount();
+
+    setup({ canEdit: false });
+    expect(screen.queryByRole("button", CHECK)).toBeNull();
+  });
+
+  it("a check in flight says so on its row and locks every row's Check", () => {
+    const { props } = setup({ checking: ALICE.id });
+    expect(row("Alice Tan").getByRole("button", { name: "Checking…" })).toBeTruthy();
+    const carol = row("Carol Ng").getByRole("button", { name: "Check marked lessons" });
+    expect((carol as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(carol);
+    expect(props.checkBacklog).not.toHaveBeenCalled();
   });
 
   it("busy locks Extend and Cancel", () => {

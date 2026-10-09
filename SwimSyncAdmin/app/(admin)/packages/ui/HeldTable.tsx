@@ -39,6 +39,8 @@ export function HeldTable({
   canEdit,
   openRefund,
   openReverse,
+  checkBacklog,
+  checking,
 }: {
   held: Purchase[];
   heldMatches: Purchase[];
@@ -56,6 +58,10 @@ export function HeldTable({
   canEdit: boolean;
   openRefund: (p: Purchase) => void;
   openReverse: (p: Purchase, r: LiveRefund) => void;
+  /** Re-ask the backdated-draw question for this package (packages:edit). */
+  checkBacklog: (p: Purchase) => void;
+  /** The package id being checked, else null — locks every row's Check. */
+  checking: string | null;
 }) {
   const heldSort = useTableSort<Purchase>({
     key: "parent_name",
@@ -228,6 +234,19 @@ export function HeldTable({
                         >
                           Cancel
                         </Button>
+                        {/* The backdated-draw question again (Wave 6 D5 is
+                            asked once, at activation). Draw needs
+                            packages:edit, so the button does too. */}
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => checkBacklog(p)}
+                            disabled={busy || checking !== null}
+                          >
+                            {checking === p.id ? "Checking…" : "Check marked lessons"}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </Td>

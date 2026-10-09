@@ -1090,17 +1090,6 @@ modifier in the system — changes `amount_payable`, never `total_value`. **LIVE
 (`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
 
-### Re-offer the backdated draw — **S** _(filed 2026-10-06, Wave 6 lane 2)_
-A *Check marked lessons* action on a held package's row that runs `package_backlog_preview` / `draw_package_backlog`
-again.
-
-**Why:** the *Draw from package / Keep as ad-hoc* question (PRD §7.16) is asked ONCE, right after activation. If that
-preview read fails (the page then shows a banner) or the admin closes the tab, there is no later way to draw those
-lessons from the package — they bill ad-hoc at the next run, which may not be what the family paid for.
-
-**Notes:** both RPCs exist and re-derive at call time (a second draw draws 0), so this is UI only — the Held table
-row in `app/(admin)/packages/ui/HeldTable.tsx`. Gate on packages:edit like the dialog.
-
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
 the admin sending a renewal offer.

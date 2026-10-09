@@ -210,6 +210,8 @@ export default function PackagesPage() {
         canEdit={refund.canEdit}
         openRefund={refund.openRefund}
         openReverse={refund.openReverse}
+        checkBacklog={(p) => backlog.check(p.id, p.name)}
+        checking={backlog.checking}
       />
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}

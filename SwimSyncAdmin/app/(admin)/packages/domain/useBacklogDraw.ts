@@ -8,6 +8,13 @@
 // ⚠ ORDER: offer() runs AFTER the activation write succeeded. The preview reads
 // the package as active; called before, it sees nothing and the dialog never
 // opens. Invoiced lessons stay invoiced — the preview never lists them.
+//
+// check() is the SAME question asked again on demand — the Held table's "Check
+// marked lessons" (PRD §7.16). offer() is asked once;
+// if its preview failed or the tab closed, nothing else could ever draw those
+// lessons and they billed ad-hoc. Both RPCs re-derive at call time, so asking
+// again is safe: drawn lessons are no longer candidates and are never listed.
+// Unlike offer(), an empty answer is SAID (the admin asked a question).
 
 import { useState } from "react";
 import * as rpc from "../dao/packages.rpc";
@@ -21,6 +28,9 @@ export type Backlog = {
   drawn: number | null;
   /** The DB's refusal, verbatim (switch off, not authorised, not active). */
   error: string | null;
+  /** "activation" = asked by offer() right after activating; "check" = the
+   *  admin asked from the Held table (may have no rows). */
+  source: "activation" | "check";
 };
 
 type Shared = {
@@ -31,6 +41,8 @@ type Shared = {
 export function useBacklogDraw({ setError, reload }: Shared) {
   const [backlog, setBacklog] = useState<Backlog | null>(null);
   const [drawing, setDrawing] = useState(false);
+  /** The package id a check() is reading, else null. */
+  const [checking, setChecking] = useState<string | null>(null);
 
   async function offer(packageId: string, packageName: string) {
     const { data, error } = await rpc.packageBacklogPreview(packageId);
@@ -44,7 +56,23 @@ export function useBacklogDraw({ setError, reload }: Shared) {
     }
     const rows = (data ?? []) as BacklogRow[];
     if (!rows.length) return; // D5: asked only when such lessons exist.
-    setBacklog({ packageId, packageName, rows, drawn: null, error: null });
+    setBacklog({ packageId, packageName, rows, drawn: null, error: null, source: "activation" });
+  }
+
+  async function check(packageId: string, packageName: string) {
+    if (checking) return;
+    setChecking(packageId);
+    setError(null);
+    const { data, error } = await rpc.packageBacklogPreview(packageId);
+    setChecking(null);
+    if (error) {
+      setError(
+        `Checking ${packageName} for lessons already marked failed (${error.message}). Nothing was drawn.`
+      );
+      return;
+    }
+    const rows = (data ?? []) as BacklogRow[];
+    setBacklog({ packageId, packageName, rows, drawn: null, error: null, source: "check" });
   }
 
   async function draw() {
@@ -65,7 +93,7 @@ export function useBacklogDraw({ setError, reload }: Shared) {
     setBacklog(null);
   }
 
-  return { backlog, drawing, offer, draw, dismiss };
+  return { backlog, drawing, checking, offer, check, draw, dismiss };
 }
 
 export type BacklogDraw = ReturnType<typeof useBacklogDraw>;

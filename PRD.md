@@ -2205,8 +2205,10 @@ cash paid always equals value granted — nothing to reconcile.
   2026-10-06)*. After *Payment received* or *Record sale* succeeds, if the family already has un-invoiced lessons
   marked since the start date that this package could cover, a dialog lists them (with which package would pay
   each — this one, an earlier-expiring one, or none) and asks **Draw from package** or **Keep as ad-hoc**. Kept
-  lessons bill at the next run; lessons already on an invoice stay invoiced. The question is asked once, at
-  activation (BACKLOG → *Re-offer the backdated draw*).
+  lessons bill at the next run; lessons already on an invoice stay invoiced. It is asked automatically once, at
+  activation, and can be asked again any time from the held package's row — **Check marked lessons**
+  *(implemented 2026-10-09; packages:edit)* — which opens the same dialog, or says *Nothing to draw* when no such
+  lesson is waiting. Lessons already drawn are never listed again.
 - **The parent can see what their package paid for** *(implemented 2026-10-06)*: on Billing → Packages each
   active package expands to **Show lessons used** — a dated line per lesson (child, class), returned lessons
   struck through and labelled, and lessons paid under the old monthly model marked *On a monthly invoice*.

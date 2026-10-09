@@ -138,6 +138,13 @@ describe("useBacklogDraw", () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
+  it("offer() marks its dialog as an activation", async () => {
+    rpc.packageBacklogPreview.mockResolvedValue({ data: [ROW()], error: null });
+    const { result } = setup();
+    await act(() => result.current.offer("pkg-1", "10 lessons"));
+    expect(result.current.backlog!.source).toBe("activation");
+  });
+
   it("Keep as ad-hoc closes and writes nothing", async () => {
     rpc.packageBacklogPreview.mockResolvedValue({ data: [ROW()], error: null });
     const { result } = setup();
@@ -145,6 +152,63 @@ describe("useBacklogDraw", () => {
     act(() => result.current.dismiss());
     expect(result.current.backlog).toBeNull();
     expect(rpc.drawPackageBacklog).not.toHaveBeenCalled();
+  });
+});
+
+// PRD §7.16: the Held table's "Check marked lessons".
+// The same preview and the same Draw; an empty answer opens the dialog to SAY so
+// (the admin asked), a failed read says so on the page, and nothing is drawn
+// until the admin presses Draw.
+describe("useBacklogDraw.check — the question asked again", () => {
+  const setup = () => {
+    const setError = vi.fn();
+    const reload = vi.fn();
+    const hook = renderHook(() => useBacklogDraw({ setError, reload }));
+    return { ...hook, setError, reload };
+  };
+
+  it("rows → the dialog opens as a check; nothing drawn until Draw", async () => {
+    rpc.packageBacklogPreview.mockResolvedValue({ data: [ROW()], error: null });
+    const { result } = setup();
+    await act(() => result.current.check("pkg-1", "10 lessons"));
+    expect(rpc.packageBacklogPreview).toHaveBeenCalledWith("pkg-1");
+    expect(result.current.backlog).toMatchObject({ packageId: "pkg-1", source: "check", drawn: null });
+    expect(rpc.drawPackageBacklog).not.toHaveBeenCalled();
+    rpc.drawPackageBacklog.mockResolvedValue({ data: 1, error: null });
+    await act(() => result.current.draw());
+    expect(rpc.drawPackageBacklog).toHaveBeenCalledWith("pkg-1");
+    expect(result.current.backlog!.drawn).toBe(1);
+  });
+
+  it("no rows → the dialog still opens, empty, so the answer is said", async () => {
+    rpc.packageBacklogPreview.mockResolvedValue({ data: [], error: null });
+    const { result } = setup();
+    await act(() => result.current.check("pkg-1", "10 lessons"));
+    expect(result.current.backlog).toMatchObject({ rows: [], source: "check" });
+  });
+
+  it("a failed read is said on the page and opens nothing", async () => {
+    rpc.packageBacklogPreview.mockResolvedValue({ data: null, error: { message: "boom" } });
+    const { result, setError } = setup();
+    await act(() => result.current.check("pkg-1", "10 lessons"));
+    expect(result.current.backlog).toBeNull();
+    expect(setError).toHaveBeenLastCalledWith(expect.stringMatching(/Checking 10 lessons.*boom.*Nothing was drawn/));
+  });
+
+  it("checking names the package while the read is in flight, then clears", async () => {
+    let resolve!: (v: unknown) => void;
+    rpc.packageBacklogPreview.mockReturnValue(new Promise((r) => (resolve = r)));
+    const { result } = setup();
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.check("pkg-1", "10 lessons");
+    });
+    expect(result.current.checking).toBe("pkg-1");
+    await act(async () => {
+      resolve({ data: [], error: null });
+      await pending;
+    });
+    expect(result.current.checking).toBeNull();
   });
 });
 

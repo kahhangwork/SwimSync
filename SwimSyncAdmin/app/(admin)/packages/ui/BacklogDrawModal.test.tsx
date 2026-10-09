@@ -27,10 +27,13 @@ function setup(backlog: Partial<NonNullable<BacklogDraw["backlog"]>> = {}, drawi
       rows: [ROW(), ROW({ student_id: "s2", student_name: "Ben", funds_this: false, funding_package_id: null, funding_package_name: null })],
       drawn: null,
       error: null,
+      source: "activation",
       ...backlog,
     },
     drawing,
+    checking: null,
     offer: vi.fn(),
+    check: vi.fn(),
     draw: vi.fn(),
     dismiss: vi.fn(),
   };
@@ -65,6 +68,23 @@ describe("BacklogDrawModal", () => {
     expect(screen.queryByText("Draw from package")).toBeNull();
     expect(screen.queryByText("Keep as ad-hoc")).toBeNull();
     expect(screen.getByText("Close")).toBeTruthy();
+  });
+
+  it("a check from the Held table words the question as a check, not an activation", () => {
+    setup({ source: "check" });
+    expect(screen.getByText(/2 lessons marked since/)).toBeTruthy();
+    expect(screen.queryByText(/is active/)).toBeNull();
+    expect(screen.getByText("Draw from package")).toBeTruthy();
+    expect(screen.getByText("Keep as ad-hoc")).toBeTruthy();
+  });
+
+  it("a check that found nothing says so, with Close only", () => {
+    const form = setup({ source: "check", rows: [] });
+    expect(screen.getByTestId("backlog-empty").textContent).toMatch(/Nothing to draw/);
+    expect(screen.queryByText("Draw from package")).toBeNull();
+    expect(screen.queryByText("Keep as ad-hoc")).toBeNull();
+    fireEvent.click(screen.getByText("Close"));
+    expect(form.dismiss).toHaveBeenCalledTimes(1);
   });
 
   it("a refusal shows the DB's words and keeps both answers", () => {
