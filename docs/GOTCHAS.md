@@ -2874,3 +2874,28 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     says so. When re-bodying, mark each copied stamp `-- clock: stamp` in the NEW file before applying it.
     (2026-10-09, §8.143.)
 
+
+355. **`postgres` cannot set `swimsync.now` at database level; only `supabase_admin` can.** `ALTER DATABASE postgres
+    SET swimsync.now = …` as `postgres` → `permission denied to set parameter "swimsync.now"` (PG 17.6: a custom
+    placeholder needs a superuser, and `postgres` is not one). `docker exec <db> psql -U supabase_admin` IS a superuser
+    and succeeds; every new session — `postgres`, and `authenticator` logging in over TCP — then inherits the value as
+    its default, and pgTAP's per-transaction `set_config(…, true)` still overrides it. ⛔ Never "fix" the refusal with
+    `GRANT SET ON PARAMETER`, `ALTER ROLE … SET` or a seed line: those ship to CI/prod, and §6af allows one switch only.
+    The database-level carrier is local tooling, set by `run-all-drivers.sh --now` alone. (Step 0 of
+    `docs/plans/PIN_DRIVER_CLOCK_PLAN.md`, 2026-10-09.)
+
+356. **A database-level pin reaches PostgREST only through a FRESH pool, and `supabase db reset` erases it.** Pooled
+    `authenticator` connections keep the defaults they logged in with, so after `ALTER DATABASE … SET` restart
+    `supabase_rest_*` then `supabase_kong_*` (§7.44 — kong caches the upstream IP) and wait for auth; Step 0 saw both
+    `authenticator` backends born after the restart. Don't `pg_terminate_backend` the pool instead — it can keep dead
+    connections that fail a later request at random. `supabase db reset` recreates the database: a pin set before it is
+    gone after it (`pg_db_role_setting` empty, and a reset run WITH a pin set still exits 0 — the pin never reaches
+    the migrations), so a runner must **pin after every reset**. Unpin before it anyway: the reset alone leaves the
+    live PostgREST pool and any open session on the old default. (2026-10-09, Step 0.)
+
+357. **V8 rejects `"2026-10-01T07:59+08"` — Invalid Date — while Postgres accepts it.** Node parses the space form
+    (`"2026-10-01 07:59+08"`) and the full `"…T07:59:00+08:00"`, but the `T` with a short offset is `NaN`, and
+    `new Date("junk") instanceof Date` is still `true`, so an `instanceof` guard waves it through. Canonicalise a
+    user-typed moment in Postgres once (`to_char(x::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`) and
+    pass only the `…Z` string onward; any JS that parses a time checks `Number.isFinite(d.getTime())`. PostgREST's
+    `"…T23:59:00.123456+00:00"` does parse (truncated to ms). (Node v25.8.0, 2026-10-09.)

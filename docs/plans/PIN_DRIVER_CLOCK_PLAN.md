@@ -1,7 +1,7 @@
 # Pin the clock for UI drivers — replay any moment, end to end
 
-_Status: NOT STARTED (plan written 2026-10-09; hardened by /plan-review 2026-10-09). BACKLOG → Foundations → *Pin the
-clock for UI drivers* (L)._
+_Status: IN PROGRESS — T0 done, **Step 0 PASSED 2026-10-09** (S0.1–S0.5; S0.6: a pin does not survive `db reset`,
+§7.356). Plan written and hardened by /plan-review 2026-10-09. BACKLOG → Foundations → *Pin the clock for UI drivers* (L)._
 
 ## What this builds, and why
 
