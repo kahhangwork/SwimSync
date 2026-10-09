@@ -1,3 +1,4 @@
+// clock: pinnable
 // The attendance window as a RULE, and the roster as it was ON THE DAY.
 //
 // Guards four things no unit test can reach, because all four are what the
@@ -71,9 +72,9 @@ const CLASS_ID = sql("SELECT id FROM classes WHERE title='Saturday Beginners'");
 // because the fixture creates it literally — no lookup a second class confuses.
 const NEW_CLASS_ID = "d0000000-0000-0000-0000-0000000000e1";
 const NEW_CLASS_DOW = sql(`SELECT day_of_week::text FROM classes WHERE id='${NEW_CLASS_ID}'`);
-const TODAY = sql("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date");
+const TODAY = sql("SELECT app_today()");
 const LAST_SAT = sql(
-  "SELECT ((now() AT TIME ZONE 'Asia/Singapore')::date - ((EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 1) % 7))"
+  "SELECT (app_today() - ((EXTRACT(DOW FROM app_today())::int + 1) % 7))"
 );
 const D_PAST = sql(`SELECT '${LAST_SAT}'::date - 21`);
 // Below the CALENDAR rule but above this business's own floor, because the

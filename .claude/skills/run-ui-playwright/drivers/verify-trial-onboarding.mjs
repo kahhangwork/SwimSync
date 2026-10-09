@@ -1,3 +1,4 @@
+// clock: pinnable
 // Trial / provisional student onboarding, end to end through the real UIs.
 //
 // THE LOAD-BEARING ASSERTION IS THE REFUSAL. Everything else here is plumbing;

@@ -29,7 +29,7 @@ DECLARE
   v_month  DATE;
   v_class  UUID := 'fb000000-0000-0000-0000-000000000001';
 BEGIN
-  v_month := date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)
+  v_month := date_trunc('month', app_today())
              - INTERVAL '1 month';
 
   -- The walk-in and everything hanging off it.
@@ -114,12 +114,12 @@ SELECT
   (SELECT count(*) FROM billing_periods
     WHERE tenant_id = '70000000-0000-0000-0000-000000000001'
       AND billing_month = to_char(
-            date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)
+            date_trunc('month', app_today())
             - INTERVAL '1 month', 'YYYY-MM'))                            AS seal,
   (SELECT count(*) FROM invoices i
     WHERE i.tenant_id = '70000000-0000-0000-0000-000000000001'
       AND i.billing_month = to_char(
-            date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)
+            date_trunc('month', app_today())
             - INTERVAL '1 month', 'YYYY-MM')
       AND EXISTS (SELECT 1 FROM invoice_items ii
                     JOIN lesson_sessions ls ON ls.id = ii.lesson_session_id

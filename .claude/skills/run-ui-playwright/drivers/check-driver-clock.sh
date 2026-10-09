@@ -59,7 +59,7 @@ OWN_LITERAL=(verify-edit-child.mjs verify-student-identity.mjs verify-tz-saturda
 # ⚠ THE SWEEP RATCHETS. Remove a file the commit that converts it; lower the
 # constant with it. Both lists — and both constants — are deleted at the close of
 # the sweep, after which an unmarked driver or a raw-clock fixture is simply red.
-UNSWEPT_MAX=73
+UNSWEPT_MAX=68
 UNSWEPT=(
   verify-accounting-packages.mjs
   verify-active-inactive.mjs
@@ -74,7 +74,6 @@ UNSWEPT=(
   verify-app-home-writes.mjs
   verify-app-money.mjs
   verify-assessment.mjs
-  verify-attendance-guard.mjs
   verify-bulk-setall.mjs
   verify-cancel-lesson.mjs
   verify-class-admin.mjs
@@ -101,7 +100,6 @@ UNSWEPT=(
   verify-levels-table.mjs
   verify-levels.mjs
   verify-locations.mjs
-  verify-makeups.mjs
   verify-money-admin.mjs
   verify-multi-class.mjs
   verify-orphan-report.mjs
@@ -120,7 +118,6 @@ UNSWEPT=(
   verify-platform-controls.mjs
   verify-referrals.mjs
   verify-roles.mjs
-  verify-schedule-week.mjs
   verify-smoke-admin.mjs
   verify-smoke-app.mjs
   verify-stale-screen.mjs
@@ -129,13 +126,11 @@ UNSWEPT=(
   verify-tenant-branding.mjs
   verify-tenant-provisioning.mjs
   verify-tenant-suspension.mjs
-  verify-trial-onboarding.mjs
   verify-trial-visibility.mjs
   verify-trials.mjs
   verify-tz-saturday.mjs
-  verify-unmarked-lessons.mjs
 )
-UNSWEPT_FIXTURES_MAX=46
+UNSWEPT_FIXTURES_MAX=40
 UNSWEPT_FIXTURES=(
   fixtures-accounting-packages.sql
   fixtures-active-inactive.sql
@@ -148,7 +143,6 @@ UNSWEPT_FIXTURES=(
   fixtures-app-home-writes.sql
   fixtures-app-money.sql
   fixtures-assessment.sql
-  fixtures-attendance-guard.sql
   fixtures-class-admin.sql
   fixtures-class-deactivation.sql
   fixtures-class-students.sql
@@ -163,7 +157,6 @@ UNSWEPT_FIXTURES=(
   fixtures-grading-admin.sql
   fixtures-invoice-admin.sql
   fixtures-lesson-detail-guests.sql
-  fixtures-makeups.sql
   fixtures-money-admin.sql
   fixtures-multi-class.sql
   fixtures-orphan-report.sql
@@ -176,13 +169,9 @@ UNSWEPT_FIXTURES=(
   fixtures-phase4-billing.sql
   fixtures-platform-controls.sql
   fixtures-roles.sql
-  fixtures-stale-screen.sql
   fixtures-student-identity.sql
   fixtures-tenant-suspension.sql
-  fixtures-trial-onboarding-teardown.sql
-  fixtures-trial-onboarding.sql
   fixtures-trial-visibility.sql
-  fixtures-unmarked-lessons.sql
 )
 
 # The rules' patterns. SQL_RE is G2's token list (scripts/check-migration-clock.sh)

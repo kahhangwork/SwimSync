@@ -35,7 +35,7 @@
 \set ON_ERROR_STOP on
 
 CREATE TEMP TABLE ss AS
-WITH t AS (SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS today)
+WITH t AS (SELECT app_today() AS today)
 SELECT
   today,
   (today - 7) AS d_prev,

@@ -35,7 +35,7 @@
 -- any month falls on the 22nd or later, so minus seven is the 15th or later.
 CREATE TEMP VIEW fixture_dates AS
 WITH d AS (
-  SELECT (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)::date - 1)
+  SELECT (date_trunc('month', app_today())::date - 1)
            AS last_day_prev_month
 )
 SELECT (
@@ -55,10 +55,10 @@ INSERT INTO auth.users (
   'b0000000-0000-0000-0000-000000000001',
   'authenticated', 'authenticated', 'parent@swimsync.test',
   crypt('password123', gen_salt('bf')),
-  NOW(),
+  NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Test Parent","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 );
 
 -- Two children, linked to the parent, enrolled since 1 July
@@ -111,7 +111,7 @@ WITH sess AS (
   RETURNING id
 )
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by, marked_at)
-SELECT sess.id, st.id, 'present', 'c0000000-0000-0000-0000-000000000001', NOW()
+SELECT sess.id, st.id, 'present', 'c0000000-0000-0000-0000-000000000001', NOW()  -- clock-real: attendance.marked_at is a real audit stamp (its column default is now())
 FROM sess
 CROSS JOIN students st
 JOIN parent_students ps ON ps.student_id = st.id
