@@ -205,11 +205,25 @@ preflight() {
   code="$(http_code "$EXPO_URL")"
   [[ "$code" == "000" ]] && { echo "✗ expo not answering at $EXPO_URL — cd SwimSyncApp && npx expo start --web" >&2; ok=1; }
   # 503 = edge runtime not serving (§7.84). Anything else (400/404/…) proves it is.
-  code="$(http_code "$API_URL/functions/v1/public-invoice?token=preflight")"
+  # Up to 60 s: the nightly starts `functions serve` in the background and waits
+  # only for the two apps, so the edge runtime may still be booting here.
+  code="$(functions_code "$API_URL/functions/v1/public-invoice?token=preflight")"
   [[ "$code" == "503" || "$code" == "000" ]] && { echo "✗ edge functions not served (public-invoice → $code) — supabase functions serve --env-file supabase/functions/.env --no-verify-jwt" >&2; ok=1; }
-  code="$(http_code "$API_URL/functions/v1/generate-invoices")"
+  code="$(functions_code "$API_URL/functions/v1/generate-invoices")"
   [[ "$code" == "503" || "$code" == "000" ]] && { echo "✗ edge functions not served (generate-invoices → $code) — same fix as above" >&2; ok=1; }
   return $ok
+}
+
+# The last status code from up to 30 tries 2 s apart, stopping at the first that
+# is neither 503 nor 000.
+functions_code() {
+  local i code
+  for ((i = 0; i < 30; i++)); do
+    code="$(http_code "$1")"
+    [[ "$code" != "503" && "$code" != "000" ]] && break
+    sleep 2
+  done
+  echo "$code"
 }
 
 # ── One driver under a hard timeout ──────────────────────────────────────────
@@ -334,6 +348,11 @@ if [[ -n "$PIN" && -n "$ONLY" && -f "verify-$ONLY.mjs" && -z "$(marker_of "verif
   echo "✗ verify-$ONLY.mjs has no '// clock: pinnable' marker — it cannot run under --now (it would run half-pinned)" >&2
   exit 2
 fi
+
+# Refuse a half-up environment BEFORE any reset (§7.84). Defined since the first
+# nightly (d98a873) but never called until 2026-10-09 — a missing server read as
+# 73 product regressions instead of one named line.
+preflight || { echo "✗ preflight failed — fix the line(s) above and re-run" >&2; exit 1; }
 
 echo "run dir: $RUN_DIR"
 echo "running ${#DRIVERS[@]} driver(s), ${TIMEOUT_SECS}s timeout each"
