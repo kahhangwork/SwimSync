@@ -43,6 +43,16 @@
 #   .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh
 #   .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh --only unmarked-lessons
 #   .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh --isolated-only
+#   .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh --now '2026-10-01 07:59+08'
+#
+# --now '<past ts WITH an offset>' loads AND tears down every fixture at that
+# moment (docs/plans/PIN_DRIVER_CLOCK_PLAN.md, CI guard 3): app_now()/app_today()
+# in the fixtures read the pin. The pin rides on PGOPTIONS — on THIS script's
+# own psql sessions only — so nothing database-level is written and the script
+# stays sibling-safe. ⛔ Never a database-level pin here: only run-all-drivers.sh --now
+# and scripts/clock-unpin.sh write a database-level swimsync.now. Apply and
+# teardown share the pin, so a teardown finds the rows its fixture derived.
+# Both modes refuse a stack that already carries a stale pin (scripts/clock-unpin.sh).
 #
 # It leaves the database exactly as it found it, so it is safe to run against the
 # shared local Postgres while a sibling worktree is working (docs/GOTCHAS.md
@@ -53,10 +63,12 @@ cd "$(dirname "$0")"
 
 ONLY=""
 ISOLATED_ONLY=0
+NOW_IN=""
 while (($#)); do
   case "$1" in
     --only) ONLY="${2:-}"; shift 2 ;;
     --isolated-only) ISOLATED_ONLY=1; shift ;;
+    --now) NOW_IN="${2:-}"; [[ -n "$NOW_IN" ]] || { echo "--now needs a timestamp with an offset" >&2; exit 2; }; shift 2 ;;
     # Print the header block above, however long it grows — a hardcoded line
     # range drifts into nonsense the first time someone edits a comment.
     -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
@@ -74,18 +86,40 @@ if [[ -z "$DB_CONTAINER" ]]; then
   exit 1
 fi
 
+# A stale database-level pin (a killed run-all-drivers.sh --now) would load every
+# fixture on a fake day while this script reports "unpinned". Read-only check.
+"$(cd ../../../.. && pwd)/scripts/clock-unpin.sh" --check || exit 2
+
+# The pinned mode's carrier: PGOPTIONS on each of this script's psql sessions.
+# Canonicalised by Postgres (the input is a psql variable, never spliced); the
+# offset regex is app_now()'s own (§7.337).
+PG_ENV=()
+if [[ -n "$NOW_IN" ]]; then
+  PIN="$(printf '%s\n' "SELECT CASE
+      WHEN :'pin' !~ '([+-][0-9]{2}(:?[0-9]{2})?|Z)\$' THEN 'ERR no UTC offset'
+      WHEN (:'pin')::timestamptz > pg_catalog.now() THEN 'ERR in the future'
+      ELSE to_char((:'pin')::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') END;" \
+    | docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 -v pin="$NOW_IN" 2>&1)" \
+    || { echo "✗ --now '$NOW_IN' is not a timestamp: $PIN" >&2; exit 2; }
+  if [[ ! "$PIN" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+    echo "✗ --now '$NOW_IN' refused: ${PIN#ERR } — give a PAST moment with an offset" >&2
+    exit 2
+  fi
+  PG_ENV=(-e "PGOPTIONS=-c swimsync.now=$PIN")
+fi
+
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 # Run a .sql FILE. ON_ERROR_STOP=1 is the whole point: a fixture that half-loads
 # must fail here, not three weeks later inside someone else's driver score.
 psql_file() {
-  docker exec -i "$DB_CONTAINER" \
+  docker exec -i ${PG_ENV[@]+"${PG_ENV[@]}"} "$DB_CONTAINER" \
     psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q < "$1"
 }
 
 psql_query() {
-  docker exec -i "$DB_CONTAINER" \
+  docker exec -i ${PG_ENV[@]+"${PG_ENV[@]}"} "$DB_CONTAINER" \
     psql -U postgres -d postgres -v ON_ERROR_STOP=1 -At -F'|' -c "$1"
 }
 
@@ -127,6 +161,16 @@ delta() {
 exemption_of() {
   sed -n 's/^-- roundtrip-exempt: cross-fixture-writes *—* *//p' "$1" | head -1
 }
+
+# Prove the carrier before trusting a single result: a session of this script
+# must read the pin through app_now(), or every "pinned" line below is a lie.
+if [[ -n "$NOW_IN" ]]; then
+  if [[ "$(psql_query "SELECT app_now() = '$PIN'::timestamptz")" != t ]]; then
+    echo "✗ PGOPTIONS did not pin app_now() to $PIN — the pinned roundtrip cannot say anything" >&2
+    exit 2
+  fi
+  echo "Pinned at: $PIN  (--now '$NOW_IN', PGOPTIONS on this script's sessions only)"
+fi
 
 FIXTURES=()
 for f in fixtures-*.sql; do

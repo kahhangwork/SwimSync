@@ -21,6 +21,9 @@ set -euo pipefail
 
 DB_CONTAINER="$(docker ps --format '{{.Names}}' | grep -m1 '^supabase_db_' || true)"
 [ -n "$DB_CONTAINER" ] || { echo "app_clock_locks: no running local stack"; exit 1; }
+# A stale clock pin (a killed run-all-drivers.sh --now) leaves the API row in place, and checks 1–3 would then
+# test the wrong thing. Read-only check.
+"$(cd "$(dirname "$0")/../../.." && pwd)/scripts/clock-unpin.sh" --check || exit 2
 
 # One psql session per check, logged in as authenticator. Prints one value; exits non-zero on any error,
 # including a refused login.

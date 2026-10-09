@@ -47,6 +47,13 @@ jobs:
       - name: No UI driver builds a date label outside lib.mjs
         run: .claude/skills/run-ui-playwright/drivers/check-driver-dates.sh
 
+      # `run-all-drivers.sh --now` replays a past moment end to end; one stray new Date()
+      # or now() puts a driver back on the real clock beside a pinned stack. Drivers read
+      # the time only through lib.mjs, fixtures through app_now(); the API pin row can
+      # never ship (PIN_DRIVER_CLOCK_PLAN).
+      - name: UI drivers and fixtures read the clock only through the pinnable path
+        run: .claude/skills/run-ui-playwright/drivers/check-driver-clock.sh
+
       # A literal test date the marking floor has not passed expires the 1st it does —
       # main went red that way on 2026-10-01 (§7.303). Annotate or derive (§7.305).
       - name: No pgTAP test or UI fixture holds an expiring literal date
@@ -173,6 +180,13 @@ jobs:
       # concern, not a correctness one.
       - name: UI fixtures load, own their own rows, and tear down clean
         run: .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh
+
+      # The same roundtrip at a FIXED PAST moment — the 1st, before 08:00 SGT, where the
+      # UTC and SGT dates disagree (§7.7). The only CI exercise of the pinned path: every
+      # fixture and teardown derives its dates from app_now()/app_today() at the pin. The
+      # pin rides on PGOPTIONS for the script's own sessions; nothing database-level.
+      - name: UI fixtures load and tear down clean at a pinned moment (2026-10-01 07:59+08)
+        run: .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh --now '2026-10-01 07:59+08'
 
       - name: Stop Supabase stack
         if: always()
