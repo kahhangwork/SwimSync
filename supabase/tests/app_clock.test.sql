@@ -14,12 +14,14 @@
 --   * ACL parity (RISK 2): any role that can call today_sg() can call app_now()/app_today(); anon neither.
 --   * Nothing but app_now() reads swimsync.now, and no public function calls set_config — so no
 --     client-reachable path can set the pin.
+--   * The local-only API pin (20261009000200, PIN_DRIVER_CLOCK_PLAN): its row is invisible to every API role,
+--     readable by app_now()'s owner, and ABSENT here — and no database/role-level pin is left on the stack.
 --
 -- NOT HERE: lock 2 (session_user = 'authenticator'). pgTAP runs with session_user = postgres and cannot
 -- become authenticator (§7.333), so any assertion here would be vacuous. It is proven over a real login by
 -- supabase/tests/http/app_clock_locks.sh.
 BEGIN;
-SELECT plan(27);
+SELECT plan(31);
 
 -- ---- 1. The flag row (lock 1's switch) is present: seed.sql ran, or M1's hand insert did (§7.334) ----------
 SELECT is((SELECT count(*)::int FROM private.clock_override_enabled), 1,
@@ -94,6 +96,25 @@ SELECT is_empty($$
   SELECT r FROM unnest(ARRAY['anon','authenticated','service_role']) r
    WHERE has_schema_privilege(r, 'private', 'USAGE') OR has_schema_privilege(r, 'private', 'CREATE')
 $$, 'no API role can use or create in the private schema');
+
+-- ---- 7b. The local-only API pin (20261009000200, PIN_DRIVER_CLOCK_PLAN RISK 3) ---------------------------------
+-- Only run-all-drivers.sh --now inserts this row, and only for the length of a run; a test run must never see it.
+SELECT is_empty($$
+  SELECT r, p FROM unnest(ARRAY['anon','authenticated','service_role']) r,
+                   unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) p
+   WHERE has_table_privilege(r, 'private.clock_api_pin_enabled', p)
+$$, 'no API role holds any privilege on the API-pin table');
+-- Locally the owner is postgres, which holds pg_read_all_data, so this bites only if ownership moves: proven red
+-- 2026-10-09 by OWNER TO anon (as supabase_admin) — every pinned non-API app_now() call then fails "permission
+-- denied for schema private", because the API-pin subquery is planned even when session_user is not authenticator.
+SELECT ok(has_table_privilege(
+            (SELECT proowner::regrole::text FROM pg_proc WHERE oid = 'public.app_now'::regproc),
+            'private.clock_api_pin_enabled', 'SELECT'),
+  'app_now()''s owner (it is SECURITY DEFINER) can read the API-pin table');
+SELECT is((SELECT count(*)::int FROM private.clock_api_pin_enabled), 0,
+  'no API-pin row survives into a test run — run scripts/clock-unpin.sh');
+SELECT ok(NOT EXISTS (SELECT 1 FROM pg_db_role_setting WHERE array_to_string(setconfig, ',') ~ 'swimsync\.now'),
+  'no database/role-level pin left behind — run scripts/clock-unpin.sh');
 
 -- The general form of the parity: a SECURITY INVOKER function that calls the clock runs app_now() as ITS caller,
 -- so every role that may execute it must hold app_now()/app_today() (M2's four invoker re-bodies, and any later).
