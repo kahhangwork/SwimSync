@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives prepaid packages end-to-end across both UIs (PACKAGES_DESIGN.md §8).
 //
 // pgTAP owns the money rules and the Deno suite owns the engine; this exists

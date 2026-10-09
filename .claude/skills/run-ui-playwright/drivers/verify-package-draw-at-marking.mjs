@@ -1,3 +1,4 @@
+// clock: pinnable
 // Wave 6 — package lessons draw AT MARKING (docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md §1.5).
 //
 // pgTAP owns the ledger rules (draw, return, PK001, PK002, the matcher); this proves what only the real
@@ -21,8 +22,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { chromium } from "playwright-core";
-import { loginAdmin, loginExpo, tap, gotoAuthed, pressByText, dumpText, ADMIN, EXPO } from "./lib.mjs";
+import { loginAdmin, loginExpo, tap, gotoAuthed, pressByText, dumpText, launch, ADMIN, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(`docker exec -i supabase_db_SwimSync psql -U postgres -tAc ${JSON.stringify(q.replace(/\s+/g, " ").trim())}`,
@@ -47,8 +47,8 @@ const ID = (tail) => `e6d00000-0000-0000-0000-${tail}`;
 const PKG = { ava: ID("00000000e0a0"), ben: ID("00000000e0b0"), cara: ID("00000000e0c0"), dan: ID("00000000e0d0") };
 const CLS = { draw: ID("00000000c1a0"), guard: ID("00000000c1d0") };
 const KID = { ava: ID("0000000005a0"), dan: ID("0000000005d0") };
-const [T, M1] = sql(`SELECT to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'YYYY-MM-DD')
-  || '|' || to_char(date_trunc('month', now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month', 'YYYY-MM')`).split("|");
+const [T, M1] = sql(`SELECT to_char(app_today(), 'YYYY-MM-DD')
+  || '|' || to_char(date_trunc('month', app_now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month', 'YYYY-MM')`).split("|");
 const minus = (iso, k) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - k); return d.toISOString().slice(0, 10); };
 const AVA_D1 = minus(T, 1);          // Ava's unmarked lesson
 const DAN_EARLY = minus(T, 9);       // Dan's earlier unmarked lesson — the one PK001 names
@@ -62,7 +62,10 @@ const markOf = (cls, kid, iso) => sql(`SELECT COALESCE((SELECT a.status::text FR
 
 console.log(`scenario: T=${T}  Ava ${AVA_D1}  Dan ${DAN_EARLY}/${DAN_LATE}  backdated start ${BACKDATED_START}  months ${M1}`);
 
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+// lib.mjs's browser: every context this driver makes on it is pinned under --now.
+// The spare context launch() opens is closed; this driver builds its own.
+const { browser, ctx: spareCtx } = await launch();
+await spareCtx.close();
 const mobile = async () => {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, isMobile: true, timezoneId: "Asia/Singapore" });
   const page = await ctx.newPage();

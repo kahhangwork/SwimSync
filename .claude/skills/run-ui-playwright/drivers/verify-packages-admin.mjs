@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-packages-admin.mjs — the eleven Packages admin actions no other driver
 // presses: Show superseded (and Hide), Record a sale, the held search, Extend
 // (with its refusal), Cancel of an ACTIVE package (Keep it, then Cancel
@@ -72,9 +73,9 @@ const sql = (q) =>
     "-v", "ON_ERROR_STOP=1", "-Atc", q], { encoding: "utf8" }).trim();
 // Poll until the DB value satisfies `ok` — a UI write lands asynchronously.
 async function dbUntil(q, ok, ms = 10000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = sql(q);
-  while (!ok(v) && Date.now() < end) {
+  while (!ok(v) && Date.now() < end) { // clock-real: a poll deadline (elapsed time, not a date)
     await new Promise((r) => setTimeout(r, 300));
     v = sql(q);
   }
@@ -132,9 +133,9 @@ const held = () => section("Who holds one");
 const refsIn = async (loc) =>
   [...new Set(((await loc.innerText().catch(() => "")).match(/PKG-\d{4}-\d{4,}/g) ?? []))].sort().join(",");
 async function refsUntil(loc, want, ms = 8000) {
-  const end = Date.now() + ms;
+  const end = Date.now() + ms; // clock-real: a poll deadline (elapsed time, not a date)
   let v = await refsIn(loc);
-  while (v !== want && Date.now() < end) { await page.waitForTimeout(250); v = await refsIn(loc); }
+  while (v !== want && Date.now() < end) { await page.waitForTimeout(250); v = await refsIn(loc); } // clock-real: a poll deadline (elapsed time, not a date)
   return v;
 }
 const sorted = (...r) => [...r].sort().join(",");
@@ -191,8 +192,8 @@ try {
   const preview = await saleModal.getByText("Pays S$300.00").waitFor({ timeout: 8000 })
     .then(() => true).catch(() => false);
   const startField = saleModal.locator('input[type="date"]');
-  const endStart = Date.now() + 8000;
-  while (!(await startField.inputValue()) && Date.now() < endStart) await page.waitForTimeout(200);
+  const endStart = Date.now() + 8000; // clock-real: a poll deadline (elapsed time, not a date)
+  while (!(await startField.inputValue()) && Date.now() < endStart) await page.waitForTimeout(200); // clock-real: a poll deadline (elapsed time, not a date)
   const saleStart = await startField.inputValue();
   check("choosing parent + package previews the price and suggests a start date",
     preview && /^\d{4}-\d{2}-\d{2}$/.test(saleStart), `preview ${preview} · start ${saleStart || "(empty)"}`);
@@ -329,7 +330,7 @@ try {
       (await reqHeld.getByRole("button", { name: "Record refund" }).count()) === 0,
     flat(await alderHeld.innerText().catch(() => "")).slice(0, 160));
 
-  const month = sql(`SELECT to_char(now() AT TIME ZONE 'Asia/Singapore','YYYY-MM')`);
+  const month = sql(`SELECT to_char(app_now() AT TIME ZONE 'Asia/Singapore','YYYY-MM')`);
   sql(`INSERT INTO billing_periods (billing_month, tenant_id, invoices_issued) VALUES ('${month}','${TENANT}',1)`);
   await alderHeld.getByRole("button", { name: "Record refund" }).click();
   await modal(page).getByLabel("Amount refunded (S$)").fill("120");
@@ -346,7 +347,7 @@ try {
   await modal(page).getByLabel(/Note/).fill("Driver refund");
   await modal(page).getByRole("button", { name: "Record refund" }).click();
   const refRow = await dbUntil(
-    `SELECT amount||'|'||(refunded_on = (now() AT TIME ZONE 'Asia/Singapore')::date)::text||'|'||coalesce(note,'-')||'|'||recorded_by
+    `SELECT amount||'|'||(refunded_on = app_today())::text||'|'||coalesce(note,'-')||'|'||recorded_by
        FROM package_refunds WHERE tenant_id='${TENANT}' AND reversed_at IS NULL`,
     (v) => v !== "");
   check("⚠ Record refund writes ONE live refund — S$120.00, dated today (SGT), with the note, by this admin",

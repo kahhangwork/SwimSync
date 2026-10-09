@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives the package RENEWAL-OFFER loop end to end on the admin UI
 // (PACKAGE_RENEWAL_AUTOMATION_PLAN.md, Phase 4).
 //
@@ -72,9 +73,9 @@ function seed() {
         email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,
         confirmation_token,recovery_token,email_change_token_new,email_change)
        VALUES ('00000000-0000-0000-0000-000000000000','${AUTHU}','authenticated',
-        'authenticated','renewal-parent@test.local',crypt('x',gen_salt('bf')),now(),
+        'authenticated','renewal-parent@test.local',crypt('x',gen_salt('bf')),now(), /* clock-real: auth.users stamps are real time */
         '{"provider":"email"}','{"full_name":"Renewal Parent","role":"parent","phone":"91230099"}',
-        now(),now(),'','','','')`);
+        now(),now(),'','','','')`); /* clock-real: auth.users stamps are real time */
   sql(`INSERT INTO parent_tenants (parent_id, tenant_id)
        SELECT id, '${T}' FROM parents WHERE profile_id='${AUTHU}'`);
   sql(`INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id, created_by)
@@ -86,7 +87,7 @@ function seed() {
   // An active package that STARTED 21 days ago → 4-week validity expires in ~7
   // days → low by the default 14-day expiry warning.
   sql(`INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status, start_date)
-       SELECT '${PKG}','${T}', id, '${PROD}', 'active', CURRENT_DATE - 21
+       SELECT '${PKG}','${T}', id, '${PROD}', 'active', app_today() - 21
        FROM parents WHERE profile_id='${AUTHU}'`);
 }
 

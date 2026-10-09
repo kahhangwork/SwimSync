@@ -28,7 +28,7 @@
 
 -- ---- The business, sealed month included ----
 INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
-  ('ab000000-0000-0000-0000-000000000001','orphanrpt','OrphanRpt Business','SWIM-ORPH', now())
+  ('ab000000-0000-0000-0000-000000000001','orphanrpt','OrphanRpt Business','SWIM-ORPH', now())  -- clock-real: tenants.created_at is a real stamp (column default now())
 ON CONFLICT (id) DO NOTHING;
 
 -- Inserting auth.users rows fires handle_new_user, which builds profiles (and
@@ -42,17 +42,17 @@ INSERT INTO auth.users (
   ('00000000-0000-0000-0000-000000000000',
    'ab100000-0000-0000-0000-0000000000a1',
    'authenticated', 'authenticated', 'orphan-admin@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"OrphanRpt Admin","role":"tenant_admin","tenant_id":"ab000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', ''),
+   NOW(), NOW(), '', '', '', ''),  -- clock-real: auth.users stamps are real time
   ('00000000-0000-0000-0000-000000000000',
    'ab100000-0000-0000-0000-0000000000c1',
    'authenticated', 'authenticated', 'orphan-coach@swimsync.test',
-   crypt('password123', gen_salt('bf')), NOW(),
+   crypt('password123', gen_salt('bf')), NOW(),  -- clock-real: auth.users stamps are real time
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"OrphanRpt Coach","role":"coach","tenant_id":"ab000000-0000-0000-0000-000000000001"}',
-   NOW(), NOW(), '', '', '', '')
+   NOW(), NOW(), '', '', '', '')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO class_categories (tenant_id, name)
@@ -77,7 +77,7 @@ SELECT
     WHERE c.profile_id = 'ab100000-0000-0000-0000-0000000000c1'),
   'OrphanRpt Lane',
   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
-    )[EXTRACT(DOW FROM (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
+    )[EXTRACT(DOW FROM (date_trunc('month', (app_now() AT TIME ZONE 'Asia/Singapore'))
        - INTERVAL '1 month' + INTERVAL '7 days'))::int + 1]::day_of_week,
   '16:00', '17:00', 'ab000000-1111-0000-0000-0000000010c1', 30,
   (SELECT id FROM class_categories
@@ -93,7 +93,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Last month, sealed. This is the row that makes the lessons below ORPHANS
 -- rather than month-blockers.
 INSERT INTO billing_periods (billing_month, tenant_id, invoices_issued)
-SELECT to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month', 'YYYY-MM'),
+SELECT to_char((app_now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month', 'YYYY-MM'),
        'ab000000-0000-0000-0000-000000000001', 0
 ON CONFLICT (tenant_id, billing_month) DO NOTHING;
 
@@ -102,10 +102,10 @@ INSERT INTO lesson_sessions (id, class_id, session_date, start_time, end_time)
 SELECT v.id, 'ab000000-1111-0000-0000-000000000001', v.d, '16:00', '17:00'
 FROM (VALUES
   ('ab400000-0000-0000-0000-00000000000b'::uuid,
-   (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
+   (date_trunc('month', (app_now() AT TIME ZONE 'Asia/Singapore'))
       - INTERVAL '1 month' + INTERVAL '7 days')::date),
   ('ab400000-0000-0000-0000-00000000000c'::uuid,
-   (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
+   (date_trunc('month', (app_now() AT TIME ZONE 'Asia/Singapore'))
       - INTERVAL '1 month' + INTERVAL '14 days')::date)
 ) AS v(id, d)
 ON CONFLICT (id) DO NOTHING;

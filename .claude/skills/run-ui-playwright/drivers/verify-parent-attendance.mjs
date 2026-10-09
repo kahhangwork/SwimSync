@@ -1,3 +1,4 @@
+// clock: pinnable
 // Parent Attendance screen: chip layout + the "not assigned yet" state.
 //
 // Guards two web-only regressions that unit tests cannot catch:

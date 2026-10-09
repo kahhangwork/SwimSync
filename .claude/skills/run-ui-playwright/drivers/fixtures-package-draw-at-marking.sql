@@ -61,9 +61,9 @@ DELETE FROM tenants               WHERE id::text LIKE 'e6d00000-%';
 
 -- ── The clock: T = today in SGT, M1 = the 1st of last month ─────────────────────────────────────────────────
 CREATE TEMP TABLE _w6 ON COMMIT DROP AS
-SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS t,
-       (date_trunc('month', now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date AS m1,
-       date_trunc('month', now() AT TIME ZONE 'Asia/Singapore')::date AS m0;
+SELECT app_today() AS t,
+       (date_trunc('month', app_now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date AS m1,
+       date_trunc('month', app_now() AT TIME ZONE 'Asia/Singapore')::date AS m0;
 
 CREATE FUNCTION pg_temp.wd(d date) RETURNS day_of_week LANGUAGE sql IMMUTABLE AS $$
   SELECT ((ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])
@@ -92,8 +92,8 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, e
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
   confirmation_token, recovery_token, email_change_token_new, email_change)
 SELECT '00000000-0000-0000-0000-000000000000', u.id::uuid, 'authenticated', 'authenticated', u.email,
-       crypt('password123', gen_salt('bf')), now(),
-       '{"provider":"email","providers":["email"]}', u.meta::jsonb, now(), now(), '', '', '', ''
+       crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
+       '{"provider":"email","providers":["email"]}', u.meta::jsonb, now(), now(), '', '', '', ''  -- clock-real: auth.users stamps are real time
   FROM (VALUES
     ('e6d00000-0000-0000-0000-0000000000a1', 'w6pd-owner@swimsync.test',
      '{"full_name":"W6PD Owner","role":"tenant_admin","is_coach":true,"tenant_id":"e6d00000-0000-0000-0000-000000000001"}'),
@@ -139,7 +139,7 @@ SELECT c.id::uuid, c.tenant::uuid, co.id, c.title, pg_temp.wd(c.d), '16:00', '16
 
 -- ── Children ────────────────────────────────────────────────────────────────────────────────────────────────
 INSERT INTO students (id, full_name, date_of_birth, assignment_status, is_active, tenant_id)
-SELECT s.id::uuid, s.name, (now() - INTERVAL '8 years')::date, 'assigned', true, s.tenant::uuid
+SELECT s.id::uuid, s.name, (app_now() - INTERVAL '8 years')::date, 'assigned', true, s.tenant::uuid
   FROM (VALUES
     ('e6d00000-0000-0000-0000-0000000005a0', 'Ava W6pd',  'e6d00000-0000-0000-0000-000000000001', 'fa'),
     ('e6d00000-0000-0000-0000-0000000005b0', 'Ben W6pd',  'e6d00000-0000-0000-0000-000000000001', 'fb'),

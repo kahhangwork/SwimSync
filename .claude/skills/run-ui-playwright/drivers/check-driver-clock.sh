@@ -61,16 +61,8 @@ OWN_LITERAL=(verify-edit-child.mjs verify-student-identity.mjs verify-tz-saturda
 # ⚠ THE SWEEP RATCHETS. Remove a file the commit that converts it; lower the
 # constant with it. Both lists — and both constants — are deleted at the close of
 # the sweep, after which an unmarked driver or a raw-clock fixture is simply red.
-UNSWEPT_MAX=28
+UNSWEPT_MAX=20
 UNSWEPT=(
-  verify-multi-class.mjs
-  verify-orphan-report.mjs
-  verify-package-draw-at-marking.mjs
-  verify-package-renewal.mjs
-  verify-packages-admin.mjs
-  verify-packages.mjs
-  verify-parent-address.mjs
-  verify-parent-attendance.mjs
   verify-parent-claim.mjs
   verify-parent-pay-claim.mjs
   verify-payment-collection.mjs
@@ -92,13 +84,8 @@ UNSWEPT=(
   verify-trials.mjs
   verify-tz-saturday.mjs
 )
-UNSWEPT_FIXTURES_MAX=13
+UNSWEPT_FIXTURES_MAX=8
 UNSWEPT_FIXTURES=(
-  fixtures-multi-class.sql
-  fixtures-orphan-report.sql
-  fixtures-package-draw-at-marking.sql
-  fixtures-packages-admin.sql
-  fixtures-packages.sql
   fixtures-parent-claim.sql
   fixtures-payment-collection.sql
   fixtures-paynow-fallback.sql

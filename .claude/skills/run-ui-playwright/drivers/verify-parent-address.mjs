@@ -1,3 +1,4 @@
+// clock: pinnable
 // Drives address + postal code: collected at signup, editable afterwards.
 //
 // The editable-afterwards half is the point. Both fields are OPTIONAL at
@@ -14,7 +15,7 @@ const check = (ok, label, detail = "") => {
   else { fail++; console.log("  FAIL", label, detail ? `\n        ${detail}` : ""); }
 };
 
-const EMAIL = `addr-${Date.now()}@test.local`;
+const EMAIL = `addr-${Date.now()}@test.local`; // clock-real: a unique suffix, not a date
 const { browser, page } = await launch({ mobile: true, headless: true });
 
 try {

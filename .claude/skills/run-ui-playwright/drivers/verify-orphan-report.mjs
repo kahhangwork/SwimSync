@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-orphan-report.mjs — the standing "recorded after billing" report
 // (Wave 4): its sidebar badge, its per-line persistence, and both settle paths.
 //
@@ -141,7 +142,7 @@ function sqlAs(uid, q) {
     // month in SGT, the fixture's sealed month); the LABEL from lib.mjs, never
     // to_char — 'Mon' said "Sep" against the page's "Sept" (§7.302).
     const monthLabel = sgMonthLabel(
-      sql(`SELECT to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month', 'YYYY-MM')`)
+      sql(`SELECT to_char((app_now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month', 'YYYY-MM')`)
     );
     check(
       `lines name the sealed month (${monthLabel})`,
@@ -176,7 +177,7 @@ function sqlAs(uid, q) {
          FROM student_settlements WHERE student_id = '${KID_TWO_ID}'`
     );
     const d2 = sql(
-      `SELECT (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')) - INTERVAL '1 month' + INTERVAL '14 days')::date::text`
+      `SELECT (date_trunc('month', (app_now() AT TIME ZONE 'Asia/Singapore')) - INTERVAL '1 month' + INTERVAL '14 days')::date::text`
     );
     check(
       "the row is paid_outside, 60.00, dated at the line's LATEST lesson",

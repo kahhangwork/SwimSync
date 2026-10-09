@@ -63,10 +63,10 @@ INSERT INTO auth.users (
   'c6000000-0000-0000-0000-00000000000d',
   'authenticated', 'authenticated', 'multicls-parent@swimsync.test',
   crypt('password123', gen_salt('bf')),
-  NOW(),
+  NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"MultiCls Parent","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 ) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO parent_tenants (parent_id, tenant_id)

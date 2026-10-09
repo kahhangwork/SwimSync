@@ -50,28 +50,28 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
  ('00000000-0000-0000-0000-000000000000','c8000000-0000-0000-0000-0000000000a1',
   'authenticated','authenticated','packages-admin-owner@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"PkgAdm Owner","role":"tenant_admin","is_coach":false,"tenant_id":"c8000000-0000-0000-0000-000000000001"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','c8000000-0000-0000-0000-0000000000f1',
   'authenticated','authenticated','packages-admin-alder@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"PkgAdm Parent Alder","role":"parent"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','c8000000-0000-0000-0000-0000000000f2',
   'authenticated','authenticated','packages-admin-birch@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"PkgAdm Parent Birch","role":"parent"}',
-  now(), now(), '','','',''),
+  now(), now(), '','','',''),  -- clock-real: auth.users stamps are real time
  ('00000000-0000-0000-0000-000000000000','c8000000-0000-0000-0000-0000000000f3',
   'authenticated','authenticated','packages-admin-cedar@swimsync.test',
-  crypt('password123', gen_salt('bf')), now(),
+  crypt('password123', gen_salt('bf')), now(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"PkgAdm Parent Cedar","role":"parent"}',
-  now(), now(), '','','','')
+  now(), now(), '','','','')  -- clock-real: auth.users stamps are real time
 ON CONFLICT (id) DO NOTHING;
 
 -- ── Reset the driver's side effects FIRST ───────────────────────────────────
@@ -120,7 +120,7 @@ DECLARE
   v_a   uuid;
   v_b   uuid;
   v_c   uuid;
-  v_sg  date := (now() AT TIME ZONE 'Asia/Singapore')::date;
+  v_sg  date := app_today();
 BEGIN
   SELECT id INTO v_a FROM parents WHERE profile_id = 'c8000000-0000-0000-0000-0000000000f1';
   SELECT id INTO v_b FROM parents WHERE profile_id = 'c8000000-0000-0000-0000-0000000000f2';
@@ -155,21 +155,21 @@ BEGIN
                                requested_at, confirmed_at, start_date)
   VALUES ('c8000000-0000-0000-0000-0000000003a1', t, v_a,
           'c8000000-0000-0000-0000-0000000002a1', 'active',
-          now() - interval '20 days', now() - interval '14 days', v_sg - 14);
+          app_now() - interval '20 days', app_now() - interval '14 days', v_sg - 14);
 
   -- 2. Birch's admin OFFER (pending, offered_by set, unclaimed)…
   INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status,
                                requested_at, offered_by, offered_at, start_date)
   VALUES ('c8000000-0000-0000-0000-0000000003a2', t, v_b,
           'c8000000-0000-0000-0000-0000000002a2', 'pending',
-          now() - interval '3 days', 'c8000000-0000-0000-0000-0000000000a1',
-          now() - interval '3 days', v_sg);
+          app_now() - interval '3 days', 'c8000000-0000-0000-0000-0000000000a1',
+          now() - interval '3 days', v_sg);  -- clock-real: offered_at is a real stamp (create_package_offer writes now())
 
   -- 3. …then her OWN pending request, whose AFTER INSERT trigger
   --    (supersede_open_package_offer) cancels the offer with superseded_by = 3.
   INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status, requested_at)
   VALUES ('c8000000-0000-0000-0000-0000000003a3', t, v_b,
-          'c8000000-0000-0000-0000-0000000002a1', 'pending', now() - interval '1 day');
+          'c8000000-0000-0000-0000-0000000002a1', 'pending', app_now() - interval '1 day');
 END $$;
 
 -- ── Postconditions — fail at load time, not twenty checks later ────────────

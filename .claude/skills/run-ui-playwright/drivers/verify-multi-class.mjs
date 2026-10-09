@@ -1,3 +1,4 @@
+// clock: pinnable
 // verify-multi-class.mjs — a child in more than one class (Wave 2,
 // 20260811000100).
 //
@@ -306,7 +307,7 @@ function sqlAsExpectError(profileId, q) {
     const ownClassErr = sqlAsExpectError(
       adminUid,
       `SELECT book_makeup('c6000000-0000-0000-0000-00000000000b',
-                          (date_trunc('week', CURRENT_DATE) + interval '9 days')::date,
+                          (date_trunc('week', app_today()) + interval '9 days')::date,
                           '${AMELIA}', '${MONDAY_CLASS}')`
     );
     check(
@@ -318,7 +319,7 @@ function sqlAsExpectError(profileId, q) {
     const noHomeErr = sqlAsExpectError(
       adminUid,
       `SELECT book_makeup('c6000000-0000-0000-0000-00000000000c',
-                          (date_trunc('week', CURRENT_DATE) + interval '7 days')::date,
+                          (date_trunc('week', app_today()) + interval '7 days')::date,
                           '${AMELIA}', NULL)`
     );
     check(

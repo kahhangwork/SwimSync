@@ -22,10 +22,10 @@ INSERT INTO auth.users (
   'c9000000-0000-0000-0000-000000000001',
   'authenticated', 'authenticated', 'parent-pkg@swimsync.test',
   crypt('password123', gen_salt('bf')),
-  NOW(),
+  NOW(),  -- clock-real: auth.users stamps are real time
   '{"provider":"email","providers":["email"]}',
   '{"full_name":"Paula Package","role":"parent"}',
-  NOW(), NOW(), '', '', '', ''
+  NOW(), NOW(), '', '', '', ''  -- clock-real: auth.users stamps are real time
 );
 
 -- Joined the seed tenant
@@ -43,7 +43,7 @@ SELECT p.id, 'c5000000-0000-0000-0000-000000000001'
 FROM parents p WHERE p.profile_id = 'c9000000-0000-0000-0000-000000000001';
 
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
-SELECT 'c5000000-0000-0000-0000-000000000001', c.id, NOW() - interval '60 days', true
+SELECT 'c5000000-0000-0000-0000-000000000001', c.id, app_now() - interval '60 days', true
 FROM classes c WHERE c.title = 'Saturday Beginners';
 
 -- The seed class is a "Group" class
@@ -66,7 +66,7 @@ INSERT INTO package_products (id, tenant_id, name, category_id, lesson_count,
 INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, status, confirmed_at)
 SELECT 'ee100000-0000-0000-0000-000000000001',
        '70000000-0000-0000-0000-000000000001', p.id,
-       'dd100000-0000-0000-0000-000000000001', 'active', NOW() - interval '30 days'
+       'dd100000-0000-0000-0000-000000000001', 'active', app_now() - interval '30 days'
 FROM parents p WHERE p.profile_id = 'c9000000-0000-0000-0000-000000000001';
 
 -- One PRESENT lesson after confirmation, not yet invoiced: a Saturday at
@@ -85,8 +85,8 @@ FROM parents p WHERE p.profile_id = 'c9000000-0000-0000-0000-000000000001';
 -- two reserved, so one is always free; 7-27 days back, inside the 30-day
 -- window. Proven over every day of 2026-27. SGT, never CURRENT_DATE (§7.94).
 WITH t AS (
-  SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS today,
-         date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))::date - 1 AS last_day_prev
+  SELECT app_today() AS today,
+         date_trunc('month', (app_now() AT TIME ZONE 'Asia/Singapore'))::date - 1 AS last_day_prev
 ), r AS (
   SELECT today - ((EXTRACT(DOW FROM today)::int + 1) % 7) AS recent_sat,           -- most recent Saturday
          last_day_prev - ((EXTRACT(DOW FROM last_day_prev)::int + 1) % 7) AS l     -- unmarked-lessons' L
@@ -139,4 +139,4 @@ FROM parents p WHERE p.profile_id = 'c9000000-0000-0000-0000-000000000001';
 
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
 VALUES ('c5000000-0000-0000-0000-000000000002',
-        'c1100000-0000-0000-0000-000000000001', NOW() - interval '30 days', true);
+        'c1100000-0000-0000-0000-000000000001', app_now() - interval '30 days', true);
