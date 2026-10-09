@@ -131,10 +131,47 @@ actually open the PNG — a blank frame means the bundle didn't hydrate.
 invoiced session (Classes → roster → session → Absent → Save, which fires the
 credit-note trigger) → assert the note in the parent Billing→Credit Notes tab
 and the admin Credit Notes page → generate the next month → assert "Credit
-Applied" on the parent invoice. Use it as the template for new flows.
+Applied" on the parent invoice. It is a walkthrough, **not** a template: it posts
+to the engine by hand and is not in the suite.
+
+## Writing a new driver
+
+Copy **`drivers/_TEMPLATE.mjs`** to `drivers/verify-<name>.mjs` (and, if the seed
+lacks your rows, `drivers/_TEMPLATE-fixture.sql` to `fixtures-<name>.sql` plus a
+`fixtures-<name>-teardown.sql`). `check-driver-clock.sh` holds the template to
+every rule below, so it is always a correct starting point.
+
+**The clock contract** — `run-all-drivers.sh --now '<past ts+08>'` replays one
+moment across the browser, PostgREST, the driver's SQL, the fixture and the
+engine. A driver keeps that only if it reads "now" exclusively through `lib.mjs`:
+
+| Need | Use | Never |
+|---|---|---|
+| now / today in Node | `nowSg()` / `todaySg()`, `addDaysIso(iso, n)` | `new Date()`, `Date.now()` |
+| now / today in SQL (driver or fixture) | `app_now()` / `app_today()` via `sql(q)` | `now()`, `CURRENT_DATE`, `'today'` |
+| a browser / context | `launch()` — its browser pins every context it makes | `chromium.launch()`, a `playwright` import |
+| a fake time | the runner's `--now` | `clock.install`, `setFixedTime`, `setSystemTime` |
+| a date label | `sgLabel(iso)` / `sgMonthLabel(ym)` | `toLocaleDateString`, `to_char(…,'Mon')` |
+
+- The header carries **`// clock: pinnable`** in its first 40 lines, exactly.
+  (`// clock: own-literal` is a closed list of three drivers that pin their own
+  literal world; a fourth is CI red.) A driver with no marker is CI red.
+- A line that must read the REAL clock (elapsed timing, a REAL-TIME window such
+  as an invitation expiry, §6af) ends with `// clock-real: <why>` /
+  `-- clock-real: <why>`.
+- `lib.mjs` refuses to import on a half-pinned stack: `DRIVER_NOW` set but the DB
+  not pinned, or a stale pin with no `DRIVER_NOW` (`scripts/clock-unpin.sh`).
+- **Before the first commit, run it once pinned** at a past moment —
+  `run-all-drivers.sh --only <name> --now '2026-10-01 07:59+08'` — as well as
+  unpinned. CI proves the code reads the clock correctly; only a pinned run
+  proves the behaviour.
+- Check locally: `drivers/check-driver-clock.sh` (and the other `check-*.sh`).
 
 ## Reference: reusable helpers
 
 `drivers/lib.mjs` exports `launch()`, `loginExpo(page, email, pw)`,
 `loginAdmin(page, email, pw)`, `tap(locator, label)` (force-click),
-`gotoAuthed(page, url)` (goto with login-bounce retry), and `dumpText(page)`.
+`gotoAuthed(page, url)` (goto with login-bounce retry), and `dumpText(page)`;
+the clock — `nowSg()`, `todaySg()`, `addDaysIso()`, `pinBrowser(context)`, `PIN`;
+`sql(q)` (one statement as `postgres`, trimmed `-At` output); and the date labels
+`sgLabel()` / `sgMonthLabel()`.
