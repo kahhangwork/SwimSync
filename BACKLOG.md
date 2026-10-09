@@ -1101,16 +1101,6 @@ lessons from the package — they bill ad-hoc at the next run, which may not be 
 **Notes:** both RPCs exist and re-derive at call time (a second draw draws 0), so this is UI only — the Held table
 row in `app/(admin)/packages/ui/HeldTable.tsx`. Gate on packages:edit like the dialog.
 
-### Coach app shows the window guard's own words — **S** _(filed 2026-10-06, Wave 6 lane 2)_
-Make the coach app's `attendanceSaveErrorMessage` pass the DB text through for the marking-window guard (P0001), as
-it now does for PK001.
-
-**Why:** a coach saving a lesson below the marking floor sees "Please try again" — retrying cannot work, and the DB
-message already names the floor date. The admin panel shows the DB text; the coach app does not.
-
-**Notes:** `SwimSyncApp/lib/attendanceSaveError.ts` (byte-identical with the admin copy — the drift test pins it).
-P0001 is a generic RAISE code: pass through only messages from `guard_attendance_date`, not every P0001.
-
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
 the admin sending a renewal offer.

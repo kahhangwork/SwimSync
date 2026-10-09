@@ -1225,6 +1225,10 @@ the **database**, for every caller, not by the screen:
   invoiced lesson is a credit note (§7.8), which is what the coach is told.
 - **The ceiling** stops a lesson being recorded before it has happened.
 
+A refused save shows the database's own words on **both** surfaces — the date, and why
+(*"That lesson (06 Sept 2026) is closed. Attendance can be marked back to …"*). The coach
+app showed only *"Please try again"* until 2026-10-09, which no retry could satisfy.
+
 ##### The floor follows what a business has BILLED, not the calendar *(implemented 2026-08-07)*
 
 The floor is **the 1st of last month, or the month after the business's most recently

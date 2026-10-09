@@ -11,6 +11,14 @@
 // the date, child and class ("Mark 3 Oct first — …") and is the coach's ONLY
 // route forward — the batch rolled back and the screen won't save with a child
 // unmarked. Return it verbatim. PROHIBITION: no retry, no force, no per-row split.
+//
+// ⚠ P0001 from the MARKING-WINDOW guard (guard_attendance_date →
+// assert_markable_date): a lesson below the floor, in the future, or cancelled.
+// Retrying cannot work and the DB's message names the date, so return it. P0001
+// is the code of ANY plpgsql RAISE, so pass through only the guard's own shape —
+// "That lesson (<date>) …" — never every P0001.
+const WINDOW_GUARD_MESSAGE = /^That lesson \([^)]+\) /;
+
 export function attendanceSaveErrorMessage(
   code: string | undefined,
   dbMessage?: string
@@ -23,6 +31,9 @@ export function attendanceSaveErrorMessage(
       dbMessage ||
       "A family package can't cover an earlier unmarked lesson. None of your changes were saved — mark the earlier lesson first, then this one."
     );
+  }
+  if (code === "P0001" && dbMessage && WINDOW_GUARD_MESSAGE.test(dbMessage)) {
+    return dbMessage;
   }
   return "Failed to save attendance. Please try again.";
 }

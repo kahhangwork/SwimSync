@@ -29,6 +29,33 @@ describe("attendanceSaveErrorMessage", () => {
     }
   });
 
+  // BACKLOG "Coach app shows the window guard's own words": a mark outside the
+  // window (guard_attendance_date → assert_markable_date) refuses with the
+  // generic P0001 and a message naming the date. Retrying cannot work, so the
+  // DB's words are the toast — but only those messages: P0001 is any RAISE.
+  it("returns the marking-window guard's message verbatim (P0001)", () => {
+    for (const db of [
+      "That lesson (06 Sept 2026) is closed. Attendance can be marked back to 01 Oct 2026; an earlier lesson sits behind an invoice already sent, so it needs a credit note rather than a late mark.",
+      "That lesson (15 Oct 2026) has not happened yet — attendance cannot be marked ahead of time.",
+      "That lesson (06 Oct 2026) was cancelled by your business's admin. Restore it on the admin panel before recording attendance.",
+    ]) {
+      expect(attendanceSaveErrorMessage("P0001", db)).toBe(db);
+    }
+  });
+
+  it("keeps the generic line for any OTHER P0001", () => {
+    expect(attendanceSaveErrorMessage("P0001", "Your business is suspended.")).toBe(
+      "Failed to save attendance. Please try again."
+    );
+    expect(attendanceSaveErrorMessage("P0001", "")).toBe(
+      "Failed to save attendance. Please try again."
+    );
+    // The guard's shape under a different code is not the guard.
+    expect(attendanceSaveErrorMessage("23514", "That lesson (06 Sept 2026) is closed.")).toBe(
+      "Failed to save attendance. Please try again."
+    );
+  });
+
   it("falls back to the generic retry for any other error", () => {
     expect(attendanceSaveErrorMessage("23505")).toBe(
       "Failed to save attendance. Please try again."
