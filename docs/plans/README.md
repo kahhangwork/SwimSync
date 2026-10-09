@@ -27,6 +27,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 | WAVE3_RENDER_TESTS_PLAN.md | DONE (§8.137, deploy #63) | Wave 3 — two lanes: admin invoice/Pending-charges tests; parent money cards + the D5 child-card fix |
 | WAVE7_DB_CLOCK_PLAN.md | DONE (§8.140, deploys #74–#76) | Wave 7 — the injectable DB clock (`app_now()`/`app_today()`), 83 pgTAP files pinned, guards G1–G4 |
 | WAVE8_GENERATED_TYPES_PLAN.md | DONE (§8.141, deploys #77–#78) | Wave 8 — generated Supabase `Database` types in both apps, DB `any`s removed, guards G5/G6 + runtime-identity; Bug ledger #1–#5 |
+| PIN_DRIVER_CLOCK_PLAN.md | NOT STARTED | Pin the clock for UI drivers — `run-all-drivers.sh --now`: browser + PostgREST (local-only lock-2 row) + engine reads `app_now()`; full driver sweep |
 
 ## Done
 
