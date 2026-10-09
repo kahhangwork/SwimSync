@@ -1568,7 +1568,16 @@ in auto mode and its email-retry skip (§7.265, §7.266). No run-day test writes
 - **Markers:** a driver header carries `// clock: pinnable` (reads time only via `lib.mjs` `nowSg`/`todaySg`/
   `addDaysIso`/`sql`) or `// clock: own-literal` (closed list of three); anything else is **SKIPPED (not pinnable)**
   under `--now`, a pinned run with any skip exits 3, and `--only <unmarked> --now` exits 2 before any reset.
-  `check-driver-clock.sh` (repo-invariants) enforces the rules and holds the `UNSWEPT` ratchet until the sweep ends.
+  **All 73 are marked** (70 pinnable; `edit-child`, `student-identity`, `tz-saturday` own-literal, each proven pinned
+  and listed in the runner's `OWN_LITERAL_PROVEN`). `check-driver-clock.sh` (repo-invariants, no ratchet) fails CI on
+  a driver with no marker — canary 2026-10-10: no marker → red, marker + `new Date()` → red, a copy of
+  `_TEMPLATE.mjs` → green; guard red-proofs 39/39. Opt-outs, each with a reason: `// clock-real:` (JS),
+  `-- clock-real:` (fixture), `/* clock-real: */` inside a driver's SQL string (some `sql()` helpers collapse
+  newlines, so `--` would swallow the query). A driver that needs a browser moment derived from the DB uses
+  `installDerivedClock(ctx, time)`, never a bare `clock.install`.
+- **Proven (2026-10-09/10):** 5 pilots + the 10 drivers with semantic sweep edits, each unpinned AND pinned (pins
+  `2026-09-01 07:59+08`, `2026-06-01 07:59+08`); the 3 own-literal pinned; withholding the API row → CANNOT SAY.
+  A full pinned sweep has NOT been run (user's call).
 - **`lib.mjs` refuses half-pinned** at import: `DRIVER_NOW` set but the stack not pinned, or a stale pin with no
   `DRIVER_NOW` → throw. Every context on `launch()`'s wrapped browser is fixed to the pin and asserted.
 - **Stale pin** (a killed `--now` run): `scripts/clock-unpin.sh` clears it (API row first, then RESET);

@@ -1,7 +1,8 @@
 # Pin the clock for UI drivers — replay any moment, end to end
 
-_Status: IN PROGRESS — T0 done, **Step 0 PASSED 2026-10-09** (S0.1–S0.5; S0.6: a pin does not survive `db reset`,
-§7.356). Plan written and hardened by /plan-review 2026-10-09. BACKLOG → Foundations → *Pin the clock for UI drivers* (L)._
+_Status: DONE 2026-10-10 except deploy steps 4–5 (§8.144) — the engine (`ba620c3`) is on `main`, NOT on prod, until
+Little Orcas' Sep 2026 run is done (prod checked 2026-10-10: not yet). Migration on prod (deploy #80). BACKLOG item
+removed._
 
 ## What this builds, and why
 
@@ -577,6 +578,13 @@ for decisions** (only for permission clicks). Every message carries the task num
 - **Future moments can't be replayed** (JWT refresh). Only past moments.
 - **A pin earlier than data a migration backdated** may produce worlds that never existed. `seed.sql` has no dates, so
   this is limited to fixture-relative derivations, which all follow the pin.
+
+- **Re-verified 2026-10-09:** the Next server's clock reads are exactly the six `app/api/*/route.ts` `banned_until`
+  checks; 12 other files without `"use client"` read `new Date()` but are client-imported and run in the browser.
+- **The HTTP engine proof could not show `Today is day 1`:** the seed tenant has unbilled May lessons, so the
+  earlier-month guard answers before the run-day guard. The proof used the default billing month instead (pinned
+  `2026-08-01 00:30+08` → `2026-07`; unpinned → `2026-09`), which reads the same `opts.now`.
+- **The browser is not always at the pin** (ARCHITECTURE §6af): own-literal drivers and `installDerivedClock`.
 
 ## Pre-commit gate (walk before EVERY commit in this effort; a box that cannot be ticked is a blocker)
 

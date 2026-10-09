@@ -809,6 +809,7 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/lib/enrolmentStart.ts` (+ rpc, test) · `components/StartsOnField.tsx` | *Starts on*: bounds → today-only fallback, sealed / unbilled / this-month warnings, the second press, dropped dates (§6ad) |
 | `supabase/migrations/20261006000100…_a.sql` · `…000200…_b.sql` · `supabase/tests/package_draw_at_marking{,_b}.test.sql` · `generate-invoices/wave6.test.ts` | Wave 6 (§6ae): the matcher, draw/return triggers, PK001 guard, PK002 backstop, the four RPCs; B = switch on + backfill |
 | `supabase/migrations/20261006000300_app_clock.sql` · `…000400_clock_decide_ops` · `…000500_clock_stamp_feeds` · `supabase/tests/app_clock{,_edges}.test.sql` · `supabase/tests/http/app_clock_locks.sh` · `scripts/check-{pgtap,migration}-clock.sh` · `scripts/check-functions-sg-date.sh` · `scripts/lib/pgtap-pin.sh` | Wave 7 (§6af): the injectable clock, its two locks, the frozen census; G1–G3 + the shared pin predicate |
+| `supabase/migrations/20261009000200_api_clock_pin.sql` · `generate-invoices/clock.ts` · `drivers/lib.mjs` (`nowSg`/`todaySg`/`sql`/wrapped `launch()`) · `drivers/check-driver-clock.sh` · `scripts/clock-unpin.sh` · `drivers/_TEMPLATE.mjs` · `drivers/_TEMPLATE-fixture.sql` | Pin the clock for UI drivers (§6af addendum): the local-only API pin, the engine's DB clock, `run-all-drivers.sh --now`, the driver clock guard and the template a new driver copies |
 | `SwimSyncApp|Admin/lib/database.types.ts` (generated) · `lib/database.overrides.ts` · `scripts/gen-db-types.sh` · `scripts/check-{db-types,db-any,db-overrides,runtime-identical}.sh` · `scripts/lib/{db-types.sh,runtime-identical.mjs,trigger-fill.sql}` · `SwimSyncAdmin/lib/noTenant.ts` | Wave 8 (§6ag): generated types, the widen-only overrides, G5/G6/runtime-identity; the shared no-business message |
 | `SwimSyncAdmin/lib/staffInvitation.ts` | `mintStaffInvitation()` — every staff-creating route calls it before `generateLink`/`createUser` (§6aa) |
 | `SwimSyncAdmin/app/api/resend-invoice-email/route.ts` | Per-invoice email resend (lane 2): `billing:edit` as the caller, then a CRON_SECRET proxy to `generate-invoices`' `{resend_invoice_email}` branch |
@@ -997,6 +998,11 @@ pins with **`PGOPTIONS`** (session-only, sibling-safe), never `ALTER DATABASE`. 
 pin is ever set there (line 1 returns first), no migration or seed inserts the API row, and lock 1 still RAISEs —
 checked after the API line. **Never** insert `clock_api_pin_enabled` from a migration, seed or anything that can reach
 `--linked`; pgTAP is red on a row or a database/role-level pin left behind (`scripts/clock-unpin.sh` clears both).
+Under `--now` the browser is not always AT the pin: the three `own-literal` drivers fix their own literal instant, and
+five drivers set a moment DERIVED from the pinned DB with `installDerivedClock` (e.g. today 12:00 SGT) — so a pinned
+run equals the real-clock run on that day. Every driver declares one of the two markers; `check-driver-clock.sh`
+fails CI on a driver with neither. `tenants.created_at` is a real stamp that `markable_floor` reads; `LEAST(…)` keeps
+the floor right under a past pin today — a future rule that reads `created_at` directly would not be.
 
 **Kept true by checks, not memory:** G2 refuses a raw clock in a new migration (`-- clock: stamp` / `-- clock-real:`
 to opt a line out); the **frozen clock census** in `app_clock.test.sql` is red on any change to which public function

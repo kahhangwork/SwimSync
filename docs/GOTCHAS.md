@@ -32,21 +32,21 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 | Area | Items |
 |---|---|
-| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338 |
+| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338, 355, 356, 357, 360 |
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352 |
-| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356 |
+| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
-`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` + `scripts/check-sept.sh` + `sg_date_label.test.sql` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
+`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` + `scripts/check-sept.sh` + `sg_date_label.test.sql` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` · driver/fixture clock reads → `drivers/check-driver-clock.sh` ·
 §7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic) · §7.350/§7.347 → G5 `scripts/check-db-types.sh` · §7.346 → `scripts/check-db-overrides.sh` · §7.348 → `scripts/check-runtime-identical.sh` (CI, per `types(…)` commit) · casts regrowing → G6 `scripts/check-db-any.sh`.
 
 ---
@@ -2285,6 +2285,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       sibling lane's `fixtures-front-desk-role` booking turned it red mid-session. **Fixed** the way #18 was: it now
       counts only its own classes (`cf000000-%`) — proven: with a sibling make-up loaded the scoped count passes and
       the old one fails. **Rule for any new pgTAP count: scope it to the file's own ids.**
+    - **Hit again (2026-10-09, pin-clock lane 2):** after `run-all-drivers.sh --only attendance-guard`, the next
+      `check-fixture-roundtrip.sh` failed that fixture on `users_pkey` (d0…aa) and its teardown silently cleaned up;
+      twice in one session. Re-run = green. BACKLOG → *`--only` tears its own fixture down*.
 
 273. **To simulate a slow cold hydrate in a driver, never rewrite the Expo bundle, and don't delay it with
     `page.route` alone.** `domcontentloaded` absorbs it, so the helper never sees it; `setTimeout`-wrapping
@@ -2535,6 +2538,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     proven over every day of 2026–27 by a one-off SQL sweep. **When a fixture writes into the SEED class, enumerate
     the other fixtures that do (`grep -l "Saturday Beginners" fixtures-*.sql`) and check every day of the year, not
     today.** (2026-10-01.)
+    - **Hit again (2026-10-10, §8.144):** `fixtures-admin-table-geometry.sql` takes "the latest Saturday in the
+      window", which on a SATURDAY is today — and its package, confirmed today, then covers that lesson, so marking
+      attendance drew it (Wave 6 draw-at-marking) and the fixture's own invoice line was refused. Latent from 6 Oct;
+      CI went red at 00:47 SGT on the first Saturday after. Found in minutes by replaying
+      `check-fixture-roundtrip.sh --now '2026-10-0N 12:00+08'` for N = 1…9 (only Sat 3 Oct failed). Fixed `3d8adb0`
+      (mark the lesson before the package exists). **Promotion:** the replay is the check — run the pinned roundtrip
+      over seven consecutive days in CI (BACKLOG → *Pinned roundtrip over a whole week*).
 
 305. **A literal test date the floor has not passed now fails CI — `scripts/check-test-dates.sh`.** Scans pgTAP +
     UI fixtures for quoted `'YYYY-MM-DD'` / `'YYYY-MM'` at or after the floor (1st of last month, SGT); each must be
@@ -2909,3 +2919,18 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     Rule: every SQL string a script or lib adds is executed once by the real Postgres before the change counts as
     proven — read-only against the shared DB is enough. In SQL that is concatenated, spell booleans
     (`CASE WHEN … THEN 't' ELSE 'f' END`).
+
+359. **macOS ships bash 3.2: `"${A[@]}"` on an EMPTY array is `unbound variable` under `set -u`.** CI's bash 5 accepts
+    it, so CI stays green while the same script crashes on the dev machine. `check-driver-clock.sh` would have died
+    locally the day its `UNSWEPT` list emptied (fixed `173df14`). Expand an optional array as `${A[@]+"${A[@]}"}`;
+    there is no `mapfile` and no `declare -A` either. Sibling of §7.340 (zsh), which covers the other local shell.
+    (2026-10-09, pin-clock lane 2.)
+
+360. **Under a past `--now`, a fixture that backdates a REAL stamp from the real clock builds a world that never
+    existed.** `fixtures-assessment.sql` set `graded_at = now() - 90 days`, and the admin calls a grade fresh against
+    the browser's (pinned) SGT today — so under any pin older than 90 days the "stale" grade read as fresh. Rule: a
+    fixture backdates from the scenario's now (`app_now() - …`); the product's own stamp stays real (`now()`, marked
+    `-- clock-real:`). The reverse holds too: a column the product writes with `app_now()` (`enrolled_at`,
+    `confirmed_at`, `requested_at`, `deactivated_at`) is written with `app_now()` in a fixture. Read the writer from
+    `pg_get_functiondef`, not the migration (§7.40). (2026-10-09, pin-clock sweep; `fixtures-grading-admin` too.)
+

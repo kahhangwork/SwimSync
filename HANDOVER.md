@@ -1,9 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-09 — **§8.143: all three Wave 6 follow-ups SHIPPED + "Sept" on every surface** — migration
-`20261009000100` (prod), 3 edge functions, apps; two new guards (pgTAP census, G-Sept). CI green at `bf1b406`.**_
+_Last updated: 2026-10-10 — **§8.144: Pin the clock for UI drivers SHIPPED** — `run-all-drivers.sh --now` replays any
+past moment across browser, API, fixtures and engine; all 73 drivers marked; migration `20261009000200` on prod.
+**The engine change is on `main` but NOT on prod** (gated on Little Orcas Sep 2026)._
 
-_Previously (§8.142, 2026-10-07) — G3-apps: neither app takes the UTC date of a timestamp (CI-only)._
+_Previously (§8.143, 2026-10-09) — Wave 6 follow-ups ×3 + "Sept" on every surface._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -26,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.353** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.360** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -348,6 +349,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.144 (2026-10-09 → 10) — Pin the clock for UI drivers, two lanes
+
+**Shipped BACKLOG *Pin the clock for UI drivers* (L) per `docs/plans/PIN_DRIVER_CLOCK_PLAN.md`, run as two lanes
+(root orchestrator + worktree `pin-clock-drivers`, closed).** Migration → prod (#80); engine source on `main` only.
+
+- **Shipped:** `--now` + `clock-unpin.sh` + the pinned fixture roundtrip in CI (TESTING §5); the local-only API pin
+  and the engine's DB clock (ARCHITECTURE §6af addendum); `check-driver-clock.sh` — a driver without a clock marker
+  is CI red. 15 drivers proven unpinned AND pinned, 3 own-literal pinned, CANNOT SAY proven.
+- **Found:** two SQL bugs a fake-docker proof hid (§7.358); `preflight()` was never called (now is — user's call B);
+  a Saturday-only fixture collision red CI at 00:47 SGT Sat 10 Oct — replayed with `--now`, fixed `3d8adb0`
+  (§7.304 *Hit again*). New §7.355–§7.360.
+- **Not done:** engine prod deploy (plan steps 4–5); no full pinned sweep (user's call); the nightly over this unread.
+
 ## 8.143 (2026-10-09) — Wave 6 follow-ups ×3, and "Sept" everywhere, with a guard for each half
 
 **Shipped the three Wave 6 S-items plus the wider "Sep" sweep the user chose (13 DB functions, not 1); deployed
@@ -360,19 +374,7 @@ migration → 3 functions → apps per `/deploy`.** `58b532c` `fe33d5f` `32a6ad0
   `file:line` exemption, user's call; `/deploy` Step 0 now runs repo-invariants first).
 - **Not done:** nightly over these commits unread. (Live admin `/packages` chunk carries the button — DEPLOYMENT #79.)
 
-## 8.142 (2026-10-07) — G3-apps: neither app takes the UTC date of a timestamp
-
-**Shipped BACKLOG *Extend G3 to the apps* (S) as one CI-only commit, `7c270d6`; CI green on all five jobs.** No app
-code, migration or deploy — today's tree has 0 hits across 815 files.
-
-- **Shipped:** `scripts/check-apps-sg-date.sh`, a repo-invariants step beside G3 — TESTING §5 (rule, proofs), GOTCHAS
-  index + §7.7's Wave 8 note. Matches ANY receiver, not just `*_at`, deliberately (the parent-side bug read
-  `createdAtIso`); marker `// sg-date-ok: <why>`, no allowlist.
-- **Found in-unit:** the first cut was vacuous — macOS `paste -d '\001'` misread the delimiter, so the old buggy bodies
-  passed; the red proof caught it (§7.283's new bullet). A canary now exits 2 on a broken scanner.
-- **Not done:** nightly still unread (none has run since `37398088721`). PRD untouched — no user-visible change.
-
-_(§8.141 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.142 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -415,10 +417,11 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-09: three nightlies in a row GREEN, 73/73** (latest `37861091530` on `f67178e`) — the first over
-all of Waves 6, 7 and 8, so the §7.1 gate they held is cleared. **The NEXT nightly is the first over §8.143** (#1
-*Check marked lessons*, #2 the coach's guard message, the "Sept" sweep): read `packages-admin`,
-`package-draw-at-marking`, `attendance-guard`, `cancel-lesson` and the billing-months drivers first.
+**State on 2026-10-10: three nightlies in a row GREEN, 73/73** (latest `37861091530` on `f67178e`, 2026-10-08).
+**The NEXT nightly is the first over §8.143 AND §8.144** — every driver now imports `lib.mjs`'s wrapped browser and
+an import-time clock check (needs the local DB container up), and the runner now calls `preflight()` (functions get a
+60 s grace). A red that reads "stale clock pin" / "preflight failed" is the new tooling, not the product. Then read
+`packages-admin`, `package-draw-at-marking`, `attendance-guard`, `cancel-lesson`, `admin-table-geometry`.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -428,13 +431,18 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over §8.143. Red → fix first.
+1. **Read the next nightly** (never dispatch it unasked) — the first over §8.143 + §8.144. Red → replay the failing
+   day with `run-all-drivers.sh --only <driver> --now '<that day> <time>+08'` (TESTING §5), then fix.
 2. **Little Orcas September is the OWNER's** (WhatsApp sent 2026-10-05; still unbilled on prod 2026-10-09): *Generate
    Sep 2026*, then *Record it as settled* for the 15 pilot children (PRD §7.17) — **and Brayden Ong** (unlinked from
    the Ang family 2026-10-06, his 6 + 13 Sept lessons unclaimed: invite his parent or settle). The Ang family's package
    lessons are already paid (drawn at B). Coach Kah Hang's September is billed and sealed.
-3. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8 and every Wave 6 follow-up shipped
-   (§8.143); *Pin the clock for UI drivers* (L) is filed, unranked. **A schema migration regenerates the types in the
+3. **Engine deploy, PIN_DRIVER_CLOCK_PLAN steps 4–5 — gated.** `generate-invoices` on `main` is AHEAD of prod since
+   `ba620c3` (reads `app_now()` over RPC). Deploy it only after Little Orcas' Sep 2026 run is done and no run is in
+   flight; **never from an unrelated change before then.** Rollback = revert `ba620c3` → `functions deploy`. Proof is
+   the next real Generate (DEPLOYMENT #80, DORMANT until then).
+4. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8, Wave 6's follow-ups and driver
+   pinning (§8.144); three S-items from it sit under Foundations. **A schema migration regenerates the types in the
    SAME commit** (§7.350), and **runs every repo-invariants step locally before its push** (§7.354, `/deploy` Step 0).
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
@@ -449,7 +457,7 @@ which mutate shared seed state — are in the same section.
 
 **GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20261009000100` (Sept date labels), on prod, 0 pending
+**No migration is HELD or in flight.** Latest applied is `20261009000200` (API clock pin), on prod, 0 pending
 (2026-10-09). **B's rollback is valid only until the first seal of a month containing draws** (its header).
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 

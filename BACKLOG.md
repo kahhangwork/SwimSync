@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-09 — **all three Wave 6 follow-ups SHIPPED** (§8.143): *Re-offer the backdated draw*, *Coach app shows the window guard's own words*, *The guard message says "Sep"…* removed. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-10 — **Pin the clock for UI drivers SHIPPED** (§8.144) and removed; three S-items filed from it (Foundations). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -284,8 +284,8 @@ Package lessons draw at marking; the run bills only ad-hoc lessons; Generate is 
 #### ~~Wave 7~~ — **SHIPPED 2026-10-06** (§8.140, plan `docs/plans/WAVE7_DB_CLOCK_PLAN.md`)
 
 The injectable DB clock (`app_now()`/`app_today()`, ARCHITECTURE §6af); every dated pgTAP file pins it; G1–G4 in
-CI (incl. the folded-in §7.7 check over `supabase/functions`). Deploys #74–#76. Driver pinning stays out (D2) →
-*Pin the clock for UI drivers* (L, Foundations). Next is Wave 8.
+CI (incl. the folded-in §7.7 check over `supabase/functions`). Deploys #74–#76. Driver pinning followed as its own
+effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `docs/plans/PIN_DRIVER_CLOCK_PLAN.md`).
 
 #### Wave 8 — cheaper by waiting
 
@@ -1607,28 +1607,39 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Pin the clock for UI drivers — **L** — _filed 2026-10-06 (§8.140, Wave 7 D2)_
-Let a Playwright driver replay a fixed day, the way every pgTAP file now does (Wave 7, ARCHITECTURE §6af).
+### Pinned roundtrip over a whole week, in CI — **S** — _filed 2026-10-10 (§8.144, §7.304 promotion)_
+Run `check-fixture-roundtrip.sh --now` at noon SGT on seven consecutive past days (one of each weekday), not only at
+the single `2026-10-01 07:59+08` moment CI pins today.
 
-**Why:** the drivers are the last tests that run on whatever day CI happens to run. A driver that books, marks or
-bills is exercised only on today's position in the month — the §7.304 class of bug (a fixture collision that only
-real days 247 of 730 hit) is still reachable there, and §7.302's label drift was found the same way.
+**Why:** §7.304 has now bitten twice — a fixture valid only on some weekdays. The second time
+(`fixtures-admin-table-geometry`, every Saturday) turned CI red at 00:47 SGT on a Saturday and was found in minutes
+only because `--now` could replay 1–9 Oct by hand. A week of pins makes that replay automatic, so the next one is
+red on the push that introduces it rather than on the day it fires.
 
-**Notes — there are FOUR clocks, and all four must agree or the driver tests a world that cannot exist:**
-1. **The browser** — Playwright's `page.clock` can fix it.
-2. **The app's JS** — both apps read `todayInSg()` / `nowMinutesInSg()` from `Date`, so (1) covers them in the
-   browser, but the Next server components and API routes run in Node and do not see it.
-3. **Postgres** — `app_now()`. **Lock 2 refuses exactly this path on purpose:** PostgREST and the edge functions log
-   in as `authenticator`, which never pins (§7.333). Pinning through the API needs a deliberate, separately-reviewed
-   relaxation for local only (e.g. a role-level setting on a local-only role), and it must keep the prod proof
-   (`app_clock_locks.sh`) green. Never a request header — PostgREST writes `request.*` from the client.
-4. **The engine** (Deno, `generate-invoices`) — reads `new Date()`; its own tests inject `now` via `BillingScenario`,
-   but a driver-triggered run does not.
-Decide first whether a cheaper target is enough (e.g. pin only (1)+(3) for the attendance/booking drivers and leave
-billing drivers on real time). Until then: drivers derive dates from the real clock (`lib.mjs` `sgLabel()`), guarded
-by `check-driver-dates.sh` (§7.302).
+**Notes:** the roundtrip is `PGOPTIONS`-pinned and sibling-safe; seven passes cost a few minutes of CI. Pick the week
+as literals (annotate `-- date-literal-ok:` if `check-test-dates.sh` scans the file, §7.305). Keep the existing
+07:59 step — the 1st-before-08:00 hazard is a different axis.
 
-**Size:** L — four clocks, one deliberate change to a security lock, ~60 drivers to sweep.
+### `run-all-drivers.sh --only` tears its own fixture down — **S** — _filed 2026-10-10 (§8.144, §7.272)_
+After an `--only` run, run the driver's `fixtures-<name>-teardown.sql` (best-effort, logged).
+
+**Why:** §7.272 *Hit again* ×3: an `--only` run leaves its fixture and writes loaded, and the next
+`check-fixture-roundtrip.sh` or `supabase test db` fails on a duplicate key or a global count. Twice on 2026-10-09
+alone. A full sweep doesn't need it (it resets per driver), so only the `--only` path changes.
+
+**Notes:** a teardown can't undo every driver WRITE (that's why the sweep resets); the aim is only that the shared
+DB no longer carries the fixture's fixed ids. Skip it when the driver failed, so its state stays inspectable.
+
+### Fixture `billing_runs` deletes are tenant+month wide — **S** — _filed 2026-10-10 (pin-clock lane 2)_
+`fixtures-trial-onboarding.sql` and its teardown `DELETE FROM billing_runs WHERE tenant_id = <seed> AND billing_month
+= <last month>`, so they also delete runs the fixture did not create.
+
+**Why:** a §7.63-class hygiene leak — on 2026-10-09 the roundtrip saw `billing_runs −1` after a manual engine proof
+left a run. Harmless to products, but it makes a footprint check lie.
+
+**Notes:** not teardown-local: `billing_runs` has no class axis. Snapshot the run ids before the driver's Generate
+and delete only newer ones, or have the driver delete by the ids its own runs return.
+
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the
 single deliberate exclusion in `profile_reference_columns()`; every other FK pointing at
