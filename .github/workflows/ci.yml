@@ -74,6 +74,12 @@ jobs:
       - name: Neither app takes the UTC date of a timestamp (G3-apps)
         run: scripts/check-apps-sg-date.sh
 
+      # §7.302: the apps' en-SG labels say "Sept"; a hand-typed month list, an
+      # "en-US" Intl or a to_char 'Mon' in a new migration says "Sep". The DB half
+      # (live functions) is sg_date_label.test.sql. Marker: `// sept-ok: <why>`.
+      - name: September reads "Sept" on every surface (G-Sept)
+        run: scripts/check-sept.sh
+
       # Wave 8: both apps carry the SAME generated Database types (they share no
       # package). A one-sided edit or regen is a lie in one app.
       - name: Both apps' database.types.ts are byte-identical

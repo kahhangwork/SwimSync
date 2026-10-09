@@ -46,7 +46,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
-`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
+`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` + `scripts/check-sept.sh` + `sg_date_label.test.sql` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` ·
 §7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic) · §7.350/§7.347 → G5 `scripts/check-db-types.sh` · §7.346 → `scripts/check-db-overrides.sh` · §7.348 → `scripts/check-runtime-identical.sh` (CI, per `types(…)` commit) · casts regrowing → G6 `scripts/check-db-any.sh`.
 
 ---
@@ -2499,6 +2499,17 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       first" with `to_char(…,'FMDD Mon')` in Postgres and the apps show it verbatim beside en-SG "27 Sept". The CI
       guard covers drivers only. Not a bug (September only, cosmetic) — filed as BACKLOG *The guard message says
       "Sep" where the apps say "Sept"*; the promotion for DB-built user text is that item, not a new check.
+    - **Closed on every PRODUCT surface (2026-10-09) — two guards, one per half.** That item turned out to be 13
+      DB functions (31 `to_char 'Mon'` calls: booking, cancel/restore, refund, enrolment start, both attendance
+      guards), plus five hand-typed month lists (the invoice, credit-note and package emails, the admin's Billing
+      months label, the public package page). All now say "Sept". **DB:** migration `20261009000100` adds
+      `sg_date_label(date, format)` — `to_char` with "Sep" widened, every other token untouched — and
+      `supabase/tests/sg_date_label.test.sql` scans `pg_proc` for any function still formatting `'Mon'` through
+      `to_char` (red on the old bodies: it named all 13). **Source:** `scripts/check-sept.sh` (CI, G-Sept) refuses
+      the word `Sep` on a code line in either app or any edge function, an `"en-US"` Intl (whose short month is
+      "Sep"), and `to_char(…'Mon')` in any migration from `20261009000100` on; marker `// sept-ok: <why>`.
+      `YYYY-MM` billing-month keys are not display and stay `to_char`. **For a date inside a DB message, reach for
+      `sg_date_label`; in TS, `formatSgStamp` or spell it "Sept".**
 
 303. **A pgTAP file that writes a LITERAL date through a guarded path is a time bomb with a date on it.** On
     2026-10-01 `main` CI went red on `trial_onboarding` (10/35), `session_coach_roster` (3/41) and
