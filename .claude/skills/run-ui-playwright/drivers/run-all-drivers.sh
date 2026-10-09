@@ -114,7 +114,8 @@ if [[ -n "$NOW_IN" && -n "${AFTER_RESET_SQL:-}" ]]; then
 fi
 # A driver stays SKIPPED in a pinned SWEEP until its own pinned --only run has
 # proven it; add it here in the commit that records that run.
-OWN_LITERAL_PROVEN=()
+# Proven 2026-10-10 by lane 1, pinned at 2026-06-01 07:59+08: edit-child 7/7, student-identity 13/13, tz-saturday 6/6.
+OWN_LITERAL_PROVEN=(edit-child student-identity tz-saturday)
 
 # Some drivers seed through the service role (verify-platform-admin.mjs).
 # Export the stack's own keys so a driver never needs a hand-exported secret.
