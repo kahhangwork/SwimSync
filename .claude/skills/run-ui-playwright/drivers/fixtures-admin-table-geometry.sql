@@ -187,14 +187,6 @@ BEGIN
           'AdmGeo 10-lesson pack', 10, 40.00, 6, TRUE)
   ON CONFLICT (id) DO NOTHING;
 
-  INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, name, lesson_count,
-                               rate_per_lesson, total_value, validity_months,
-                               value_remaining, status, confirmed_at, expires_on)
-  VALUES ('a6000000-0000-0000-0000-0000000000d2'::uuid, v_tenant, v_parent,
-          'a6000000-0000-0000-0000-0000000000d1'::uuid, 'AdmGeo 10-lesson pack',
-          10, 40.00, 400.00, 6, 400.00, 'active', app_now(),
-          (today_sg() + interval '6 months')::date)
-  ON CONFLICT (id) DO NOTHING;
 
   -- ── A marked lesson (date computed above — see the header) ───────────────
   INSERT INTO lesson_sessions (id, class_id, session_date, start_time, end_time, status)
@@ -207,6 +199,21 @@ BEGIN
   VALUES ('a6000000-0000-0000-0000-0000000000e2'::uuid,
           'a6000000-0000-0000-0000-0000000000e1'::uuid,
           'a6000000-0000-0000-0000-0000000000a1'::uuid, 'present', v_coach_pr)
+  ON CONFLICT (id) DO NOTHING;
+
+  -- The package is created AFTER the lesson is marked. Marking draws a lesson from an
+  -- active package that covers it (Wave 6, attendance_package_draw), and on a SATURDAY
+  -- v_date is today, which a package confirmed today covers: the lesson was drawn and
+  -- the invoice line below was refused (guard_invoice_item_not_drawn). CI went red on
+  -- 2026-10-10, the first Saturday after Wave 6; replayed with
+  -- check-fixture-roundtrip.sh --now '2026-10-03 12:00+08'. No retro-draw on insert.
+  INSERT INTO parent_packages (id, tenant_id, parent_id, product_id, name, lesson_count,
+                               rate_per_lesson, total_value, validity_months,
+                               value_remaining, status, confirmed_at, expires_on)
+  VALUES ('a6000000-0000-0000-0000-0000000000d2'::uuid, v_tenant, v_parent,
+          'a6000000-0000-0000-0000-0000000000d1'::uuid, 'AdmGeo 10-lesson pack',
+          10, 40.00, 400.00, 6, 400.00, 'active', app_now(),
+          (today_sg() + interval '6 months')::date)
   ON CONFLICT (id) DO NOTHING;
 
   -- ── An invoice, its line item, and a credit note against that line ───────
