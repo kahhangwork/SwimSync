@@ -2,13 +2,13 @@
 // Moved VERBATIM from app/(parent)/billing/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
 // App L-G); props destructured on the first line so the JSX is byte-identical
 // (whitespace aside).
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
-import { formatDate } from "../domain/billingFormat";
+import { formatDate, childrenForProduct, requestStudentFor } from "../domain/billingFormat";
 import { ReferralSection } from "./ReferralSection";
 import { PackageUsageList } from "./PackageUsageList";
 import { usePackageUsage } from "../domain/usePackageUsage";
@@ -16,9 +16,11 @@ import type { useBilling } from "../domain/useBilling";
 
 type Billing = ReturnType<typeof useBilling>;
 
-export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "products" | "requestingId" | "requestPackage" | "cancelRequest">) {
-  const { packageError, packages, products, requestingId, requestPackage, cancelRequest } = p;
+export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "products" | "requestingId" | "requestPackage" | "cancelRequest" | "familyChildren">) {
+  const { packageError, packages, products, requestingId, requestPackage, cancelRequest, familyChildren } = p;
   const usage = usePackageUsage();
+  // Single-child packages (D7): the child chosen per one-child product.
+  const [childChoice, setChildChoice] = useState<Record<string, string>>({});
   return (
     <>
       <>
@@ -48,6 +50,11 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                   {pkg.business_name}
                   {pkg.category_name ? ` · ${pkg.category_name} classes` : ""}
                 </Text>
+                {pkg.child_name && (
+                  <Text className="text-xs font-semibold text-gray-700 mt-0.5">
+                    For {pkg.child_name} only
+                  </Text>
+                )}
               </View>
               <StatusBadge
                 status={pkg.status === "active" ? "Active" : "Pending"}
@@ -151,7 +158,13 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
             <Text className="text-sm font-bold text-gray-700 mt-3 mb-1">
               Buy a package
             </Text>
-            {products.map((p) => (
+            {products.map((p) => {
+              // D7 — which child a one-child product is for: shown when there is
+              // one child at this business, asked when several, refused when none.
+              const eligible = p.single_child ? childrenForProduct(familyChildren, p) : [];
+              const studentId = requestStudentFor(p, eligible, childChoice[p.id]);
+              const blocked = p.single_child && (eligible.length === 0 || !studentId);
+              return (
               <Card key={p.id}>
                 <Text className="text-base font-bold text-gray-900">
                   {p.name}
@@ -169,18 +182,56 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                   , valid {p.validity_weeks} week
                   {p.validity_weeks === 1 ? "" : "s"} from its start date.
                 </Text>
+                {p.single_child && (
+                  <View className="mb-3" testID={`child-picker-${p.id}`}>
+                    {eligible.length === 0 ? (
+                      <Text className="text-sm text-amber-700">
+                        Add your child at this business first.
+                      </Text>
+                    ) : eligible.length === 1 ? (
+                      <Text className="text-sm text-gray-700">
+                        For <Text className="font-bold">{eligible[0].name}</Text>
+                      </Text>
+                    ) : (
+                      <>
+                        <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+                          Which child is this for?
+                        </Text>
+                        <View className="flex-row flex-wrap gap-2">
+                          {eligible.map((k) => {
+                            const on = childChoice[p.id] === k.id;
+                            return (
+                              <TouchableOpacity
+                                key={k.id}
+                                onPress={() => setChildChoice((c) => ({ ...c, [p.id]: k.id }))}
+                                className={`rounded-full px-3 py-1.5 border ${on ? "bg-sky-500 border-sky-500" : "border-gray-300"}`}
+                                accessibilityRole="radio"
+                                accessibilityState={{ selected: on }}
+                              >
+                                <Text className={`text-sm ${on ? "text-white font-semibold" : "text-gray-700"}`}>
+                                  {k.name}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </>
+                    )}
+                  </View>
+                )}
                 <TouchableOpacity
-                  onPress={() => requestPackage(p)}
-                  disabled={requestingId !== null}
+                  onPress={() => requestPackage(p, studentId)}
+                  disabled={requestingId !== null || blocked}
                   className="bg-sky-500 rounded-xl py-2.5 items-center"
-                  style={requestingId !== null ? { opacity: 0.6 } : undefined}
+                  style={requestingId !== null || blocked ? { opacity: 0.6 } : undefined}
                 >
                   <Text className="text-sm font-semibold text-white">
                     {requestingId === p.id ? "Requesting…" : "Request & pay"}
                   </Text>
                 </TouchableOpacity>
               </Card>
-            ))}
+              );
+            })}
             <Text className="text-xs text-gray-400 px-1">
               You pay by PayNow; the package becomes active once your
               coach confirms the money arrived. Lessons then use the

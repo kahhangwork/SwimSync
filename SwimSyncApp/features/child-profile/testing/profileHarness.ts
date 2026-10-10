@@ -83,6 +83,7 @@ const repoDefaults: { [K in keyof typeof Repo]: Impl } = {
   }),
   fetchGradeScale: ok([]),
   fetchSkillProgress: ok([]),
+  fetchPackageOwner: ok(null),
 };
 
 // kid-A's coverage row, so a test can waitFor the fire-and-forget coverage setState

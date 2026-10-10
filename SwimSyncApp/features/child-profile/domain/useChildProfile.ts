@@ -21,6 +21,7 @@ import {
   fetchParentBalances,
   fetchGradeScale,
   fetchSkillProgress,
+  fetchPackageOwner,
 } from "../dao/childProfile.repo";
 import { fetchPackageCoverage } from "../dao/childProfile.rpc";
 import type { ChildDetail } from "../types";
@@ -39,10 +40,15 @@ export function useChildProfile() {
 
     // Payment method for the Balances card. Fire-and-forget: a failed RPC
     // only means the line is absent, never a broken screen.
+    // Single-child packages: "<name>'s own" when the covering package is this
+    // child's own one-child package; a failed lookup reads as shared.
     fetchPackageCoverage()
-      .then(({ data: cov }) =>
-        setCoverage(coverageByStudent(cov ?? []).get(String(id)))
-      );
+      .then(async ({ data: cov }) => {
+        const c = coverageByStudent(cov ?? []).get(String(id));
+        if (!c?.packageId) return setCoverage(c);
+        const { data: owner } = await fetchPackageOwner(c.packageId);
+        setCoverage({ ...c, own: !!owner?.student_id && owner.student_id === String(id) });
+      });
 
     const { data: student } = await fetchStudentProfile(id);
 

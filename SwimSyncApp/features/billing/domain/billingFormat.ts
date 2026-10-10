@@ -8,8 +8,8 @@
 // ("parseInt(month) - 1"), repointed here from the route (plan ⚠ R6). Do NOT
 // "fix" it with a timeZone option: it is correct in every zone.
 import { formatSgStamp } from "@/lib/lessonDates";
-import type { Invoice, ParentPackage, PackageProduct } from "../types";
-import type { InvoiceListRow, PackageListRow, ProductListRow } from "../dao/billing.repo";
+import type { ChildOption, Invoice, ParentPackage, PackageProduct } from "../types";
+import type { ChildLinkRow, InvoiceListRow, PackageListRow, ProductListRow } from "../dao/billing.repo";
 import type { LiveBalanceRow } from "../dao/billing.rpc";
 
 export function formatBillingMonth(ym: string): string {
@@ -46,7 +46,11 @@ export function invoicesOf(rows: InvoiceListRow[] | null): Invoice[] {
 
 /** LIVE numbers come from package_live_balances(), keyed by package id — never
  *  recomputed here (the RPC is the single derivation). */
-export function packagesOf(rows: PackageListRow[] | null, liveRows: LiveBalanceRow[] | null): ParentPackage[] {
+export function packagesOf(
+  rows: PackageListRow[] | null,
+  liveRows: LiveBalanceRow[] | null,
+  children: ChildOption[] = []
+): ParentPackage[] {
   const liveById = new Map<string, LiveBalanceRow>(
     (liveRows ?? []).map((r) => [r.parent_package_id, r])
   );
@@ -75,8 +79,46 @@ export function packagesOf(rows: PackageListRow[] | null, liveRows: LiveBalanceR
       live_value_remaining: live ? Number(live.live_value_remaining) : null,
       holiday_extension_days: p.holiday_extension_days ?? 0,
       cancel_extension_days: p.cancel_extension_days ?? 0,
+      student_id: p.student_id ?? null,
+      child_name: p.student_id
+        ? (children.find((k) => k.id === p.student_id)?.name ?? "your child")
+        : null,
     };
   });
+}
+
+/** The parent's children (inactive ones included — a held package may name one);
+ *  rows RLS hides are dropped. */
+export function childrenOf(rows: ChildLinkRow[] | null): ChildOption[] {
+  const out: ChildOption[] = [];
+  for (const r of rows ?? []) {
+    const s = Array.isArray(r.students) ? r.students[0] : r.students;
+    if (!s?.id || !s.full_name) continue;
+    out.push({ id: s.id, name: s.full_name, tenant_id: s.tenant_id, active: s.is_active });
+  }
+  return out;
+}
+
+/** ⚠ RISK 7 — the children a one-child product can be for: the parent's ACTIVE
+ *  children at the product's business. */
+export function childrenForProduct(
+  children: ChildOption[],
+  product: Pick<PackageProduct, "tenant_id">
+): ChildOption[] {
+  return children.filter((k) => k.active && k.tenant_id === product.tenant_id);
+}
+
+/** ⚠ RISK 7 — what a request sends as student_id: a shared product always null;
+ *  a one-child product the single eligible child (D7 — shown, not asked), else the
+ *  parent's choice, else null (the caller refuses before sending). */
+export function requestStudentFor(
+  product: Pick<PackageProduct, "single_child">,
+  eligible: ChildOption[],
+  choice: string | undefined
+): string | null {
+  if (!product.single_child) return null;
+  if (eligible.length === 1) return eligible[0].id;
+  return eligible.some((k) => k.id === choice) ? (choice as string) : null;
 }
 
 export function productsOf(rows: ProductListRow[] | null): PackageProduct[] {
@@ -87,6 +129,8 @@ export function productsOf(rows: ProductListRow[] | null): PackageProduct[] {
       : p.class_categories;
     return {
       id: p.id,
+      tenant_id: p.tenant_id,
+      single_child: !!p.single_child,
       name: p.name,
       business_name: t?.display_name ?? "Your coach",
       category_name: c?.name ?? null,

@@ -52,7 +52,7 @@ function child(over: Partial<ChildDetail> = {}): ChildDetail {
 }
 
 function cov(coverage: StudentCoverage["coverage"], lessonsRemaining: number | null): StudentCoverage {
-  return { parentId: "parent-1", tenantId: "tA", coverage, lessonsRemaining };
+  return { parentId: "parent-1", tenantId: "tA", coverage, lessonsRemaining, packageId: null };
 }
 
 /** The n-th HOST ancestor of an element (composite wrappers skipped). */

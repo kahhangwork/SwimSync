@@ -29,6 +29,7 @@ export default function BillingScreen() {
     loadData,
     requestPackage,
     cancelRequest,
+    familyChildren,
   } = useBilling();
 
   useFocusEffect(
@@ -55,7 +56,7 @@ export default function BillingScreen() {
           {activeTab === "Invoices" ? (
             <InvoicesTab invoices={invoices} claimPaid={claimPaid} claimingId={claimingId} />
           ) : activeTab === "Packages" ? (
-            <PackagesTab packageError={packageError} packages={packages} products={products} requestingId={requestingId} requestPackage={requestPackage} cancelRequest={cancelRequest} />
+            <PackagesTab packageError={packageError} packages={packages} products={products} requestingId={requestingId} requestPackage={requestPackage} cancelRequest={cancelRequest} familyChildren={familyChildren} />
           ) : (
             <CreditNotesTab creditNotes={creditNotes} />
           )}

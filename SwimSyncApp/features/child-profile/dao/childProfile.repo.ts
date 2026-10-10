@@ -35,6 +35,14 @@ export const fetchStudentProfile = (id: string) =>
     .eq("id", id)
     .single();
 
+// Whose is the covering package? (single-child packages) — RLS: the parent's own.
+export const fetchPackageOwner = (packageId: string) =>
+  supabase
+    .from("parent_packages")
+    .select("student_id")
+    .eq("id", packageId)
+    .maybeSingle();
+
 // Fetch outstanding invoices for the parent linked to this student
 export const fetchParentLink = (id: string) =>
   supabase

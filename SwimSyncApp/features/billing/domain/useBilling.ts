@@ -18,13 +18,14 @@ import {
   fetchCreditNotes,
   fetchPackages,
   fetchProducts,
+  fetchChildren,
   insertPackageRequest,
   cancelPackageRequest,
 } from "../dao/billing.repo";
 import { claimInvoicePaid, fetchLiveBalances } from "../dao/billing.rpc";
 import { invokePackageEmail } from "../dao/billing.api";
-import type { Tab, Invoice, ParentPackage, PackageProduct, CreditNote } from "../types";
-import { invoicesOf, packagesOf, productsOf } from "./billingFormat";
+import type { Tab, Invoice, ParentPackage, PackageProduct, CreditNote, ChildOption } from "../types";
+import { invoicesOf, packagesOf, productsOf, childrenOf } from "./billingFormat";
 
 export function useBilling() {
   const session = useAppStore((s) => s.session);
@@ -34,6 +35,8 @@ export function useBilling() {
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [packages, setPackages] = useState<ParentPackage[]>([]);
   const [products, setProducts] = useState<PackageProduct[]>([]);
+  // The family's children — the one-child picker and "For Ava only" (D7).
+  const [children, setChildren] = useState<ChildOption[]>([]);
   const [parentId, setParentId] = useState<string | null>(null);
   const [requestingId, setRequestingId] = useState<string | null>(null);
   const [packageError, setPackageError] = useState<string | null>(null);
@@ -93,7 +96,7 @@ export function useBilling() {
     // Holiday extensions are event-driven now (reconcile trigger,
     // 20260818000700): expires_on is already current when this page reads it,
     // so there is no pre-read recompute call any more.
-    const [invoicesRes, creditNotesRes, packagesRes, liveRes, productsRes] =
+    const [invoicesRes, creditNotesRes, packagesRes, liveRes, productsRes, childrenRes] =
       await Promise.all([
         fetchInvoices(parent.id),
 
@@ -107,12 +110,16 @@ export function useBilling() {
         // Products of every business this parent has joined (RLS) — the ⚠ on
         // the two named FKs lives on dao/billing.repo fetchProducts (§7.176).
         fetchProducts(),
+
+        fetchChildren(parent.id),
       ]);
 
     setInvoices(invoicesOf(invoicesRes.data));
     setCreditNotes(creditNotesRes.data ?? []);
 
-    setPackages(packagesOf(packagesRes.data, liveRes.data));
+    const kids = childrenOf(childrenRes.data);
+    setChildren(kids);
+    setPackages(packagesOf(packagesRes.data, liveRes.data, kids));
 
     // A FAILED products fetch and "this business sells nothing" render
     // IDENTICALLY — `?? []` collapses both to an empty Buy-a-package list with
@@ -128,16 +135,33 @@ export function useBilling() {
   }, [session]);
 
   /** Request a package: a PENDING row (the DB snapshots the product's terms
-   *  and forces pending for parents), then straight to the PayNow screen. */
+   *  and forces pending for parents), then straight to the PayNow screen.
+   *  studentId: the child a one-child product is for (the tab decides it —
+   *  requestStudentFor); null for a shared product. No Alert.alert anywhere
+   *  here — a no-op on RN-web (⚠ RISK 8): errors are inline. */
   const requestPackage = useCallback(
-    async (product: PackageProduct) => {
+    async (product: PackageProduct, studentId: string | null = null) => {
       if (!parentId) return;
+      if (product.single_child && !studentId) {
+        setPackageError("Choose which child this package is for.");
+        return;
+      }
       setRequestingId(product.id);
       setPackageError(null);
-      const { data, error } = await insertPackageRequest(parentId, product.id);
+      const { data, error } = await insertPackageRequest(
+        parentId,
+        product.id,
+        product.single_child ? studentId : null
+      );
       setRequestingId(null);
       if (error || !data) {
-        setPackageError("Could not request that package. Please try again.");
+        // 23514 = the database's own sentence (which child; one kind per
+        // family) — say it; anything else stays generic.
+        setPackageError(
+          error?.code === "23514"
+            ? error.message
+            : "Could not request that package. Please try again."
+        );
         return;
       }
       // Best-effort email with the amount + PayNow instructions. Fire and
@@ -171,6 +195,7 @@ export function useBilling() {
     creditNotes,
     packages,
     products,
+    familyChildren: children,
     requestingId,
     packageError,
     loading,

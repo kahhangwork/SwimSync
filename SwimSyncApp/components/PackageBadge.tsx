@@ -6,8 +6,9 @@ import type { StudentCoverage } from "../lib/packageCoverage";
 // explicit BOTH ways, so a missing badge is never the signal. It renders
 // nothing only when there is no coverage row at all (the RPC failed, or the
 // child is not linked to this parent) — fail-safe is no badge, never a wrong
-// label. The count is FAMILY-SHARED; detail screens spell that out via
-// describeCoverage(). 'mixed' is structurally unreachable while
+// label. The count is what THIS child can use — shared packages for every
+// sibling, a one-child package for its own child only (single-child packages);
+// detail screens spell that out via describeCoverage(). 'mixed' is structurally unreachable while
 // one_active_enrolment_per_student stands; the branch keeps a lifted
 // constraint honest instead of mislabelling.
 export default function PackageBadge({

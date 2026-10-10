@@ -74,7 +74,7 @@ describe("billing.repo money chains", () => {
       [
         "select",
         "id,name,lesson_count,rate_per_lesson,total_value,amount_payable,discount_amount,status," +
-          "offered_by,expires_on,requested_at,holiday_extension_days,cancel_extension_days," +
+          "offered_by,expires_on,requested_at,holiday_extension_days,cancel_extension_days,student_id," +
           "class_categories(name),tenants(display_name)",
       ],
       ["in", "status", ["pending", "active"]],
@@ -88,7 +88,7 @@ describe("billing.repo money chains", () => {
       ["from", "package_products"],
       [
         "select",
-        "id,name,lesson_count,rate_per_lesson,validity_weeks," +
+        "id,tenant_id,name,lesson_count,rate_per_lesson,validity_weeks,single_child," +
           "class_categories!package_products_category_id_fkey(name)," +
           "tenants!package_products_tenant_id_fkey(display_name)",
       ],

@@ -24,6 +24,7 @@ describe("coverageByStudent", () => {
       tenantId: "t1",
       coverage: "package",
       lessonsRemaining: 8,
+      packageId: null,
     });
     expect(map.get("s2")?.coverage).toBe("ad_hoc");
   });
@@ -58,10 +59,20 @@ describe("describeCoverage (the child profile's Balances line)", () => {
     tenantId: "t1",
     coverage,
     lessonsRemaining,
+    packageId: null,
   });
 
   it("spells out the family-shared package count", () => {
     expect(describeCoverage(cov("package", 8))).toBe(
+      "Package — 8 lessons left · shared across the family"
+    );
+  });
+
+  // Single-child packages: "shared across the family" only when it IS shared.
+  it("a child's own one-child package reads as theirs, not the family's", () => {
+    expect(describeCoverage({ ...cov("package", 8), own: true }, "Ava")).toBe("Package — 8 lessons left · Ava's own");
+    expect(describeCoverage({ ...cov("package", 8), own: true })).toBe("Package — 8 lessons left · this child's own");
+    expect(describeCoverage({ ...cov("package", 8), own: false }, "Ava")).toBe(
       "Package — 8 lessons left · shared across the family"
     );
   });

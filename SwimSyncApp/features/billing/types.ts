@@ -48,10 +48,23 @@ export type ParentPackage = {
   live_value_remaining: number | null;
   holiday_extension_days: number;
   cancel_extension_days: number;
+  /** NULL = shared across the family; set = a one-child package
+   *  (single-child packages, 20261010000100). */
+  student_id: string | null;
+  /** That child's name, from the family's own children list (never a bare
+   *  embed, §7.344); "your child" when it cannot be found. */
+  child_name: string | null;
 };
+
+/** One of the parent's children — the one-child request picker. */
+export type ChildOption = { id: string; name: string; tenant_id: string; active: boolean };
 
 export type PackageProduct = {
   id: string;
+  /** The business selling it: the picker lists the children AT that business. */
+  tenant_id: string;
+  /** One child only (D7: "Which child is this for?"). */
+  single_child: boolean;
   name: string;
   business_name: string;
   category_name: string | null;

@@ -40,7 +40,7 @@ export const fetchCreditNotes = (parentId: string) =>
 export const fetchPackages = () =>
   supabase
     .from("parent_packages")
-    .select("id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, status, offered_by, expires_on, requested_at, holiday_extension_days, cancel_extension_days, class_categories(name), tenants(display_name)")
+    .select("id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, status, offered_by, expires_on, requested_at, holiday_extension_days, cancel_extension_days, student_id, class_categories(name), tenants(display_name)")
     .in("status", ["pending", "active"])
     .order("requested_at", { ascending: false });
 
@@ -62,14 +62,24 @@ export const fetchPackages = () =>
 export const fetchProducts = () =>
   supabase
     .from("package_products")
-    .select("id, name, lesson_count, rate_per_lesson, validity_weeks, class_categories!package_products_category_id_fkey(name), tenants!package_products_tenant_id_fkey(display_name)")
+    .select("id, tenant_id, name, lesson_count, rate_per_lesson, validity_weeks, single_child, class_categories!package_products_category_id_fkey(name), tenants!package_products_tenant_id_fkey(display_name)")
     .eq("is_active", true)
     .order("name");
 
-export const insertPackageRequest = (parentId: string, productId: string) =>
+// The family's children (single-child packages): the "Which child is this for?"
+// picker and the "For Ava only" label. RLS shows this parent's own links.
+export const fetchChildren = (parentId: string) =>
+  supabase
+    .from("parent_students")
+    .select("students(id, full_name, is_active, tenant_id)")
+    .eq("parent_id", parentId);
+
+// studentId: the one child of a one-child product; null for a shared one (the
+// trigger refuses a mismatch either way).
+export const insertPackageRequest = (parentId: string, productId: string, studentId: string | null) =>
   supabase
     .from("parent_packages")
-    .insert({ parent_id: parentId, product_id: productId })
+    .insert({ parent_id: parentId, product_id: productId, student_id: studentId })
     .select("id")
     .single();
 
@@ -97,4 +107,5 @@ export const fetchReferralRewards = () =>
 export type InvoiceListRow = RlsNullable<DataOf<typeof fetchInvoices>[number], "tenants">;
 export type PackageListRow = RlsNullable<DataOf<typeof fetchPackages>[number], "tenants" | "class_categories">;
 export type ProductListRow = RlsNullable<DataOf<typeof fetchProducts>[number], "tenants" | "class_categories">;
+export type ChildLinkRow = RlsNullable<DataOf<typeof fetchChildren>[number], "students">;
 export type MembershipRow = RlsNullable<DataOf<typeof fetchReferralMemberships>[number], "tenants">;

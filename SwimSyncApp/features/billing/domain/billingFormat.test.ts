@@ -51,7 +51,7 @@ describe("billingFormat (characterisation)", () => {
 
   it("productsOf: the product card's fields, rate as a number", () => {
     expect(
-      productsOf([{ id: "x", name: "10-pack", lesson_count: 10, rate_per_lesson: "25.5", validity_weeks: 12, class_categories: { name: "Private" }, tenants: [{ display_name: "Coastal" }] }])
-    ).toEqual([{ id: "x", name: "10-pack", business_name: "Coastal", category_name: "Private", lesson_count: 10, rate_per_lesson: 25.5, validity_weeks: 12 }]);
+      productsOf([{ id: "x", tenant_id: "tA", single_child: true, name: "10-pack", lesson_count: 10, rate_per_lesson: "25.5", validity_weeks: 12, class_categories: { name: "Private" }, tenants: [{ display_name: "Coastal" }] }])
+    ).toEqual([{ id: "x", tenant_id: "tA", single_child: true, name: "10-pack", business_name: "Coastal", category_name: "Private", lesson_count: 10, rate_per_lesson: 25.5, validity_weeks: 12 }]);
   });
 });

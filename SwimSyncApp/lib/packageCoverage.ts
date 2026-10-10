@@ -13,8 +13,15 @@ export type StudentCoverage = {
   parentId: string;
   tenantId: string;
   coverage: CoverageVerdict;
-  /** Family-shared live lessons remaining; null when ad_hoc. */
+  /** Live lessons this child can draw on (shared packages, or their own one-child
+   *  package — single-child packages); null when ad_hoc. */
   lessonsRemaining: number | null;
+  /** The covering package SQL chose to show (student_package_coverage().package_id). */
+  packageId: string | null;
+  /** True when that package is THIS child's own one-child package. Never from
+   *  the coverage row (its columns are unchanged, RISK 5): the caller looks the
+   *  package up in the parent's own packages and sets it. */
+  own?: boolean;
 };
 
 const VERDICTS: ReadonlySet<string> = new Set(["package", "mixed", "ad_hoc"]);
@@ -31,6 +38,7 @@ export function coverageByStudent(
       tenant_id?: unknown;
       coverage?: unknown;
       lessons_remaining?: unknown;
+      package_id?: unknown;
     } | null;
     if (
       !r ||
@@ -47,18 +55,26 @@ export function coverageByStudent(
       coverage: r.coverage as CoverageVerdict,
       lessonsRemaining:
         typeof r.lessons_remaining === "number" ? r.lessons_remaining : null,
+      packageId: typeof r.package_id === "string" ? r.package_id : null,
     });
   }
   return map;
 }
 
-/** The badge's one-line description for detail screens (child profile). */
-export function describeCoverage(c: StudentCoverage | undefined): string | null {
+/** The badge's one-line description for detail screens (child profile).
+ *  "shared across the family" only when the counted package IS shared; a
+ *  child's own one-child package reads "<name>'s own". */
+export function describeCoverage(
+  c: StudentCoverage | undefined,
+  childName?: string | null
+): string | null {
   if (!c) return null;
   if (c.coverage === "ad_hoc") return "Ad-hoc — billed per lesson";
   const n = c.lessonsRemaining ?? 0;
   const lessons = `${n} lesson${n === 1 ? "" : "s"} left`;
   return c.coverage === "mixed"
     ? `Mixed — ${lessons} · some classes bill per lesson`
-    : `Package — ${lessons} · shared across the family`;
+    : c.own
+      ? `Package — ${lessons} · ${childName ? `${childName}'s` : "this child's"} own`
+      : `Package — ${lessons} · shared across the family`;
 }

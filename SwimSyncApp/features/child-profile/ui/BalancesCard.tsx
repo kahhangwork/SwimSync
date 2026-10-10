@@ -10,6 +10,7 @@ import type { ChildDetail } from "../types";
 
 export function BalancesCard(p: { child: ChildDetail; coverage: StudentCoverage | undefined }) {
   const { child, coverage } = p;
+  const firstName = child.full_name.split(" ")[0];
   return (
     <>
       {/* Balances */}
@@ -31,7 +32,7 @@ export function BalancesCard(p: { child: ChildDetail; coverage: StudentCoverage 
         </View>
         {/* How this child's lessons are paid — package (with the family's
             live count) or ad-hoc invoice. Absent only if the RPC failed. */}
-        {describeCoverage(coverage) && (
+        {describeCoverage(coverage, firstName) && (
           <View
             className={`mt-3 rounded-xl p-3 ${
               coverage?.coverage === "ad_hoc" ? "bg-gray-50" : "bg-emerald-50"
@@ -44,7 +45,7 @@ export function BalancesCard(p: { child: ChildDetail; coverage: StudentCoverage 
                   : "text-emerald-700"
               }`}
             >
-              {describeCoverage(coverage)}
+              {describeCoverage(coverage, firstName)}
             </Text>
           </View>
         )}
