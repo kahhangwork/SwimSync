@@ -1,10 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-10 — **§8.144: Pin the clock for UI drivers SHIPPED** — `run-all-drivers.sh --now` replays any
-past moment across browser, API, fixtures and engine; all 73 drivers marked; migration `20261009000200` on prod.
-**Engine v35 on prod 2026-10-10** (DEPLOYMENT #81) — DORMANT until the next real Generate._
+_Last updated: 2026-10-10 (2nd) — **§8.145: three fixture-hygiene S-items shipped** (`4a53ca1`, CI green) and **Wave 9
+planned**: *Single-child packages* (Little Orcas) has an approved, reviewed plan — `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`._
 
-_Previously (§8.143, 2026-10-09) — Wave 6 follow-ups ×3 + "Sept" on every surface._
+_Previously (§8.144, 2026-10-10) — Pin the clock for UI drivers; engine v35 on prod, DORMANT until the next real Generate._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -349,6 +348,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.145 (2026-10-10) — Fixture hygiene ×3, then Wave 9 filed, ranked and planned
+
+**Shipped the three Foundations S-items §8.144 filed (`4a53ca1`, CI green); filed + ranked two user items; planned the
+first with `/plan-with-confidence` + `/plan-review`.**
+
+- **Shipped:** the trial-onboarding fixture deletes only runs naming its walk-in (§7.63 note); `run-all-drivers.sh
+  --only` tears its fixture down after a PASS (§7.272); CI runs the pinned roundtrip on every weekday (TESTING §5,
+  §7.304 *Promoted*). Each proven red-without / green-with on the real DB.
+- **Planned:** *Single-child packages* — 10 user decisions + 14 inlined risks; nothing built. BACKLOG Wave 9 also holds
+  *UI/UX improvements* (audit first) and *Remove the legacy package matcher* (gated on Little Orcas' September seal).
+- **Not done:** Little Orcas' September Generate (the owner's — a platform admin has no Generate button, and the user
+  asked; declined to work around it). The reviewer's 4 GOTCHAS candidates were offered, not applied.
+
 ## 8.144 (2026-10-09 → 10) — Pin the clock for UI drivers, two lanes
 
 **Shipped BACKLOG *Pin the clock for UI drivers* (L) per `docs/plans/PIN_DRIVER_CLOCK_PLAN.md`, run as two lanes
@@ -363,19 +375,7 @@ inside a file read at the start of every session.
 - **Not done:** no full pinned sweep (user's call). The engine went to prod BEFORE Little Orcas' run, by the
   user's call, after nightly `38003471836` was green; its proof (plan step 5) is the next real Generate.
 
-## 8.143 (2026-10-09) — Wave 6 follow-ups ×3, and "Sept" everywhere, with a guard for each half
-
-**Shipped the three Wave 6 S-items plus the wider "Sep" sweep the user chose (13 DB functions, not 1); deployed
-migration → 3 functions → apps per `/deploy`.** `58b532c` `fe33d5f` `32a6ad0` `0bd161a` `4f29867` `bf1b406`.
-
-- **Shipped:** *Check marked lessons* (PRD §7.16, driven in Chrome on the Wave 6 fixture); the coach sees the window
-  guard's words (PRD §7.6); every DB message, email and app label says "Sept" (§7.302's new note). Record: DEPLOYMENT #79.
-- **Guards:** `sg_date_label.test.sql` (pg_proc census) + `scripts/check-sept.sh` (G-Sept) — TESTING §5.
-- **Found:** CI went red on `main` after prod had the migration — G2 saw its copied `now()` stamps (§7.354; exact
-  `file:line` exemption, user's call; `/deploy` Step 0 now runs repo-invariants first).
-- **Not done:** nightly over these commits unread. (Live admin `/packages` chunk carries the button — DEPLOYMENT #79.)
-
-_(§8.142 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.143 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -418,11 +418,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-10: three nightlies in a row GREEN, 73/73** (latest `37861091530` on `f67178e`, 2026-10-08).
-**The NEXT nightly is the first over §8.143 AND §8.144** — every driver now imports `lib.mjs`'s wrapped browser and
-an import-time clock check (needs the local DB container up), and the runner now calls `preflight()` (functions get a
-60 s grace). A red that reads "stale clock pin" / "preflight failed" is the new tooling, not the product. Then read
-`packages-admin`, `package-draw-at-marking`, `attendance-guard`, `cancel-lesson`, `admin-table-geometry`.
+**State on 2026-10-10: four nightlies in a row GREEN, 73/73** (latest `38003471836`, the first over §8.143 + §8.144).
+A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -430,20 +427,18 @@ an import-time clock check (needs the local DB container up), and the runner now
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — pick from BACKLOG
+### THE NEXT BUILD — Wave 9 (BACKLOG Build order)
 
-1. **Read each nightly** (never dispatch it unasked); `38003471836` over §8.143 + §8.144 was green. Red → replay the
-   failing day with `run-all-drivers.sh --only <driver> --now '<that day> <time>+08'` (TESTING §5), then fix.
-2. **Little Orcas September is the OWNER's** (WhatsApp sent 2026-10-05; still unbilled on prod 2026-10-09): *Generate
-   Sep 2026*, then *Record it as settled* for the 15 pilot children (PRD §7.17) — **and Brayden Ong** (unlinked from
-   the Ang family 2026-10-06, his 6 + 13 Sept lessons unclaimed: invite his parent or settle). The Ang family's package
-   lessons are already paid (drawn at B). Coach Kah Hang's September is billed and sealed.
-3. **Engine v35 is on prod but unexercised** (DEPLOYMENT #81). Little Orcas' Generate is its first real run: after it,
-   read `billing_runs` (no `status = 'error'`) and the function logs (no *could not read the database clock*). Any
-   failure → rollback first: revert `ba620c3` → `functions deploy`. Never press Generate yourself to prove it.
-4. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8, Wave 6's follow-ups and driver
-   pinning (§8.144); three S-items from it sit under Foundations. **A schema migration regenerates the types in the
-   SAME commit** (§7.350), and **runs every repo-invariants step locally before its push** (§7.354, `/deploy` Step 0).
+1. **Build *Single-child packages*** — `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`, starting at its **Step 0** (prod
+   function md5 = local, before writing). One migration on a `db/…` branch, then both apps, then a driver; deploy
+   when verified (D10 — not gated on Little Orcas). Walk the plan's pre-commit gate per commit.
+2. **Little Orcas September is the OWNER's** (unbilled on prod 2026-10-10): *Generate Sep 2026*, *Record it as settled*
+   for the 15 pilot children, and Brayden Ong's 6 + 13 Sept lessons (invite his parent or settle). After it: read
+   `billing_runs` (no `status = 'error'`) and the function logs (no *could not read the database clock*) — engine
+   v35's first real run (DEPLOYMENT #81); failure → revert `ba620c3` → `functions deploy`. Never press Generate
+   yourself. **Its seal also un-gates BACKLOG Wave 9 item 9** (remove the legacy matcher).
+3. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
+   '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).

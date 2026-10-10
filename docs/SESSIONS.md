@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.143** | 2026-10-09 | Wave 6 follow-ups ×3 + "Sept" on every surface, guarded both halves | PRD §7.16, §7.6 · TESTING §5 · §7.302, §7.354 · DEPLOYMENT #79 |
 | **8.142** | 2026-10-07 | G3-apps: neither app takes the UTC date of a timestamp (CI-only) | TESTING §5 · GOTCHAS §7.7, §7.283 |
 | **8.141** | 2026-10-06 | Wave 8: generated Supabase `Database` types; 5 bugs fixed | ARCHITECTURE §6ag · TESTING §5 · DEPLOYMENT #77–#78 |
 | **8.140** | 2026-10-06 | Wave 7: the injectable DB clock; G1–G4 CI guards | ARCHITECTURE §6af · DEPLOYMENT #74–#76 · TESTING §5 |
