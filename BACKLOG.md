@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-10 — **Pin the clock for UI drivers SHIPPED** (§8.144) and removed; three S-items filed from it (Foundations). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-10 — the three Foundations S-items filed from §8.144 are **DONE** (week-long pinned roundtrip in CI, `--only` teardown, scoped `billing_runs` delete). Nothing is ranked or unparked; the next pick is a decision. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1607,7 +1607,7 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Pinned roundtrip over a whole week, in CI — **S** — _filed 2026-10-10 (§8.144, §7.304 promotion)_
+### ~~Pinned roundtrip over a whole week, in CI~~ — **S** — **DONE 2026-10-10** (CI `backend-tests`, TESTING §5, §7.304 *Promoted*)
 Run `check-fixture-roundtrip.sh --now` at noon SGT on seven consecutive past days (one of each weekday), not only at
 the single `2026-10-01 07:59+08` moment CI pins today.
 
@@ -1620,7 +1620,7 @@ red on the push that introduces it rather than on the day it fires.
 as literals (annotate `-- date-literal-ok:` if `check-test-dates.sh` scans the file, §7.305). Keep the existing
 07:59 step — the 1st-before-08:00 hazard is a different axis.
 
-### `run-all-drivers.sh --only` tears its own fixture down — **S** — _filed 2026-10-10 (§8.144, §7.272)_
+### ~~`run-all-drivers.sh --only` tears its own fixture down~~ — **S** — **DONE 2026-10-10** (step 5 of the runner's protocol, §7.272)
 After an `--only` run, run the driver's `fixtures-<name>-teardown.sql` (best-effort, logged).
 
 **Why:** §7.272 *Hit again* ×3: an `--only` run leaves its fixture and writes loaded, and the next
@@ -1630,7 +1630,7 @@ alone. A full sweep doesn't need it (it resets per driver), so only the `--only`
 **Notes:** a teardown can't undo every driver WRITE (that's why the sweep resets); the aim is only that the shared
 DB no longer carries the fixture's fixed ids. Skip it when the driver failed, so its state stays inspectable.
 
-### Fixture `billing_runs` deletes are tenant+month wide — **S** — _filed 2026-10-10 (pin-clock lane 2)_
+### ~~Fixture `billing_runs` deletes are tenant+month wide~~ — **S** — **DONE 2026-10-10** (owned = names `Fixture Walkin`, §7.63)
 `fixtures-trial-onboarding.sql` and its teardown `DELETE FROM billing_runs WHERE tenant_id = <seed> AND billing_month
 = <last month>`, so they also delete runs the fixture did not create.
 

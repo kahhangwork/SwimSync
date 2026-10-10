@@ -88,10 +88,13 @@ BEGIN
   DELETE FROM billing_periods
     WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
 
-  -- The run log the driver's Generate wrote (⚠ RISK 4). Tenant+month scoped for
-  -- the same reason as the seal above: billing_runs has no class axis.
+  -- The run log the driver's Generate wrote (⚠ RISK 4). billing_runs has no
+  -- class axis, so ownership is the walk-in's name in the run's unclaimed list —
+  -- NOT tenant+month, which also deleted runs the fixture never made (§7.63;
+  -- symmetric with the setup's own DELETE).
   DELETE FROM billing_runs
-    WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
+    WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM')
+      AND unclaimed_students @> '[{"student_name": "Fixture Walkin"}]';
 
   -- The class this fixture owns, and the effective-dated rate its trigger made.
   -- It used to BORROW the seed class, which is what broke CI on 2026-08-01; now

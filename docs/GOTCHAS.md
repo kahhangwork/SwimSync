@@ -504,6 +504,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `grep -n "CROSS JOIN\|FROM students\|FROM classes" .claude/skills/run-ui-playwright/drivers/fixtures-*.sql`
     and ask "would this pick up a row another fixture created?" Sibling of §7.62: psql aborts the statement, the
     script continues, the fixture half-loads silently. (Fixed 2026-07-26.)
+    - **Same rule for DELETEs, on a table with no class axis (2026-10-10).** `fixtures-trial-onboarding.sql` and its
+      teardown deleted `billing_runs` by tenant + month, so they also took a manual engine proof's run (the roundtrip
+      read `billing_runs −1`, 2026-10-09). When a table has no column the fixture owns, find an ownership marker
+      in the row: the driver's runs are now the ones whose `unclaimed_students` names `Fixture Walkin`. Proven: a
+      stranger run survives setup + teardown, the old code deleted it.
 
 64. **EXPO ROUTER REUSES A MOUNTED SCREEN WHEN ONLY A SEARCH PARAM CHANGES, SO A
     MOUNT-ONLY `useEffect` NEVER RELOADS — AND THIS WROTE ATTENDANCE TO THE WRONG DAY.**
@@ -2288,6 +2293,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - **Hit again (2026-10-09, pin-clock lane 2):** after `run-all-drivers.sh --only attendance-guard`, the next
       `check-fixture-roundtrip.sh` failed that fixture on `users_pkey` (d0…aa) and its teardown silently cleaned up;
       twice in one session. Re-run = green. BACKLOG → *`--only` tears its own fixture down*.
+    - **Fixed for the fixture half (2026-10-10):** `run-all-drivers.sh --only` now runs the fixture's
+      `-teardown.sql` after a PASS (skipped after a failure, so the state stays inspectable; a teardown error is a
+      warning). The driver's UI writes still stay until a reset — a teardown cannot undo those.
 
 273. **To simulate a slow cold hydrate in a driver, never rewrite the Expo bundle, and don't delay it with
     `page.route` alone.** `domcontentloaded` absorbs it, so the helper never sees it; `setTimeout`-wrapping
@@ -2545,6 +2553,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       `check-fixture-roundtrip.sh --now '2026-10-0N 12:00+08'` for N = 1…9 (only Sat 3 Oct failed). Fixed `3d8adb0`
       (mark the lesson before the package exists). **Promotion:** the replay is the check — run the pinned roundtrip
       over seven consecutive days in CI (BACKLOG → *Pinned roundtrip over a whole week*).
+    - **Promoted (2026-10-10):** CI's `backend-tests` now runs the pinned roundtrip at noon SGT on 2026-10-03 … 09.
+      Proven against the pre-`3d8adb0` fixture: red on 10-03 (Sat), green on 10-04/05. A new weekday-dependent fixture is red on its own
+      push (TESTING §5).
 
 305. **A literal test date the floor has not passed now fails CI — `scripts/check-test-dates.sh`.** Scans pgTAP +
     UI fixtures for quoted `'YYYY-MM-DD'` / `'YYYY-MM'` at or after the floor (1st of last month, SGT); each must be

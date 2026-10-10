@@ -1584,8 +1584,11 @@ in auto mode and its email-retry skip (§7.265, §7.266). No run-day test writes
   `--check` is read-only and is called by the runner, `check-fixture-roundtrip.sh`, `generate-invoices/test.sh` and
   `app_clock_locks.sh`, which all refuse (exit 2) on a pinned stack. pgTAP `app_clock` (31) is red on a leftover API
   row or a database/role-level pin.
-- **CI:** the fixture roundtrip runs twice — unpinned, and `--now '2026-10-01 07:59+08'` with the pin carried by
-  `PGOPTIONS` (session-only; never `ALTER DATABASE`, so it stays sibling-safe). `app_clock_locks.sh` grew checks 4–6
+- **CI:** the fixture roundtrip runs unpinned, at `--now '2026-10-01 07:59+08'`, and **at noon SGT on each of
+  2026-10-03 … 09 — one of every weekday** (2026-10-10, §7.304's promotion), the pin carried by `PGOPTIONS`
+  (session-only; never `ALTER DATABASE`, so it stays sibling-safe). The week step is proven: the pre-`3d8adb0`
+  `admin-table-geometry` fixture fails it on 10-03 (Sat) and passes 10-04/05 (§8.144's 1–9 Oct replay: Sat only);
+  the single Thursday pin missed it. ~50 s a day. A red names the day; replay with `check-fixture-roundtrip.sh --now '<day> 12:00+08'`. `app_clock_locks.sh` grew checks 4–6
   (API row → pinned; row without lock 1 → RAISE; row without pin → real) — check 4 red-proven on the old body.
 - **Engine:** `generate-invoices/clock.test.ts` (12, stubbed RPC) — Invalid Date, prod-URL skew, retry; each guard
   red-proven. HTTP proof: pinned at `2026-08-01 00:30+08` the default billing month is `2026-07`, unpinned `2026-09`.
@@ -1640,6 +1643,9 @@ Then the four rules, all bought with real time:
 
 **One more, learned 2026-08-30:** `check-fixture-roundtrip.sh` run straight after a UI driver
 reports failures that are just the driver's own UI writes — reset before believing it.
+*Since 2026-10-10* `run-all-drivers.sh --only` runs the fixture's teardown after a PASS (not after a
+failure), so the fixture's fixed ids no longer collide (§7.272) — but the driver's UI WRITES still stay
+until a reset, so this caution stands.
 
 ### Save-on-leave, signed-out deep links, the dead run-day row (2026-09-25, §8.123)
 

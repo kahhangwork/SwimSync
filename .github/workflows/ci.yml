@@ -188,6 +188,23 @@ jobs:
       - name: UI fixtures load and tear down clean at a pinned moment (2026-10-01 07:59+08)
         run: .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh --now '2026-10-01 07:59+08'
 
+      # The same roundtrip at noon on SEVEN consecutive days, one of each weekday. §7.304 has
+      # bitten twice: a fixture valid only on some weekdays — the second one (admin-table-
+      # geometry, every Saturday) turned CI red at 00:47 SGT on a Saturday, four days after it
+      # landed. The single Thursday pin above missed it; proven: the pre-3d8adb0 fixture fails
+      # here on 2026-10-03 (Sat) and passes 10-04/05 (§8.144's 1–9 Oct replay: Sat only). A different axis from the
+      # 07:59 step, which stays. Fixed literals, all past, so the run is reproducible.
+      - name: UI fixtures load and tear down clean on every weekday (2026-10-03 … 09, noon SGT)
+        run: |
+          fail=0
+          for d in 2026-10-03 2026-10-04 2026-10-05 2026-10-06 2026-10-07 2026-10-08 2026-10-09; do
+            echo "::group::$d ($(date -u -d "$d" +%A)) 12:00+08"
+            .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh --now "$d 12:00+08" \
+              || { echo "::error::fixture roundtrip failed at $d 12:00+08 ($(date -u -d "$d" +%A)) — replay: check-fixture-roundtrip.sh --now '$d 12:00+08'"; fail=1; }
+            echo "::endgroup::"
+          done
+          exit $fail
+
       - name: Stop Supabase stack
         if: always()
         run: supabase stop

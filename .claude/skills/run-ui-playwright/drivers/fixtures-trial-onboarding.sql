@@ -80,10 +80,16 @@ BEGIN
   DELETE FROM billing_periods
     WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
   -- The run log for that month (docs/plans/BILLING_MONTHS_PLAN.md ⚠ RISK 4):
-  -- the driver's own Generate writes one, and the Billing months card asserts on
-  -- the LATEST run's reason, so a stale earlier run must not be there to read.
+  -- the driver's own Generate writes one and asserts there is exactly one, so a
+  -- stale run from a previous driver run must not be there to count.
+  -- ONLY runs that name this fixture's walk-in — the driver's own (every run over
+  -- this month reports it as unclaimed). billing_runs has no class axis, and the
+  -- tenant+month-wide delete this used to be also took runs the fixture never
+  -- made: a manual engine proof's run vanished and the roundtrip read
+  -- `billing_runs −1` (2026-10-09, §7.63).
   DELETE FROM billing_runs
-    WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
+    WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM')
+      AND unclaimed_students @> '[{"student_name": "Fixture Walkin"}]';
 
   -- ── An UNCLAIMED child with one billable lesson in that month ─────────────
   -- No parent_students row: that absence IS the fixture.

@@ -18,7 +18,7 @@
 #                                    makeups books, tenant-provisioning creates
 #                                    a business). Fixture teardowns cannot undo
 #                                    UI writes; the next reset is the cleanup,
-#                                    so teardowns are deliberately not run here.
+#                                    so a SWEEP deliberately runs no teardown.
 #   2. docker restart kong         — §7.44: a reset leaves kong pointing at a
 #                                    dead auth container; every /auth/v1 call
 #                                    502s while docker reports both healthy.
@@ -27,6 +27,16 @@
 #   4. node verify-<name>.mjs      — the driver's own exit code is the verdict,
 #                                    under a hard timeout so one hang cannot eat
 #                                    the whole sweep.
+#   5. --only, after a PASS        — the driver's fixtures-<x>-teardown.sql,
+#                                    best-effort (§7.272 Hit again ×3): with no
+#                                    next reset coming, the fixture's fixed ids
+#                                    stayed in the shared DB and the next
+#                                    check-fixture-roundtrip.sh / `supabase test
+#                                    db` failed on a duplicate key or a count.
+#                                    It cannot undo the driver's WRITES — only the
+#                                    fixture. Skipped after a failure so the
+#                                    state stays inspectable; a teardown that
+#                                    errors is a warning, never the verdict.
 #
 # Uniformity is the point: no per-driver "does this one need a reset?" judgment
 # to rot. The price is wall clock, which a nightly job has to spend.
@@ -473,6 +483,19 @@ for name in "${DRIVERS[@]}"; do
     printf '  ✓ PASS  %s  (%ss)\n' "${score:-—}" "$secs"
     echo "| $name | PASS | ${score:-—} | $secs |" >> "$SUMMARY"
     PASSED=$((PASSED + 1))
+    # Step 5 (header). Still inside the pin, deliberately: teardowns recompute
+    # their month from app_today(), exactly as the fixture did.
+    if [[ -n "$ONLY" && -n "$fixture" ]]; then
+      teardown="${fixture%.sql}-teardown.sql"
+      if [[ ! -f "$teardown" ]]; then
+        echo "  ⚠ no $teardown — the fixture stays loaded (run supabase db reset before the roundtrip)"
+      elif psql_file "$teardown" > "$RUN_DIR/$name.teardown.log" 2>&1; then
+        echo "  ↺ tore down $fixture (driver writes stay — only a reset undoes those)"
+      else
+        echo "  ⚠ $teardown did not apply (log: $name.teardown.log) — the fixture may still be loaded"
+        tail -5 "$RUN_DIR/$name.teardown.log" | sed 's/^/      /'
+      fi
+    fi
   elif ((rc == 143 || rc == 137)); then
     printf '  ✗ TIMEOUT after %ss\n' "$TIMEOUT_SECS"
     tail -20 "$log" | sed 's/^/      /'

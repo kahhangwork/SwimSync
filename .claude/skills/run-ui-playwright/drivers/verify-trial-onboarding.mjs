@@ -189,7 +189,7 @@ check(
 const MONTH = LESSON_DATE.slice(0, 7);
 check(
   "the engine RECORDED the run (billing_runs row for the month)",
-  sql(`SELECT count(*) FROM billing_runs WHERE tenant_id = '70000000-0000-0000-0000-000000000001' AND billing_month = '${MONTH}' AND unclaimed_billable > 0`) === "1",
+  sql(`SELECT count(*) FROM billing_runs WHERE tenant_id = '70000000-0000-0000-0000-000000000001' AND billing_month = '${MONTH}' AND unclaimed_billable > 0 AND unclaimed_students @> '[{"student_name": "Fixture Walkin"}]'`) === "1",
   "RISK 1 — a silent insert failure leaves the card with nothing to show"
 );
 
