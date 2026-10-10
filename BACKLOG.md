@@ -296,12 +296,14 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 
 7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
    user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
-8. **UI/UX improvements** (M, *Platform and reach*). Audit all three apps first, then file concrete S items.
+8. **UI/UX improvements** (M, *Platform and reach*). Target system decided 2026-10-11 — root `DESIGN.md`. Next: audit
+   the live screens against it, then file concrete S items.
 9. **Remove the legacy package matcher** (M, *Billing and payments*). Gated: only after Little Orcas seals September
    (it is Wave 6's rollback until then). Independent of 7–8.
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
-(low-balance nudge, automated reminders), Native builds → Push → Logo check, Bulk WhatsApp, In-app payment gateway.
+(low-balance nudge, automated reminders), Native builds → Push, Bulk WhatsApp, In-app payment gateway. (*Logo check*
+— done 2026-10-11, IPOS clear on the new mark.)
 
 **Moved to *Deliberately not doing* 2026-10-05:** *Show package refunds to the parent*, *Hide edit controls page by
 page for a view-only role*.
@@ -649,8 +651,7 @@ on it (and shipping it added no gated surface — it is owner-gated, not co-admi
 no new data, no rework, but parked because production is one location (full item below). Household split billing (M — *needs a credit-splitting
 rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
 In-app payment gateway (L), Native store builds (M — *deferred; not spending the $99 yet*)
-→ Push notifications (M — *blocked by it*), Check the logo for brand collisions (S —
-*deferred to the user's brand refactor, 2026-09-27; still before native builds*), Bulk WhatsApp Cloud API (M — *only on a
+→ Push notifications (M — *blocked by it*), ~~Check the logo for brand collisions~~ (*done 2026-10-11*), Bulk WhatsApp Cloud API (M — *only on a
 real tenant's request*). *(Multi-language and More polished dashboards moved to
 Deliberately not doing 2026-08-16.)*
 
@@ -1590,9 +1591,15 @@ roles. Do it before the co-admin hire if the owner builds such a role.
 ### UI/UX improvements across the admin panel, parent app and coach app — **M** (audit first) — _filed 2026-10-10_
 A polish pass over all three surfaces.
 
-**Why:** the user wants it. No specific screens or complaints have been named yet.
+**Why:** the user wants it.
 
-**Notes:** unscoped as filed. Step one is an **audit**: drive each app (`run-ui-playwright`), list concrete issues,
+**Decided 2026-10-11:** the target is **root `DESIGN.md`** — direction A (neutral greys, one blue `#2563eb`, Geist,
+flat bordered cards), a five-step status scale, the new logo, and three signature rules from an Impeccable critique of
+the mock-ups (Blocked-Action, Pay-First, Blocker-Outranks-Routine). The user scoped the first pass to that critique's
+P0 + P1: the status scale, Generate disabled-with-reason on a blocked month plus a month picker, parent PayNow-first,
+and the coach's billing blocker above routine lessons.
+
+**Notes:** Step one is an **audit**: drive each app (`run-ui-playwright`), list concrete issues,
 rank them with the user, then file each as its own S item. Do it **after** *Single-child packages*, which changes the
 package screens (Packages page, purchase flow, chips, parent Billing → Packages); polishing those first would be
 redone.
@@ -1608,7 +1615,11 @@ between "a link the coach sends parents" and "an app."
 whole stack is $0 today. **Blocks push notifications.** Decision point is willingness to
 spend, not engineering.
 
-### Check the logo for brand collisions — **S** — _deferred 2026-09-27 to the user's brand refactor_
+### ~~Check the logo for brand collisions~~ — **S** — **DONE 2026-10-11**
+**Done (user, 2026-10-11):** the owner ran an IPOS trademark search on the NEW mark — concept 2a, "wave into a
+tick" (`DESIGN.md` → Logo) — and it came back clear. The wordmark typeface is settled too: Geist 600. The mark itself
+is not yet shipped; that is part of *UI/UX improvements*.
+
 **Deferred (user, 2026-09-27):** a brand refactor is coming; run this check as part of it, against the NEW mark,
 not the current pace clock — checking a mark about to be replaced is wasted work. Not before the user starts it.
 
