@@ -2,7 +2,7 @@
 
 _Last updated: 2026-10-10 — **§8.144: Pin the clock for UI drivers SHIPPED** — `run-all-drivers.sh --now` replays any
 past moment across browser, API, fixtures and engine; all 73 drivers marked; migration `20261009000200` on prod.
-**The engine change is on `main` but NOT on prod** (gated on Little Orcas Sep 2026)._
+**Engine v35 on prod 2026-10-10** (DEPLOYMENT #81) — DORMANT until the next real Generate._
 
 _Previously (§8.143, 2026-10-09) — Wave 6 follow-ups ×3 + "Sept" on every surface._
 
@@ -352,7 +352,7 @@ inside a file read at the start of every session.
 ## 8.144 (2026-10-09 → 10) — Pin the clock for UI drivers, two lanes
 
 **Shipped BACKLOG *Pin the clock for UI drivers* (L) per `docs/plans/PIN_DRIVER_CLOCK_PLAN.md`, run as two lanes
-(root orchestrator + worktree `pin-clock-drivers`, closed).** Migration → prod (#80); engine source on `main` only.
+(root orchestrator + worktree `pin-clock-drivers`, closed).** Migration → prod (#80); engine → prod v35 (#81).
 
 - **Shipped:** `--now` + `clock-unpin.sh` + the pinned fixture roundtrip in CI (TESTING §5); the local-only API pin
   and the engine's DB clock (ARCHITECTURE §6af addendum); `check-driver-clock.sh` — a driver without a clock marker
@@ -360,7 +360,8 @@ inside a file read at the start of every session.
 - **Found:** two SQL bugs a fake-docker proof hid (§7.358); `preflight()` was never called (now is — user's call B);
   a Saturday-only fixture collision red CI at 00:47 SGT Sat 10 Oct — replayed with `--now`, fixed `3d8adb0`
   (§7.304 *Hit again*). New §7.355–§7.360.
-- **Not done:** engine prod deploy (plan steps 4–5); no full pinned sweep (user's call); the nightly over this unread.
+- **Not done:** no full pinned sweep (user's call). The engine went to prod BEFORE Little Orcas' run, by the
+  user's call, after nightly `38003471836` was green; its proof (plan step 5) is the next real Generate.
 
 ## 8.143 (2026-10-09) — Wave 6 follow-ups ×3, and "Sept" everywhere, with a guard for each half
 
@@ -431,16 +432,15 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over §8.143 + §8.144. Red → replay the failing
-   day with `run-all-drivers.sh --only <driver> --now '<that day> <time>+08'` (TESTING §5), then fix.
+1. **Read each nightly** (never dispatch it unasked); `38003471836` over §8.143 + §8.144 was green. Red → replay the
+   failing day with `run-all-drivers.sh --only <driver> --now '<that day> <time>+08'` (TESTING §5), then fix.
 2. **Little Orcas September is the OWNER's** (WhatsApp sent 2026-10-05; still unbilled on prod 2026-10-09): *Generate
    Sep 2026*, then *Record it as settled* for the 15 pilot children (PRD §7.17) — **and Brayden Ong** (unlinked from
    the Ang family 2026-10-06, his 6 + 13 Sept lessons unclaimed: invite his parent or settle). The Ang family's package
    lessons are already paid (drawn at B). Coach Kah Hang's September is billed and sealed.
-3. **Engine deploy, PIN_DRIVER_CLOCK_PLAN steps 4–5 — gated.** `generate-invoices` on `main` is AHEAD of prod since
-   `ba620c3` (reads `app_now()` over RPC). Deploy it only after Little Orcas' Sep 2026 run is done and no run is in
-   flight; **never from an unrelated change before then.** Rollback = revert `ba620c3` → `functions deploy`. Proof is
-   the next real Generate (DEPLOYMENT #80, DORMANT until then).
+3. **Engine v35 is on prod but unexercised** (DEPLOYMENT #81). Little Orcas' Generate is its first real run: after it,
+   read `billing_runs` (no `status = 'error'`) and the function logs (no *could not read the database clock*). Any
+   failure → rollback first: revert `ba620c3` → `functions deploy`. Never press Generate yourself to prove it.
 4. **Next build — pick from `BACKLOG.md`.** The Build order is done through Wave 8, Wave 6's follow-ups and driver
    pinning (§8.144); three S-items from it sit under Foundations. **A schema migration regenerates the types in the
    SAME commit** (§7.350), and **runs every repo-invariants step locally before its push** (§7.354, `/deploy` Step 0).

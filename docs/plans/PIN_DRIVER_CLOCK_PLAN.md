@@ -1,8 +1,8 @@
 # Pin the clock for UI drivers — replay any moment, end to end
 
-_Status: DONE 2026-10-10 except deploy steps 4–5 (§8.144) — the engine (`ba620c3`) is on `main`, NOT on prod, until
-Little Orcas' Sep 2026 run is done (prod checked 2026-10-10: not yet). Migration on prod (deploy #80). BACKLOG item
-removed._
+_Status: DONE 2026-10-10 except step 5 (§8.144). Migration on prod (deploy #80); engine v35 on prod (deploy #81) —
+deployed before Little Orcas' Sep 2026 run by the user's explicit call, after a green nightly. Step 5's proof waits for
+the next real Generate. BACKLOG item removed._
 
 ## What this builds, and why
 

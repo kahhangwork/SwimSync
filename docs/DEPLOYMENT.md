@@ -1166,6 +1166,14 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     under it, UP re-applied). Every repo-invariants step run locally first (§7.354). The user ran `db push` (auto mode
     refuses a prod deploy). Prod probes: md5 `679d6cd1…` = local, owner/ACL/volatility/secdef/config unchanged, 0 API
     rows, 0 lock-1 rows, service_role EXECUTE, `app_now()` within 1 s of `now()`; `migration list --linked` 0 pending;
-    remote grant dump: no grant on `private.clock_api_pin_enabled`. **DORMANT:** `generate-invoices` on `main` is ahead
-    of prod (v34) from `ba620c3` — deploy only at the plan's step 4 (after Little Orcas' Sep 2026 run, no run in
-    flight); rollback = revert `ba620c3` → `functions deploy`.
+    remote grant dump: no grant on `private.clock_api_pin_enabled`. The engine followed on 2026-10-10 (#81).
+
+81. **Deploy record (2026-10-10): `generate-invoices` v34 → v35 (`ba620c3`, main @ `5808dd8`) — the engine reads
+    `app_now()` over RPC (`clock.ts`).** Deployed BEFORE Little Orcas' Sep 2026 run, by the user's explicit call
+    ("deploy after the nightly") — the plan's step-4 gate allows it. Gates held: nightly `38003471836` green on
+    `5808dd8`; prod `billing_runs` had no run in the last 15 min (latest 2026-10-05); no `cron.job` on prod. The user
+    ran `functions deploy` (auto mode refuses). Proof: `functions list` v35; downloaded source carries `clock.ts`
+    (*could not read the database clock*) and `withDbNow` in `index.ts`. **DORMANT:** not yet exercised on prod — proof
+    is the next real Generate (Little Orcas Sep 2026): `billing_runs` after 2026-10-10 01:05 UTC with no
+    `status = 'error'`, logs without *could not read the database clock*. Any failure → rollback first: revert
+    `ba620c3` on a branch → `functions deploy generate-invoices` → `functions list`. ⛔ Never press Generate to prove it.
