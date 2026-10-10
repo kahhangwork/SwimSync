@@ -51,6 +51,9 @@ export const NULLABLE_RPC_ARGS = {
   class_coach_terms: ["p_class_ids"],
   // L67 `IF p_home_class_id IS NULL` (no home class named).
   book_makeup: ["p_home_class_id"],
+  // 20261010000100 (read 2026-10-10): L44 `AND student_id IS NOT DISTINCT FROM
+  // p_student_id` (NULL = the family's offer); L59 inserts it as is (NULL = shared).
+  create_package_offer: ["p_student_id"],
   // L9 `v_to DATE := COALESCE(p_effective_to, today_sg())` — NULL means "today".
   end_class_shadow: ["p_effective_to"],
   // L7 `is_tenant_admin(p_tenant) AND …`, whose body opens `p_tenant_id IS NOT NULL`:
@@ -67,6 +70,9 @@ export const NULLABLE_RPC_ARGS = {
   // L10 `v_from DATE := COALESCE(p_effective_from, today_sg())` (a correction);
   // p_location_address is not read by the body at all (DEFAULT NULL).
   set_class_terms: ["p_effective_from", "p_location_address"],
+  // 20261010000100 (read 2026-10-10): L22 `AND (pp.student_id IS NULL OR pp.student_id
+  // = p_student_id)` (NULL = shared packages only); L36 `(p_student_id IS NULL OR …)`.
+  suggest_package_start: ["p_student_id"],
 } as const;
 
 /**

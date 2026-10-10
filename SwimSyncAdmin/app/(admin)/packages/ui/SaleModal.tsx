@@ -28,6 +28,11 @@ export function SaleModal({
     saleStart,
     setSaleStart,
     salePreview,
+    saleChild,
+    setSaleChild,
+    saleChildren,
+    needsChild,
+    saleError,
     recordSale,
   } = form;
 
@@ -72,10 +77,42 @@ export function SaleModal({
             {activeProducts.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} — {money(p.lesson_count * p.rate_per_lesson)}
+                {p.single_child ? " (one child)" : ""}
               </option>
             ))}
           </select>
         </div>
+        {/* Single-child packages (D7): which child a one-child package is for.
+            With one active child here it is shown, not asked. */}
+        {needsChild && saleParent && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Which child is this for?
+            </label>
+            {saleChildren.length === 0 ? (
+              <p className="text-sm text-amber-700">
+                This family has no active child at your business yet.
+              </p>
+            ) : saleChildren.length === 1 ? (
+              <p className="text-sm text-gray-700" data-testid="sale-child-auto">
+                For <strong>{saleChildren[0].name}</strong>
+              </p>
+            ) : (
+              <select
+                value={saleChild}
+                onChange={(e) => setSaleChild(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">Choose…</option>
+                {saleChildren.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Start date
@@ -110,6 +147,11 @@ export function SaleModal({
             )}
           </div>
         )}
+        {saleError && (
+          <p className="text-sm text-red-600" role="alert">
+            {saleError}
+          </p>
+        )}
         <div className="flex justify-end gap-2">
           <Button
             variant="outline"
@@ -120,7 +162,7 @@ export function SaleModal({
           </Button>
           <Button
             onClick={recordSale}
-            disabled={busy || !saleParent || !saleProduct}
+            disabled={busy || !saleParent || !saleProduct || (needsChild && !saleChild)}
           >
             {busy ? "Saving…" : "Record sale"}
           </Button>

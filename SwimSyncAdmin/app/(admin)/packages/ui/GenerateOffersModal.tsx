@@ -8,6 +8,7 @@ import { toWaNumber } from "@/lib/waMessage";
 import { money } from "../constants";
 import type { Product } from "../types";
 import type { GenerateOffers } from "../domain/useGenerateOffers";
+import { candidateKey, productFitsRow } from "../domain/singleChild";
 
 export function GenerateOffersModal({
   form,
@@ -47,23 +48,26 @@ export function GenerateOffersModal({
             email goes out and a WhatsApp queue opens for the rest.
           </p>
           <div className="max-h-[420px] space-y-2 overflow-y-auto">
-            {candidates.map((c, i) => (
+            {candidates.map((c) => (
               <div
-                key={c.parent_id}
+                key={candidateKey(c)}
                 className="rounded-lg border border-gray-200 p-3"
               >
                 <div className="flex items-start gap-2">
                   <input
                     type="checkbox"
                     checked={c.include}
-                    onChange={(e) => toggleInclude(i, e.target.checked)}
+                    onChange={(e) => toggleInclude(candidateKey(c), e.target.checked)}
                     className="mt-1"
                   />
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">
                       {c.parent_name}
                       {c.children ? (
-                        <span className="text-gray-400"> · {c.children}</span>
+                        <span className="text-gray-400">
+                          {" "}· {c.children}
+                          {c.student_id ? " only" : ""}
+                        </span>
                       ) : null}
                     </div>
                     <div className="text-xs text-gray-500">
@@ -76,11 +80,13 @@ export function GenerateOffersModal({
                     <div className="mt-2 flex flex-wrap gap-2">
                       <select
                         value={c.chosenProduct}
-                        onChange={(e) => changeCandidateProduct(i, e.target.value)}
+                        onChange={(e) => changeCandidateProduct(candidateKey(c), e.target.value)}
                         className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
                       >
                         <option value="">Choose package…</option>
-                        {activeProducts.map((p) => (
+                        {/* D11 — a family row offers shared products, a
+                            child's row one-child products (RISK 4). */}
+                        {activeProducts.filter((p) => productFitsRow(c, p)).map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name} — {money(p.lesson_count * p.rate_per_lesson)}
                           </option>
@@ -89,7 +95,7 @@ export function GenerateOffersModal({
                       <input
                         type="date"
                         value={c.chosenStart}
-                        onChange={(e) => changeCandidateStart(i, e.target.value)}
+                        onChange={(e) => changeCandidateStart(candidateKey(c), e.target.value)}
                         className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
                       />
                     </div>

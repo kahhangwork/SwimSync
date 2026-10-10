@@ -82,12 +82,19 @@ export function toParentsOf(data: ParentLinkRow[] | null): Map<string, string[]>
   return m;
 }
 
-/** Live packages not yet expired as of `today2` (todayInSg()). */
-export function toLivePackages(data: LiveBalanceRow[] | null, today2: string): LivePackage[] {
+/** Live packages not yet expired as of `today2` (todayInSg()). `childOf` maps a
+ *  one-child package's id to its child (read beside package_live_balances, whose
+ *  return type stays unchanged); a package absent from it is shared. */
+export function toLivePackages(
+  data: LiveBalanceRow[] | null,
+  today2: string,
+  childOf: Map<string, string> = new Map()
+): LivePackage[] {
   return (data ?? [])
     .filter((p) => String(p.expires_on ?? "") >= today2)
     .map((p) => ({
       parent_id: p.parent_id,
+      student_id: childOf.get(p.parent_package_id) ?? null,
       category_id: p.category_id ?? null,
       expires_on: String(p.expires_on),
       live_lessons_remaining: Number(p.live_lessons_remaining ?? 0),
@@ -146,8 +153,9 @@ export function datesForClass(
   return [...new Set([...pattern, ...extras])].sort();
 }
 
-/** The advisory: if every live same-category package of this child's family
- *  expires before the chosen date, the lesson will bill at the class rate. */
+/** The advisory: if every live same-category package THIS CHILD can draw from
+ *  (shared, or their own — never a sibling's one-child package) expires before
+ *  the chosen date, the lesson will bill at the class rate. */
 export function expiryWarningFor(
   kid: EligibleKid | undefined,
   bookDate: string,
@@ -161,6 +169,7 @@ export function expiryWarningFor(
   const familyPkgs = livePackages.filter(
     (p) =>
       parentIds.has(p.parent_id) &&
+      (p.student_id === null || p.student_id === kid.id) &&
       (p.category_id === null || p.category_id === homeClass?.category_id)
   );
   if (familyPkgs.length === 0) return null;

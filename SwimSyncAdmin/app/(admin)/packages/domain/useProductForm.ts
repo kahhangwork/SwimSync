@@ -20,6 +20,8 @@ export function useProductForm({ setBusy, reload }: Shared) {
   const [pLessons, setPLessons] = useState("");
   const [pRate, setPRate] = useState("");
   const [pWeeks, setPWeeks] = useState("12");
+  // Who can use it (single-child packages, D1): false = shared across siblings.
+  const [pSingleChild, setPSingleChild] = useState(false);
   // Per-product referral override (D4): off = inherit the tenant default; on =
   // this product's own type + value (a 0 is an explicit "no referral discount").
   const [pRefOverride, setPRefOverride] = useState(false);
@@ -33,6 +35,7 @@ export function useProductForm({ setBusy, reload }: Shared) {
     setPLessons("");
     setPRate("");
     setPWeeks("12");
+    setPSingleChild(false);
     setPRefOverride(false);
     setPRefType("percent");
     setPRefValue("");
@@ -73,6 +76,7 @@ export function useProductForm({ setBusy, reload }: Shared) {
       lesson_count: Number(pLessons),
       rate_per_lesson: Number(pRate),
       validity_weeks: Number(pWeeks),
+      single_child: pSingleChild,
       // Override present ⇒ its own type + value; absent ⇒ NULL/NULL = inherit.
       referral_discount_type: pRefOverride ? pRefType : null,
       referral_discount_value: pRefOverride ? Number(pRefValue) : null,
@@ -100,6 +104,8 @@ export function useProductForm({ setBusy, reload }: Shared) {
     setPRate,
     pWeeks,
     setPWeeks,
+    pSingleChild,
+    setPSingleChild,
     pRefOverride,
     setPRefOverride,
     pRefType,

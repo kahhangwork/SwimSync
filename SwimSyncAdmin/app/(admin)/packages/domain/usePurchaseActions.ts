@@ -28,7 +28,7 @@ export function usePurchaseActions({ setBusy, setError, reload, onActivated }: S
   // request (no start_date) falls back to the freshly-suggested one.
   useEffect(() => {
     if (confirming) {
-      rpc.fetchSuggestedStart(confirming.parent_id, confirming.product_id).then(
+      rpc.fetchSuggestedStart(confirming.parent_id, confirming.product_id, confirming.student_id).then(
         (suggested) =>
           setConfirmStart(defaultConfirmStart(confirming.start_date, suggested))
       );

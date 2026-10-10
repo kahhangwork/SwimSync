@@ -53,7 +53,7 @@ describe("packages money reads", () => {
       ["from", "parent_packages"],
       [
         "select",
-        "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, confirmed_at, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))",
+        "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, confirmed_at, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, student_id, students!student_id(full_name), class_categories(name), parents(profiles(full_name, email))",
       ],
       ["order", "status"],
       ["order", "requested_at", { ascending: false }],
@@ -67,7 +67,7 @@ describe("packages money reads", () => {
       ["from", "package_products"],
       [
         "select",
-        "id, name, category_id, lesson_count, rate_per_lesson, validity_weeks, is_active, class_categories!package_products_category_id_fkey(name), parent_packages(id, status)",
+        "id, name, category_id, lesson_count, rate_per_lesson, validity_weeks, is_active, single_child, class_categories!package_products_category_id_fkey(name), parent_packages(id, status)",
       ],
       ["order", "is_active", { ascending: false }],
       ["order", "name"],

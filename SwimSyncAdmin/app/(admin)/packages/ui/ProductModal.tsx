@@ -33,6 +33,8 @@ export function ProductModal({
     setPRate,
     pWeeks,
     setPWeeks,
+    pSingleChild,
+    setPSingleChild,
     pRefOverride,
     setPRefOverride,
     pRefType,
@@ -122,6 +124,38 @@ export function ProductModal({
             {pLessons} lessons at {money(Number(pRate))} each.
           </p>
         )}
+
+        {/* Single-child packages (D1): shared across siblings, or one child only. */}
+        <fieldset>
+          <legend className="mb-1 block text-sm font-medium text-gray-700">
+            Who can use it
+          </legend>
+          <div className="flex flex-col gap-1 text-sm text-gray-700">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="who-can-use"
+                checked={!pSingleChild}
+                onChange={() => setPSingleChild(false)}
+              />
+              Shared across siblings
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="who-can-use"
+                checked={pSingleChild}
+                onChange={() => setPSingleChild(true)}
+              />
+              One child only
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            {pSingleChild
+              ? "Bought for one named child — a sibling's lessons are billed ad-hoc."
+              : "Any of the family's children can use its lessons."}
+          </p>
+        </fieldset>
 
         {/* Referral discount override (D4). Off = inherit the tenant default. */}
         <div className="rounded-lg border border-gray-200 p-3">

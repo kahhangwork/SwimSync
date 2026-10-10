@@ -97,10 +97,16 @@ export function useMakeups() {
         setParentsOf(toParentsOf(data));
       });
     }
-    rpc.packageLiveBalances().then(({ data }) => {
-      const today2 = todayInSg();
-      setLivePackages(toLivePackages(data, today2));
-    });
+    // Single-child packages: which live packages are one child's (RISK 13).
+    Promise.all([rpc.packageLiveBalances(), repo.loadPackageChildren()]).then(
+      ([{ data }, { data: owners }]) => {
+        const today2 = todayInSg();
+        const childOf = new Map(
+          (owners ?? []).filter((o) => o.student_id).map((o) => [o.id, o.student_id as string])
+        );
+        setLivePackages(toLivePackages(data, today2, childOf));
+      }
+    );
 
     setLoading(false);
   }

@@ -21,6 +21,9 @@ export type Product = {
   validity_weeks: number;
   is_active: boolean;
   holder_count: number;
+  /** One child only (true) or shared across siblings (false). Read at SALE —
+   *  flipping it affects new sales only (single-child packages, D6). */
+  single_child: boolean;
 };
 
 export type Purchase = {
@@ -63,9 +66,18 @@ export type Purchase = {
   superseded_by: string | null;
   public_token: string | null;
   children: string | null;
+  /** NULL = shared across the family. Set = a one-child package: only this
+   *  child's lessons draw from it (20261010000100). */
+  student_id: string | null;
+  /** The one child's name — null for a shared package, or when RLS hides the
+   *  embed (§7.344: the row still reads "One child"). */
+  student_name: string | null;
 };
 
 export type ParentOption = { id: string; name: string };
+
+/** A family's active child at this business — the one-child sale picker. */
+export type ChildOption = { id: string; name: string };
 
 /** A row of the Generate-all preview (from package_renewal_candidates), plus the
  *  admin's editable product/start choices and whether it is ticked. */
@@ -81,6 +93,9 @@ export type CandidateRow = {
   original_product_id: string | null;
   suggested_product_id: string | null;
   has_open_offer: boolean;
+  /** NULL = a FAMILY row (shared packages). Set = this child's own row (D8).
+   *  Rows are keyed `${parent_id}:${student_id ?? "family"}` (RISK 4). */
+  student_id: string | null;
   // admin-editable
   chosenProduct: string;
   chosenStart: string;

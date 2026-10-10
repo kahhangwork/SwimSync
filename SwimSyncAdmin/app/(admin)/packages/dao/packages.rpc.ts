@@ -17,7 +17,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { todayInSg } from "@/lib/lessonDates";
-import type { DataOf } from "@/lib/database.overrides";
+import type { Assert, DataOf, Extends, Rpc } from "@/lib/database.overrides";
 
 /** The caller's own business id. Every insert payload stamps tenant_id from
  *  here; RLS scopes reads without it. */
@@ -38,12 +38,23 @@ export type LiveBalanceRow = DataOf<typeof liveBalances>[number];
 
 // Pre-fill a start date from the smart default. ⚠ RISK 7: this is only a
 // suggestion — any failure falls back to today, never blocks the flow.
-export async function fetchSuggestedStart(parentId: string, productId: string) {
+// p_student_id: the one child of a one-child sale (their enrolments and the
+// packages usable by them); null for a shared product. Required here so no
+// caller forgets it (§7.345).
+export type SuggestPackageStartArgs = {
+  p_parent_id: string;
+  p_product_id: string;
+  p_student_id: string | null;
+};
+type _CheckSuggest = Assert<Extends<SuggestPackageStartArgs, Rpc<"suggest_package_start">["Args"]>>;
+export async function fetchSuggestedStart(parentId: string, productId: string, studentId: string | null) {
   try {
-    const { data, error: err } = await supabase.rpc("suggest_package_start", {
+    const args: SuggestPackageStartArgs = {
       p_parent_id: parentId,
       p_product_id: productId,
-    });
+      p_student_id: studentId,
+    };
+    const { data, error: err } = await supabase.rpc("suggest_package_start", args);
     if (err || !data) return todayInSg();
     return String(data);
   } catch {
@@ -78,16 +89,25 @@ export const extendPackage = (packageId: string, days: number, reason: string) =
     p_reason: reason,
   });
 
-export const createPackageOffer = (
-  parentId: string,
-  productId: string,
-  startDate: string
-) =>
-  supabase.rpc("create_package_offer", {
-    p_parent_id: parentId,
-    p_product_id: productId,
-    p_start_date: startDate,
-  });
+// p_student_id is REQUIRED (null = a shared/family offer): dropping it would
+// silently turn a child's offer into a family one (RISK 4, §7.345).
+export type CreatePackageOfferArgs = {
+  p_parent_id: string;
+  p_product_id: string;
+  p_start_date: string;
+  p_student_id: string | null;
+};
+type _CheckOffer = Assert<Extends<CreatePackageOfferArgs, Rpc<"create_package_offer">["Args"]>>;
+export const createPackageOffer = (args: CreatePackageOfferArgs) =>
+  supabase.rpc("create_package_offer", args);
+
+// Change child (D4). The RPC is the authority on "unused" — a reversed draw
+// restores the balance, so the balance cannot tell. Its refusals are sentences
+// for the admin; the dialog shows error.message.
+export type ReassignPackageChildArgs = { p_package: string; p_student: string };
+type _CheckReassign = Assert<Extends<ReassignPackageChildArgs, Rpc<"reassign_package_child">["Args"]>>;
+export const reassignPackageChild = (args: ReassignPackageChildArgs) =>
+  supabase.rpc("reassign_package_child", args);
 
 export const renewalCandidates = () => supabase.rpc("package_renewal_candidates");
 export type RenewalCandidateRow = DataOf<typeof renewalCandidates>[number];

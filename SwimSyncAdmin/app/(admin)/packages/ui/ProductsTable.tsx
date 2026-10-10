@@ -5,8 +5,10 @@
 // branch, and the page renders <ProductsTable/> unconditionally, so the sort
 // survives a load() reload (which flips loading true) instead of resetting.
 
+import { useState } from "react";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
+import { Modal } from "@/components/Modal";
 import { money } from "../constants";
 import type { Product } from "../types";
 
@@ -15,18 +17,24 @@ export function ProductsTable({
   loading,
   busy,
   setProductActive,
+  setProductSingleChild,
   openProductModal,
 }: {
   products: Product[];
   loading: boolean;
   busy: boolean;
   setProductActive: (p: Product, active: boolean) => void;
+  /** Shared ↔ one child (D6) — new sales only. */
+  setProductSingleChild?: (p: Product, singleChild: boolean) => void;
   openProductModal: () => void;
 }) {
+  // The product whose kind is about to flip; confirmed in a dialog (D6).
+  const [flipping, setFlipping] = useState<Product | null>(null);
   const productSort = useTableSort<Product>({
     key: "name",
     accessors: {
       category_name: (p) => p.category_name ?? "All classes",
+      kind: (p) => (p.single_child ? 1 : 0),
       price: (p) => p.lesson_count * p.rate_per_lesson,
     },
   });
@@ -54,6 +62,7 @@ export function ProductsTable({
           <Thead>
             <Th sort={productSort} sortKey="name">Package</Th>
             <Th sort={productSort} sortKey="category_name">Valid for</Th>
+            <Th sort={productSort} sortKey="kind">Who can use it</Th>
             <Th sort={productSort} sortKey="lesson_count" firstDir="desc">Lessons</Th>
             <Th sort={productSort} sortKey="rate_per_lesson" firstDir="desc">Rate</Th>
             <Th sort={productSort} sortKey="price" firstDir="desc">Price</Th>
@@ -74,6 +83,18 @@ export function ProductsTable({
                 </Td>
                 <Td className="text-gray-500">
                   {p.category_name ?? "All classes"}
+                </Td>
+                <Td className="text-gray-500">
+                  {p.single_child ? "One child only" : "Shared across siblings"}
+                  {setProductSingleChild && (
+                    <button
+                      onClick={() => setFlipping(p)}
+                      disabled={busy}
+                      className="ml-2 text-xs font-semibold text-sky-700 underline disabled:opacity-50"
+                    >
+                      Change
+                    </button>
+                  )}
                 </Td>
                 <Td className="text-gray-500">{p.lesson_count}</Td>
                 <Td className="text-gray-500">{money(p.rate_per_lesson)}</Td>
@@ -98,6 +119,37 @@ export function ProductsTable({
           </Tbody>
         </Table>
       )}
+      <Modal
+        open={flipping !== null}
+        onClose={() => setFlipping(null)}
+        title={flipping?.single_child ? "Make it shared across siblings?" : "Make it one child only?"}
+      >
+        {flipping && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              {flipping.name} becomes{" "}
+              <strong>{flipping.single_child ? "shared across siblings" : "one child only"}</strong>.
+            </p>
+            <p className="text-sm text-gray-600">
+              Applies to new sales only — packages already sold keep their terms.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setFlipping(null)} disabled={busy}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setProductSingleChild?.(flipping, !flipping.single_child);
+                  setFlipping(null);
+                }}
+                disabled={busy}
+              >
+                Change
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
       <p className="mt-2 text-xs text-gray-500">
         A package&rsquo;s lessons, rate and validity can&rsquo;t be edited —
         families already hold them at those terms. To change the price,

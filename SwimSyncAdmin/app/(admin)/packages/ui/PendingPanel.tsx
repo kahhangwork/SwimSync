@@ -20,6 +20,8 @@ export function PendingPanel({
   busy,
   setConfirming,
   setCancelling,
+  canEdit = false,
+  openChangeChild,
 }: {
   pending: Purchase[];
   superseded: Purchase[];
@@ -28,6 +30,9 @@ export function PendingPanel({
   busy: boolean;
   setConfirming: (p: Purchase | null) => void;
   setCancelling: (p: Purchase | null) => void;
+  /** Change child (D4) — packages:edit only; the RPC is the authority. */
+  canEdit?: boolean;
+  openChangeChild?: (p: Purchase) => void;
 }) {
   // Oldest request first: this queue is work waiting on the admin, and the
   // parent who has been waiting longest is the one to serve next.
@@ -86,6 +91,11 @@ export function PendingPanel({
                   {" "}
                   · {p.lesson_count} × {money(p.rate_per_lesson)}
                 </span>
+                {p.student_id && (
+                  <span className="block text-xs text-sky-700" data-testid="one-child-label">
+                    {p.student_name ?? "One child"} only
+                  </span>
+                )}
               </Td>
               {/* The whole point of the column: this string is what
                   appears on the bank statement, so it must be readable
@@ -116,6 +126,11 @@ export function PendingPanel({
                   >
                     Decline
                   </Button>
+                  {canEdit && openChangeChild && p.student_id && (
+                    <Button variant="ghost" size="sm" onClick={() => openChangeChild(p)} disabled={busy}>
+                      Change child
+                    </Button>
+                  )}
                 </div>
               </Td>
             </Tr>

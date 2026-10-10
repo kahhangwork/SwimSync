@@ -28,6 +28,9 @@ export type EligibleKid = {
 
 export type LivePackage = {
   parent_id: string;
+  /** NULL = shared across the family; set = a one-child package, usable by that
+   *  child only (single-child packages, 20261010000100). */
+  student_id: string | null;
   category_id: string | null;
   expires_on: string;
   live_lessons_remaining: number;

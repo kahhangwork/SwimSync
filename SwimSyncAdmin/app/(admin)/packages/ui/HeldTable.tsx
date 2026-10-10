@@ -41,6 +41,7 @@ export function HeldTable({
   openReverse,
   checkBacklog,
   checking,
+  openChangeChild,
 }: {
   held: Purchase[];
   heldMatches: Purchase[];
@@ -62,6 +63,8 @@ export function HeldTable({
   checkBacklog: (p: Purchase) => void;
   /** The package id being checked, else null — locks every row's Check. */
   checking: string | null;
+  /** Change child (D4) — one-child, non-cancelled packages, packages:edit. */
+  openChangeChild?: (p: Purchase) => void;
 }) {
   const heldSort = useTableSort<Purchase>({
     key: "parent_name",
@@ -140,6 +143,11 @@ export function HeldTable({
                       {" "}
                       · {p.category_name ?? "all classes"}
                     </span>
+                    {p.student_id && (
+                      <span className="block text-xs text-sky-700" data-testid="one-child-label">
+                        {p.student_name ?? "One child"} only
+                      </span>
+                    )}
                   </Td>
                   {/* Kept here too so a payment can still be reconciled
                       after the request has been confirmed. */}
@@ -217,6 +225,18 @@ export function HeldTable({
                       openRefund={openRefund}
                       openReverse={openReverse}
                     />
+                    {/* Change child (D4): the RPC decides "unused" — shown for
+                        every one-child package that is not cancelled. */}
+                    {canEdit && openChangeChild && p.student_id && p.status !== "cancelled" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openChangeChild(p)}
+                        disabled={busy}
+                      >
+                        Change child
+                      </Button>
+                    )}
                     {p.status === "active" && (
                       <div className="flex items-center gap-1">
                         <Button

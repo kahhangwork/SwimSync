@@ -31,6 +31,7 @@ import { useBacklogDraw } from "./domain/useBacklogDraw";
 import { useGenerateOffers } from "./domain/useGenerateOffers";
 import { useLowSettings } from "./domain/useLowSettings";
 import { useRefund } from "./domain/useRefund";
+import { useChangeChild } from "./domain/useChangeChild";
 import { ListNotices } from "./ui/ListNotices";
 import { ProductModal } from "./ui/ProductModal";
 import { ExtendModal } from "./ui/ExtendModal";
@@ -45,6 +46,7 @@ import { ProductsTable } from "./ui/ProductsTable";
 import { HeldTable } from "./ui/HeldTable";
 import { LowSettingsCard } from "./ui/LowSettingsCard";
 import { RefundModal, ReverseRefundModal } from "./ui/RefundModal";
+import { ChangeChildModal } from "./ui/ChangeChildModal";
 
 export default function PackagesPage() {
   // Slice 1 (list-core): all loaded data, held-search, the WhatsApp queue, and
@@ -57,6 +59,7 @@ export default function PackagesPage() {
     purchases,
     refunds,
     parents,
+    childOptions,
     businessName,
     tenantDefaultProduct,
     tenantReferral,
@@ -79,6 +82,7 @@ export default function PackagesPage() {
     setShowSuperseded,
     load,
     setProductActive,
+    setProductSingleChild,
   } = usePackageList();
 
   // Wave 6 D5 — the backdated-activation question. Declared before the two
@@ -123,6 +127,8 @@ export default function PackagesPage() {
     reload: load,
     onActivated: backlog.offer,
     productName: (id) => products.find((p) => p.id === id)?.name ?? "The package",
+    products,
+    childOptions,
   });
   const { setSaleModal } = sale;
 
@@ -137,6 +143,8 @@ export default function PackagesPage() {
   const { openGenerateAll, genBusy } = gen;
   // Refunds (Wave 2 U2) — record/reverse, and whether this admin may (canEdit).
   const refund = useRefund({ setBusy, reload: load });
+  // Change child (single-child packages, D4).
+  const changeChild = useChangeChild({ setBusy, reload: load, childOptions });
 
   // The "running low" thresholds — Generate renewal offers reads them.
   const low = useLowSettings();
@@ -168,6 +176,8 @@ export default function PackagesPage() {
         busy={busy}
         setConfirming={setConfirming}
         setCancelling={setCancelling}
+        canEdit={refund.canEdit}
+        openChangeChild={changeChild.openChangeChild}
       />
 
       {/* ── Class categories ──────────────────────────────────────────────── */}
@@ -191,6 +201,7 @@ export default function PackagesPage() {
         loading={loading}
         busy={busy}
         setProductActive={setProductActive}
+        setProductSingleChild={refund.canEdit ? setProductSingleChild : undefined}
         openProductModal={openProductModal}
       />
 
@@ -212,6 +223,7 @@ export default function PackagesPage() {
         openReverse={refund.openReverse}
         checkBacklog={(p) => backlog.check(p.id, p.name)}
         checking={backlog.checking}
+        openChangeChild={changeChild.openChangeChild}
       />
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
@@ -246,6 +258,8 @@ export default function PackagesPage() {
         setCancelling={setCancelling}
         cancelPurchase={cancelPurchase}
       />
+
+      <ChangeChildModal form={changeChild} busy={busy} />
 
       <RefundModal form={refund} busy={busy} />
       <ReverseRefundModal form={refund} busy={busy} />

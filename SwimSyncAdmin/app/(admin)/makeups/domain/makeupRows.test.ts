@@ -92,7 +92,7 @@ describe("toExtraMap / toParentsOf / toLivePackages", () => {
       { parent_id: "p1", category_id: GROUP, expires_on: "2026-09-17", live_lessons_remaining: 5 },
       { parent_id: "p2", expires_on: null },
     ] as any, "2026-09-18")).toEqual([
-      { parent_id: "p1", category_id: null, expires_on: "2026-09-18", live_lessons_remaining: 3 },
+      { parent_id: "p1", student_id: null, category_id: null, expires_on: "2026-09-18", live_lessons_remaining: 3 },
     ]);
   });
 });
@@ -149,7 +149,7 @@ describe("expiryWarningFor", () => {
   const parentsOf = new Map([["k1", ["p1"]]]);
   const home = oneClassKid.home_classes[0];
   const pkgs = (expires_on: string, category_id: string | null = GROUP): LivePackage[] => [
-    { parent_id: "p1", category_id, expires_on, live_lessons_remaining: 2 },
+    { parent_id: "p1", student_id: null, category_id, expires_on, live_lessons_remaining: 2 },
   ];
 
   it("warns only when EVERY same-category family package expires before the lesson", () => {
@@ -162,6 +162,31 @@ describe("expiryWarningFor", () => {
   it("an any-category package counts; another category's does not", () => {
     expect(expiryWarningFor(oneClassKid, "2026-10-10", parentsOf, pkgs("2026-10-01", null), home)).not.toBeNull();
     expect(expiryWarningFor(oneClassKid, "2026-10-10", parentsOf, pkgs("2026-10-01", PRIVATE), home)).toBeNull();
+  });
+
+  // Single-child packages (RISK 13): a sibling's one-child package is not this
+  // child's cover. Ben (k1) books after AVA's own package expired.
+  it("a sibling's one-child package never warns; the child's own does", () => {
+    const ava = { ...oneClassKid, id: "kAva" };
+    const avasOwn: LivePackage[] = [
+      { parent_id: "p1", student_id: "kAva", category_id: GROUP, expires_on: "2026-10-01", live_lessons_remaining: 2 },
+    ];
+    const both = new Map([["k1", ["p1"]], ["kAva", ["p1"]]]);
+    // Control: the same package SHARED does warn Ben (the case above).
+    expect(expiryWarningFor(oneClassKid, "2026-10-10", both, pkgs("2026-10-01"), home)).not.toBeNull();
+    expect(expiryWarningFor(oneClassKid, "2026-10-10", both, avasOwn, home)).toBeNull();
+    expect(expiryWarningFor(ava, "2026-10-10", both, avasOwn, home)).toBe(
+      "The family's package expires Thu, 1 Oct — this lesson is after that, so it will bill at the class rate instead."
+    );
+  });
+
+  it("toLivePackages marks a one-child package with its child, others shared", () => {
+    const rows = [
+      { parent_package_id: "own", parent_id: "p1", category_id: null, expires_on: "2026-12-01", live_lessons_remaining: 3 },
+      { parent_package_id: "fam", parent_id: "p1", category_id: null, expires_on: "2026-12-01", live_lessons_remaining: 3 },
+    ] as unknown as Parameters<typeof toLivePackages>[0];
+    const out = toLivePackages(rows, "2026-10-10", new Map([["own", "kAva"]]));
+    expect(out.map((p) => p.student_id)).toEqual(["kAva", null]);
   });
 
   it("is silent with no child, no date, no parents, or no package", () => {

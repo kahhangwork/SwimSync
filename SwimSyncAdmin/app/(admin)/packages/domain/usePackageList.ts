@@ -9,13 +9,14 @@
 import { useEffect, useState } from "react";
 import type { WaQueueRow } from "@/components/WhatsAppQueue";
 import { ROW_LIMIT } from "../constants";
-import type { Category, Product, Purchase, ParentOption, LiveRefund } from "../types";
+import type { Category, ChildOption, Product, Purchase, ParentOption, LiveRefund } from "../types";
 import * as repo from "../dao/packages.repo";
 import * as rpc from "../dao/packages.rpc";
 import {
   mapCategories,
   mapProducts,
   childrenByParent,
+  childOptionsByParent,
   liveBalancesById,
   refundsByPackage,
   mapPurchases,
@@ -40,6 +41,8 @@ export function usePackageList() {
   // null = the refunds read FAILED — every refund control hides (fail closed).
   const [refunds, setRefunds] = useState<Map<string, LiveRefund> | null>(new Map());
   const [parents, setParents] = useState<ParentOption[]>([]);
+  // parent_id → active children at this business (the one-child sale picker).
+  const [childOptions, setChildOptions] = useState<Map<string, ChildOption[]>>(new Map());
   const [businessName, setBusinessName] = useState("your swim school");
   const [tenantDefaultProduct, setTenantDefaultProduct] = useState<string | null>(null);
   const [tenantReferral, setTenantReferral] = useState<TenantReferral>({
@@ -104,6 +107,7 @@ export function usePackageList() {
     }
 
     const childMap = childrenByParent(childRes.data);
+    setChildOptions(childOptionsByParent(childRes.data));
     setCategories(mapCategories(catRes.data));
     setProducts(mapProducts(prodRes.data));
     setCapped((purRes.data ?? []).length >= ROW_LIMIT);
@@ -124,6 +128,15 @@ export function usePackageList() {
     load();
   }
 
+  // Shared ↔ one child (D6) — new sales only; held packages keep their terms.
+  async function setProductSingleChild(p: Product, singleChild: boolean) {
+    setBusy(true);
+    const { error: err } = await repo.updateProductSingleChild(p.id, singleChild);
+    setBusy(false);
+    if (err) setError("Could not update that package.");
+    load();
+  }
+
   const pending = pendingPurchases(purchases);
   const superseded = supersededPurchases(purchases);
   const held = heldPurchases(purchases);
@@ -137,6 +150,7 @@ export function usePackageList() {
     purchases,
     refunds,
     parents,
+    childOptions,
     businessName,
     tenantDefaultProduct,
     tenantReferral,
@@ -162,5 +176,6 @@ export function usePackageList() {
     // actions
     load,
     setProductActive,
+    setProductSingleChild,
   };
 }

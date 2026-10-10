@@ -21,7 +21,7 @@ type PurchaseSelected = DataOf<typeof loadPurchases>[number];
 type ParentEmbed = RlsNullable<NonNullable<PurchaseSelected["parents"]>, "profiles">;
 export type PurchaseRow = RlsNullable<
   Omit<PurchaseSelected, "parents"> & { parents: ParentEmbed | null },
-  "class_categories"
+  "class_categories" | "students"
 >;
 export type RefundRow = DataOf<typeof loadRefunds>[number];
 type ParentOptionSelected = DataOf<typeof loadParentOptions>[number];
@@ -70,16 +70,21 @@ export const loadProducts = () =>
   supabase
     .from("package_products")
     .select(
-      "id, name, category_id, lesson_count, rate_per_lesson, validity_weeks, is_active, class_categories!package_products_category_id_fkey(name), parent_packages(id, status)"
+      "id, name, category_id, lesson_count, rate_per_lesson, validity_weeks, is_active, single_child, class_categories!package_products_category_id_fkey(name), parent_packages(id, status)"
     )
     .order("is_active", { ascending: false })
     .order("name");
 
+// ⚠ `students!student_id` IS QUALIFIED ON PURPOSE (single-child packages):
+// package_applications also links parent_packages and students, so a bare
+// `students(...)` names two paths. It resolves today, but the qualified form is
+// the one that cannot silently change (§7.90). The embed can be null under RLS
+// (§7.344) — mapPurchases falls back to "One child".
 export const loadPurchases = () =>
   supabase
     .from("parent_packages")
     .select(
-      "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, confirmed_at, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
+      "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, confirmed_at, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, student_id, students!student_id(full_name), class_categories(name), parents(profiles(full_name, email))"
     )
     .order("status")
     .order("requested_at", { ascending: false })
@@ -101,9 +106,10 @@ export const loadParentOptions = () =>
     .select("parents(id, profiles(full_name, email))")
     .order("joined_at");
 
-// Children names per family, for the "Who holds one" rows (Decision 9).
+// Children per family: names for the "Who holds one" rows (Decision 9), and the
+// ids for the one-child sale picker. RLS shows this business's children only.
 export const loadChildren = () =>
-  supabase.from("parent_students").select("parent_id, students(full_name, is_active)");
+  supabase.from("parent_students").select("parent_id, students(id, full_name, is_active)");
 
 // ── Category writes ──────────────────────────────────────────────────────────
 
@@ -153,6 +159,10 @@ export const insertProduct = (row: TablesInsert<"package_products">) =>
 
 export const updateProductActive = (id: string, active: boolean) =>
   supabase.from("package_products").update({ is_active: active }).eq("id", id);
+
+// Shared ↔ one child (D6): read at sale, so it affects new sales only.
+export const updateProductSingleChild = (id: string, singleChild: boolean) =>
+  supabase.from("package_products").update({ single_child: singleChild }).eq("id", id);
 
 // ── Purchase writes + the confirm/offer read-backs ───────────────────────────
 

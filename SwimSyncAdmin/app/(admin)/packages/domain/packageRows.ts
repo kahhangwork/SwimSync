@@ -4,7 +4,7 @@
 // (characterisation tests: they pin the behaviour the page already had).
 
 import { matchesAnyField } from "@/lib/tableSearch";
-import type { Category, Product, Purchase, ParentOption, LiveRefund } from "../types";
+import type { Category, ChildOption, Product, Purchase, ParentOption, LiveRefund } from "../types";
 import type {
   CategoryRow,
   ChildRow,
@@ -38,6 +38,7 @@ export function mapProducts(rows: ProductRow[] | null): Product[] {
     holder_count: (p.parent_packages ?? []).filter(
       (x) => x.status !== "cancelled"
     ).length,
+    single_child: !!p.single_child,
   }));
 }
 
@@ -51,6 +52,21 @@ export function childrenByParent(rows: ChildRow[] | null): Map<string, string[]>
     arr.push(s.full_name);
     map.set(r.parent_id, arr);
   }
+  return map;
+}
+
+// parent_id → the family's ACTIVE children at this business, by name — the
+// one-child sale picker (RLS hides other businesses' children: the embed is null).
+export function childOptionsByParent(rows: ChildRow[] | null): Map<string, ChildOption[]> {
+  const map = new Map<string, ChildOption[]>();
+  for (const r of rows ?? []) {
+    const s = Array.isArray(r.students) ? r.students[0] : r.students;
+    if (!s?.is_active || !s?.id || !s?.full_name) continue;
+    const arr = map.get(r.parent_id) ?? [];
+    arr.push({ id: s.id, name: s.full_name });
+    map.set(r.parent_id, arr);
+  }
+  for (const arr of map.values()) arr.sort((a, b) => a.name.localeCompare(b.name));
   return map;
 }
 
@@ -103,6 +119,9 @@ export function mapPurchases(
     superseded_by: p.superseded_by ?? null,
     public_token: p.public_token ?? null,
     children: (childrenMap.get(p.parent_id) ?? []).join(", ") || null,
+    student_id: p.student_id ?? null,
+    // §7.344: a one-child package whose child RLS hides still reads "One child".
+    student_name: p.student_id ? (p.students?.full_name ?? "One child") : null,
   }));
 }
 

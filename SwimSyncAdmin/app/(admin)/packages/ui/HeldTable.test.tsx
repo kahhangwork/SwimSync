@@ -63,6 +63,8 @@ function purchase(over: Partial<Purchase>): Purchase {
     superseded_by: null,
     public_token: null,
     children: "Mia, Max",
+    student_id: null,
+    student_name: null,
     ...over,
   };
 }

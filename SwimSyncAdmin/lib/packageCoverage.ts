@@ -12,9 +12,11 @@ export type StudentCoverage = {
   parentId: string;
   tenantId: string;
   coverage: CoverageVerdict;
-  /** Family-shared live lessons remaining; null when ad_hoc. */
+  /** Live lessons this child can draw on (shared packages + their own one-child
+   *  package, single-child packages); null when ad_hoc. */
   lessonsRemaining: number | null;
-  /** ⚠ RISK 2/10 — the FAMILY "running low" verdict, computed in SQL (lessons
+  /** ⚠ RISK 2/10 — the "running low" verdict over the packages this child can
+   *  draw on (= the family verdict for a shared-only family), computed in SQL (lessons
    *  OR expiry, minus families that already have an open row). The Students
    *  filter/amber read THIS; the old TS isRunningLow is gone so there is one
    *  definition of "low", in SQL, everywhere. */

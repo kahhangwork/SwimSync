@@ -67,3 +67,9 @@ export function loadParentLinks(studentIds: string[]) {
     .select("parent_id, student_id")
     .in("student_id", studentIds);
 }
+
+// One-child packages' children (single-child packages, 20261010000100), for the
+// expiry advisory: a sibling's own package never covers this child.
+export function loadPackageChildren() {
+  return supabase.from("parent_packages").select("id, student_id").not("student_id", "is", null);
+}

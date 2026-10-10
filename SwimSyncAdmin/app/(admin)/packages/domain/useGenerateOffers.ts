@@ -19,6 +19,7 @@ import type { WaQueueRow } from "@/components/WhatsAppQueue";
 import * as repo from "../dao/packages.repo";
 import * as rpc from "../dao/packages.rpc";
 import { pickOfferProduct } from "./packageOffers";
+import { candidateKey, offerStudentFor, productFitsRow } from "./singleChild";
 import { money } from "../constants";
 import type { CandidateRow, Product } from "../types";
 
@@ -49,11 +50,14 @@ export function useGenerateOffers({
    *  caller can mark that family and continue (RISK 12: the RPC itself refuses a
    *  second open offer). */
   async function createOneOffer(c: CandidateRow): Promise<QueueRow> {
-    const { data: offerId, error: err } = await rpc.createPackageOffer(
-      c.parent_id,
-      c.chosenProduct,
-      c.chosenStart || todayInSg()
-    );
+    const product = activeProducts.find((p) => p.id === c.chosenProduct);
+    const { data: offerId, error: err } = await rpc.createPackageOffer({
+      p_parent_id: c.parent_id,
+      p_product_id: c.chosenProduct,
+      p_start_date: c.chosenStart || todayInSg(),
+      // RISK 4 — a child's row offers that child's package; a family row, shared.
+      p_student_id: offerStudentFor(c, product),
+    });
     if (err || !offerId) {
       throw new Error(err?.message ?? "offer failed");
     }
@@ -115,9 +119,16 @@ export function useGenerateOffers({
     }
     const rows: CandidateRow[] = await Promise.all(
       (data ?? []).map(async (r) => {
+        const row = { student_id: r.student_id ?? null };
+        // D11: a family row offers shared products only, a child's row one-child
+        // products only — a suggestion of the other kind is dropped, not offered.
+        const fits = (id: string | null | undefined) => {
+          const p = activeProducts.find((x) => x.id === id);
+          return id && (!p || productFitsRow(row, p)) ? id : null;
+        };
         const suggested =
-          r.suggested_product_id ??
-          pickOfferProduct(
+          fits(r.suggested_product_id) ??
+          fits(pickOfferProduct(
             r.original_product_id
               ? {
                   productId: r.original_product_id,
@@ -128,10 +139,14 @@ export function useGenerateOffers({
               : null,
             null,
             null
-          ) ??
+          )) ??
           "";
         const start = suggested
-          ? await rpc.fetchSuggestedStart(r.parent_id, suggested)
+          ? await rpc.fetchSuggestedStart(
+              r.parent_id,
+              suggested,
+              offerStudentFor(row, activeProducts.find((p) => p.id === suggested))
+            )
           : todayInSg();
         const preview = suggested
           ? await rpc.fetchPreviewPrice(r.parent_id, suggested)
@@ -148,6 +163,7 @@ export function useGenerateOffers({
           original_product_id: r.original_product_id ?? null,
           suggested_product_id: suggested || null,
           has_open_offer: !!r.has_open_offer,
+          student_id: row.student_id,
           chosenProduct: suggested,
           chosenStart: start,
           include: !!suggested && !r.has_open_offer,
@@ -182,18 +198,22 @@ export function useGenerateOffers({
     reload();
   }
 
-  function toggleInclude(i: number, checked: boolean) {
+  // ⚠ RISK 4 — rows are addressed by candidateKey (`parent:child|family`),
+  // never by position: one parent can hold a family row and a child's row.
+  function toggleInclude(key: string, checked: boolean) {
     setCandidates((prev) =>
-      prev.map((r, j) => (j === i ? { ...r, include: checked } : r))
+      prev.map((r) => (candidateKey(r) === key ? { ...r, include: checked } : r))
     );
   }
 
-  // ⚠ RISK 9 — the former inline product-select onChange, VERBATIM body.
-  function changeCandidateProduct(i: number, productId: string) {
-    const c = candidates[i];
+  // ⚠ RISK 9 — the former inline product-select onChange, VERBATIM body
+  // (addressed by key, RISK 4).
+  function changeCandidateProduct(key: string, productId: string) {
+    const c = candidates.find((r) => candidateKey(r) === key);
+    if (!c) return;
     setCandidates((prev) =>
-      prev.map((r, j) =>
-        j === i
+      prev.map((r) =>
+        candidateKey(r) === key
           ? { ...r, chosenProduct: productId, previewPayable: null,
               previewDiscount: null, previewTotal: null }
           : r
@@ -204,8 +224,8 @@ export function useGenerateOffers({
     if (productId) {
       rpc.fetchPreviewPrice(c.parent_id, productId).then((pv) =>
         setCandidates((prev) =>
-          prev.map((r, j) =>
-            j === i
+          prev.map((r) =>
+            candidateKey(r) === key
               ? { ...r, previewTotal: pv?.total ?? null,
                   previewDiscount: pv?.discount ?? null,
                   previewPayable: pv?.payable ?? null }
@@ -216,9 +236,9 @@ export function useGenerateOffers({
     }
   }
 
-  function changeCandidateStart(i: number, value: string) {
+  function changeCandidateStart(key: string, value: string) {
     setCandidates((prev) =>
-      prev.map((r, j) => (j === i ? { ...r, chosenStart: value } : r))
+      prev.map((r) => (candidateKey(r) === key ? { ...r, chosenStart: value } : r))
     );
   }
 

@@ -67,7 +67,7 @@ describe("mapProducts", () => {
 describe("childrenByParent", () => {
   it("keeps only active, named children, grouped by parent", () => {
     const map = childrenByParent([
-      { parent_id: "p1", students: { full_name: "Ali", is_active: true } },
+      { parent_id: "p1", students: { id: "s1", full_name: "Ali", is_active: true } },
       { parent_id: "p1", students: [{ full_name: "Bo", is_active: true }] },
       { parent_id: "p1", students: { full_name: "Cy", is_active: false } },
       { parent_id: "p2", students: { full_name: null, is_active: true } },
@@ -98,7 +98,7 @@ describe("mapPurchases", () => {
       { parent_package_id: "pp1", live_value_remaining: "200", live_lessons_remaining: "6" },
     ] as any);
     const kids = childrenByParent([
-      { parent_id: "p1", students: { full_name: "Ali", is_active: true } },
+      { parent_id: "p1", students: { id: "s1", full_name: "Ali", is_active: true } },
     ]);
     const [row] = mapPurchases(
       [{ ...base, parents: { profiles: { full_name: "Mum" } } }],
