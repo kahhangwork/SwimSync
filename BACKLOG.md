@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -294,8 +294,8 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 
 #### Wave 9 — set 2026-10-10 with the user
 
-7. **Single-child packages** (L, *Billing and payments*). Little Orcas asked for it, and it changes the money rule
-   for which package pays. Goes first because the UI pass would otherwise polish package screens this rewrites.
+7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
+   user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
 8. **UI/UX improvements** (M, *Platform and reach*). Audit all three apps first, then file concrete S items.
 9. **Remove the legacy package matcher** (M, *Billing and payments*). Gated: only after Little Orcas seals September
    (it is Wave 6's rollback until then). Independent of 7–8.
@@ -1098,28 +1098,17 @@ modifier in the system — changes `amount_payable`, never `total_value`. **LIVE
 (`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
 
-### Single-child packages — the admin decides, per product, whether siblings can share — **L** — _filed 2026-10-10, requested by Little Orcas_
-On the admin **Packages** page, each package product is marked **Shared across siblings** (today's behaviour, the
-default) or **One child only**. Buying a one-child product names the child, and only that child's lessons can draw
-from it.
+### Name the child in package emails — **S** — _filed 2026-10-11, follow-up of Single-child packages_
+The `package-emails` Edge Function (requested / offered / confirmed) names the family, never the child. For a
+one-child package the email should say whose it is ("5 lessons for Ava"), the way the app and admin now do.
 
-**Why:** Little Orcas asked for it. They don't let one package cover two children, but SwimSync pools every package
-per (parent, business) across siblings (PRD §7.16), so today a second child's lessons silently draw from the first
-child's package.
+**Why:** single-child packages (PRD §7.16) deliberately left the emails alone — a git push does not deploy an Edge
+Function, and that build deployed none (plan RISK 8). A parent with two children who receives "your package is
+confirmed" cannot tell which child it covers.
 
-**Settled with the user 2026-10-10:**
-- **Per product**, not per business or per purchase. A business can offer both kinds.
-- **Already-sold packages stay shared.** They keep the terms they were sold under, including the Ang family's at
-  Little Orcas. Only new purchases of a one-child product are tied to a child.
-
-**Notes:** this is an L because it changes the rule for which package pays, and many things read that rule: the
-draw at marking (Wave 6), *earlier lessons get first claim* (it counts siblings' lessons today), the backdated
-*Check marked lessons* dialog, the per-child **Package · N left** chip and the copy saying the count is
-family-shared, the running-low filter, renewal offers and the `/package` pay page, referral rewards, refunds and the
-parent's **Show lessons used**. `parent_packages` has no child column today (it's keyed by `parent_id`), so this needs
-a migration: an optional child on the held package plus a flag on the product. Product money terms are immutable
-(retire and recreate), so decide whether the flag counts as a money term. Plan it with `/plan-with-confidence`
-before building.
+**Notes:** read `parent_packages.student_id` → `students.full_name` in the function (service role; no new grant).
+The `/package/[token]` public page stays child-free by rule (no child names to an unauthenticated link) — decide
+whether the email may name the child when the link may not. Needs `supabase functions deploy package-emails`.
 
 ### Remove the legacy package matcher (pay-at-the-monthly-run) — **M** — _filed 2026-10-10; WAIT until Little Orcas seals September_
 Delete the old way a package pays for a lesson: the engine's own FIFO matcher (`generate-invoices/core.ts`, the

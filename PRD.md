@@ -2164,7 +2164,36 @@ The volume discount lives in the rate itself (50 lessons at $30 when walk-in is 
 cash paid always equals value granted — nothing to reconcile.
 
 - **Held per (parent, business)**, pooling across siblings there; like credit, it never
-  crosses businesses (§5.6's rule, same reasoning).
+  crosses businesses (§5.6's rule, same reasoning). *(Since 2026-10-11 a product can instead be **one child
+  only** — see "Single-child packages" below; shared remains the default.)*
+- **Single-child packages** *(implemented 2026-10-11 — `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`, requested by
+  Little Orcas)*. Each **product** is either **Shared across siblings** (the default) or **One child only** — set on
+  *Add package* under **Who can use it**, and changeable later from the catalogue's *Change* (confirmed: *"Applies
+  to new sales only — packages already sold keep their terms."*). A one-child package is tied to **one named child
+  at sale** and only that child's lessons draw from it; a sibling's lesson the package would otherwise cover is
+  **ad-hoc** (billed at the next run at the class price, chip *Ad-hoc*) — never a refusal. Packages sold before a
+  product's kind changed keep the kind they were sold under.
+  - **One kind per family.** A family (parent × business) holds shared **or** one-child packages, never both: a
+    purchase of the other kind is refused while the family still has a package of the current kind that is pending
+    or has a lesson left and is unexpired — *"This family already has a shared package that is pending or has
+    lessons left — a one-child package can be bought once it is used up."* Once it is used up, expired, cancelled
+    or refunded, the family can switch. (In the rare case both are live — a lesson returned to a used-up shared
+    package after a one-child one was bought — the child's own package pays first.)
+  - **Buying.** The parent's *Request & pay* on a one-child product asks **"Which child is this for?"** when they
+    have several active children at that business, shows *For Ava* (not asked) when they have one, and says *Add
+    your child at this business first* (Request disabled) when they have none. The admin's **Record a sale** does
+    the same. Renewal offers come **one row per child** whose own package is low or recently expired (a shared
+    family keeps one family row); a family row offers shared products and a child's row one-child products, and
+    each audience can hold its own open offer.
+  - **Showing it.** Package cards (parent) and the admin's held/awaiting rows read **"For Ava only" / "Ava only"**;
+    the child profile's Balances line reads *Package — N lessons left · Ava's own* instead of *shared across the
+    family*.
+  - **Change child** *(packages:edit)* moves a one-child package to a sibling **only while no lesson has ever drawn
+    from it** (a reversed draw still counts); otherwise *"A lesson has already drawn from this package — refund it
+    instead."* Holiday/cancel extensions are recomputed for the new child, and the change is audited.
+  - **Limits.** One-child packages need draw-at-marking (every business has it); the database refuses one where it
+    is off, and refuses switching it off while one is held. A child holding one cannot be moved to another
+    business until it is reassigned, refunded or cancelled. Package emails do not name the child yet (BACKLOG).
 - **Scoped by class category** — the business's own grouping of classes ("Group",
   "Private"), spendable at every class in the category including ones added later; a
   package with no category covers all the business's classes (the private-coach shape).
@@ -2196,7 +2225,8 @@ cash paid always equals value granted — nothing to reconcile.
   in `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md` (*Known consequences*).
 - **Earlier lessons get first claim on the last package lessons** *(implemented 2026-10-06)*. Marking a child
   present is **refused** when the package that would pay for it would be left with fewer lessons than there are
-  EARLIER unmarked lessons it would also cover — this child's or a sibling's (packages pool per family), counting
+  EARLIER unmarked lessons it would also cover — this child's or a sibling's (a shared package pools per family; a
+  one-child package counts only its own child's lessons, *2026-10-11*), counting
   only lessons still inside the marking window, in a class still running, not cancelled. The coach sees *"Mark
   27 Sep first — the package has 1 lesson left. (Ava · Dolphins) Nothing was saved."*; nothing in that save is
   kept, so they mark the named lesson first. Marking absent/cancelled is never blocked, and re-saving marks that
@@ -2228,7 +2258,8 @@ cash paid always equals value granted — nothing to reconcile.
   lessons by parent, ignoring both category and expiry — the same family's every child
   read "N left". Fixed with the per-child verdict; the "running low" filter follows the
   same rule, and never flags an ad-hoc child: no pool is not an empty pool.)* The
-  count is **family-shared** — siblings read the same pool, and the copy says so. An
+  count is what **this child can use** — siblings read the same shared pool, and the copy says so; a child's own
+  one-child package counts for that child alone, so a sibling reads *Ad-hoc* *(2026-10-11)*. An
   **exhausted but unexpired package reads "Package · 0 left", never "Ad-hoc"** — "buy
   a top-up" and "you are not a package family" are different messages, so the engine's
   can-it-fund-a-lesson rule deliberately plays no part in the label. Two family-grain
