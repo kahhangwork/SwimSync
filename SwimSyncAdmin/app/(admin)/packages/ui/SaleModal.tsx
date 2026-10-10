@@ -86,9 +86,6 @@ export function SaleModal({
             With one active child here it is shown, not asked. */}
         {needsChild && saleParent && (
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Which child is this for?
-            </label>
             {saleChildren.length === 0 ? (
               <p className="text-sm text-amber-700">
                 This family has no active child at your business yet.
@@ -98,18 +95,23 @@ export function SaleModal({
                 For <strong>{saleChildren[0].name}</strong>
               </p>
             ) : (
-              <select
-                value={saleChild}
-                onChange={(e) => setSaleChild(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="">Choose…</option>
-                {saleChildren.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Which child is this for?
+                </label>
+                <select
+                  value={saleChild}
+                  onChange={(e) => setSaleChild(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Choose…</option>
+                  {saleChildren.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
           </div>
         )}
