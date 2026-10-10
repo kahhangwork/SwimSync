@@ -51,6 +51,7 @@ document when the task touches it; don't read them all up front.
 | What's queued but unbuilt, and why? | `BACKLOG.md` |
 | **What trap is waiting for me here?** | **`docs/GOTCHAS.md` (§7)** |
 | Why is it built this way? | `docs/ARCHITECTURE.md` (§6, §10, §12) |
+| **What should a screen look like?** (visual system — not code design) | **`DESIGN.md`** |
 | What do the tests cover? | `docs/TESTING.md` (§5) |
 | What's live, and how? | `docs/DEPLOYMENT.md` (§11) |
 | What shipped in an older session (`§8a`, `§8.n`)? | `docs/SESSIONS.md` |
