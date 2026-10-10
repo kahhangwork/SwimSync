@@ -1177,3 +1177,15 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     is the next real Generate (Little Orcas Sep 2026): `billing_runs` after 2026-10-10 01:05 UTC with no
     `status = 'error'`, logs without *could not read the database clock*. Any failure → rollback first: revert
     `ba620c3` on a branch → `functions deploy generate-invoices` → `functions list`. ⛔ Never press Generate to prove it.
+
+82. **Deploy record (2026-10-11): `20261010000100_single_child_packages` → prod (`supabase db push`, run by the session
+    on the user's instruction), then `4476fd9` (migration + types) and `9cb03f8` (apps) to `main`, in that order.** Step 0
+    before writing: 21 function md5s prod = local; re-read just before the push — unchanged. Rollback rehearsed (DOWN →
+    all 21 bodies/ACLs byte-identical to Step 0, RISK 5 snapshot taken under it, `db reset` back to UP); both rollbacks
+    refuse with their own preflight while one-child rows are held. Prod after: `migration list --linked` 0 pending; 25
+    touched functions md5 = local; 0 one-child products / packages; Little Orcas Σ `value_remaining` 700.00 before and
+    after; one `pg_proc` row each for `create_package_offer` / `suggest_package_start`; `package_candidates_for` ran on
+    the Ang family's latest lesson (already drawn from PKG-2026-0002 → empty, no error). Grants (live `has_function_privilege`
+    + remote dump agree): anon and PUBLIC on none; `authenticated` on the seven RPCs/helpers; matcher internals owner-only.
+    Bundle greps: admin "Who can use it", app "Which child is this for?" (the probe first validated on strings the old
+    build had). Vercel built serially (~15 min for the third push). CI `38068772597` green. No product flipped; no Generate.

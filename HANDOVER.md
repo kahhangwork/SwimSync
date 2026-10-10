@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-10 (2nd) — **§8.145: three fixture-hygiene S-items shipped** (`4a53ca1`, CI green) and **Wave 9
-planned**: *Single-child packages* (Little Orcas) has an approved, reviewed plan — `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`._
+_Last updated: 2026-10-11 — **§8.146: Single-child packages SHIPPED and LIVE** (migration `20261010000100` on prod, apps
+`9cb03f8`, both bundle greps, CI green). The user added **D11 — one kind per family** in the build. No product flipped._
 
-_Previously (§8.144, 2026-10-10) — Pin the clock for UI drivers; engine v35 on prod, DORMANT until the next real Generate._
+_Previously (§8.145, 2026-10-10) — Fixture hygiene ×3; Wave 9 filed, ranked and planned._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -32,6 +32,7 @@ there is no second index to go through.
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
 | **Running two sessions at once without clashing** | **`docs/WORKTREES.md`** | — |
+| **What a screen should look like** (visual system, not code design) | **`DESIGN.md`** | — |
 | How to bill a month | `INVOICE_RUNBOOK.md` | — |
 | **Plans — which are open, which are done** | **`docs/plans/README.md`** (index; plans never move) | — |
 | The design/plan behind a shipped feature | `docs/design/`, `docs/plans/` | — |
@@ -167,6 +168,8 @@ first-firing trigger is what to watch for.
   fired only through B's backfill (8 draws), so the D6 guard (PK001), the backdated dialog and holiday-void returns
   have never fired live, nor have renewal offers/supersede or the `/package` page. First firing: the next package
   family's marked lesson / first `Void lessons` / first offer.
+  **Single-child packages (§8.146): 0 one-child products** — D11, Change child, per-child renewal rows and PK001's
+  per-child count have fired only locally. First firing: a product flip.
 - **Billing a month LATE** — no late month billed, so `markable_floor`'s reopened window is unused
   insurance, shipped ahead of its own trigger.
 - **Retired classes** — **0** inactive classes on prod (re-confirmed 2026-08-10); none retired on real data.
@@ -348,6 +351,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.146 (2026-10-10 → 11) — Single-child packages, built and deployed in one session
+
+**Shipped Wave 9 item 7 per `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`, root checkout, no worktree** — migration →
+admin → parent app → driver → docs → deploy, each step gated. Live 2026-10-11 (DEPLOYMENT #82).
+
+- **The user's call mid-build — D11, one kind per family** (plan §2): raised because the plan's §3 renewal-row rule
+  could not satisfy D8 or its own assertion. Recorded with its consequences in the plan; PRD §7.16 describes it.
+- **Proof:** pgTAP 2083 (73 new), Deno 305 ×2, vitest 1148, jest 712, `verify-single-child-packages` 19/19 pinned and
+  unpinned + 8 package drivers `--only`; 43 mutants red at their target (one redundant clause stays green, recorded).
+- **Found on the way:** the DOWN as planned was unrunnable (§7.93 *Hit again*); `innerText` uppercases headers
+  (§7.362); a bare `students(...)` embed resolves, no PGRST201 (§7.90); the admin sale asked about a single child
+  (fixed, `3954b24`). Graduated: ARCHITECTURE §6ae addendum, TESTING §5, BACKLOG *Name the child in package emails*.
+- **Not done:** no Little Orcas product flipped (the owner's call); no full sweep, no Generate.
+
 ## 8.145 (2026-10-10) — Fixture hygiene ×3, then Wave 9 filed, ranked and planned
 
 **Shipped the three Foundations S-items §8.144 filed (`4a53ca1`, CI green); filed + ranked two user items; planned the
@@ -361,21 +378,7 @@ first with `/plan-with-confidence` + `/plan-review`.**
 - **Not done:** Little Orcas' September Generate (the owner's — a platform admin has no Generate button, and the user
   asked; declined to work around it). The reviewer's 4 GOTCHAS candidates: applied after close (§7.361 + bullets on §7.165, §7.189, §7.205).
 
-## 8.144 (2026-10-09 → 10) — Pin the clock for UI drivers, two lanes
-
-**Shipped BACKLOG *Pin the clock for UI drivers* (L) per `docs/plans/PIN_DRIVER_CLOCK_PLAN.md`, run as two lanes
-(root orchestrator + worktree `pin-clock-drivers`, closed).** Migration → prod (#80); engine → prod v35 (#81).
-
-- **Shipped:** `--now` + `clock-unpin.sh` + the pinned fixture roundtrip in CI (TESTING §5); the local-only API pin
-  and the engine's DB clock (ARCHITECTURE §6af addendum); `check-driver-clock.sh` — a driver without a clock marker
-  is CI red. 15 drivers proven unpinned AND pinned, 3 own-literal pinned, CANNOT SAY proven.
-- **Found:** two SQL bugs a fake-docker proof hid (§7.358); `preflight()` was never called (now is — user's call B);
-  a Saturday-only fixture collision red CI at 00:47 SGT Sat 10 Oct — replayed with `--now`, fixed `3d8adb0`
-  (§7.304 *Hit again*). New §7.355–§7.360.
-- **Not done:** no full pinned sweep (user's call). The engine went to prod BEFORE Little Orcas' run, by the
-  user's call, after nightly `38003471836` was green; its proof (plan step 5) is the next real Generate.
-
-_(§8.143 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.144 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -429,14 +432,16 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — Wave 9 (BACKLOG Build order)
 
-1. **Build *Single-child packages*** — `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`, starting at its **Step 0** (prod
-   function md5 = local, before writing). One migration on a `db/…` branch, then both apps, then a driver; deploy
-   when verified (D10 — not gated on Little Orcas). Walk the plan's pre-commit gate per commit.
-2. **Little Orcas September is the OWNER's** (unbilled on prod 2026-10-10): *Generate Sep 2026*, *Record it as settled*
+1. **Little Orcas September is the OWNER's** (unbilled on prod 2026-10-10): *Generate Sep 2026*, *Record it as settled*
    for the 15 pilot children, and Brayden Ong's 6 + 13 Sept lessons (invite his parent or settle). After it: read
    `billing_runs` (no `status = 'error'`) and the function logs (no *could not read the database clock*) — engine
    v35's first real run (DEPLOYMENT #81); failure → revert `ba620c3` → `functions deploy`. Never press Generate
-   yourself. **Its seal also un-gates BACKLOG Wave 9 item 9** (remove the legacy matcher).
+   yourself. **Its seal also un-gates BACKLOG Wave 9 item 9** (remove the legacy matcher — it now also removes
+   single-child packages' D9 guard and the B rollback's one-child preflight).
+2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
+   the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
+   cancelled/refunded) before that family can buy a one-child package — say so before any flip. Next build after
+   it: **Wave 9 item 8, UI/UX improvements** (audit first; `DESIGN.md` is the visual system).
 3. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 
@@ -452,8 +457,9 @@ which mutate shared seed state — are in the same section.
 
 **GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20261009000200` (API clock pin), on prod, 0 pending
-(2026-10-09). **B's rollback is valid only until the first seal of a month containing draws** (its header).
+**No migration is HELD or in flight.** Latest applied is `20261010000100` (single-child packages), on prod, 0 pending
+(2026-10-11). **B's rollback is valid only until the first seal of a month containing draws** (its header), and it
+now refuses while any one-child package is active or pending.
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

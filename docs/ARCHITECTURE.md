@@ -808,6 +808,7 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/app/(admin)/roles/` | The Roles page — roles, holders, the 8×3 grid; owner-only writes (D9) |
 | `SwimSyncAdmin/lib/enrolmentStart.ts` (+ rpc, test) · `components/StartsOnField.tsx` | *Starts on*: bounds → today-only fallback, sealed / unbilled / this-month warnings, the second press, dropped dates (§6ad) |
 | `supabase/migrations/20261006000100…_a.sql` · `…000200…_b.sql` · `supabase/tests/package_draw_at_marking{,_b}.test.sql` · `generate-invoices/wave6.test.ts` | Wave 6 (§6ae): the matcher, draw/return triggers, PK001 guard, PK002 backstop, the four RPCs; B = switch on + backfill |
+| `supabase/migrations/20261010000100_single_child_packages.sql` (+ `supabase/rollback/…_DOWN.sql`) · `supabase/tests/single_child_packages.test.sql` · admin `packages/domain/{singleChild,useChangeChild}.ts` · `ui/ChangeChildModal.tsx` · app `features/billing/domain/billingFormat.ts` (`childrenForProduct`, `requestStudentFor`) · `drivers/verify-single-child-packages.mjs` | Single-child packages (§6ae addendum): `student_id` + `draw_rank`, the kind/child pins, D11, Change child, the picker |
 | `supabase/migrations/20261006000300_app_clock.sql` · `…000400_clock_decide_ops` · `…000500_clock_stamp_feeds` · `supabase/tests/app_clock{,_edges}.test.sql` · `supabase/tests/http/app_clock_locks.sh` · `scripts/check-{pgtap,migration}-clock.sh` · `scripts/check-functions-sg-date.sh` · `scripts/lib/pgtap-pin.sh` | Wave 7 (§6af): the injectable clock, its two locks, the frozen census; G1–G3 + the shared pin predicate |
 | `supabase/migrations/20261009000200_api_clock_pin.sql` · `generate-invoices/clock.ts` · `drivers/lib.mjs` (`nowSg`/`todaySg`/`sql`/wrapped `launch()`) · `drivers/check-driver-clock.sh` · `scripts/clock-unpin.sh` · `drivers/_TEMPLATE.mjs` · `drivers/_TEMPLATE-fixture.sql` | Pin the clock for UI drivers (§6af addendum): the local-only API pin, the engine's DB clock, `run-all-drivers.sh --now`, the driver clock guard and the template a new driver copies |
 | `SwimSyncApp|Admin/lib/database.types.ts` (generated) · `lib/database.overrides.ts` · `scripts/gen-db-types.sh` · `scripts/check-{db-types,db-any,db-overrides,runtime-identical}.sh` · `scripts/lib/{db-types.sh,runtime-identical.mjs,trigger-fill.sql}` · `SwimSyncAdmin/lib/noTenant.ts` | Wave 8 (§6ag): generated types, the widen-only overrides, G5/G6/runtime-identity; the shared no-business message |
@@ -971,6 +972,17 @@ wrongful refusal blocks a whole class's save with no override (§7.324). The eng
 (`package_mode_unreadable`: no invoice, no seal): billing a lesson a package paid is the worse error. Both count
 "expected" through `class_unmarked_lesson_pairs`, the core of `class_unmarked_lesson_dates` — do not write a third
 copy — Billing months' per-month unmarked count (`package_month_funding.unmarked_lessons`) is the same pairs function, server-side, never a client derivation. Plan + deploy record: `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md`.
+
+**Addendum — single-child packages (2026-10-11, `20261010000100`, plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`).**
+`parent_packages.student_id` (NULL = shared) ties a package to one child; the matcher filters on it and returns
+**`draw_rank`** (own first, then FIFO) — **every caller that picks orders by `draw_rank` and nothing else**, pinned
+by a catalogue census in `single_child_packages.test.sql` (§7.361). The draw's LOCK order stays FIFO on purpose: it is
+the deadlock-avoidance order, not the draw order. **The kind is a sold term**: shared↔one-child is refused for every
+role, the child for every client; only `reassign_package_child` (unused only) and `merge_students` move it. **One kind
+per family** (D11) is enforced at INSERT by `assert_package_kind_free` under a per-family advisory lock — do not move
+it to the UI. The flag-off legacy matcher pools across siblings, so the DB refuses a one-child package where the flag
+is off and refuses turning it off while one is held (`trg_guard_one_child_packages_flag`) — removed together with the
+legacy matcher (BACKLOG).
 
 ### 6af. The database has ONE injectable clock — `app_now()` / `app_today()`; prod can never move it (2026-10-06)
 

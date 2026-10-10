@@ -39,7 +39,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356 |
@@ -874,6 +874,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       pair, `HAVING count(*) > 1`) and qualify **every** pair at once — PostgREST reports only the first. Check
       `.error` wherever emptiness is a plausible real state.
     - **Now a CHECK:** `supabase/tests/recurring_gotchas.test.sql` #1 goes red on any new table pair joined by two FKs (2026-09-25).
+    - **Not every second PATH is a second FK (measured 2026-10-11, §8.146):** `parent_packages.student_id → students`
+      plus the many-to-many through `package_applications` did NOT give PGRST201 — a signed-in bare
+      `parent_packages?select=students(full_name)` resolved to the direct FK (admin and parent JWT, 200). recurring_gotchas
+      #1 stays green (one direct FK per pair). Qualify anyway (`students!student_id`): a later second direct FK flips it.
 
 91. **"NEVER GATE ON ROLE" (§7.19) NOW HAS EXACTLY ONE DELIBERATE EXCEPTION — ADMIN-PANEL
     *ENTRY* — AND ITS SHAPE IS WHAT KEEPS IT FROM RECREATING §7.19. DO NOT "FIX" IT BACK.**
@@ -912,6 +916,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       local holds the seed, so a DOWN that re-inserts the seed goes red/green/red/green perfectly. Found in
       review on `20260925000200` (prod held `false`, the seed `true`). (2026-09-25, §8.124.)
 
+    - **Hit again (2026-10-11, §8.146) — the DOWN was unrunnable by construction.** Single-child packages' DOWN, written to
+      the plan, refused "while any `student_id IS NOT NULL` row exists" — but the UP pins shared↔one-child for every role,
+      so a cancelled one-child row can never be cleared and the rollback could never run after the first sale. The
+      rehearsal with rows held caught it; it now refuses on active/pending only. Rule: **a DOWN's refusal must be
+      satisfiable under the UP's own pins** — rehearse it with the blocking rows present, then removed.
 94. **`CURRENT_DATE` IN A FUNCTION IS THE *SESSION'S* TIME ZONE — UTC ON THIS SERVER — SO IT
     IS §7.7 WITH THE DATABASE HOLDING THE WRONG CLOCK. USE `today_sg()`.** Clients are already
     correct (`todayInSg()`); the database end was never audited.
@@ -2969,3 +2978,8 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     over a sibling's lesson. Rule: **expose the order as a returned column (`draw_rank`) and have every caller sort by
     it**, pinned by a catalogue census (`pg_get_functiondef` of each caller references `draw_rank`). Read callers with
     `pg_get_functiondef`, never the migration (§7.40).
+
+362. **`innerText` applies CSS `text-transform`: an admin `<Th>` reads "WHO CAN USE IT", not "Who can use it".** The
+    admin `Table` header is `uppercase`, so a driver regex copied from the JSX source fails on a page that is correct —
+    `verify-single-child-packages` lost a run to it (2026-10-11, §8.146). Match headers case-insensitively (`/…/i`) or
+    read `textContent`, which returns the source text. Body cells are not transformed.
