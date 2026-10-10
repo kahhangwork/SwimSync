@@ -18,6 +18,7 @@ import {
   loginAdmin,
   loginExpo,
   tap,
+  pressByText,
   pressByTextMatch,
   visibleText,
   todaySg as todaySgLib,
@@ -144,7 +145,12 @@ await loginExpo(page, "coach@swimsync.test");
 await page.waitForTimeout(1500);
 await tap(page.getByText(/Classes/i).first(), "Classes tab");
 await page.waitForTimeout(1200);
-await tap(page.getByText(/Saturday Beginners/i).first(), "the seed class");
+// pressByText, VISIBLE screen only — never getByText(...).first() + a forced
+// click. The Schedule tab stays mounted underneath and holds its own "Saturday
+// Beginners" (the NEEDS MARKING row); `.first()` resolved to THAT copy and the
+// forced click landed at its coordinates, which happened to sit under this
+// card until the Schedule restyle moved the row (§7.10, §7.58).
+if (!(await pressByText(page, "Saturday Beginners"))) throw new Error("the seed class card was not pressable on the Classes tab");
 await page.waitForTimeout(1500);
 
 // visibleText, not body.innerText: the Schedule tab stays MOUNTED underneath

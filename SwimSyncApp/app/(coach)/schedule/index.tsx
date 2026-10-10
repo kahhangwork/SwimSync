@@ -63,7 +63,7 @@ export default function ScheduleScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <ScrollView
         contentContainerClassName="px-5 py-6 pb-10"
         showsVerticalScrollIndicator={false}
@@ -80,13 +80,13 @@ export default function ScheduleScreen() {
 
         {loading ? (
           <View className="items-center py-16">
-            <ActivityIndicator size="large" color="#0ea5e9" />
+            <ActivityIndicator size="large" color="#2563eb" />
           </View>
         ) : (
           <>
             <NeedsMarkingSection visibleNeedsMarking={visibleNeedsMarking} openAttendance={openAttendance} />
 
-            <TodaySection showsTodaySection={showsTodaySection} todayDate={todayDate} nowMins={nowMins} todayLessons={todayLessons} todayStudents={todayStudents} todayGuests={todayGuests} openAttendance={openAttendance} />
+            <TodaySection showsTodaySection={showsTodaySection} todayDate={todayDate} nowMins={nowMins} todayLessons={todayLessons} todayStudents={todayStudents} todayGuests={todayGuests} openAttendance={openAttendance} blockerShown={visibleNeedsMarking.length > 0} />
 
             <ComingUpSection buckets={buckets} expandedDays={expandedDays} toggleDay={toggleDay} openAttendance={openAttendance} />
 

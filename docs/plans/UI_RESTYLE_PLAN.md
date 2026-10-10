@@ -81,14 +81,14 @@ Decisions this plan makes (the user may overrule; none changes the look):
 
 ## 3. State (update in every commit that ticks a step)
 
-_As of 2026-10-12: steps 0.1 and 0.2 are on `main`; 0.3 is `ui/restyle-plan`; 2.1 waits on it._
+_As of 2026-10-12: Phase 0 is on `main`; 2.1 lands as built (words kept). Its wording half — sentence-case headings, `Sat 26 Sept` dates — is still open._
 
 | Branch | Commit | What | Landed? |
 |---|---|---|---|
 | `ui/logo-2a` | `9edfee4` (+ docs `99c1f51`, `33c8156`) | Step 0.1 — logo 2a everywhere + `brand/render.mjs` | **yes**, 2026-10-11 (DEPLOYMENT #83) |
 | `ui/design-tokens` | `f805461`, `f5609d4` | Step 0.2 — tokens + drift tests; BACKLOG audit filing | **yes**, 2026-10-12 (DEPLOYMENT #83) |
-| `ui/restyle-plan` (on `main`) | see `git log origin/main..ui/restyle-plan` | Step 0.3 — this plan, Q1 = "Sept", six GOTCHAS, `check-visual-only.sh`, the D3 exception in HANDOVER §9 GATE + DEPLOYMENT #84 | no |
-| `ui/coach-schedule` (rebase onto `ui/restyle-plan`) | `b0e455f` | Step 2.1 — coach Schedule restyle (words kept; "Sept"; G-Sept green). 11 Schedule drivers green `--only` 2026-10-11 after two fixes: week arrows lost their button role (a `<button disabled>` cannot be clicked past the bound), and `verify-trials` presses the visible class card (it passed on coordinate luck, §7.58). `check-visual-only.sh`: NOT VISUAL-ONLY on 3 lines — `useState` (the fold toggle) ×2, `.sort()` in `blockedMonths` (a display helper) — each must be explained in its commit message to land under D3 | no |
+| `ui/restyle-plan` | `5c38056`, `cda10ac`, `e97d14f` | Step 0.3 — this plan, Q1 = "Sept", six GOTCHAS, `check-visual-only.sh`, the D3 exception in HANDOVER §9 GATE + DEPLOYMENT #84 | **yes**, 2026-10-12 |
+| `ui/coach-schedule` | this commit | Step 2.1 — coach Schedule restyle (words kept; "Sept"; G-Sept green). 11 Schedule drivers green `--only` 2026-10-11 after two fixes: week arrows lost their button role (a `<button disabled>` cannot be clicked past the bound), and `verify-trials` presses the visible class card (it passed on coordinate luck, §7.58). `check-visual-only.sh`: NOT VISUAL-ONLY on 3 lines — `useState` (the fold toggle) ×2, `.sort()` in `blockedMonths` (a display helper) — each must be explained in its commit message to land under D3 | no |
 | `ui/status-scale` (on old `main`) | `08fe3d9` | PARKED — becomes step 1.4 | no |
 
 ⚠ RISK 3 MITIGATION — **Landing ledger** (one row per restyle landing; append, never edit):
@@ -97,6 +97,7 @@ _As of 2026-10-12: steps 0.1 and 0.2 are on `main`; 0.3 is `ui/restyle-plan`; 2.
 |---|---|---|---|---|---|---|---|
 | 0.1 logo | `9edfee4` | NOT VISUAL-ONLY (`app.json` splash colour) — landed under the nightly gate | (built 2026-10-11, before this ledger) | — | admin login chunk `M6 32Q13 21`; rasters byte-identical | `38182159846` | green |
 | 0.2 tokens | `f805461`, `f5609d4` | VISUAL-ONLY | none — compiled CSS byte-identical | — | none possible (no visible change) | | |
+| 2.1 Schedule (as built — words kept) | this commit | NOT VISUAL-ONLY on 3 lines, each explained in the commit message (fold toggle `useState` ×2, `.sort()` in a display helper) — landed under D3 | 11 Schedule drivers green 2026-10-11 on the identical app tree (`schedule-week` 21/21, `trials` 16/16, `coach-schedule-roles` 28/28, `cancel-lesson` 29/29, 7 more) | not recorded (built before the ledger) | app bundle `Mark oldest lesson` | | |
 
 A landing whose "Nightly verdict" cell is empty is **unverified**. **Do NOT land a fourth restyle while three are
 unverified** — at most three landings can be attributed per red nightly. The user may raise this cap; nobody else may.

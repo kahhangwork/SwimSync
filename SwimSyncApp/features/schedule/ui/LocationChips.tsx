@@ -19,7 +19,7 @@ export function LocationChips(p: Pick<Sections, "scheduleLocationOpts" | "effLoc
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 pb-1"
-          className="mb-4 -mx-1 px-1"
+          className="mb-5 -mx-1 px-1"
         >
           {[{ id: "", name: "All locations" }, ...scheduleLocationOpts].map((opt) => {
             const active = effLocationFilter === opt.id;
@@ -28,13 +28,17 @@ export function LocationChips(p: Pick<Sections, "scheduleLocationOpts" | "effLoc
                 key={opt.id || "all"}
                 onPress={() => setLocationFilter(opt.id)}
                 activeOpacity={0.8}
-                className={`rounded-full px-4 py-1.5 ${
-                  active ? "bg-sky-600" : "bg-white border border-gray-200"
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                // DESIGN.md: the selected segment is the Selected fill — not a
+                // second blue — and words, not shade alone, carry the choice.
+                className={`min-h-11 justify-center rounded-control border px-3.5 ${
+                  active ? "bg-selected border-border-strong" : "bg-surface border-border"
                 }`}
               >
                 <Text
-                  className={`text-sm font-medium ${
-                    active ? "text-white" : "text-gray-600"
+                  className={`text-body ${
+                    active ? "font-semibold text-ink" : "font-medium text-ink-secondary"
                   }`}
                 >
                   {opt.name}

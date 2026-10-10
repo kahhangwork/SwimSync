@@ -20,10 +20,11 @@ export function BackToThisWeek(p: Pick<Week, "weekOffset" | "setWeekOffset">) {
         <TouchableOpacity
           testID="week-today"
           onPress={() => setWeekOffset(0)}
-          className="mb-4 self-start flex-row items-center gap-1"
+          className="mb-3 self-start flex-row items-center gap-1 min-h-11"
+          accessibilityRole="button"
         >
-          <Ionicons name="today-outline" size={14} color="#0ea5e9" />
-          <Text className="text-xs font-semibold text-sky-600">
+          <Ionicons name="today-outline" size={14} color="#2563eb" />
+          <Text className="text-body font-semibold text-primary">
             Back to this week
           </Text>
         </TouchableOpacity>

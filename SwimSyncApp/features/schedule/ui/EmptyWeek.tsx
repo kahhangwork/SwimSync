@@ -3,9 +3,9 @@
 // Stage 5); props destructured on the first line so the JSX is byte-identical
 // (whitespace aside).
 import React from "react";
-import { Text } from "react-native";
+import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Card from "@/components/Card";
+import { CARD } from "./ScheduleButton";
 import type { useWeek } from "../domain/useWeek";
 import type { useScheduleLoad } from "../domain/useScheduleLoad";
 import type { useScheduleSections } from "../domain/useScheduleSections";
@@ -24,12 +24,12 @@ export function EmptyWeek(p: Pick<Load, "weekLessons"> & Pick<Sections, "visible
       {weekLessons.length === 0 &&
         visibleNeedsMarking.length === 0 &&
         !showsTodaySection && (
-        <Card className="items-center py-10">
-          <Ionicons name="sunny-outline" size={40} color="#d1d5db" />
-          <Text className="text-gray-400 mt-3 text-sm">
+        <View className={`${CARD} items-center py-10`}>
+          <Ionicons name="sunny-outline" size={40} color="#d4d4d4" />
+          <Text className="text-body text-ink-secondary mt-3">
             No lessons this week
           </Text>
-        </Card>
+        </View>
       )}
     </>
   );

@@ -7,7 +7,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { formatAttendees, isFinished } from "@/lib/attendanceSummary";
-import Card from "@/components/Card";
+import { CARD } from "./ScheduleButton";
 import type { WeekLesson } from "../types";
 import { formatTime, dayHeading } from "../domain/scheduleFormat";
 import { ProgressChip } from "./ProgressChip";
@@ -41,21 +41,23 @@ export function DaySection({
     <View className="mb-2">
       <TouchableOpacity
         onPress={() => onToggle(group.date)}
-        className="flex-row items-center gap-2 py-2"
+        className="flex-row items-center gap-2 min-h-11"
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
       >
         <Ionicons
           name={open ? "chevron-down" : "chevron-forward"}
           size={14}
-          color="#6b7280"
+          color="#525252"
         />
-        <Text className="text-sm font-semibold text-gray-700">
+        <Text className="text-body font-semibold text-ink">
           {dayHeading(group.date)}
         </Text>
-        <Text className="text-xs text-gray-400">
+        <Text className="text-body-secondary text-ink-muted">
           {group.items.length === 1 ? "1 lesson" : `${group.items.length} lessons`}
         </Text>
         {allMarked && (
-          <Ionicons name="checkmark-circle" size={14} color="#15803d" />
+          <Ionicons name="checkmark-circle" size={14} color="#166534" />
         )}
       </TouchableOpacity>
 
@@ -76,21 +78,21 @@ export function DaySection({
                     router.push(`/(coach)/classes/${l.classId}/roster`)
               }
             >
-              <Card>
+              <View className={CARD}>
                 <View className="flex-row items-start justify-between">
                   <View className="flex-1">
                     <Text
-                      className={`text-sm font-bold ${
-                        l.cancelled ? "text-gray-500 line-through" : "text-gray-900"
+                      className={`text-body font-semibold ${
+                        l.cancelled ? "text-ink-muted line-through" : "text-ink"
                       }`}
                     >
                       {l.title}
                     </Text>
-                    <Text className="text-xs text-gray-500 mt-0.5">
+                    <Text className="text-body-secondary text-ink-secondary mt-0.5">
                       {formatTime(l.startTime)} – {formatTime(l.endTime)}
                     </Text>
                     {l.cancelled && (
-                      <Text className="text-xs font-semibold text-gray-500 mt-0.5">
+                      <Text className="text-body-secondary font-semibold text-ink-secondary mt-0.5">
                         Cancelled by your admin
                       </Text>
                     )}
@@ -98,11 +100,11 @@ export function DaySection({
                   </View>
                   <ProgressChip progress={l.progress} />
                 </View>
-                <Text className="text-xs text-gray-500 mt-1">
+                <Text className="text-body-secondary text-ink-secondary mt-1">
                   {formatAttendees(l.students, l.guests)}
                   {l.summary ? ` · ${l.summary}` : ""}
                 </Text>
-              </Card>
+              </View>
             </TouchableOpacity>
           ))}
         </View>

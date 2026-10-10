@@ -15,8 +15,8 @@ export function DoneSection(p: Pick<Sections, "buckets" | "expandedDays" | "togg
     <>
       {/* ── DONE ──────────────────────────────────────────────────── */}
       {buckets.done.length > 0 && (
-        <View className="mb-6">
-          <Text className="text-lg font-bold text-gray-900 mb-2">DONE</Text>
+        <View className="mb-5">
+          <Text className="text-label text-ink-muted tracking-wide mb-1">DONE</Text>
           {buckets.done.map((g) => (
             <DaySection
               key={g.date}

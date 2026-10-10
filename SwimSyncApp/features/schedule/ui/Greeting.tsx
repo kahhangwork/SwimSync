@@ -5,6 +5,7 @@
 import React from "react";
 import { View, Text } from "react-native";
 import { greetingFor } from "@/lib/timeOfDay";
+import { coachTitle } from "../domain/scheduleFormat";
 import type { useWeek } from "../domain/useWeek";
 import type { useScheduleLoad } from "../domain/useScheduleLoad";
 
@@ -18,12 +19,12 @@ export function Greeting(p: Pick<Load, "session"> & Pick<Week, "todayStr" | "now
       {/* Greeting. The long-form SGT date is also the cheapest possible proof
           that this screen's date is the Singapore one, and verify-tz-saturday
           asserts on it (§7.7). */}
-      <View className="mb-4">
-        <Text className="text-gray-500 text-sm">{greetingFor(nowMins)},</Text>
-        <Text className="text-2xl font-bold text-gray-900">
-          Coach {session?.fullName ?? "—"}
+      <View className="mb-5">
+        <Text className="text-body-secondary text-ink-secondary">{greetingFor(nowMins)},</Text>
+        <Text className="text-display font-semibold text-ink">
+          {coachTitle(session?.fullName)}
         </Text>
-        <Text className="text-sm text-gray-400 mt-0.5">{todayStr}</Text>
+        <Text className="text-body-secondary text-ink-secondary mt-0.5">{todayStr}</Text>
       </View>
     </>
   );

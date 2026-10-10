@@ -8,8 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { isNowInRange } from "@/lib/timeOfDay";
 import { formatAttendees, isFinished } from "@/lib/attendanceSummary";
 import { canMark } from "@/lib/coachRoster";
-import Card from "@/components/Card";
-import PrimaryButton from "@/components/PrimaryButton";
+import { CARD, ScheduleButton } from "./ScheduleButton";
 import { formatTime, dayHeading } from "../domain/scheduleFormat";
 import { ProgressChip } from "./ProgressChip";
 import { RoleBadge } from "./RoleBadge";
@@ -19,14 +18,20 @@ import type { useScheduleSections } from "../domain/useScheduleSections";
 type Week = ReturnType<typeof useWeek>;
 type Sections = ReturnType<typeof useScheduleSections>;
 
-export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "nowMins"> & Pick<Sections, "todayLessons" | "todayStudents" | "todayGuests" | "openAttendance">) {
-  const { showsTodaySection, todayDate, nowMins, todayLessons, todayStudents, todayGuests, openAttendance } = p;
+export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "nowMins"> & Pick<Sections, "todayLessons" | "todayStudents" | "todayGuests" | "openAttendance"> & {
+  /** NEEDS MARKING is showing — its button is the screen's one primary, so a
+   *  routine lesson here does not outrank it (DESIGN.md, Blocker-Outranks-Routine). */
+  blockerShown: boolean;
+}) {
+  const { showsTodaySection, todayDate, nowMins, todayLessons, todayStudents, todayGuests, openAttendance, blockerShown } = p;
   return (
     <>
       {/* ── TODAY — only in the current week ───────────────────────── */}
       {showsTodaySection && (
-        <View className="mb-6">
-          <Text className="text-lg font-bold text-gray-900">
+        <View className="mb-5">
+          {/* "TODAY · <day>" then the count on the NEXT line: a driver reads the
+              count with /TODAY · [^\n]*\n(\d+ lessons?|No lessons today\.)/. */}
+          <Text className="text-label text-ink-muted tracking-wide">
             TODAY · {dayHeading(todayDate)}
           </Text>
           {/* The three tiles this replaced (Classes / Students / Guests
@@ -34,7 +39,7 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
               space reclaimed, because this screen is far denser than the
               one-day screen it replaces. Guests stay counted APART from
               students: a guest at one lesson is not a weekly student. */}
-          <Text className="text-xs text-gray-500 mb-3">
+          <Text className="text-body-secondary text-ink-secondary mb-2">
             {todayLessons.length === 0
               ? "No lessons today."
               : `${todayLessons.length === 1 ? "1 lesson" : `${todayLessons.length} lessons`} · ${formatAttendees(todayStudents, todayGuests)}`}
@@ -44,14 +49,16 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
             {todayLessons.map((l) => {
               const isActive = isNowInRange(l.startTime, l.endTime, nowMins);
               return (
-                <Card
+                <View
                   key={`${l.classId}:${l.date}`}
-                  className={isActive ? "border-sky-200 bg-sky-50" : ""}
+                  // On now: a stronger edge, not a tint — the One Blue Rule keeps
+                  // blue for actions, and the "Now" word carries the meaning.
+                  className={`${CARD} ${isActive ? "border-border-strong" : ""}`}
                 >
                   {isActive && (
                     <View className="flex-row items-center gap-1.5 mb-2">
-                      <View className="w-2 h-2 rounded-full bg-green-500" />
-                      <Text className="text-xs font-semibold text-green-600">
+                      <View className="w-2 h-2 rounded-full bg-status-success-text" />
+                      <Text className="text-label font-semibold text-ink">
                         Now
                       </Text>
                     </View>
@@ -60,26 +67,26 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
                   <View className="flex-row items-start justify-between mb-3">
                     <View className="flex-1">
                       <Text
-                        className={`text-base font-bold ${
-                          l.cancelled ? "text-gray-500 line-through" : "text-gray-900"
+                        className={`text-headline font-semibold ${
+                          l.cancelled ? "text-ink-muted line-through" : "text-ink"
                         }`}
                       >
                         {l.title}
                       </Text>
                       {l.cancelled && (
-                        <Text className="text-xs font-semibold text-gray-500 mt-0.5">
+                        <Text className="text-body-secondary font-semibold text-ink-secondary mt-0.5">
                           Cancelled by your admin — nothing to mark
                         </Text>
                       )}
                       <View className="flex-row items-center gap-1.5 mt-1">
-                        <Ionicons name="time-outline" size={13} color="#6b7280" />
-                        <Text className="text-xs text-gray-500">
+                        <Ionicons name="time-outline" size={13} color="#6b6b6b" />
+                        <Text className="text-body-secondary text-ink-secondary">
                           {formatTime(l.startTime)} – {formatTime(l.endTime)}
                         </Text>
                       </View>
                       <View className="flex-row items-center gap-1.5 mt-0.5">
-                        <Ionicons name="location-outline" size={13} color="#6b7280" />
-                        <Text className="text-xs text-gray-500">
+                        <Ionicons name="location-outline" size={13} color="#6b6b6b" />
+                        <Text className="text-body-secondary text-ink-secondary">
                           {l.location}
                         </Text>
                       </View>
@@ -88,7 +95,7 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
                     <ProgressChip progress={l.progress} />
                   </View>
 
-                  <Text className="text-xs text-gray-500 mb-3 -mt-1">
+                  <Text className="text-body-secondary text-ink-secondary mb-3 -mt-1">
                     {formatAttendees(l.students, l.guests)}
                     {l.summary ? ` · ${l.summary}` : ""}
                   </Text>
@@ -106,7 +113,7 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
                       toast. The screen behind it still opens, read-only,
                       because knowing who is expected is the reason a
                       trainee is there at all. */}
-                  <PrimaryButton
+                  <ScheduleButton
                     label={
                       !canMark(l.role)
                         ? "View lesson"
@@ -115,13 +122,13 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
                           : "Mark Attendance"
                     }
                     variant={
-                      !canMark(l.role) || isFinished(l.progress)
-                        ? "outline"
+                      !canMark(l.role) || isFinished(l.progress) || blockerShown
+                        ? "secondary"
                         : "primary"
                     }
                     onPress={() => openAttendance(l)}
                   />
-                </Card>
+                </View>
               );
             })}
           </View>
