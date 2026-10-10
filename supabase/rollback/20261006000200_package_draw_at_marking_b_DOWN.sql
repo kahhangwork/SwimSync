@@ -15,6 +15,16 @@ DO $$
 DECLARE
   r RECORD;
 BEGIN
+  -- Added by 20261010000100_single_child_packages (D9, RISK 9): switching off restores the legacy matcher, which
+  -- pools every package across siblings — a one-child package would silently pay for a sibling. Refuse first, with
+  -- the references, so the operator knows exactly which packages to refund or cancel. Never disable
+  -- trg_guard_one_child_packages_flag to push this rollback through.
+  IF EXISTS (SELECT 1 FROM parent_packages WHERE student_id IS NOT NULL AND status IN ('active', 'pending')) THEN
+    RAISE EXCEPTION 'one-child packages are held (%): refund or cancel them first — switching off restores the legacy matcher, which would pool them across siblings',
+      (SELECT string_agg(reference_number, ', ' ORDER BY reference_number) FROM parent_packages
+        WHERE student_id IS NOT NULL AND status IN ('active', 'pending'));
+  END IF;
+
   IF EXISTS (
     SELECT 1
       FROM package_applications pa

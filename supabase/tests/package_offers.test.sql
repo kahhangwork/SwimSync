@@ -295,7 +295,8 @@ SELECT is(
 RESET ROLE;
 
 -- ── Grants: anon holds EXECUTE on neither new callable (§7.39/§7.82) ─────────
-SELECT is(has_function_privilege('anon','create_package_offer(uuid,uuid,date)','EXECUTE'),
+-- (create_package_offer gained p_student_id in 20261010000100; the 3-arg form was dropped.)
+SELECT is(has_function_privilege('anon','create_package_offer(uuid,uuid,date,uuid)','EXECUTE'),
   false, 'anon has no EXECUTE on create_package_offer');
 SELECT is(has_function_privilege('anon','package_renewal_candidates()','EXECUTE'),
   false, 'anon has no EXECUTE on package_renewal_candidates');

@@ -757,13 +757,13 @@ isOneToOne: false
                   ]
                 },"package_products": {
                   Row: {
-                    "category_id": string | null,"created_at": string,"id": string,"is_active": boolean,"lesson_count": number,"name": string,"rate_per_lesson": number,"referral_discount_type": string | null,"referral_discount_value": number | null,"tenant_id": string,"validity_months": number,"validity_weeks": number
+                    "category_id": string | null,"created_at": string,"id": string,"is_active": boolean,"lesson_count": number,"name": string,"rate_per_lesson": number,"referral_discount_type": string | null,"referral_discount_value": number | null,"single_child": boolean,"tenant_id": string,"validity_months": number,"validity_weeks": number
                   }
                   Insert: {
-                    "category_id"?: string | null,"created_at"?: string,"id"?: string,"is_active"?: boolean,"lesson_count": number,"name": string,"rate_per_lesson": number,"referral_discount_type"?: string | null,"referral_discount_value"?: number | null,"tenant_id": string,"validity_months": number,"validity_weeks": number
+                    "category_id"?: string | null,"created_at"?: string,"id"?: string,"is_active"?: boolean,"lesson_count": number,"name": string,"rate_per_lesson": number,"referral_discount_type"?: string | null,"referral_discount_value"?: number | null,"single_child"?: boolean,"tenant_id": string,"validity_months": number,"validity_weeks": number
                   }
                   Update: {
-                    "category_id"?: string | null,"created_at"?: string,"id"?: string,"is_active"?: boolean,"lesson_count"?: number,"name"?: string,"rate_per_lesson"?: number,"referral_discount_type"?: string | null,"referral_discount_value"?: number | null,"tenant_id"?: string,"validity_months"?: number,"validity_weeks"?: number
+                    "category_id"?: string | null,"created_at"?: string,"id"?: string,"is_active"?: boolean,"lesson_count"?: number,"name"?: string,"rate_per_lesson"?: number,"referral_discount_type"?: string | null,"referral_discount_value"?: number | null,"single_child"?: boolean,"tenant_id"?: string,"validity_months"?: number,"validity_weeks"?: number
                   }
                   Relationships: [
                     {
@@ -819,13 +819,13 @@ isOneToOne: false
                   ]
                 },"parent_packages": {
                   Row: {
-                    "amount_payable": number,"cancel_extension_days": number,"cancelled_at": string | null,"category_id": string | null,"confirmed_at": string | null,"confirmed_by": string | null,"discount_amount": number,"expires_on": string | null,"holiday_extension_days": number,"id": string,"lesson_count": number,"manual_extension_days": number,"name": string,"offered_at": string | null,"offered_by": string | null,"paid_claimed_at": string | null,"parent_id": string,"product_id": string,"public_token": string | null,"rate_per_lesson": number,"reference_number": string,"referral_reward_id": string | null,"requested_at": string,"start_date": string | null,"status": string,"superseded_by": string | null,"tenant_id": string,"total_value": number,"validity_months": number,"validity_weeks": number,"value_remaining": number
+                    "amount_payable": number,"cancel_extension_days": number,"cancelled_at": string | null,"category_id": string | null,"confirmed_at": string | null,"confirmed_by": string | null,"discount_amount": number,"expires_on": string | null,"holiday_extension_days": number,"id": string,"lesson_count": number,"manual_extension_days": number,"name": string,"offered_at": string | null,"offered_by": string | null,"paid_claimed_at": string | null,"parent_id": string,"product_id": string,"public_token": string | null,"rate_per_lesson": number,"reference_number": string,"referral_reward_id": string | null,"requested_at": string,"start_date": string | null,"status": string,"student_id": string | null,"superseded_by": string | null,"tenant_id": string,"total_value": number,"validity_months": number,"validity_weeks": number,"value_remaining": number
                   }
                   Insert: {
-                    "amount_payable": number,"cancel_extension_days"?: number,"cancelled_at"?: string | null,"category_id"?: string | null,"confirmed_at"?: string | null,"confirmed_by"?: string | null,"discount_amount"?: number,"expires_on"?: string | null,"holiday_extension_days"?: number,"id"?: string,"lesson_count"?: number,"manual_extension_days"?: number,"name"?: string,"offered_at"?: string | null,"offered_by"?: string | null,"paid_claimed_at"?: string | null,"parent_id": string,"product_id": string,"public_token"?: string | null,"rate_per_lesson"?: number,"reference_number": string,"referral_reward_id"?: string | null,"requested_at"?: string,"start_date"?: string | null,"status"?: string,"superseded_by"?: string | null,"tenant_id": string,"total_value"?: number,"validity_months"?: number,"validity_weeks"?: number,"value_remaining"?: number
+                    "amount_payable": number,"cancel_extension_days"?: number,"cancelled_at"?: string | null,"category_id"?: string | null,"confirmed_at"?: string | null,"confirmed_by"?: string | null,"discount_amount"?: number,"expires_on"?: string | null,"holiday_extension_days"?: number,"id"?: string,"lesson_count"?: number,"manual_extension_days"?: number,"name"?: string,"offered_at"?: string | null,"offered_by"?: string | null,"paid_claimed_at"?: string | null,"parent_id": string,"product_id": string,"public_token"?: string | null,"rate_per_lesson"?: number,"reference_number": string,"referral_reward_id"?: string | null,"requested_at"?: string,"start_date"?: string | null,"status"?: string,"student_id"?: string | null,"superseded_by"?: string | null,"tenant_id": string,"total_value"?: number,"validity_months"?: number,"validity_weeks"?: number,"value_remaining"?: number
                   }
                   Update: {
-                    "amount_payable"?: number,"cancel_extension_days"?: number,"cancelled_at"?: string | null,"category_id"?: string | null,"confirmed_at"?: string | null,"confirmed_by"?: string | null,"discount_amount"?: number,"expires_on"?: string | null,"holiday_extension_days"?: number,"id"?: string,"lesson_count"?: number,"manual_extension_days"?: number,"name"?: string,"offered_at"?: string | null,"offered_by"?: string | null,"paid_claimed_at"?: string | null,"parent_id"?: string,"product_id"?: string,"public_token"?: string | null,"rate_per_lesson"?: number,"reference_number"?: string,"referral_reward_id"?: string | null,"requested_at"?: string,"start_date"?: string | null,"status"?: string,"superseded_by"?: string | null,"tenant_id"?: string,"total_value"?: number,"validity_months"?: number,"validity_weeks"?: number,"value_remaining"?: number
+                    "amount_payable"?: number,"cancel_extension_days"?: number,"cancelled_at"?: string | null,"category_id"?: string | null,"confirmed_at"?: string | null,"confirmed_by"?: string | null,"discount_amount"?: number,"expires_on"?: string | null,"holiday_extension_days"?: number,"id"?: string,"lesson_count"?: number,"manual_extension_days"?: number,"name"?: string,"offered_at"?: string | null,"offered_by"?: string | null,"paid_claimed_at"?: string | null,"parent_id"?: string,"product_id"?: string,"public_token"?: string | null,"rate_per_lesson"?: number,"reference_number"?: string,"referral_reward_id"?: string | null,"requested_at"?: string,"start_date"?: string | null,"status"?: string,"student_id"?: string | null,"superseded_by"?: string | null,"tenant_id"?: string,"total_value"?: number,"validity_months"?: number,"validity_weeks"?: number,"value_remaining"?: number
                   }
                   Relationships: [
                     {
@@ -863,6 +863,12 @@ isOneToOne: false
       columns: ["referral_reward_id"]
 isOneToOne: false
       referencedRelation: "referral_rewards"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "parent_packages_student_id_fkey"
+      columns: ["student_id"]
+isOneToOne: false
+      referencedRelation: "students"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "parent_packages_superseded_by_fkey"
@@ -1683,6 +1689,12 @@ isOneToOne: false
 "assert_markable_date":
 { Args: { "p_date": string,"p_tenant_id": string }; Returns: undefined
                            },
+"assert_package_child":
+{ Args: { "p_parent": string,"p_student": string,"p_tenant": string }; Returns: undefined
+                           },
+"assert_package_kind_free":
+{ Args: { "p_parent": string,"p_single_child": boolean,"p_tenant": string }; Returns: undefined
+                           },
 "assert_payout_month_open":
 { Args: { "p_date": string,"p_tenant_id": string,"p_what": string }; Returns: undefined
                            },
@@ -1813,7 +1825,7 @@ isOneToOne: false
 { Args: { "p_invoice_id": string,"p_notes"?: string }; Returns: string
                            },
 "create_package_offer":
-{ Args: { "p_parent_id": string,"p_product_id": string,"p_start_date": string }; Returns: string
+{ Args: { "p_parent_id": string,"p_product_id": string,"p_start_date": string,"p_student_id"?: string }; Returns: string
                            },
 "create_role":
 { Args: { "p_grid": Json,"p_name": string }; Returns: string
@@ -1989,7 +2001,7 @@ isOneToOne: false
                            },
 "package_candidates_for":
 { Args: { "p_session": string,"p_student": string }; Returns: {
-              "confirmed_at": string,"expires_on": string,"lesson_date": string,"package_id": string,"rate": number,"tenant_id": string,"value_remaining": number
+              "confirmed_at": string,"draw_rank": number,"expires_on": string,"lesson_date": string,"package_id": string,"rate": number,"tenant_id": string,"value_remaining": number
             }[]
                            },
 "package_draw_for":
@@ -2010,7 +2022,7 @@ isOneToOne: false
                            },
 "package_renewal_candidates":
 { Args: Record<PropertyKey, never>; Returns: {
-              "children": string,"expired_days_ago": number,"expires_on": string,"has_open_offer": boolean,"lessons_left": number,"original_product_id": string,"package_name": string,"parent_id": string,"parent_name": string,"parent_phone": string,"suggested_product_id": string,"tenant_id": string
+              "children": string,"expired_days_ago": number,"expires_on": string,"has_open_offer": boolean,"lessons_left": number,"original_product_id": string,"package_name": string,"parent_id": string,"parent_name": string,"parent_phone": string,"student_id": string,"suggested_product_id": string,"tenant_id": string
             }[]
                            },
 "package_return_for":
@@ -2074,6 +2086,9 @@ isOneToOne: false
                            },
 "reactivate_coach":
 { Args: { "p_coach_id": string }; Returns: undefined
+                           },
+"reassign_package_child":
+{ Args: { "p_package": string,"p_student": string }; Returns: undefined
                            },
 "reassign_student_tenant":
 { Args: { "p_student_id": string,"p_tenant_id": string }; Returns: undefined
@@ -2175,7 +2190,7 @@ isOneToOne: false
             }[]
                            },
 "suggest_package_start":
-{ Args: { "p_parent_id": string,"p_product_id": string }; Returns: string
+{ Args: { "p_parent_id": string,"p_product_id": string,"p_student_id"?: string }; Returns: string
                            },
 "suspend_tenant":
 { Args: { "p_tenant_id": string }; Returns: undefined

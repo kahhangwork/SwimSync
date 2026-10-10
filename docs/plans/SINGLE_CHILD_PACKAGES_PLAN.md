@@ -26,6 +26,18 @@ across siblings (PRD §7.16), so a second child's lessons silently draw from the
 | D8 | Renewal offers? | **A row per child** for a child whose own package is low/expired, offer tied to that child. Shared families keep one row per family. |
 | D9 | The engine's legacy matcher (runs only when `tenants.package_draw_at_marking` is false — all 3 prod tenants are true)? | **Block, don't change the engine.** The DB refuses a one-child package in a flag-off tenant and refuses turning the flag off while one is held. Removing the legacy path entirely is a **separate BACKLOG item**, after Little Orcas seals September (it is Wave 6's rollback until then). |
 | D10 | When does it go live? | **When verified** — not gated on Little Orcas' September Generate. No engine change, so engine v35's first-run proof is untouched. |
+| D11 | *(added 2026-10-10, build session — the user's call, replacing the mixed-family cases)* Can one family hold both kinds? | **No — one kind per family (parent × business).** A purchase of the other kind is REFUSED while the family holds a package of the current kind that is pending, or active with ≥1 lesson left and unexpired. Once used up, expired, cancelled or refunded, the family may switch. |
+
+**D11's consequences (build session).** Raised because §3 RISK 4's renewal-row definition (combined coverage) could not
+satisfy D8 or its own assertion (Ava own-low + healthy shared → one row). With D11 a family is shared XOR one-child,
+so: renewal rows are family rows for a shared family and per-child rows for a one-child family (D8 and §3 now agree);
+the D5 order and `draw_rank` are KEPT, because one path still co-holds both kinds briefly — a reversed draw returns a
+lesson to a used-up shared package after an own package was bought; the RISK 4 assertions become "Ava own-low + Ben
+own-healthy → one row" and "Ava own-low + Ben own-low → two rows"; the "mixed family" PK001 case (§3, §6, §7) is now
+reachable only through that reversal and is no longer pinned; a family row's offer picker lists shared products only
+and a child row's lists one-child products only. Enforced by a SECURITY DEFINER helper `assert_package_kind_free`
+called from the lifecycle trigger on INSERT (same grant shape as `assert_package_child`), under a per-family advisory
+lock so two concurrent purchases cannot both pass.
 
 Prod facts this plan relies on (read 2026-10-10): 3 tenants, all `package_draw_at_marking = true`. Little Orcas has 6
 active products and 1 active package (PKG-2026-0002, the Ang family, shared, drawn from B's backfill). Its September is
