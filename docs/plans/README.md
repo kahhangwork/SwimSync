@@ -29,6 +29,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 | WAVE8_GENERATED_TYPES_PLAN.md | DONE (§8.141, deploys #77–#78) | Wave 8 — generated Supabase `Database` types in both apps, DB `any`s removed, guards G5/G6 + runtime-identity; Bug ledger #1–#5 |
 | PIN_DRIVER_CLOCK_PLAN.md | DONE except step 5 — engine v35 on prod (deploy #81), proof = the next real Generate (§8.144) | Pin the clock for UI drivers — `run-all-drivers.sh --now`: browser + PostgREST (local-only lock-2 row) + engine reads `app_now()`; full driver sweep |
 | SINGLE_CHILD_PACKAGES_PLAN.md | BUILT 2026-10-11, deploy pending (D11 added in the build) | Wave 9 — a package product can be one-child only (Little Orcas); per-child draw, offers, picker |
+| UI_RESTYLE_PLAN.md | IN PROGRESS (logo + tokens built; coach Schedule built; nothing landed) | Wave 9 #8 — every surface to `DESIGN.md`, one screen per commit; relaxed nightly gate for visual-only (§6); Q1 Sep/Sept open |
 
 ## Done
 
