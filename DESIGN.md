@@ -275,7 +275,7 @@ A single stroke: a swell of water that flows into a tick — the lesson marked, 
 - **Colour:** Lane Blue on light grounds; white on Lane Blue for the app-icon tile; white on Ink for dark grounds.
 - **Lockup:** mark left of the "SwimSync" wordmark in Geist 600, −0.03em.
 - **Not yet shipped** — `brand/` still holds the pace clock. Replacing it is its own change: `brand/` sources,
-  both `components/Logo.tsx`, and every raster listed in `brand/README.md`. Run an IPOS trademark search first.
+  both `components/Logo.tsx`, and every raster listed in `brand/README.md`. IPOS trademark search: run by the owner 2026-10-11, clear.
 
 ### Signature behaviours (from the 2026-10-11 critique)
 **The Blocked-Action Rule.** An action the system will refuse is shown **disabled with the reason beside it and a
