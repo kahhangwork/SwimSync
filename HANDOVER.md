@@ -26,7 +26,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.360** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.361** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -359,7 +359,7 @@ first with `/plan-with-confidence` + `/plan-review`.**
 - **Planned:** *Single-child packages* — 10 user decisions + 14 inlined risks; nothing built. BACKLOG Wave 9 also holds
   *UI/UX improvements* (audit first) and *Remove the legacy package matcher* (gated on Little Orcas' September seal).
 - **Not done:** Little Orcas' September Generate (the owner's — a platform admin has no Generate button, and the user
-  asked; declined to work around it). The reviewer's 4 GOTCHAS candidates were offered, not applied.
+  asked; declined to work around it). The reviewer's 4 GOTCHAS candidates: applied after close (§7.361 + bullets on §7.165, §7.189, §7.205).
 
 ## 8.144 (2026-10-09 → 10) — Pin the clock for UI drivers, two lanes
 

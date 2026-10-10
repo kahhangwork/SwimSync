@@ -36,7 +36,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
-| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350 |
+| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360 |
@@ -1554,6 +1554,12 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     predicate.** `apply_referral_reward` (BEFORE) re-uses a reward reserved by an open admin offer
     (`create_package_offer` never supersedes; `supersede_open_package_offer` (AFTER) is too late): candidate set is `available` OR `reserved` by a to-be-superseded offer of the same family, re-pointing `reserved_package_id`. `settle_referral_reward`'s release arm is guarded `AND reserved_package_id = OLD.id`, so
     the supersede-cancel does NOT release the new row's reward. (RISK 4 · §8.61)
+    - **The two predicates are ONE (found at plan-review 2026-10-10, single-child packages).**
+      `supersede_open_package_offer`'s "which open offer does this purchase cancel" and `apply_referral_reward`'s
+      "reserved by a to-be-superseded offer" arm must stay identical. Narrow either alone (e.g. scope supersede to the
+      same child) and one reward discounts TWO packages: the new purchase takes the reward the offer held, the offer
+      is no longer cancelled and keeps it. Change them together, with a pgTAP that one reward has at most one
+      non-cancelled package.
 
 166. **A discount is a PRICE concept, not a VALUE concept** — `total_value` / `value_remaining` / invoice
     `package_applied` never move; only `amount_payable` (= `total_value − discount_amount`) does. The in-app PayNow QR (`SwimSyncApp/app/(parent)/billing/paynow.tsx`) and the
@@ -1700,6 +1706,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     migration** — callable by nobody until granted (§7.87); a missing grant broke every package sale. Census callers
     and re-run their suites: a same-typed arg whose *meaning* changed (weeks→days) is a silent ×7 error.
     (`package_effective_end`, `p_ph_ext_weeks`→`p_holiday_days`, `20260818000600`; §8.70.)
+    - **Adding a DEFAULTed parameter is the same trap in disguise (found at plan-review 2026-10-10, single-child
+      packages).** `CREATE OR REPLACE f(a, b, c DEFAULT NULL)` does not replace `f(a, b)` — it creates a SECOND
+      overload, and every existing 2-argument call then fails in PostgREST with **PGRST203** ("could not choose the
+      best candidate function"). DROP the old signature, CREATE the new one, re-apply the captured ACL (a new
+      function grants EXECUTE to PUBLIC — `anon` on a DEFINER function), and assert **one `pg_proc` row per name**.
 
 190. **A coverage/attribution resolver lifted from the billing engine must carry the engine's TENANT filter, or it
     leaks across businesses.** The engine filters `.eq("tenant_id", …)` FIRST; without it a two-tenant parent gets a
@@ -1808,6 +1819,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     enrolments). **Key per (package, cancelled LESSON), scope `apply_cancel_reconcile(class, date)` to it**; a
     3-trigger fan (ins/upd/**del**) retracts a raw-deleted session (§7.199). Pin `cancel_package_extension.test.sql`
     14 (must NOT move another package). NO enrolment trigger, no re-fire on activation — deliberate. (2026-08-22.)
+    - **Changing WHO a package covers must re-run both reconcilers for that package (found at plan-review
+      2026-10-10, single-child packages).** Holiday and advance-cancel extensions are keyed (package, date) through
+      `holiday_covering_package`, and nothing re-derives them when coverage changes — so a package moved to another
+      child (or re-scoped) keeps extension days its previous holder earned. Any coverage-changing write (e.g.
+      `reassign_package_child`) recomputes that package's extensions in the same transaction.
 
 206. **A post-payment DEBIT is a SEPARATE `debit_balance` column, NEVER a signed `credit_balance`.**
     (`20260822000100`, §8.83.) The ledger assumes `pool = Σ(note amount − live draws)`, `pool ≥ 0`; negative consumes
@@ -2945,3 +2961,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `confirmed_at`, `requested_at`, `deactivated_at`) is written with `app_now()` in a fixture. Read the writer from
     `pg_get_functiondef`, not the migration (§7.40). (2026-10-09, pin-clock sweep; `fixtures-grading-admin` too.)
 
+361. **An ORDER BY inside a set-returning function is not a contract — every caller re-sorts.** `package_draw_for`,
+    `guard_package_draw_order` and `package_backlog_preview` each sort `package_candidates_for`'s rows AGAIN by
+    `expires_on, confirmed_at, id`, so changing the matcher's ORDER BY reaches none of them, and the return table had
+    no column the new order could be sorted on. Found at plan-review 2026-10-10 (single-child packages' "own package
+    first"): the draw would have picked the shared package, PK001 would have judged it and refused a whole-class save
+    over a sibling's lesson. Rule: **expose the order as a returned column (`draw_rank`) and have every caller sort by
+    it**, pinned by a catalogue census (`pg_get_functiondef` of each caller references `draw_rank`). Read callers with
+    `pg_get_functiondef`, never the migration (§7.40).
