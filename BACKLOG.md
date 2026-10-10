@@ -296,8 +296,8 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 
 7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
    user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
-8. **UI/UX improvements** (M, *Platform and reach*). Target system decided 2026-10-11 — root `DESIGN.md`. Next: audit
-   the live screens against it, then file concrete S items.
+8. **UI/UX improvements** (M, *Platform and reach*). Target: root `DESIGN.md`. Logo + tokens done and the audit filed
+   2026-10-11; now **one screen per change** — the ranked S list under the item, starting with *Coach Schedule*.
 9. **Remove the legacy package matcher** (M, *Billing and payments*). Gated: only after Little Orcas seals September
    (it is Wave 6's rollback until then). Independent of 7–8.
 
@@ -1588,21 +1588,79 @@ roles. Do it before the co-admin hire if the owner builds such a role.
 
 ## Platform and reach
 
-### UI/UX improvements across the admin panel, parent app and coach app — **M** (audit first) — _filed 2026-10-10_
-A polish pass over all three surfaces.
+### UI/UX improvements across the admin panel, parent app and coach app — **M** — _filed 2026-10-10, audited 2026-10-11_
+A restyle of all three surfaces to root **`DESIGN.md`** — direction A (neutral greys, one blue `#2563eb`, Geist, flat
+bordered cards), the five-step status scale, the new logo, and the Blocked-Action / Pay-First / Blocker-Outranks-Routine
+rules. **Those look decisions are final** (user, 2026-10-11): don't reopen look, colour, font or logo.
 
 **Why:** the user wants it.
 
-**Decided 2026-10-11:** the target is **root `DESIGN.md`** — direction A (neutral greys, one blue `#2563eb`, Geist,
-flat bordered cards), a five-step status scale, the new logo, and three signature rules from an Impeccable critique of
-the mock-ups (Blocked-Action, Pay-First, Blocker-Outranks-Routine). The user scoped the first pass to that critique's
-P0 + P1: the status scale, Generate disabled-with-reason on a blocked month plus a month picker, parent PayNow-first,
-and the coach's billing blocker above routine lessons.
+**The user's order (2026-10-11):** 1) ship logo 2a · 2) DESIGN.md tokens in both Tailwind configs, no screen changes ·
+3) audit every screen (`run-ui-playwright` + Impeccable audit), file ranked S items · 4) one screen per change, starting
+with coach Schedule. **Stop and ask before adding any new package.** Steps 1–3 done 2026-10-11 (logo `9edfee4`, tokens
+`f805461` — classes listed in `DESIGN.md` → *Tokens as Tailwind classes*).
 
-**Notes:** Step one is an **audit**: drive each app (`run-ui-playwright`), list concrete issues,
-rank them with the user, then file each as its own S item. Do it **after** *Single-child packages*, which changes the
-package screens (Packages page, purchase flow, chips, parent Billing → Packages); polishing those first would be
-redone.
+**The audit (2026-10-11):** 81 live screens at 1440px / 390px against `DESIGN.md`, four parallel reviewers + Impeccable's
+detector (3 findings: two `border-l-4` side-tabs in `components/calendar/LessonCard.tsx`, grey-on-amber in
+`ConfirmGenerateModal.tsx:96`). The global gap — sky theme, shadows, pills, system font — is every screen and is what each
+S item below removes from its own screen.
+
+**S items, in the order the user accepted 2026-10-11 (each ≤ ~2 h, one screen or one shared component; UI drivers assert on
+visible text, so keep words unless the item changes them on purpose):**
+
+1. **Coach Schedule restyle** (`app/(coach)/schedule`) — a Danger container above everything when past lessons are
+   unmarked, naming the months it blocks ("20 lessons not marked · blocks Sep and Oct billing") with the screen's ONE
+   primary, *Mark attendance* → the oldest; the list collapses to 3 rows + "See all 20" so *Today* is not buried; each
+   lesson card carries one status tag (Blocks billing · Not marked · 3 of 5 marked · Marked · Upcoming); greeting fixed
+   ("Coach Coach Marcus" — the name already holds "Coach"); dates per the One Date Style rule.
+2. **Mobile tab bar to spec** (coach + parent `_layout.tsx`) — labels are 11px `#9ca3af` (~2.5:1), active is colour
+   alone, "Settings"/"Billing" descenders clip to "Settinas"/"Billina". → 12px `#525252`, active Ink 600 + 2px blue
+   indicator, 64px + safe area.
+3. **Parent invoice card** (Billing → Invoices) — Pay-First (PayNow full-width primary, "Already paid?" text link
+   beneath, Info "Claimed · awaiting confirmation" after a claim); "Gross / Net Amount" → "N lessons / Credit / To pay";
+   unpaid is amber, money in Ink, true minus.
+4. **Admin Invoices: Generate disabled with the reason** — today a live primary while the seed month has 20 unmarked
+   lessons; the month shows amber "Not billed yet". → disabled + "20 lessons unmarked → Review", the month a Danger tag.
+   (The critique's "month picker" is already done: it is a native month input.)
+5. **Admin sidebar stacks below 800px** (`components/Sidebar.tsx` + shell) — **P0**: at 390px it stays ~200px wide and
+   leaves the page a ~180px strip (Students shows one column; Invoices' fields clip).
+6. **Parent invoice detail** — the same Pay-First / Plain Words fix, and the **Lesson Breakdown card renders empty**
+   (no rows, no empty text), so a parent cannot see what they are paying for.
+7. **One status scale across every tag** — revive the parked branch `ui/status-scale` (`08fe3d9`: twin
+   `lib/statusTone.ts`, both `StatusBadge`s, Claimed tag, month tones), extended with Due vs Overdue. Rebase it onto the
+   tokens first (its classes predate them).
+8. **Admin Lessons + the sidebar badge** — past unmarked lessons show amber "Needs marking" (→ Danger "Blocks billing");
+   the sidebar badge says 20 while the page tab says 2 — one count definition, Danger colour.
+9. **One date style in admin tables** — ISO (`2026-10-11`) or numeric (`11/10/2026`) on Credit Notes, Referrals,
+   Packages, Wages, Attendance, Assessment; Wages shows the placeholder `2000-01-01` as a real date. Display through
+   `formatSgStamp`.
+10. **Settings out of working pages** — start with Invoices (PayNow UEN/mobile + auto-generation share the Generate card,
+    and its two day-7 sentences contradict); then Wages, Referrals, Packages.
+
+**Fold-ins — fix whenever the screen is touched (not their own items):**
+- Plurals: "1 students" (coach Classes), "1 coaches", "1 families".
+- Credit amounts in link-blue with no minus (admin Credit Notes, parent invoice + credit notes) → Ink, `−S$40.00`.
+- Tables with 2+ inline actions or an inline destructive one (Classes, Locations, Platform, Parents, Coaches, Roles,
+  Credit Notes) → one inline action + a "…" menu.
+- Coloured money text (blue / green / red) → Ink, status in the tag; money right-aligned and tabular.
+- Helper text under 12px on ~12 admin screens; tab/section captions in `gray-400`.
+- More than one primary per section (Referrals, Packages ×3, Platform, parent Buy-a-package cards).
+- Amber "Awaiting confirmation" on Packages is the Claimed state → Info.
+- A green "Assigned" tag on every child card says nothing → tag only non-routine states; one tag per card.
+- Red S$0.00 "Outstanding" box on child profile; red "Outstanding Payment" banner for a plain unpaid bill (parent home).
+- Students: green "Assigned" with no class or coach (packages tenant); greyed "No levels defined" dropdown on every row.
+- Child form: Date of Birth is free text (`YYYY-MM-DD`); Edit Child pre-selects "Male" where the profile shows "—";
+  placeholders that look like values ("Emma Tan").
+- Bad public-invoice token is a dead end (no way forward). Calendar legend ~11px, red for "(Sub)", shape-only signal.
+- Mark Attendance: *Set all* top-right out of thumb reach; tab bar highlights Classes when arrived from Schedule.
+
+**Not audited yet (re-capture with edge functions served):** the public invoice and package token pages (both rendered
+"not found" — `supabase functions serve` was down), parent Contact and Join (the scripted tap landed on Profile), the
+coach Pay tab (shown only to a coach with payouts — no fixture coach had one), admin reset-password / accept-invite
+forms (need a real token), the calendar `LessonCard` side-tab (no lessons on the captured day).
+
+**Open question for the user:** Geist is declared but not loaded. Admin: `next/font/google`, no new package. App: needs
+a font package (e.g. `@expo-google-fonts/geist`) — **ask first**.
 
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
