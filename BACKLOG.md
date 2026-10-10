@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-10 — the three Foundations S-items filed from §8.144 are **DONE** (week-long pinned roundtrip in CI, `--only` teardown, scoped `billing_runs` delete). Nothing is ranked or unparked; the next pick is a decision. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request) then *UI/UX improvements* (M, audit first). Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -291,6 +291,12 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 
 6. ~~*Generate real Supabase `Database` types*~~ — **shipped 2026-10-06** (§8.141, ARCHITECTURE §6ag,
    `docs/plans/WAVE8_GENERATED_TYPES_PLAN.md`); found and fixed five bugs on the way (Bug ledger #1–#5).
+
+#### Wave 9 — set 2026-10-10 with the user
+
+7. **Single-child packages** (L, *Billing and payments*). Little Orcas asked for it, and it changes the money rule
+   for which package pays. Goes first because the UI pass would otherwise polish package screens this rewrites.
+8. **UI/UX improvements** (M, *Platform and reach*). Audit all three apps first, then file concrete S items.
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
 (low-balance nudge, automated reminders), Native builds → Push → Logo check, Bulk WhatsApp, In-app payment gateway.
@@ -1090,6 +1096,29 @@ modifier in the system — changes `amount_payable`, never `total_value`. **LIVE
 (`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
 
+### Single-child packages — the admin decides, per product, whether siblings can share — **L** — _filed 2026-10-10, requested by Little Orcas_
+On the admin **Packages** page, each package product is marked **Shared across siblings** (today's behaviour, the
+default) or **One child only**. Buying a one-child product names the child, and only that child's lessons can draw
+from it.
+
+**Why:** Little Orcas asked for it. They don't let one package cover two children, but SwimSync pools every package
+per (parent, business) across siblings (PRD §7.16), so today a second child's lessons silently draw from the first
+child's package.
+
+**Settled with the user 2026-10-10:**
+- **Per product**, not per business or per purchase. A business can offer both kinds.
+- **Already-sold packages stay shared.** They keep the terms they were sold under, including the Ang family's at
+  Little Orcas. Only new purchases of a one-child product are tied to a child.
+
+**Notes:** this is an L because it changes the rule for which package pays, and many things read that rule: the
+draw at marking (Wave 6), *earlier lessons get first claim* (it counts siblings' lessons today), the backdated
+*Check marked lessons* dialog, the per-child **Package · N left** chip and the copy saying the count is
+family-shared, the running-low filter, renewal offers and the `/package` pay page, referral rewards, refunds and the
+parent's **Show lessons used**. `parent_packages` has no child column today (it's keyed by `parent_id`), so this needs
+a migration: an optional child on the held package plus a flag on the product. Product money terms are immutable
+(retire and recreate), so decide whether the flag counts as a money term. Plan it with `/plan-with-confidence`
+before building.
+
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
 the admin sending a renewal offer.
@@ -1551,6 +1580,16 @@ role with an area at View; every standard role is Edit or None on each area exce
 roles. Do it before the co-admin hire if the owner builds such a role.
 
 ## Platform and reach
+
+### UI/UX improvements across the admin panel, parent app and coach app — **M** (audit first) — _filed 2026-10-10_
+A polish pass over all three surfaces.
+
+**Why:** the user wants it. No specific screens or complaints have been named yet.
+
+**Notes:** unscoped as filed. Step one is an **audit**: drive each app (`run-ui-playwright`), list concrete issues,
+rank them with the user, then file each as its own S item. Do it **after** *Single-child packages*, which changes the
+package screens (Packages page, purchase flow, chips, parent Billing → Packages); polishing those first would be
+redone.
 
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
