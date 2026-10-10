@@ -112,8 +112,8 @@ components:
 > `docs/design/`. The name `DESIGN.md` is a standard (Google's DESIGN.md format) that design tools such as
 > Impeccable load automatically, which is why it is not called anything else.
 >
-> **Status (2026-10-11): target, not yet adopted.** The apps today still use Tailwind sky (`#0ea5e9`), white
-> cards with shadows and the pace-clock logo. Screens move to this system one at a time under BACKLOG
+> **Status (2026-10-11): target, adoption begun.** The **logo is shipped** (below). Otherwise the apps today still
+> use Tailwind sky (`#0ea5e9`) and white cards with shadows. Screens move to this system one at a time under BACKLOG
 > *UI/UX improvements* — never in one sweep (the UI drivers assert on visible text). Until a screen is
 > migrated, its code is not evidence against this file. Chosen from three drawn directions; mock-ups:
 > https://claude.ai/artifact/2gSDdtZbKEb3pVnmDiVEKK · logo concepts: https://claude.ai/artifact/PxWBq9tXtsBYZEgnnvRYKT
@@ -274,8 +274,10 @@ A single stroke: a swell of water that flows into a tick — the lesson marked, 
   round caps and joins.
 - **Colour:** Lane Blue on light grounds; white on Lane Blue for the app-icon tile; white on Ink for dark grounds.
 - **Lockup:** mark left of the "SwimSync" wordmark in Geist 600, −0.03em.
-- **Not yet shipped** — `brand/` still holds the pace clock. Replacing it is its own change: `brand/` sources,
-  both `components/Logo.tsx`, and every raster listed in `brand/README.md`. IPOS trademark search: run by the owner 2026-10-11, clear.
+- **Shipped 2026-10-11** — `brand/` sources, both `components/Logo.tsx` and every raster (`node brand/render.mjs`;
+  production notes in `brand/README.md`). In a tile the mark is ~70% of the tile's width. The lockup's wordmark is
+  still the system font until Geist is loaded with the tokens. IPOS trademark search: run by the owner 2026-10-11,
+  clear.
 
 ### Signature behaviours (from the 2026-10-11 critique)
 **The Blocked-Action Rule.** An action the system will refuse is shown **disabled with the reason beside it and a

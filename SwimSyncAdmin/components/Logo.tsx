@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The SwimSync mark — a poolside pace clock.
+ * The SwimSync mark — a wave flowing into a tick (DESIGN.md → Logo, concept 2a).
  *
  * Canonical geometry lives in `brand/mark.svg` at the repo root; this component
  * is a hand-kept copy of the same paths so the admin can render it inline (no
@@ -17,22 +17,22 @@ export function LogoMark({ className }: { className?: string }) {
       aria-hidden="true"
       focusable="false"
     >
-      <g
+      <path
+        d="M6 32Q13 21 20 32T34 32L42 42 58 18"
         fill="none"
         stroke="currentColor"
-        strokeWidth={7.5}
+        // 9, not the canonical 8.5: every use here is 24–40px, around the 32px
+        // where DESIGN.md thickens the stroke so the wave does not thin out.
+        strokeWidth={9}
         strokeLinecap="round"
-      >
-        <path d="M36.57 10.48A22 22 0 1 1 27.43 10.48" />
-        <path d="M32 32 40.5 17.3" />
-      </g>
-      <circle cx="32" cy="32" r="4.5" fill="currentColor" />
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 
 /**
- * The mark in its sky tile, at the sizes the panel actually uses.
+ * The mark in its Lane Blue tile, at the sizes the panel actually uses.
  * `sm` is the sidebar brand; `lg` is the centred mark on the auth screens.
  */
 export function Logo({
@@ -43,12 +43,14 @@ export function Logo({
   className?: string;
 }) {
   const box = size === "lg" ? "h-14 w-14 rounded-2xl" : "h-9 w-9 rounded-xl";
-  const inner = size === "lg" ? "h-8 w-8" : "h-5 w-5";
+  // ~70% of the tile, as in the app icon: the mark is wide and flat, so the
+  // pace clock's ~57% left it looking lost in the tile.
+  const inner = size === "lg" ? "h-10 w-10" : "h-6 w-6";
 
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center bg-sky-500",
+        "flex shrink-0 items-center justify-center bg-blue-600",
         box,
         className
       )}

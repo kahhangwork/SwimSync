@@ -1617,8 +1617,8 @@ spend, not engineering.
 
 ### ~~Check the logo for brand collisions~~ — **S** — **DONE 2026-10-11**
 **Done (user, 2026-10-11):** the owner ran an IPOS trademark search on the NEW mark — concept 2a, "wave into a
-tick" (`DESIGN.md` → Logo) — and it came back clear. The wordmark typeface is settled too: Geist 600. The mark itself
-is not yet shipped; that is part of *UI/UX improvements*.
+tick" (`DESIGN.md` → Logo) — and it came back clear. The wordmark typeface is settled too: Geist 600. The mark shipped
+the same day (`brand/README.md`).
 
 **Deferred (user, 2026-09-27):** a brand refactor is coming; run this check as part of it, against the NEW mark,
 not the current pace clock — checking a mark about to be replaced is wasted work. Not before the user starts it.
