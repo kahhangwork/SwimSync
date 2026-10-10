@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request) then *UI/UX improvements* (M, audit first). Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -297,6 +297,8 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 7. **Single-child packages** (L, *Billing and payments*). Little Orcas asked for it, and it changes the money rule
    for which package pays. Goes first because the UI pass would otherwise polish package screens this rewrites.
 8. **UI/UX improvements** (M, *Platform and reach*). Audit all three apps first, then file concrete S items.
+9. **Remove the legacy package matcher** (M, *Billing and payments*). Gated: only after Little Orcas seals September
+   (it is Wave 6's rollback until then). Independent of 7–8.
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
 (low-balance nudge, automated reminders), Native builds → Push → Logo check, Bulk WhatsApp, In-app payment gateway.
@@ -1118,6 +1120,21 @@ parent's **Show lessons used**. `parent_packages` has no child column today (it'
 a migration: an optional child on the held package plus a flag on the product. Product money terms are immutable
 (retire and recreate), so decide whether the flag counts as a money term. Plan it with `/plan-with-confidence`
 before building.
+
+### Remove the legacy package matcher (pay-at-the-monthly-run) — **M** — _filed 2026-10-10; WAIT until Little Orcas seals September_
+Delete the old way a package pays for a lesson: the engine's own FIFO matcher (`generate-invoices/core.ts`, the
+`drawAtMarking ? [] : packagesByParent…` loop and its writes), `package_live_balances()`'s flag-off simulation, and the
+`tenants.package_draw_at_marking` switch read by six DB functions; then drop the column (engine first, then the
+migration — expand/contract).
+
+**Why:** every tenant has drawn at marking since Wave 6 (all 3 on prod, checked 2026-10-10), so the old path is dead
+code that every package change must still respect — *Single-child packages* had to add a DB block for it (its D9).
+
+**Notes:** **not before Little Orcas seals September.** Until a month containing draws is sealed, the old path IS
+Wave 6's rollback (`supabase/rollback/20261006000200_package_draw_at_marking_b_DOWN.sql`). After that the rollback
+refuses anyway, so removal costs nothing. Old invoices' "Paid by package" lines are stored data and stay. Needs an
+engine deploy, which should follow engine v35's first real run. Removes *Single-child packages*' D9 guard with it.
+Tests to trim: 4 pgTAP files, `wave6.test.ts` + `test-helpers.ts`, `fixtures-package-draw-at-marking.sql`.
 
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
