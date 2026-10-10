@@ -112,11 +112,30 @@ components:
 > `docs/design/`. The name `DESIGN.md` is a standard (Google's DESIGN.md format) that design tools such as
 > Impeccable load automatically, which is why it is not called anything else.
 >
-> **Status (2026-10-11): target, adoption begun.** The **logo is shipped** (below). Otherwise the apps today still
-> use Tailwind sky (`#0ea5e9`) and white cards with shadows. Screens move to this system one at a time under BACKLOG
+> **Status (2026-10-11): target, adoption begun.** The **logo is shipped** (below) and **the tokens are in both
+> Tailwind configs** (classes below), unused until a screen migrates. Otherwise the apps today still use Tailwind sky
+> (`#0ea5e9`) and white cards with shadows. Screens move to this system one at a time under BACKLOG
 > *UI/UX improvements* — never in one sweep (the UI drivers assert on visible text). Until a screen is
 > migrated, its code is not evidence against this file. Chosen from three drawn directions; mock-ups:
 > https://claude.ai/artifact/2gSDdtZbKEb3pVnmDiVEKK · logo concepts: https://claude.ai/artifact/PxWBq9tXtsBYZEgnnvRYKT
+
+## Tokens as Tailwind classes
+
+Both `tailwind.config.*` files carry the front matter above as **added** classes (the legacy `primary-50…900` sky
+shades stay until no screen uses them). Each app's `lib/designTokens.drift.test.ts` fails if a config and this file
+disagree — change both together.
+
+| Token | Class |
+|---|---|
+| primary / primary-hover | `bg-primary`, `hover:bg-primary-hover` (`text-primary`, `ring-primary`…) |
+| ink / ink-secondary / ink-muted | `text-ink`, `text-ink-secondary`, `text-ink-muted` |
+| ground · surface · divider · selected | `bg-ground`, `bg-surface`, `divide-divider` / `border-divider`, `bg-selected` |
+| border / border-strong | `border-border`, `border-border-strong` |
+| status-{tone}-{text,bg,border} | `text-status-warning-text`, `bg-status-warning-bg`, `border-status-warning-border` |
+| rounded sm / md / lg | `rounded-tag` (4) · `rounded-control` (6) · `rounded-card` (8) — Tailwind owns `rounded-sm` |
+| display · headline · body · body-secondary · label | `text-display`, `text-headline`, `text-body`, `text-body-secondary`, `text-label` |
+| the floating shadow | `shadow-float` |
+| Geist | `font-geist` — **not loaded yet** in either app; falls back to system-ui |
 
 ## Overview
 
