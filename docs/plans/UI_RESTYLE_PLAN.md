@@ -18,16 +18,12 @@ silent win for either side.**_
    ones already approved.
 6. **Every `⚠ RISK n MITIGATION` under a step is part of that step.** A step is not done, and is not ticked, until each
    of its mitigations is done or its assertion holds. Walk §11 (pre-commit gate) before every commit.
-7. **Open question for the user — Q1 (blocks the date half of 2.1 and every later date change):**
-   `DESIGN.md`'s One Date Style writes `Sep 2026` / `Thu 8 Oct` (no comma). The product says **"Sept"** everywhere —
-   13 DB functions through `sg_date_label` (migration `20261009000100`), the invoice/credit-note/package emails, and the
-   CI guard G-Sept (`scripts/check-sept.sh`, §7.302) — and en-SG `Intl` prints `Sat, 26 Sept`. Ask: *"September as
-   'Sept' (the product and CI today) or 'Sep' (DESIGN.md)? And weekday dates with or without the comma?"*
-   ⚠ RISK 6 MITIGATION — until the user answers: **use "Sept"**, and treat DESIGN.md's examples as the format,
-   not the September spelling. **Do NOT add a `// sept-ok` marker to a month a person reads, and do NOT edit or weaken
-   `check-sept.sh`, `sg_date_label` or `sgDisplay.drift.test.ts` in a restyle commit.** If the user picks "Sep", it is
-   its own non-visual-only change (a migration + guard change, root checkout, `db/…` branch), landed before any screen
-   relies on it.
+7. **Q1 — ANSWERED 2026-10-11: September is "Sept".** The product already says it everywhere — 13 DB functions through
+   `sg_date_label` (migration `20261009000100`), the invoice/credit-note/package emails, en-SG `Intl` — and CI guard
+   G-Sept (`scripts/check-sept.sh`, §7.302) enforces it. `DESIGN.md`'s One Date Style now reads `Sept 2026`. Weekday
+   dates follow `DESIGN.md`: `Thu 8 Oct`, no comma (a display-only helper, D4).
+   **Do NOT add a `// sept-ok` marker to a month a person reads, and do NOT edit or weaken `check-sept.sh`,
+   `sg_date_label` or `sgDisplay.drift.test.ts`.**
 
 ---
 
@@ -65,7 +61,7 @@ Blocker-Outranks-Routine), the Plain Words / Aligned Money / One Date Style rule
 | D1 | **The look is final**: direction A as written in `DESIGN.md` — tokens, Geist, blue-600, logo 2a, status scale, the three signature rules. No new options, no taste passes. |
 | D2 | **Order**: 1) ship logo 2a → 2) tokens in both Tailwind configs, no screen change → 3) audit every screen + Impeccable audit, file ranked S items → 4) **one screen per change, starting with coach Schedule**. Steps 1–3 are done. |
 | D3 | **Shipping — the nightly gate is relaxed for restyles.** A *visual-only* change (definition §6) may land on `main` without waiting for the next nightly, once its own `--only` drivers are green. Logic/data changes keep the gate. A red nightly freezes further restyle landings until it is triaged. |
-| D4 | **Wording may change** to meet `DESIGN.md` (sentence-case headings, `Sat 26 Sep`, Plain Words) — **and every driver that asserts the old string is updated in the same commit**, proven by `--only` runs before and after. |
+| D4 | **Wording may change** to meet `DESIGN.md` (sentence-case headings, `Sat 26 Sept`, Plain Words) — **and every driver that asserts the old string is updated in the same commit**, proven by `--only` runs before and after. |
 | D5 | **Geist is loaded in both apps.** Admin via `next/font/google` (built into Next, no package). App via **`@expo-google-fonts/geist`** (approved; `expo-font ~13.0.2` is already a dependency). |
 | D6 | **Scope is everything**: every app screen, the platform panel, public token pages, auth screens, transactional emails, and retiring the legacy tokens/components at the end. |
 | D7 | **Ask before any OTHER new package.** |
@@ -240,7 +236,7 @@ Tick `[x]` in the commit that ships each. **S#** = the BACKLOG ranked item it sa
   - Propose the full sweep to the user and wait. If declined, 1.6 lands under the HANDOVER §9 GATE.
 
 ### Phase 2 — coach app (one screen per commit)
-- [ ] **2.1** Schedule (S1) — _built on `ui/coach-schedule`_; on landing, switch headings to sentence case and dates to `Sat 26 Sep` with driver updates (D4).
+- [ ] **2.1** Schedule (S1) — _built on `ui/coach-schedule`_; on landing, switch headings to sentence case and dates to `Sat 26 Sept` with driver updates (D4).
   - ⚠ RISK 6 MITIGATION — **Before committing the built branch:** `scripts/check-sept.sh` exits 1 on
     `scheduleFormat.ts:22`. Until Q1 is answered, `blockedMonths` spells September **"Sept"**. Change `MONTHS`, its
     comment, and the three `scheduleFormat.test.ts` expectations ("Sep", "Sep and Oct", "Aug, Sep and Oct", and the
@@ -431,7 +427,7 @@ are case-insensitive or read `textContent` (§7.362).
      screen change, keep the driver change). It must FAIL on the changed string. Record the failing line.
    - ⚠ RISK 2 MITIGATION — a renamed **status word** gets its new key in `TONES` (both twins) in the same commit; the
      1.4 statusTone test stays green.
-   - ⚠ RISK 6 MITIGATION — no "Sep" until Q1 says so; `scripts/check-sept.sh` exits 0.
+   - ⚠ RISK 6 MITIGATION — never "Sep" (Q1 answered: "Sept"); `scripts/check-sept.sh` exits 0.
 5. **Verify**: typecheck + both unit suites; a before/after screenshot at 390px (app) or 1440px + 390px (admin);
    Impeccable `detect` on the changed files; every driver from step 2 with `run-all-drivers.sh --only <d>` (edge functions
    served; Expo started without `CI=1`; the served bundle grepped for a new string first).

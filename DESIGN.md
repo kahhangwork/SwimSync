@@ -222,7 +222,9 @@ right-aligned in tables and rows, and is written `S$1,260.00`; a reduction is `�
 **The Plain Words Rule.** Label money the way a parent would say it: "8 lessons", "Credit", "To pay" — never
 "Gross" or "Net" on a parent screen. The admin table may keep Gross / Net column headers.
 
-**The One Date Style Rule.** Dates read `15 Oct`, `Thu 8 Oct`, `Sep 2026`, `22 Sep 2026` — never `8/10/2026`.
+**The One Date Style Rule.** Dates read `15 Oct`, `Thu 8 Oct`, `Sept 2026`, `22 Sept 2026` — never `8/10/2026`.
+September is always **"Sept"** — the database (`sg_date_label`), the emails and en-SG `Intl` all say it, and CI
+guard G-Sept (`scripts/check-sept.sh`, §7.302) refuses "Sep".
 Display goes through `formatSgStamp()` (CLAUDE.md, §7.229).
 
 ## Layout

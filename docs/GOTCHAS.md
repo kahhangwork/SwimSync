@@ -1742,6 +1742,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     13px at 1536/1280/1152); Tailwind is rem, so **a driver pinning pixels pins the viewport**.
     `verify-invoice-controls`' `44x24` was red 2026-08-17..19 at 1280px. Read
     `getComputedStyle(document.documentElement).fontSize` in the same `evaluate`, assert in rem (±0.5px). (§8.72.)
+    - **It also bends DESIGN.md's px type scale (2026-10-11).** `DESIGN.md`'s sizes are px (`text-body` 14px…), so as
+      tokens they do NOT scale with the shell while every rem class around them does — at 1152px a 14px label sits in a
+      13px-rem layout. Pick px-or-rem for admin `fontSize` tokens before the admin shell restyle (UI_RESTYLE_PLAN 1.6)
+      and screenshot every admin restyle at 1440, 1280 and 1152px.
 
 194. **↪ Folded into §7.177 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
@@ -2546,6 +2550,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       "Sep"), and `to_char(…'Mon')` in any migration from `20261009000100` on; marker `// sept-ok: <why>`.
       `YYYY-MM` billing-month keys are not display and stay `to_char`. **For a date inside a DB message, reach for
       `sg_date_label`; in TS, `formatSgStamp` or spell it "Sept".**
+    - **Hit a FIFTH time (2026-10-11) — from the DESIGN DOC this time.** `DESIGN.md`'s One Date Style wrote `Sep 2026`
+      / `22 Sep 2026`, so the coach Schedule restyle hand-typed a `MONTHS` list with "Sep" (`scheduleFormat.ts`). G-Sept
+      caught it before commit — the guard works. **"Sept" is the answer, and it is settled:** the DB (`sg_date_label`,
+      13 functions), the emails and en-SG `Intl` all say it. `DESIGN.md` is corrected to match; a design doc example is
+      not licence to add a `// sept-ok` marker.
 
 303. **A pgTAP file that writes a LITERAL date through a guarded path is a time bomb with a date on it.** On
     2026-10-01 `main` CI went red on `trial_onboarding` (10/35), `session_coach_roster` (3/41) and
@@ -2983,3 +2992,34 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     admin `Table` header is `uppercase`, so a driver regex copied from the JSX source fails on a page that is correct —
     `verify-single-child-packages` lost a run to it (2026-10-11, §8.146). Match headers case-insensitively (`/…/i`) or
     read `textContent`, which returns the source text. Body cells are not transformed.
+
+363. **A file under a "UI" path can hold access logic, so "it only touched UI files" proves nothing about risk.** The
+    app's `_layout.tsx` and `(auth)` routes run the session/recovery-hash routing; the admin's `AuthGuard`,
+    `RequiresTenant`, `PermissionsProvider`, `Sidebar` and `lib/adminNav.ts` decide who sees which page; public token
+    pages and email templates are what a parent receives. All sit beside pure-styling files. Found planning the UI
+    restyle (2026-10-11), whose relaxed landing gate keys off "visual-only": that check carries a **never-visual list**
+    that overrides the path rule (`docs/plans/UI_RESTYLE_PLAN.md` §6). Rule: classify a change by what the file
+    DOES, not where it lives.
+
+364. **`classes.colour` holds Tailwind palette KEYS, and they are tenant data, not chrome.** Rows store `sky`, `rose`,
+    `violet`, `teal`, `orange`… (CHECK `^[a-z]{3,12}$`) and `SwimSyncAdmin/lib/classColours.ts` maps each to swatch
+    classes; **an unknown key renders NEUTRAL with no error.** So a restyle or "retire the default palette" sweep that
+    renames, removes or remaps a key silently greys out every class a tenant coloured with it — no test goes red.
+    `classColours.ts` is permanently allowlisted from palette bans; never rename a key without a migration that
+    rewrites the rows. (2026-10-11, UI restyle plan.)
+
+365. **`pressByText` returns `false` on a miss and only logs `(NOT FOUND)` — about 50 drivers `await` it bare.** A
+    renamed or restructured button is then silently never pressed, and the driver can still pass if its later
+    assertions happen to hold. Before changing any string a driver presses, record each driver's
+    `grep -c "(NOT FOUND)"` on its log; after the change the count must not rise. A press the rest of the run depends
+    on is written `if (!(await pressByText(page, X))) throw new Error(…)`. Related: `pressByText` needs the label as a
+    **leaf** text node whose parent bubbles to the handler — a wrapper or icon inside the label `Text` breaks it.
+    (2026-10-11, coach Schedule restyle.)
+
+366. **`RootLayout` (app `_layout.tsx`) must render `<Stack/>` from the first frame — never gate it on font loading.**
+    Its auth effect reads `window.location.hash` (recovery/invite links) synchronously on first mount and calls
+    `router.replace`, which throws before the navigator mounts. Returning `null` or a splash while `useFonts` loads
+    either loses the hash or throws. Load fonts in a sibling hook; on web block nothing (fallback font until the swap);
+    on native hold the splash on `loaded || error` or a 3s timeout. (2026-10-11, UI restyle plan step 1.1 — not yet
+    hit; written ahead because the failure is a broken password reset.)
+
