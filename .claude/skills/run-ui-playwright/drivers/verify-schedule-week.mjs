@@ -67,7 +67,7 @@
 // If sabotage still passes, the reveal guard has gone vacuous — fix that first.
 
 import { execSync } from "node:child_process";
-import { launch, loginExpo, visibleText, tap, sgLabel } from "./lib.mjs";
+import { launch, loginExpo, visibleText, tap, sgLabel, sgDayLabel } from "./lib.mjs";
 
 const results = [];
 const check = (label, pass, detail = "") => {
@@ -84,12 +84,12 @@ function sql(q) {
 
 const TODAY = sql("SELECT app_today()");
 const D_PREV = sql(`SELECT '${TODAY}'::date - 7`);
-const PREV_LABEL = sgLabel(D_PREV);
+const PREV_LABEL = sgDayLabel(D_PREV);
 // The fixture's own lesson NEXT week — the COMING UP day this driver drives.
 // TODAY + 7 is the same weekday one week on, so it lands in next week whatever
 // day it is run, and it is the ONE day header that belongs to this fixture.
 const D_NEXT = sql(`SELECT '${TODAY}'::date + 7`);
-const NEXT_LABEL = sgLabel(D_NEXT);
+const NEXT_LABEL = sgDayLabel(D_NEXT);
 
 console.log({ TODAY, D_PREV, PREV_LABEL, D_NEXT, NEXT_LABEL });
 
@@ -131,13 +131,13 @@ try {
   check("the selector names the current week", /This week/.test(t), "");
   check(
     "TODAY renders in the current week",
-    /TODAY ·/i.test(t),
-    (t.match(/TODAY ·[^\n]*/i) ?? ["(no TODAY heading)"])[0]
+    /Today ·/.test(t),
+    (t.match(/Today ·[^\n]*/) ?? ["(no Today heading)"])[0]
   );
   check(
     "the straggler is listed under NEEDS MARKING",
-    /NEEDS MARKING \(1\)/i.test(t) && t.includes(PREV_LABEL),
-    `${(t.match(/NEEDS MARKING \([0-9]+\)/i) ?? ["(none)"])[0]} / expected ${PREV_LABEL}`
+    /Needs marking \(1\)/.test(t) && t.includes(PREV_LABEL),
+    `${(t.match(/Needs marking \([0-9]+\)/) ?? ["(none)"])[0]} / expected ${PREV_LABEL}`
   );
   check(
     "no escape hatch is offered while already on this week",
@@ -152,13 +152,13 @@ try {
   check("the selector names next week", /Next week/.test(t), "");
   check(
     "TODAY does NOT render outside the current week",
-    !/TODAY ·/i.test(t),
-    (t.match(/TODAY ·[^\n]*/i) ?? ["(absent, correct)"])[0]
+    !/Today ·/.test(t),
+    (t.match(/Today ·[^\n]*/) ?? ["(absent, correct)"])[0]
   );
   // ⚠ THE ONE THIS DRIVER EXISTS FOR.
   check(
     "a straggler from ANOTHER week still appears under NEEDS MARKING",
-    /NEEDS MARKING/i.test(t) && t.includes(PREV_LABEL),
+    /Needs marking/.test(t) && t.includes(PREV_LABEL),
     t.includes(PREV_LABEL)
       ? "still listed"
       : `${PREV_LABEL} vanished when the week changed — the list is week-scoped`
@@ -172,7 +172,7 @@ try {
   // A future lesson cannot be marked at all, so its row must not reach the
   // attendance screen — checkMarkableDate would refuse it and the only way out
   // of that lock screen is a replace back here.
-  const comingUp = /COMING UP/.test(t);
+  const comingUp = /\nComing up\n/.test(t);
   check("next week lists COMING UP lessons", comingUp, "");
   if (comingUp) {
     // ⚠ EXPAND THE FIXTURE'S OWN DAY BY NAME. NEVER `.last()` OVER A BARE
@@ -251,7 +251,7 @@ try {
   t = await visibleText(page);
   check(
     "the escape hatch returns to the current week",
-    /This week/.test(t) && /TODAY ·/i.test(t),
+    /This week/.test(t) && /Today ·/.test(t),
     (t.match(/This week|Next week|Last week/) ?? ["(no label)"])[0]
   );
 
@@ -266,7 +266,7 @@ try {
   );
   check(
     "an unmarked past lesson is NOT filed under DONE",
-    !/\bDONE\b/.test(t) || !/Not marked/.test(t.split(/\bDONE\b/)[1] ?? ""),
+    !/\nDone\n/.test(t) || !/Not marked/.test(t.split(/\nDone\n/)[1] ?? ""),
     "a nag under a heading that means finished would read as done"
   );
 

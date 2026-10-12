@@ -146,7 +146,7 @@ await coach.waitForTimeout(4000);
 await coach.goto(`${EXPO}/schedule`);
 await coach.waitForTimeout(4000);
 text = await dumpText(coach);
-check(`After bulk save, ${missingLabel} clears the unmarked backlog`, !/NEEDS MARKING/i.test(text));
+check(`After bulk save, ${missingLabel} clears the unmarked backlog`, !/Needs marking/.test(text));
 
 await browser.close();
 

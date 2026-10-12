@@ -12,17 +12,20 @@ export function formatTime(time: string): string {
 
 export const shortDate = (d: string) =>
   formatSgDate(d, { day: "numeric", month: "short" });
+/** "Sat 26 Sept" — DESIGN.md's One Date Style: no comma after the weekday.
+ *  en-SG Intl prints "Sat, 26 Sept"; the comma is dropped here, for this screen
+ *  only. formatSgDate itself is NOT changed — every other date in the app reads
+ *  through it (UI_RESTYLE_PLAN 2.1). Mirrored by drivers/lib.mjs sgDayLabel(). */
 export const dayHeading = (d: string) =>
-  formatSgDate(d, { weekday: "short", day: "numeric", month: "short" });
+  formatSgDate(d, { weekday: "short", day: "numeric", month: "short" }).replace(",", "");
 
 // ── The billing blocker's words (DESIGN.md, Blocker-Outranks-Routine) ──────────
-// "Sept", as every other surface spells it (§7.302, G-Sept) — DESIGN.md writes
-// "Sep", an open question for the user (UI_RESTYLE_PLAN.md §0 Q1). Built from the
-// "YYYY-MM-DD" string itself — no Date, no locale, no clock.
+// "Sept", as every surface spells it (§7.302, G-Sept; UI_RESTYLE_PLAN §0 Q1).
+// Built from the "YYYY-MM-DD" string itself — no Date, no locale, no clock.
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
 
 /** The months a set of unmarked lesson dates hold, oldest first, as one phrase:
- *  "Sep", "Sep and Oct", "Aug, Sep and Oct". Each is a month that cannot be
+ *  "Sept", "Sept and Oct", "Aug, Sept and Oct". Each is a month that cannot be
  *  billed until its lessons are marked (§8a — no override). */
 export function blockedMonths(dates: string[]): string {
   const months = [...new Set(dates.map((d) => d.slice(0, 7)))].sort();

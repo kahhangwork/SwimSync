@@ -15,8 +15,8 @@ describe("scheduleFormat (characterisation)", () => {
     expect(shortDate("2026-09-21")).toBe("21 Sept");
   });
 
-  it("dayHeading: short weekday + day + short month", () => {
-    expect(dayHeading("2026-09-25")).toBe("Fri, 25 Sept");
+  it("dayHeading: short weekday + day + short month, no comma (DESIGN.md)", () => {
+    expect(dayHeading("2026-09-25")).toBe("Fri 25 Sept");
   });
 
   it("prints the SG calendar date whatever the device timezone", () => {
@@ -24,7 +24,7 @@ describe("scheduleFormat (characterisation)", () => {
     process.env.TZ = "America/Los_Angeles";
     try {
       expect(shortDate("2026-09-21")).toBe("21 Sept");
-      expect(dayHeading("2026-09-25")).toBe("Fri, 25 Sept");
+      expect(dayHeading("2026-09-25")).toBe("Fri 25 Sept");
     } finally {
       process.env.TZ = prev;
     }

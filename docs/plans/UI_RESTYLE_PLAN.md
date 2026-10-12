@@ -81,14 +81,14 @@ Decisions this plan makes (the user may overrule; none changes the look):
 
 ## 3. State (update in every commit that ticks a step)
 
-_As of 2026-10-12: Phase 0 is on `main`; 2.1 lands as built (words kept). Its wording half — sentence-case headings, `Sat 26 Sept` dates — is still open._
+_As of 2026-10-12: Phase 0 and 2.1's restyle (`64ab076`) are on `main`; 2.1's wording (sentence-case headings, `Sat 26 Sept`) is `ui/schedule-wording`._
 
 | Branch | Commit | What | Landed? |
 |---|---|---|---|
 | `ui/logo-2a` | `9edfee4` (+ docs `99c1f51`, `33c8156`) | Step 0.1 — logo 2a everywhere + `brand/render.mjs` | **yes**, 2026-10-11 (DEPLOYMENT #83) |
 | `ui/design-tokens` | `f805461`, `f5609d4` | Step 0.2 — tokens + drift tests; BACKLOG audit filing | **yes**, 2026-10-12 (DEPLOYMENT #83) |
 | `ui/restyle-plan` | `5c38056`, `cda10ac`, `e97d14f` | Step 0.3 — this plan, Q1 = "Sept", six GOTCHAS, `check-visual-only.sh`, the D3 exception in HANDOVER §9 GATE + DEPLOYMENT #84 | **yes**, 2026-10-12 |
-| `ui/coach-schedule` | this commit | Step 2.1 — coach Schedule restyle (words kept; "Sept"; G-Sept green). 11 Schedule drivers green `--only` 2026-10-11 after two fixes: week arrows lost their button role (a `<button disabled>` cannot be clicked past the bound), and `verify-trials` presses the visible class card (it passed on coordinate luck, §7.58). `check-visual-only.sh`: NOT VISUAL-ONLY on 3 lines — `useState` (the fold toggle) ×2, `.sort()` in `blockedMonths` (a display helper) — each must be explained in its commit message to land under D3 | no |
+| `ui/coach-schedule` | `64ab076` | Step 2.1 — coach Schedule restyle (words kept; "Sept"; G-Sept green). 11 Schedule drivers green `--only` 2026-10-11 after two fixes: week arrows lost their button role (a `<button disabled>` cannot be clicked past the bound), and `verify-trials` presses the visible class card (it passed on coordinate luck, §7.58). `check-visual-only.sh`: NOT VISUAL-ONLY on 3 lines — `useState` (the fold toggle) ×2, `.sort()` in `blockedMonths` (a display helper) — each must be explained in its commit message to land under D3 | **yes**, 2026-10-12 |
 | `ui/status-scale` (on old `main`) | `08fe3d9` | PARKED — becomes step 1.4 | no |
 
 ⚠ RISK 3 MITIGATION — **Landing ledger** (one row per restyle landing; append, never edit):
@@ -97,7 +97,8 @@ _As of 2026-10-12: Phase 0 is on `main`; 2.1 lands as built (words kept). Its wo
 |---|---|---|---|---|---|---|---|
 | 0.1 logo | `9edfee4` | NOT VISUAL-ONLY (`app.json` splash colour) — landed under the nightly gate | (built 2026-10-11, before this ledger) | — | admin login chunk `M6 32Q13 21`; rasters byte-identical | `38182159846` | green |
 | 0.2 tokens | `f805461`, `f5609d4` | VISUAL-ONLY | none — compiled CSS byte-identical | — | none possible (no visible change) | | |
-| 2.1 Schedule (as built — words kept) | this commit | NOT VISUAL-ONLY on 3 lines, each explained in the commit message (fold toggle `useState` ×2, `.sort()` in a display helper) — landed under D3 | 11 Schedule drivers green 2026-10-11 on the identical app tree (`schedule-week` 21/21, `trials` 16/16, `coach-schedule-roles` 28/28, `cancel-lesson` 29/29, 7 more) | not recorded (built before the ledger) | app bundle `Mark oldest lesson` | | |
+| 2.1 Schedule (as built — words kept) | `64ab076` | NOT VISUAL-ONLY on 3 lines, each explained in the commit message (fold toggle `useState` ×2, `.sort()` in a display helper) — landed under D3 | 11 Schedule drivers green 2026-10-11 on the identical app tree (`schedule-week` 21/21, `trials` 16/16, `coach-schedule-roles` 28/28, `cancel-lesson` 29/29, 7 more) | not recorded (built before the ledger) | app bundle `Mark oldest lesson` | | |
+| 2.1 Schedule wording — `Today ·`, `Needs marking (N)`, `Coming up`, `Done`; day labels `Sat 26 Sept` via `dayHeading` + `sgDayLabel` (`formatSgDate` untouched) | this commit | VISUAL-ONLY | the same 10 drivers before (`64ab076`) and after: equal scores | 0 → 0 (39 → 39 presses) | app bundle `Needs marking (` | | |
 
 A landing whose "Nightly verdict" cell is empty is **unverified**. **Do NOT land a fourth restyle while three are
 unverified** — at most three landings can be attributed per red nightly. The user may raise this cap; nobody else may.
@@ -239,7 +240,7 @@ Tick `[x]` in the commit that ships each. **S#** = the BACKLOG ranked item it sa
   - Propose the full sweep to the user and wait. If declined, 1.6 lands under the HANDOVER §9 GATE.
 
 ### Phase 2 — coach app (one screen per commit)
-- [ ] **2.1** Schedule (S1) — _built on `ui/coach-schedule`_; on landing, switch headings to sentence case and dates to `Sat 26 Sept` with driver updates (D4).
+- [x] **2.1** Schedule (S1) — _restyle landed 2026-10-12 (`64ab076`); wording on `ui/schedule-wording`_; on landing, switch headings to sentence case and dates to `Sat 26 Sept` with driver updates (D4).
   - ⚠ RISK 6 MITIGATION — **Before committing the built branch:** `scripts/check-sept.sh` exits 1 on
     `scheduleFormat.ts:22`. Until Q1 is answered, `blockedMonths` spells September **"Sept"**. Change `MONTHS`, its
     comment, and the three `scheduleFormat.test.ts` expectations ("Sep", "Sep and Oct", "Aug, Sep and Oct", and the

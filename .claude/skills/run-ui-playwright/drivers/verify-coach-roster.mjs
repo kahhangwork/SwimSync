@@ -219,11 +219,11 @@ const LESSON_LABEL = sgLabel(PATTERN_DATE);
   // covered class has a week card whatever its roster says. Check 16 then fails
   // for a reason that has nothing to do with §7.134, which is exactly what it
   // did before this bound was added. "TODAY ·" is the next heading.
-  const backlog = (t) => (t.split(/NEEDS MARKING/)[1] ?? "").split(/TODAY ·/)[0];
+  const backlog = (t) => (t.split(/Needs marking/)[1] ?? "").split(/Today ·/)[0];
   check(
     "0 — the fixture lesson starts on the class coach's NEEDS MARKING list",
     backlog(text).includes(CLASS_A_TITLE),
-    `NEEDS MARKING present: ${/NEEDS MARKING/.test(text)}`
+    `Needs marking present: ${/Needs marking/.test(text)}`
   );
 
   // ═══ A. THE ADMIN ASSIGNS ═══════════════════════════════════════════════

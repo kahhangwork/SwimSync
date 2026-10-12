@@ -99,8 +99,8 @@ try {
 
   check(
     "the backlog offers last week's lesson, and only that one",
-    /NEEDS MARKING \(1\)/i.test(t),
-    t.match(/NEEDS MARKING \([0-9]+\)/i)?.[0] ?? "(no backlog heading)"
+    /Needs marking \(1\)/.test(t),
+    t.match(/Needs marking \([0-9]+\)/)?.[0] ?? "(no backlog heading)"
   );
 
   // (The floor-scoped-not-week-scoped property of NEEDS MARKING is proven by
@@ -137,8 +137,8 @@ try {
   t = await dumpText(page);
   check(
     "after saving today, the backlog still lists last week's lesson",
-    /NEEDS MARKING/i.test(t),
-    t.match(/NEEDS MARKING \([0-9]+\)/i)?.[0] ?? "(backlog gone)"
+    /Needs marking/.test(t),
+    t.match(/Needs marking \([0-9]+\)/)?.[0] ?? "(backlog gone)"
   );
 
   await pressByText(page, "Mark");
@@ -196,8 +196,8 @@ try {
   t = await visibleText(page);
   check(
     "the NEEDS MARKING banner clears once the lesson is really marked",
-    !/NEEDS MARKING/i.test(t),
-    t.match(/NEEDS MARKING \([0-9]+\)/i)?.[0] ?? "(cleared)"
+    !/Needs marking/.test(t),
+    t.match(/Needs marking \([0-9]+\)/)?.[0] ?? "(cleared)"
   );
 
   // ══════════════ THE STATUS CHIPS AND BREAKDOWN ══════════════

@@ -85,8 +85,8 @@ try {
   );
   check(
     "TODAY actually names a lesson count, so the section is populated",
-    /TODAY ·/i.test(text) && /\d+ lesson/.test(text),
-    (text.match(/TODAY ·[^\n]*/i) ?? ["(no TODAY heading)"])[0]
+    /Today ·/.test(text) && /\d+ lesson/.test(text),
+    (text.match(/Today ·[^\n]*/) ?? ["(no Today heading)"])[0]
   );
 
   // The other half of §7.7, and the half that actually mis-billed: the DATE the

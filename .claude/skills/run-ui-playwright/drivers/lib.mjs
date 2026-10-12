@@ -20,6 +20,10 @@ export const EXPO = process.env.EXPO_URL ?? "http://localhost:8081";
 /** "Sat, 18 Jul" by default — formatSgDate's default options. */
 export const sgLabel = (iso, opts = { weekday: "short", day: "numeric", month: "short" }) =>
   new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-SG", { ...opts, timeZone: "UTC" });
+/** "Sat 18 Jul" — the coach Schedule's day label (scheduleFormat.ts dayHeading):
+ *  DESIGN.md's One Date Style drops the comma. Use it ONLY for Schedule text;
+ *  every other screen still reads formatSgDate's "Sat, 18 Jul" (sgLabel). */
+export const sgDayLabel = (iso) => sgLabel(iso).replace(",", "");
 /** "Sept 2026" for a billing month "2026-09" — the admin's formatBillingMonth. */
 export const sgMonthLabel = (ym) => sgLabel(`${ym.slice(0, 7)}-01`, { month: "short", year: "numeric" });
 

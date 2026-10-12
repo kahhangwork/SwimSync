@@ -54,7 +54,7 @@ async function pressAfterDone(pg, pattern, { first = false } = {}) {
     const re = new RegExp(source);
     const leaves = [...document.querySelectorAll("*")].filter((e) => e.children.length === 0);
     const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-    const done = leaves.find((e) => e.textContent.trim() === "DONE" && vis(e));
+    const done = leaves.find((e) => e.textContent.trim() === "Done" && vis(e));
     if (!done) return 0;
     const hits = leaves.filter((e) =>
       vis(e) && re.test(e.textContent.trim()) &&
@@ -263,7 +263,7 @@ try {
     await spin.waitForTimeout(2500);
     const after = await visibleText(spin);
     check("coach app: 'Back to class' leaves the notice for Schedule",
-      backed && !/This lesson was cancelled/.test(after) && /DONE/.test(after),
+      backed && !/This lesson was cancelled/.test(after) && /\nDone\n/.test(after),
       spin.url());
     const realErrors = spinErrors.filter((m) => !IGNORED_ERRORS.some((s) => m.includes(s)));
     check("no uncaught page errors (coach, cancelled lesson)", realErrors.length === 0, realErrors.join(" || "));

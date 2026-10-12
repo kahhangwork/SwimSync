@@ -1,10 +1,9 @@
-// NEEDS MARKING — the floor-scoped backlog, as DESIGN.md's billing blocker.
+// Needs marking — the floor-scoped backlog, as DESIGN.md's billing blocker.
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { formatSgDate } from "@/lib/lessonDates";
 import { progressLabel } from "@/lib/attendanceSummary";
-import { blockedMonths } from "../domain/scheduleFormat";
+import { blockedMonths, dayHeading } from "../domain/scheduleFormat";
 import { ScheduleButton } from "./ScheduleButton";
 import type { useScheduleSections } from "../domain/useScheduleSections";
 
@@ -38,15 +37,15 @@ export function NeedsMarkingSection(p: Pick<Sections, "visibleNeedsMarking" | "o
 
   return (
     <View className="mb-5 bg-status-danger-bg border border-status-danger-border rounded-card p-4">
-      {/* ⚠ THE HEADING STRING IS `NEEDS MARKING (N)` AND THE COUNT IS PART OF
-          IT. Three drivers assert on it verbatim, and the parenthesised number
+      {/* ⚠ THE HEADING STRING IS `Needs marking (N)` AND THE COUNT IS PART OF
+          IT. Several drivers assert on it verbatim, and the parenthesised number
           is the only assertion that the floor-scoped set is neither larger nor
           smaller than it should be. Do not relax those regexes to a bare
-          /NEEDS MARKING/. Keep this string UNIQUE on the screen too — a negative
-          assertion elsewhere (`!/needs marking/i`) false-fails if the words
+          /Needs marking/. Keep this string UNIQUE on the screen too — a negative
+          assertion elsewhere (`!/Needs marking/`) false-fails if the words
           appear twice. N is the WHOLE set, folded rows included. */}
       <Text className="text-headline font-semibold text-status-danger-text">
-        NEEDS MARKING ({visibleNeedsMarking.length})
+        Needs marking ({visibleNeedsMarking.length})
       </Text>
       <Text className="text-body text-ink mt-1">
         {blockedMonths(visibleNeedsMarking.map((i) => i.date))} can&apos;t be billed until
@@ -67,7 +66,7 @@ export function NeedsMarkingSection(p: Pick<Sections, "visibleNeedsMarking" | "o
               <View className="flex-1">
                 <Text className="text-body font-semibold text-ink">{item.class_title}</Text>
                 <Text className="text-body-secondary text-ink-secondary">
-                  {formatSgDate(item.date)}
+                  {dayHeading(item.date)}
                 </Text>
                 <Text className="text-body-secondary text-ink-secondary">
                   {progressLabel(item.progress)}

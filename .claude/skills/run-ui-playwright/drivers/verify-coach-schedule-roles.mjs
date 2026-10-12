@@ -56,7 +56,7 @@
 // edit and not after each revert, where `return "Shadowing"` / `…&from=schedule` were back.)
 
 import { execFileSync } from "node:child_process";
-import { launch, loginExpo, pressByText, visibleText, sgLabel, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, pressByText, visibleText, sgDayLabel, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API_URL = "http://127.0.0.1:54321";
@@ -107,7 +107,7 @@ const doneDate = sql(`SELECT session_date FROM lesson_sessions WHERE id = '${DON
 // The day heading, built with the APP's formatter family (§7.121: never
 // to_char for a label — ICU says "Sept"): scheduleFormat.ts dayHeading →
 // formatSgDate — which lib.mjs's sgLabel mirrors.
-const doneHeading = sgLabel(doneDate);
+const doneHeading = sgDayLabel(doneDate);
 
 // ── Scoped queries ──────────────────────────────────────────────────────────
 const activeQ = `SELECT string_agg(title || ':' || is_active || ':' || (deactivated_at IS NULL), ',' ORDER BY title)
@@ -124,7 +124,7 @@ const STATE0 = "2/1/1/present";
 // The slice of the TODAY section that belongs to ONE card: from its title to
 // the next card's title (or the tab bar). "" when the title is not in TODAY.
 function todayCard(t, title) {
-  const i = t.indexOf("TODAY ·");
+  const i = t.indexOf("Today ·");
   if (i < 0) return "";
   const sec = t.slice(i);
   const s = sec.indexOf(`\n${title}\n`);
@@ -134,7 +134,7 @@ function todayCard(t, title) {
     .concat([rest.indexOf("\nSchedule\n")]).filter((n) => n >= 0);
   return rest.slice(0, ends.length ? Math.min(...ends) : undefined);
 }
-const lessonCount = (t) => (t.match(/TODAY · [^\n]*\n(\d+ lessons?|No lessons today\.)/) ?? [])[1] ?? "(none)";
+const lessonCount = (t) => (t.match(/Today · [^\n]*\n(\d+ lessons?|No lessons today\.)/) ?? [])[1] ?? "(none)";
 const oneLine = (s) => s.replace(/\n+/g, " | ");
 
 // Press a VISIBLE element by its data-testid (icon-only controls), by DOM.
@@ -182,7 +182,7 @@ async function openCoach(email) {
 // to be the visible one first, so the return is a real re-focus.
 async function refocusSchedule(page, ok) {
   if (!(await pressByText(page, "Classes"))) throw new Error("the Classes tab was not pressable");
-  await screenUntil(page, (t) => !t.includes("TODAY ·") && !t.includes("This week"), 15000);
+  await screenUntil(page, (t) => !t.includes("Today ·") && !t.includes("This week"), 15000);
   if (!(await pressByText(page, "Schedule"))) throw new Error("the Schedule tab was not pressable");
   return screenUntil(page, ok, 20000);
 }
@@ -246,12 +246,12 @@ try {
   t = await screenUntil(page, (x) => lessonCount(x) === "1 lesson");
   check("chip South → TODAY holds only the South class",
     lessonCount(t) === "1 lesson" && todayCard(t, T_SH) !== "" && todayCard(t, T_COV) === "",
-    `${lessonCount(t)} | ${oneLine(t.slice(t.indexOf("TODAY ·"), t.indexOf("TODAY ·") + 120))}`);
+    `${lessonCount(t)} | ${oneLine(t.slice(t.indexOf("Today ·"), t.indexOf("Today ·") + 120))}`);
   if (!(await pressByText(page, NORTH, 0))) throw new Error("the North chip was not pressable");
   t = await screenUntil(page, (x) => lessonCount(x) === "1 lesson" && todayCard(x, T_COV) !== "");
   check("chip North → TODAY holds only the North class",
     lessonCount(t) === "1 lesson" && todayCard(t, T_COV) !== "" && todayCard(t, T_SH) === "",
-    `${lessonCount(t)} | ${oneLine(t.slice(t.indexOf("TODAY ·"), t.indexOf("TODAY ·") + 120))}`);
+    `${lessonCount(t)} | ${oneLine(t.slice(t.indexOf("Today ·"), t.indexOf("Today ·") + 120))}`);
 
   // ── 5. The clamp: North loses its only class while North is selected ─────
   try {
@@ -284,9 +284,9 @@ try {
 
   // ── 6. A DONE row tap ─────────────────────────────────────────────────────
   if (!(await pressTestId(page, "week-prev"))) throw new Error("week-prev was not pressable");
-  t = await screenUntil(page, (x) => x.includes("Last week") && /\nDONE\n/.test(x) && x.includes(doneHeading));
+  t = await screenUntil(page, (x) => x.includes("Last week") && /\nDone\n/.test(x) && x.includes(doneHeading));
   check("last week: a DONE section with the lesson day, and no NEEDS MARKING",
-    t.includes("Last week") && /\nDONE\n/.test(t) && t.includes(`\n${doneHeading}\n`) && !/NEEDS MARKING/i.test(t),
+    t.includes("Last week") && /\nDone\n/.test(t) && t.includes(`\n${doneHeading}\n`) && !/Needs marking/.test(t),
     oneLine(t.slice(t.indexOf("Last week"), t.indexOf("Last week") + 160)));
   if (!(await pressByText(page, doneHeading))) throw new Error(`the DONE day "${doneHeading}" was not pressable`);
   t = await screenUntil(page, (x) => x.includes(`\n${T_SH}\n`) && x.includes("Marked"));

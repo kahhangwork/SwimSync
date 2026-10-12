@@ -230,7 +230,7 @@ await page.waitForTimeout(2000);
 const beforeMark = await visibleText(page);
 check(
   "NEEDS MARKING lists the guest's lesson before it is marked",
-  /NEEDS MARKING \(\d+\)/i.test(beforeMark),
+  /Needs marking \(\d+\)/.test(beforeMark),
   "the baseline the clear-check below is measured against"
 );
 
@@ -292,7 +292,7 @@ const afterSave = await visibleText(page);
 // true whether or not anything cleared: NEEDS MARKING renders the class and the
 // date, never the child's name.
 const needsMarkingCount = (t) => {
-  const m = /NEEDS MARKING \((\d+)\)/i.exec(t);
+  const m = /Needs marking \((\d+)\)/.exec(t);
   return m ? Number(m[1]) : 0;
 };
 check(

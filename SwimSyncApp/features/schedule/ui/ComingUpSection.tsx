@@ -16,8 +16,8 @@ export function ComingUpSection(p: Pick<Sections, "buckets" | "expandedDays" | "
       {/* ── COMING UP ─────────────────────────────────────────────── */}
       {buckets.comingUp.length > 0 && (
         <View className="mb-5">
-          <Text className="text-label text-ink-muted tracking-wide mb-1">
-            COMING UP
+          <Text className="text-label font-semibold text-ink-muted mb-1">
+            Coming up
           </Text>
           {buckets.comingUp.map((g) => (
             <DaySection

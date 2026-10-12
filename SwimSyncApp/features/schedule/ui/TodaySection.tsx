@@ -19,7 +19,7 @@ type Week = ReturnType<typeof useWeek>;
 type Sections = ReturnType<typeof useScheduleSections>;
 
 export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "nowMins"> & Pick<Sections, "todayLessons" | "todayStudents" | "todayGuests" | "openAttendance"> & {
-  /** NEEDS MARKING is showing — its button is the screen's one primary, so a
+  /** Needs marking is showing — its button is the screen's one primary, so a
    *  routine lesson here does not outrank it (DESIGN.md, Blocker-Outranks-Routine). */
   blockerShown: boolean;
 }) {
@@ -29,10 +29,13 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
       {/* ── TODAY — only in the current week ───────────────────────── */}
       {showsTodaySection && (
         <View className="mb-5">
-          {/* "TODAY · <day>" then the count on the NEXT line: a driver reads the
-              count with /TODAY · [^\n]*\n(\d+ lessons?|No lessons today\.)/. */}
-          <Text className="text-label text-ink-muted tracking-wide">
-            TODAY · {dayHeading(todayDate)}
+          {/* "Today · <day>" then the count on the NEXT line: a driver reads the
+              count with /Today · [^\n]*\n(\d+ lessons?|No lessons today\.)/.
+              Match it case-SENSITIVELY: Coach Classes' "Today · <weekday>" group
+              heading is `uppercase`, so innerText reads it "TODAY · …" (§7.362)
+              and only this heading matches "Today ·". */}
+          <Text className="text-label font-semibold text-ink-muted">
+            Today · {dayHeading(todayDate)}
           </Text>
           {/* The three tiles this replaced (Classes / Students / Guests
               Today) are folded in here — every number kept, the vertical

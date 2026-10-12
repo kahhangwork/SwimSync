@@ -36,7 +36,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, loginAdmin, tap, dumpText, sgLabel, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, loginAdmin, tap, dumpText, sgLabel, sgDayLabel, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(
@@ -60,7 +60,7 @@ const [markedIso, missingIso, next1Iso, next2Iso] = sql(`
    ORDER BY ls.session_date DESC LIMIT 1`).split("|");
 const DAY_MON = { day: "numeric", month: "short" };
 const MISSING = sgLabel(missingIso, DAY_MON);
-const MARKED_ROW = sgLabel(markedIso);
+const MARKED_ROW = sgDayLabel(markedIso); // a Schedule backlog row (dayHeading)
 const NEXT_1 = sgLabel(next1Iso, DAY_MON);
 const NEXT_2 = sgLabel(next2Iso, DAY_MON);
 
@@ -136,7 +136,7 @@ await coach.waitForTimeout(3000);
 
 let text = await dumpText(coach);
 await coach.screenshot({ path: shot("coach-today-backlog.png"), fullPage: true });
-check("Schedule lists one unmarked lesson", /NEEDS MARKING \(1\)/i.test(text));
+check("Schedule lists one unmarked lesson", /Needs marking \(1\)/.test(text));
 check("Backlog names the forgotten Saturday", new RegExp(MISSING).test(text));
 check("Backlog omits the already-marked Saturday", !new RegExp(MARKED_ROW).test(text));
 
@@ -159,7 +159,7 @@ await coach.goto(`${EXPO}/schedule`);
 await coach.waitForTimeout(4000);
 text = await dumpText(coach);
 await coach.screenshot({ path: shot("coach-today-cleared.png"), fullPage: true });
-check("Backlog clears once marked", !/NEEDS MARKING/i.test(text));
+check("Backlog clears once marked", !/Needs marking/.test(text));
 
 adminText = await openCoverageModal();
 await admin.screenshot({ path: shot("admin-modal-clear.png"), fullPage: true });
