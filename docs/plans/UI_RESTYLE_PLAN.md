@@ -115,7 +115,7 @@ A landing whose "Nightly verdict" cell is empty is **unverified**. **Do NOT land
 unverified** — at most three landings can be attributed per red nightly. The user may raise this cap; nobody else may.
 
 Audit evidence (2026-10-11): 81 screenshots + four reviewer reports + Impeccable detector — summarised in BACKLOG
-*UI/UX improvements* (the ranked S list and fold-ins). Screens not yet captured: §4 step 1.5.
+*UI/UX improvements* (the ranked S list and fold-ins). The six screens it could not reach were captured in step 1.5 (2026-10-13) — findings in the same BACKLOG fold-ins.
 
 ---
 
@@ -233,7 +233,7 @@ Tick `[x]` in the commit that ships each. **S#** = the BACKLOG ranked item it sa
   - ⚠ RISK 12 MITIGATION — `08fe3d9` sits on old `main` and rewrites both `StatusBadge`s. Rebase it onto the current
     tip, then **assert `git diff <tip>..<rebased> --stat` touches only the 15 files `08fe3d9` lists.** Re-run both
     unit suites. A conflict resolved by taking "theirs" wholesale is a blocker; resolve by hand.
-- [ ] **1.5** **Capture the unaudited screens** with edge functions served: public invoice + package token pages, parent Contact + Join, coach Pay (a fixture coach WITH payouts), admin reset-password / accept-invite with real tokens, calendar Week view on a lesson day. Append findings to BACKLOG fold-ins.
+- [x] **1.5** **Capture the unaudited screens** with edge functions served: public invoice + package token pages, parent Contact + Join, coach Pay (a fixture coach WITH payouts), admin reset-password / accept-invite with real tokens, calendar Week view on a lesson day. Append findings to BACKLOG fold-ins.
   - Edge runtime is NOT started by `supabase start` (§7.84). Serve all functions and assert
     `curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:54321/functions/v1/public-invoice?token=x"` is not 503.
 - [ ] **1.6** **Admin shell + sidebar** (S5, P0) — stack below 800px (top bar or drawer), Ground sidebar, Selected fill + `aria-current`, count badges in their status colour (S8's badge half).

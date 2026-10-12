@@ -1653,10 +1653,26 @@ visible text, so keep words unless the item changes them on purpose):**
 - Bad public-invoice token is a dead end (no way forward). Calendar legend ~11px, red for "(Sub)", shape-only signal.
 - Mark Attendance: *Set all* top-right out of thumb reach; tab bar highlights Classes when arrived from Schedule.
 
-**Not audited yet (re-capture with edge functions served):** the public invoice and package token pages (both rendered
-"not found" — `supabase functions serve` was down), parent Contact and Join (the scripted tap landed on Profile), the
-coach Pay tab (shown only to a coach with payouts — no fixture coach had one), admin reset-password / accept-invite
-forms (need a real token), the calendar `LessonCard` side-tab (no lessons on the captured day).
+**Captured 2026-10-13 (UI restyle step 1.5)** — the six screens the first audit could not reach, all reached with edge
+functions served and real tokens. Fold-ins from them:
+- **Public invoice + package pages show `$88.00`, not `S$`** (`AmountCard.tsx:20`, `OfferCard.tsx:17,21,25` — a bare
+  `${…}` in JSX); "I've paid" is an equal outlined button → a text link under the primary (Pay-First); `bg-sky-50`, sky
+  button, shadowed `rounded-2xl` card → Ground, Lane Blue, flat 8px; caption/footer `text-xs text-gray-400`.
+- Public package: "Prefer a different package? Tell your coach." is a dead end → link to the business's contact.
+- **Admin Calendar Week hides Sunday at 1440px** (the grid scrolls inside its own box: 1264 vs 1138px); a full class is
+  drawn red with a red "FULL" (Red Means Stuck → neutral/warning); 10–11px text in `LessonCard` / `TimeGrid`; a class
+  with no capacity shows a bare "1" where the legend promises "enrolled + guests / max".
+- Coach Pay: green money and a green `rounded-2xl` total box → Ink; "Paid"/"Draft" as grey text → status tags; violet
+  correction chip (outside the status scale); `toFixed(2)` → `S$1,260.00`.
+- Parent Contact: placeholders that look like values ("9123 4567", "Blk 123 Clementi Ave 3"); grey-filled `rounded-xl`
+  inputs; helper in `gray-400`; a sky Save plus a sky "Cancel" link.
+- Join screen (opened from Profile → Add Child) highlights **Home** — the route lives under `home/`; same shape as the
+  Mark Attendance tab fold-in. Its greys are `slate-*` and its field label an all-caps 12px "JOIN CODE".
+- Admin reset-password / accept-invite: sky background and button, grey `rounded-xl` inputs, shadowed card; neither
+  page says which account or business it is for.
+- Admins table: `rounded-full` "invited"/"Owner" pills and three inline actions including a red Delete → one action +
+  a "…" menu (add to the Tables fold-in above).
+Screenshots were local only (`capture15/`, not kept).
 
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
