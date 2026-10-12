@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { usePermissions } from "@/components/PermissionsProvider";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { Logo } from "@/components/Logo";
+import { Tag, type Tone } from "@/components/ui/Tag";
 import {
   groupedNavFor,
   groupIdForPath,
@@ -38,6 +39,23 @@ function badgeTitle(href: string, count: number): string {
     return `${count} child${count === 1 ? "" : "ren"} not yet assigned to a class`;
   }
   return `${count}`;
+}
+
+// DESIGN.md: a count badge takes the status colour of what it counts. Unmarked
+// past lessons block billing — Danger. The rest need doing soon — Warning.
+const BADGE_TONE: Record<string, Tone> = {
+  "/lessons": "danger",
+  "/invoices": "warning",
+  "/claims": "warning",
+  "/unassigned": "warning",
+};
+const SEVERITY: Tone[] = ["neutral", "info", "warning", "danger"];
+/** A collapsed group header shows its loudest child's tone. */
+function loudest(hrefs: string[]): Tone {
+  return hrefs.reduce<Tone>((t, h) => {
+    const c = BADGE_TONE[h] ?? "warning";
+    return SEVERITY.indexOf(c) > SEVERITY.indexOf(t) ? c : t;
+  }, "neutral");
 }
 
 
@@ -183,6 +201,20 @@ export function Sidebar() {
     });
   }
 
+  // Below 800px the sidebar is a drawer behind a top bar (DESIGN.md → Layout).
+  // It closes on every navigation, so a tapped link never leaves it covering the
+  // page it opened.
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.replace("/login");
@@ -219,42 +251,54 @@ export function Sidebar() {
       <Link
         key={item.href}
         href={item.href}
+        aria-current={active ? "page" : undefined}
         className={cn(
-          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+          "flex items-center gap-3 rounded-control px-3 py-2 text-body transition-colors",
           active
-            ? "bg-sky-50 text-sky-700"
-            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            ? "bg-selected font-semibold text-ink"
+            : "text-ink-secondary hover:bg-selected hover:text-ink"
         )}
       >
         <Icon
           className={cn(
             "h-4 w-4 shrink-0",
-            active ? "text-sky-600" : "text-gray-400"
+            active ? "text-ink" : "text-ink-muted"
           )}
         />
+        {/* The label stays a bare text node: the badge is this link's ONLY
+            span (verify-orphan-report reads `a[href] span`). */}
         {item.label}
         {count > 0 && (
-          <span
-            className="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white"
+          <Tag
+            tone={BADGE_TONE[item.href] ?? "warning"}
+            className="ml-auto"
             title={badgeTitle(item.href, count)}
           >
             {count}
-          </span>
+          </Tag>
         )}
       </Link>
     );
   }
 
-  return (
-    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
-      {/* Brand */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
-        <Logo size="sm" />
-        <div>
-          <p className="text-base font-bold text-gray-900">SwimSync</p>
-          <p className="text-xs text-gray-400">Admin Panel</p>
-        </div>
+  const brand = (
+    <div className="flex items-center gap-3">
+      <Logo size="sm" />
+      <div>
+        <p className="text-headline font-semibold text-ink">SwimSync</p>
+        <p className="text-label text-ink-muted">Admin Panel</p>
       </div>
+    </div>
+  );
+
+  // One panel, two shells: the fixed sidebar at ≥800px, the drawer below it.
+  // Only one is ever on screen (the drawer is not rendered while closed, and is
+  // hidden at ≥800px), so a driver's `getByRole("link")` never sees two. While
+  // the drawer is open the hidden aside's copy is still in the DOM (display:none,
+  // duplicate ids) — choosing one shell in JS would need matchMedia and an SSR
+  // mismatch, which costs more than it fixes.
+  const panel = (
+    <>
 
       {/* Navigation — top-level daily pages, then collapsible task groups. */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
@@ -277,30 +321,31 @@ export function Sidebar() {
                 aria-controls={`navgroup-${group.id}`}
                 data-testid={`navgroup-${group.id}`}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex w-full items-center gap-3 rounded-control px-3 py-2 text-body transition-colors",
                   containsActive && !open
-                    ? "text-sky-700"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    ? "font-semibold text-ink"
+                    : "text-ink-secondary hover:bg-selected hover:text-ink"
                 )}
               >
                 <ChevronDown
                   aria-hidden
                   className={cn(
-                    "h-4 w-4 shrink-0 text-gray-400 transition-transform",
+                    "h-4 w-4 shrink-0 text-ink-muted transition-transform",
                     open ? "" : "-rotate-90"
                   )}
                 />
                 {group.label}
                 {!open && groupCount > 0 && (
-                  <span
+                  <Tag
                     data-testid={`navgroup-${group.id}-badge`}
-                    className="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white"
+                    tone={loudest(badged.map((it) => it.href))}
+                    className="ml-auto"
                     title={badged
                       .map((it) => badgeTitle(it.href, badges[it.href]))
                       .join("; ")}
                   >
                     {groupCount}
-                  </span>
+                  </Tag>
                 )}
               </button>
               {open && (
@@ -318,28 +363,79 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-gray-100 p-4">
+      <div className="border-t border-border p-4">
         <div className="flex items-center gap-3 mb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-700 text-sm font-bold">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-selected text-ink text-body font-semibold">
             {initial}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
+            <p className="text-body font-medium text-ink truncate">
               {userName ?? "Admin"}
             </p>
-            <p className="text-xs text-gray-400 truncate">
+            <p className="text-label text-ink-muted truncate">
               {userEmail ?? "—"}
             </p>
           </div>
         </div>
         <button
           onClick={handleSignOut}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+          className="flex w-full items-center gap-2 rounded-control px-3 py-2 text-body text-status-danger-text hover:bg-status-danger-bg transition-colors"
         >
           <LogOut className="h-4 w-4" />
           Sign Out
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* ≥800px: the sidebar, on Ground. */}
+      <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-ground min-[800px]:flex">
+        <div className="px-6 py-5 border-b border-border">{brand}</div>
+        {panel}
+      </aside>
+
+      {/* <800px: a top bar; the same panel opens as a drawer from the left. */}
+      <header className="flex items-center justify-between border-b border-border bg-ground px-4 py-3 min-[800px]:hidden">
+        {brand}
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          aria-expanded={menuOpen}
+          aria-controls="admin-nav-drawer"
+          data-testid="admin-menu-open"
+          className="flex items-center gap-2 rounded-control border border-border-strong bg-surface px-3 py-2 text-body font-semibold text-ink"
+        >
+          <Menu aria-hidden className="h-4 w-4" />
+          Menu
+        </button>
+      </header>
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 min-[800px]:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} aria-hidden />
+          <aside
+            id="admin-nav-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-ground shadow-float"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              {brand}
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                aria-label="Close menu"
+                className="rounded-control p-2 text-ink-secondary hover:bg-selected"
+              >
+                <X aria-hidden className="h-4 w-4" />
+              </button>
+            </div>
+            {panel}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

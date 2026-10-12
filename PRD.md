@@ -1346,7 +1346,8 @@ lesson (locked to future-only — the coach's rain/coach mark is today's path).
 **Admin panel → Lessons** (a week of every coach's lessons, grouped by day, with a
 **Needs marking** mode that lists every lesson from the business's marking floor to today
 that is not fully marked — floor-scoped, never week-scoped; *(2026-08-20)* the **sidebar Lessons
-link carries an amber badge** of that same count, so the backlog is visible from any page) and
+link carries a badge** of that same count — red since 2026-10-13, because unmarked past lessons block billing — so
+the backlog is visible from any page) and
 **Calendar → double-click**
 both open **`/lessons/[classId]/[date]`**, one lesson addressed by class and date (never a
 session id — the row may not exist yet). There the admin:
@@ -3718,9 +3719,13 @@ The following section provides a screen-by-screen reference for each SwimSync us
 - Sidebar navigation *(implemented 2026-08-17)*: four top-level items (Dashboard, Students,
   Classes, Attendance) plus four **collapsible task groups** — Families, Billing, Scheduling,
   Settings — that remember their open/closed state and auto-expand the active page's group; a
-  collapsed group's header carries the amber count badge of any page inside it. The whole panel
-  also **auto-scales down on narrower screens** (root font-size media queries) so it fits a
-  smaller laptop without manual browser zoom.
+  collapsed group's header carries the count badge of any page inside it. *(2026-10-13)* Each badge takes the
+  status colour of what it counts — **red** for unmarked lessons (they block billing), **amber** for the rest — and a
+  collapsed header takes its loudest child's colour; the current page has a grey fill and `aria-current="page"`. The
+  whole panel also **auto-scales down on narrower screens** (root font-size media queries) so it fits a
+  smaller laptop without manual browser zoom — DESIGN.md's type sizes are rem in the admin so they scale with it.
+  **Below 800px** the sidebar becomes a top bar with a **Menu** button that opens the same navigation as a drawer
+  (closes on navigation or Esc), so the page gets the full width of a phone.
 - Persistent search bar and filter controls on all table views
 - Bulk action support where relevant (e.g. batch assign, batch mark paid)
 - **Every column is sortable and every cell hugs its content** *(implemented)* — one

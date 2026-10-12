@@ -44,12 +44,16 @@ const config: Config = {
       borderRadius: { tag: "4px", control: "6px", card: "8px" },
       // Line heights in px, not multipliers: React Native has no unitless
       // line-height, and the twin config must say the same thing.
+      // REM here, unlike the app's px twin: the admin shrinks its root font
+      // 16→13px below 1536px so the whole panel scales together (globals.css),
+      // and the user chose (2026-10-12, UI restyle 1.6) that DESIGN.md's sizes
+      // scale with it. Each value is DESIGN.md's px ÷ 16; the drift test converts.
       fontSize: {
-        display: ["24px", { lineHeight: "28.8px", letterSpacing: "-0.02em" }],
-        headline: ["16px", { lineHeight: "20.8px" }],
-        body: ["14px", { lineHeight: "21px" }],
-        "body-secondary": ["13px", { lineHeight: "18.85px" }],
-        label: ["12px", { lineHeight: "15.6px" }],
+        display: ["1.5rem", { lineHeight: "1.8rem", letterSpacing: "-0.02em" }],
+        headline: ["1rem", { lineHeight: "1.3rem" }],
+        body: ["0.875rem", { lineHeight: "1.3125rem" }],
+        "body-secondary": ["0.8125rem", { lineHeight: "1.178125rem" }],
+        label: ["0.75rem", { lineHeight: "0.975rem" }],
       },
       // Geist comes from next/font in app/layout.tsx as --font-geist (a hashed
       // family name, self-hosted). `sans` is what preflight puts on <html>, so

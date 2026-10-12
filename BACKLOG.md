@@ -1618,8 +1618,9 @@ visible text, so keep words unless the item changes them on purpose):**
 4. **Admin Invoices: Generate disabled with the reason** — today a live primary while the seed month has 20 unmarked
    lessons; the month shows amber "Not billed yet". → disabled + "20 lessons unmarked → Review", the month a Danger tag.
    (The critique's "month picker" is already done: it is a native month input.)
-5. **Admin sidebar stacks below 800px** (`components/Sidebar.tsx` + shell) — **P0**: at 390px it stays ~200px wide and
-   leaves the page a ~180px strip (Students shows one column; Invoices' fields clip).
+5. ~~**Admin sidebar stacks below 800px**~~ — **shipped 2026-10-13** (UI restyle step 1.6: top bar + drawer below 800px,
+   Ground sidebar, Selected fill, status-coloured badges; PRD *Sidebar navigation*). Kept as a line so the plan's
+   S-numbers still resolve. (S8's badge half is done; its Lessons-page half is not.)
 6. **Parent invoice detail** — the same Pay-First / Plain Words fix, and the **Lesson Breakdown card renders empty**
    (no rows, no empty text), so a parent cannot see what they are paying for.
 7. ~~**One status scale across every tag**~~ — **shipped 2026-10-13** (UI restyle step 1.4: twin `lib/statusTone.ts`,

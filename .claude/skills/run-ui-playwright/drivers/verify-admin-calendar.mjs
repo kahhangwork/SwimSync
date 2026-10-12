@@ -102,10 +102,15 @@ try {
   await page.waitForURL((u) => urlDate(u) === today, { timeout: 10000 }).catch(() => {});
   check("Today returns the URL date to today", urlDate(new URL(page.url())) === today, page.url());
 
-  // ── Sticky gutter: scroll the grid sideways (force a wide grid via zoom) ──
-  await page.setViewportSize({ width: 700, height: 800 });
+  // ── Sticky gutter: scroll the grid sideways (force a wide grid via a narrow
+  // viewport) ── 420px, not 700: below 800px the admin sidebar is a drawer (UI
+  // restyle 1.6), so at 700 the day grid FIT and there was nothing to scroll —
+  // the old width only overflowed because the 256px sidebar ate the room.
+  await page.setViewportSize({ width: 420, height: 800 });
   await page.waitForTimeout(300);
   const scroller = page.getByTestId("time-grid-scroll");
+  const overflows = await scroller.evaluate((el) => el.scrollWidth > el.clientWidth);
+  if (!overflows) console.log("  (precondition) the day grid does not overflow at 420px — the gutter check below cannot scroll");
   await scroller.evaluate((el) => { el.scrollLeft = 200; });
   await page.waitForTimeout(200);
   const scrollLeft = await scroller.evaluate((el) => el.scrollLeft);

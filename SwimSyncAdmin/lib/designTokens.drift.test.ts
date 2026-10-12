@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 // TWIN FILE: SwimSyncApp/lib/designTokens.drift.test.ts is identical except that it
 // uses jest globals, loads that app's tailwind.config.js and scans that app's source
-// folders (SCAN). Keep in sync.
+// folders (SCAN) — and this admin copy reads its type sizes as REM (px ÷ 16, the
+// user's 1.6 decision: they scale with the admin's root font). Keep in sync.
 //
 // DESIGN.md's front matter is the source of the visual tokens; each app's Tailwind
 // config holds a hand copy (two deploy roots — neither can import from the repo
@@ -85,7 +86,9 @@ describe("DESIGN.md tokens ↔ tailwind config", () => {
     const sizes = fontSizes();
     expect(Object.keys(sizes).length).toBeGreaterThanOrEqual(5);
     for (const [name, px] of Object.entries(sizes)) {
-      expect([name, ext.fontSize[name]?.[0]]).toEqual([name, px]);
+      const rem = ext.fontSize[name]?.[0] as string | undefined;
+      const asPx = rem?.endsWith("rem") ? `${parseFloat(rem) * 16}px` : rem;
+      expect([name, asPx]).toEqual([name, px]);
     }
   });
 });
