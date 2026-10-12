@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-12 — **§8.147: UI restyle under way and LIVE in part** — logo 2a, DESIGN.md tokens, the plan
-and the coach Schedule (restyle + wording). Three landings await one nightly; then plan step 1.1 (Geist)._
+_Last updated: 2026-10-12 (evening) — **§8.148: UI restyle 1.1 Geist + 1.2 tab bars LIVE** on the user's waiver of
+the nightly cap. **Five restyle landings await one nightly** — read it before step 1.3 (primitives)._
 
-_Previously (§8.146, 2026-10-10 → 11) — Single-child packages shipped and live (DEPLOYMENT #82)._
+_Previously (§8.147, 2026-10-11 → 12) — UI restyle Phase 0 + coach Schedule live (DEPLOYMENT #83–#85)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -26,7 +26,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.361** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.371** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -351,6 +351,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.148 (2026-10-12, evening) — UI restyle 1.1 Geist + 1.2 tab bars, both live
+
+**Built, swept and landed plan steps 1.1 and 1.2** (`docs/plans/UI_RESTYLE_PLAN.md` §3). Live: DEPLOYMENT #86.
+
+- **Shipped:** Geist in both apps (`85230ee`); the coach + parent tab bars to DESIGN.md, BACKLOG S2 (`1892d6a`).
+- **Decided by the user:** a full local sweep for 1.1 (74/74 PASS); **then waived the nightly cap for both** — five
+  restyle landings now await one nightly. 1.2 had no full sweep (its 19 tab drivers `--only`, equal scores).
+- **Found:** §7.368 (RN-web class names differ dev/prod — caught at review; would have shipped Geist invisible),
+  §7.369 (jest ignores `components/` tests), §7.370 (lid-close sleep stalled a batch), §7.371 (stale Tailwind in
+  `next dev`).
+- **Not done:** no live tap-through of the tab bar (no prod sign-in; bundle grep only). Native `Text` does not take
+  Geist (store builds out of scope).
+
 ## 8.147 (2026-10-11 → 12) — UI restyle: logo, tokens, plan, coach Schedule — all live
 
 **Started Wave 9 item 8 in the user's order; wrote the full restyle plan; landed Phase 0 and step 2.1.** Plan:
@@ -364,21 +377,7 @@ inside a file read at the start of every session.
   fonts, `<button disabled>`); §7.302 and §7.193 *Hit again*.
 - **Not done:** `ui/status-scale` stays parked (plan 1.4 — built out of order once). No full sweep, no nightly dispatch.
 
-## 8.146 (2026-10-10 → 11) — Single-child packages, built and deployed in one session
-
-**Shipped Wave 9 item 7 per `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`, root checkout, no worktree** — migration →
-admin → parent app → driver → docs → deploy, each step gated. Live 2026-10-11 (DEPLOYMENT #82).
-
-- **The user's call mid-build — D11, one kind per family** (plan §2): raised because the plan's §3 renewal-row rule
-  could not satisfy D8 or its own assertion. Recorded with its consequences in the plan; PRD §7.16 describes it.
-- **Proof:** pgTAP 2083 (73 new), Deno 305 ×2, vitest 1148, jest 712, `verify-single-child-packages` 19/19 pinned and
-  unpinned + 8 package drivers `--only`; 43 mutants red at their target (one redundant clause stays green, recorded).
-- **Found on the way:** the DOWN as planned was unrunnable (§7.93 *Hit again*); `innerText` uppercases headers
-  (§7.362); a bare `students(...)` embed resolves, no PGRST201 (§7.90); the admin sale asked about a single child
-  (fixed, `3954b24`). Graduated: ARCHITECTURE §6ae addendum, TESTING §5, BACKLOG *Name the child in package emails*.
-- **Not done:** no Little Orcas product flipped (the owner's call); no full sweep, no Generate.
-
-_(§8.145 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.146 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -422,7 +421,8 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-10-12: six nightlies in a row GREEN** (latest `38182159846` on `9edfee4`, the logo). The next one is
-the first over the tokens + coach Schedule landings — read it before any restyle lands (plan §3 ledger).
+the first over FIVE restyle landings (tokens, Schedule ×2, Geist, tab bars) — read it before any restyle lands and
+fill the plan's §3 ledger verdicts; a red is attributed across all five rows' driver lists.
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -443,9 +443,9 @@ which mutate shared seed state — are in the same section.
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
-   Live 2026-10-12: Phase 0 (logo 2a, tokens, plan) and step 2.1 (coach Schedule + its wording). **First, read the
-   nightly after `7445547`** and fill the plan's §3 ledger verdicts — three landings await it (the cap); red = freeze +
-   revert per §6. **Then step 1.1 (Geist)** — Phase 1 comes before more screens.
+   Live 2026-10-12: Phase 0, step 2.1, **1.1 Geist and 1.2 tab bars** (the last two on the user's waiver of the
+   three-landing cap). **First, read the nightly after `1892d6a`** and fill the five empty §3 "Nightly verdict" cells;
+   red = freeze + revert per §6. **Then step 1.3 (primitives).** Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 

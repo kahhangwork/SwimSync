@@ -38,11 +38,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365 |
-| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367 |
-| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368 |
+| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371 |
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
@@ -3031,3 +3031,26 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     (`WeekSelector.tsx`): keep the `accessibilityLabel`, drop the role on controls a driver presses at their bound. Before adding a
     role to an existing control, grep the drivers for its `testID`.
 
+368. **RN-web's class names differ between dev and production — never select one by name.** A classic class is
+    `css-text-<hash>` under `expo start` but a bare `css-<hash>` in an `expo export` build (`createIdentifier`,
+    `react-native-web/dist/exports/StyleSheet/compiler`). The Geist rule `[class*="css-text-"]` passed every dev check
+    and a 74-driver sweep and would have matched nothing on swimsync.sg; caught at `/commit-review`. Select a stable
+    attribute instead (`html [dir]` — RN-web sets `dir` on every root Text and TextInput), pinned by
+    `SwimSyncApp/lib/geistCss.test.ts`. **A change meant to reach RN-web elements through CSS is proven on a local
+    `npx expo export -p web` served statically, never on the dev server.** (2026-10-12, UI restyle 1.1.)
+
+369. **`SwimSyncApp` jest only runs tests under `lib/` and `features/`** (`testMatch` in `jest.config.js`). A
+    `components/*.test.ts` is silently never run — "75 suites passed" before and after adding it was the tell. Put
+    the pure logic in `lib/` and test it there. (2026-10-12, UI restyle 1.1.)
+
+370. **A closed lid (clamshell sleep) stalls a local driver batch for hours, with no error.** `caffeinate -dims` does
+    not stop a lid-close sleep on battery. Symptoms: one driver's seconds balloon (608 vs 112), a reset takes 17 min,
+    a driver logs `17/17 checks passed` and its process never exits — `run-all-drivers.sh`'s timeout counts loop
+    turns, so it stalls too. Check `pmset -g log | grep Sleep` before suspecting the product; re-run every driver
+    whose window overlapped a sleep. Keep the lid open (or plug in) for any batch. (2026-10-12, UI restyle 1.2.)
+
+371. **A Tailwind config change does not reach a running `next dev` — not even after a restart.** The served
+    `layout.css` kept the old `fontFamily` while `npx tailwindcss -i app/globals.css` printed the new one; only
+    stopping the server and `rm -rf SwimSyncAdmin/.next` fixed it. Compare against a fresh `npx tailwindcss` build
+    before debugging the config. The cleared cache then makes the first post-login page compile cold, which
+    once outlasted `verify-tenant-provisioning`'s fixed 3 s sign-in wait (14/15; 15/15 on re-run). (2026-10-12.)

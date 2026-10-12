@@ -796,6 +796,8 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `brand/` | **The mark's source of truth** (`mark.svg`) + recolours, app-icon tile, adaptive foreground. `README.md` there has the regeneration table and where the mark must NOT go |
 | `SwimSyncApp/components/Logo.tsx` | The mark in the app: white-knockout **PNG** + `tintColor`. Deliberately not SVG — no `react-native-svg` (§6) |
 | `SwimSyncAdmin/components/Logo.tsx` | The mark in the admin: **inline SVG**, `currentColor`. Hand-kept copy of `brand/mark.svg` — edit both |
+| `SwimSyncApp/components/GeistFonts.tsx` + `lib/geistCss.ts` | Geist on web: one family, a face per weight, applied via `html [dir]` (§7.368). Rendered BESIDE the root `<Stack/>`, never around it (§7.366) |
+| `SwimSyncApp/components/TabBar.tsx` | The coach + parent tab bar options (DESIGN.md). The label stays a bare `<Text>` inside the tab's pressable — `pressByText` presses its parent |
 | `supabase/migrations/20260719001400…002200` | This session: student identity + derived age, the tenant pin, document name snapshots, `tenant_levels`, the `swimming_ability` drop (CONTRACT), parent address, level skills |
 | `SwimSyncApp/lib/lessonDates.ts` | Also holds **`ageFromDob()`** — age is derived, never stored. **Twin file**: edit `SwimSyncAdmin/lib/lessonDates.ts` too |
 | `SwimSyncApp/app/(parent)/home/edit-child.tsx` | Parent edits their child (name/DOB/gender/notes). The first thing in the app that mutates `students` — see §6 on the tenant pin |

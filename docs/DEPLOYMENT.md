@@ -1215,3 +1215,12 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     one nightly (the plan's cap). Pushes run by the user (auto mode refuses a push to `main` unless a deploy is asked
     for explicitly, e.g. `/deploy`).
 
+86. **Deploy record (2026-10-12): UI restyle 1.1 Geist (`85230ee`, app + admin) then 1.2 tab bars (`1892d6a`, app) —
+    two pushes via `/deploy`, on the user's explicit waiver of the nightly cap** (five restyle landings now await one
+    nightly; plan §3). Neither is visual-only (P4). Before the push: invariants, both typechecks, app 750 / admin 1177
+    tests, a production `next build`. Proof, Geist: the live app bundle carries `html [dir]{font-family:`; the admin
+    CSS carries `--font-geist`; the font files return 200 `font/ttf` / `font/woff2`; on both live login pages the
+    computed font is Geist with 400/500/600 loaded. Tab bars: the live app bundle carries
+    `fontSize:12,lineHeight:16,fontWeight` (absent from the Geist bundle). **GitHub's Vercel commit status read
+    `pending` for 12+ min after the new bundle was already served** — grep the bundle, never wait on the status.
+
