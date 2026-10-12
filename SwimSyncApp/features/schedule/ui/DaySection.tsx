@@ -7,7 +7,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { formatAttendees, isFinished } from "@/lib/attendanceSummary";
-import { CARD } from "./ScheduleButton";
+import { SURFACE } from "@/components/ui/Surface";
 import type { WeekLesson } from "../types";
 import { formatTime, dayHeading } from "../domain/scheduleFormat";
 import { ProgressChip } from "./ProgressChip";
@@ -78,7 +78,7 @@ export function DaySection({
                     router.push(`/(coach)/classes/${l.classId}/roster`)
               }
             >
-              <View className={CARD}>
+              <View className={SURFACE}>
                 <View className="flex-row items-start justify-between">
                   <View className="flex-1">
                     <Text

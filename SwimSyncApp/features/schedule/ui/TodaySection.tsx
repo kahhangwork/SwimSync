@@ -8,7 +8,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { isNowInRange } from "@/lib/timeOfDay";
 import { formatAttendees, isFinished } from "@/lib/attendanceSummary";
 import { canMark } from "@/lib/coachRoster";
-import { CARD, ScheduleButton } from "./ScheduleButton";
+import { Button } from "@/components/ui/Button";
+import { SURFACE } from "@/components/ui/Surface";
 import { formatTime, dayHeading } from "../domain/scheduleFormat";
 import { ProgressChip } from "./ProgressChip";
 import { RoleBadge } from "./RoleBadge";
@@ -56,7 +57,7 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
                   key={`${l.classId}:${l.date}`}
                   // On now: a stronger edge, not a tint — the One Blue Rule keeps
                   // blue for actions, and the "Now" word carries the meaning.
-                  className={`${CARD} ${isActive ? "border-border-strong" : ""}`}
+                  className={`${SURFACE} ${isActive ? "border-border-strong" : ""}`}
                 >
                   {isActive && (
                     <View className="flex-row items-center gap-1.5 mb-2">
@@ -116,7 +117,7 @@ export function TodaySection(p: Pick<Week, "showsTodaySection" | "todayDate" | "
                       toast. The screen behind it still opens, read-only,
                       because knowing who is expected is the reason a
                       trainee is there at all. */}
-                  <ScheduleButton
+                  <Button
                     label={
                       !canMark(l.role)
                         ? "View lesson"

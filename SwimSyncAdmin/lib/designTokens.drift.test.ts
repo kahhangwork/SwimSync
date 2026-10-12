@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 // TWIN FILE: SwimSyncApp/lib/designTokens.drift.test.ts is identical except that it
-// uses jest globals and loads that app's tailwind.config.js. Keep in sync.
+// uses jest globals, loads that app's tailwind.config.js and scans that app's source
+// folders (SCAN). Keep in sync.
 //
 // DESIGN.md's front matter is the source of the visual tokens; each app's Tailwind
 // config holds a hand copy (two deploy roots — neither can import from the repo
@@ -11,7 +12,7 @@ import { describe, it, expect } from "vitest";
 // app depends on one, and the shape (`  key: "value"` under a top-level key) is
 // what DESIGN.md's format fixes.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import config from "../tailwind.config";
 
@@ -86,5 +87,35 @@ describe("DESIGN.md tokens ↔ tailwind config", () => {
     for (const [name, px] of Object.entries(sizes)) {
       expect([name, ext.fontSize[name]?.[0]]).toEqual([name, px]);
     }
+  });
+});
+
+// The legacy sky shades (`primary-50…900`) stay in the config until Phase 7, but
+// DESIGN.md's Lane Blue is `primary` / `primary-hover` — a `bg-primary-500` written
+// today is SKY, the wrong blue, and looks almost right. Zero in the source on
+// 2026-10-12, so this is a ratchet that can only stay at zero (UI restyle 1.3).
+// MUTATION PROOF (§7.25): add `bg-primary-500` to any components/ file → RED.
+const SCAN = ["app", "components", "lib"];
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+    const p = join(dir, d.name);
+    if (d.isDirectory()) return d.name === "node_modules" ? [] : sourceFiles(p);
+    return /\.(tsx?|jsx?)$/.test(d.name) && !/\.test\.tsx?$/.test(d.name) ? [p] : [];
+  });
+}
+
+describe("no legacy primary-<shade> classes", () => {
+  const files = SCAN.flatMap((d) => sourceFiles(join(__dirname, "..", d)));
+
+  it("scanned the source (guards a silent zero-row pass)", () => {
+    expect(files.length).toBeGreaterThan(100);
+  });
+
+  it("zero `-primary-<number>` classes", () => {
+    const hits = files.flatMap((f) =>
+      (readFileSync(f, "utf8").match(/[\w:]*-primary-\d+\b/g) ?? []).map((c) => `${f}: ${c}`),
+    );
+    expect(hits).toEqual([]);
   });
 });

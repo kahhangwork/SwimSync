@@ -1,5 +1,19 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// tailwind-merge only knows Tailwind's DEFAULT scale names. Unknown `text-*` is
+// filed as a COLOUR, so plain twMerge turned `text-body text-ink` into `text-ink`
+// — DESIGN.md's type size silently dropped (§7.372). Teach it the token names.
+// The lists are DESIGN.md's; lib/utils.test.ts fails if a token is missing here.
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [{ text: ["display", "headline", "body", "body-secondary", "label"] }],
+      rounded: [{ rounded: ["tag", "control", "card"] }],
+      shadow: [{ shadow: ["float"] }],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

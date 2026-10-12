@@ -32,15 +32,15 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 | Area | Items |
 |---|---|
-| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338, 355, 356, 357, 360 |
+| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338, 355, 356, 357, 360, 374 |
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365 |
-| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371 |
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359 |
@@ -3042,6 +3042,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 369. **`SwimSyncApp` jest only runs tests under `lib/` and `features/`** (`testMatch` in `jest.config.js`). A
     `components/*.test.ts` is silently never run — "75 suites passed" before and after adding it was the tell. Put
     the pure logic in `lib/` and test it there. (2026-10-12, UI restyle 1.1.)
+    **Fixed 2026-10-13 (UI restyle 1.3):** `testMatch` now includes `components/**`, so a component test there runs.
 
 370. **A closed lid (clamshell sleep) stalls a local driver batch for hours, with no error.** `caffeinate -dims` does
     not stop a lid-close sleep on battery. Symptoms: one driver's seconds balloon (608 vs 112), a reset takes 17 min,
@@ -3054,3 +3055,26 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     stopping the server and `rm -rf SwimSyncAdmin/.next` fixed it. Compare against a fresh `npx tailwindcss` build
     before debugging the config. The cleared cache then makes the first post-login page compile cold, which
     once outlasted `verify-tenant-provisioning`'s fixed 3 s sign-in wait (14/15; 15/15 on re-run). (2026-10-12.)
+
+372. **The admin's `cn()` (tailwind-merge) silently DROPPED DESIGN.md's type-size tokens.** tailwind-merge knows only
+    Tailwind's default scale names; an unknown `text-*` is filed as a colour, so `cn("text-body", "text-ink")` returned
+    `"text-ink"` — the 14px size gone with no error. Same for `rounded-tag/-control/-card` (never merged) and
+    `shadow-float`. Latent until UI restyle 1.3 (no admin screen used a token through `cn()` yet). Fix:
+    `extendTailwindMerge` in `lib/utils.ts` with the token names; `lib/utils.test.ts` reads them from the config, so a
+    new token missing from `cn()` goes red. A new `fontSize`/`borderRadius`/`boxShadow` token must be added to both.
+    The app has no `cn()` — a NativeWind class string is not merged. (2026-10-12, UI restyle 1.3.)
+
+373. **A jest `expect(instanceA).toBe(instanceB)` on two `@testing-library/react-native` nodes HANGS when it fails.**
+    The failure message pretty-prints both test instances, whose `parent`/`children` links make the diff walk the
+    whole tree for minutes; the run never reports, and `--forceExit` does not help (the test is still running). It
+    passes instantly when the two ARE the same node, so it only bites the mutation proof (§7.25) — which is exactly
+    when you need the verdict. Compare a label instead: `hostParent(n) === button ? "the button" : \`a ${type}\``.
+    macOS also has no `timeout(1)` (`timeout 100 npx jest …` prints nothing and exits) — guard a proof with a
+    background `sleep N; pkill` watchdog. (2026-10-12, UI restyle 1.3.)
+
+374. **A real-clock `--only` run that straddles SGT midnight fails a date-relative check, on an unchanged build.**
+    `verify-coach-schedule-roles` loaded its fixture at 23:59:52 and asserted at 00:00:28: *"DB: opening the lesson
+    wrote nothing"* went 27/28 on plain `main`, and 28/28 on the immediate re-run. The fixture's "today" and the
+    app's "today" were different days. Before blaming a change, compare the log's mtime with its fixture log's —
+    if they sit either side of 00:00 SGT, re-run, or pin the clock (`--now '<day> <time>+08'`) for batches that may
+    run late. (2026-10-13, UI restyle 1.3 baseline.)

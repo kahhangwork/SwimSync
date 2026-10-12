@@ -11,5 +11,9 @@ module.exports = {
     "**/lib/**/*.test.tsx",
     "**/features/**/*.test.ts",
     "**/features/**/*.test.tsx",
+    // Shared components (components/ui — the DESIGN.md primitives). Missing until
+    // 2026-10-12, so a components/ test was silently never run (§7.369).
+    "**/components/**/*.test.ts",
+    "**/components/**/*.test.tsx",
   ],
 };

@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { progressLabel } from "@/lib/attendanceSummary";
 import { blockedMonths, dayHeading } from "../domain/scheduleFormat";
-import { ScheduleButton } from "./ScheduleButton";
+import { Button } from "@/components/ui/Button";
 import type { useScheduleSections } from "../domain/useScheduleSections";
 
 type Sections = ReturnType<typeof useScheduleSections>;
@@ -52,7 +52,7 @@ export function NeedsMarkingSection(p: Pick<Sections, "visibleNeedsMarking" | "o
         these lessons are marked.
       </Text>
 
-      <ScheduleButton label="Mark oldest lesson" onPress={() => open(oldest)} className="mt-3" />
+      <Button label="Mark oldest lesson" onPress={() => open(oldest)} className="mt-3" />
 
       <View className="gap-2 mt-3">
         {rows.map((item) => (
