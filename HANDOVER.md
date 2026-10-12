@@ -442,8 +442,9 @@ which mutate shared seed state — are in the same section.
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip. Next build after
    it: **Wave 9 item 8, UI/UX improvements — IN PROGRESS, follow `docs/plans/UI_RESTYLE_PLAN.md`** (start at its §0;
-   §3 is the state). Logo 2a and the DESIGN.md tokens are live (2026-10-12); coach Schedule (step 2.1) is built on
-   `ui/coach-schedule`, not landed.
+   §3 is the state). Live 2026-10-12: Phase 0 (logo 2a, tokens, plan) and step 2.1 (coach Schedule + its wording).
+   **First, read the nightly after `7445547`** and fill the plan's §3 ledger verdicts — three landings await it (the
+   cap); red = freeze + revert per §6. **Then step 1.1 (Geist)** — Phase 1 comes before more screens.
 3. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 

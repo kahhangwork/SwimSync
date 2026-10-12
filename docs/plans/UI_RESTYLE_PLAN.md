@@ -81,7 +81,7 @@ Decisions this plan makes (the user may overrule; none changes the look):
 
 ## 3. State (update in every commit that ticks a step)
 
-_As of 2026-10-12: Phase 0 and 2.1's restyle (`64ab076`) are on `main`; 2.1's wording (sentence-case headings, `Sat 26 Sept`) is `ui/schedule-wording`._
+_As of 2026-10-12: Phase 0 and all of 2.1 (`64ab076`, wording `7445547`) are on `main`. **Next session: read the first nightly after `7445547`, fill the three empty "Nightly verdict" cells below, then step 1.1.**_
 
 | Branch | Commit | What | Landed? |
 |---|---|---|---|
@@ -98,7 +98,7 @@ _As of 2026-10-12: Phase 0 and 2.1's restyle (`64ab076`) are on `main`; 2.1's wo
 | 0.1 logo | `9edfee4` | NOT VISUAL-ONLY (`app.json` splash colour) — landed under the nightly gate | (built 2026-10-11, before this ledger) | — | admin login chunk `M6 32Q13 21`; rasters byte-identical | `38182159846` | green |
 | 0.2 tokens | `f805461`, `f5609d4` | VISUAL-ONLY | none — compiled CSS byte-identical | — | none possible (no visible change) | | |
 | 2.1 Schedule (as built — words kept) | `64ab076` | NOT VISUAL-ONLY on 3 lines, each explained in the commit message (fold toggle `useState` ×2, `.sort()` in a display helper) — landed under D3 | 11 Schedule drivers green 2026-10-11 on the identical app tree (`schedule-week` 21/21, `trials` 16/16, `coach-schedule-roles` 28/28, `cancel-lesson` 29/29, 7 more) | not recorded (built before the ledger) | app bundle `Mark oldest lesson` | | |
-| 2.1 Schedule wording — `Today ·`, `Needs marking (N)`, `Coming up`, `Done`; day labels `Sat 26 Sept` via `dayHeading` + `sgDayLabel` (`formatSgDate` untouched) | this commit | VISUAL-ONLY | the same 10 drivers before (`64ab076`) and after: equal scores | 0 → 0 (39 → 39 presses) | app bundle `Needs marking (` | | |
+| 2.1 Schedule wording (`7445547`) — `Today ·`, `Needs marking (N)`, `Coming up`, `Done`; day labels `Sat 26 Sept` via `dayHeading` + `sgDayLabel` (`formatSgDate` untouched) | `7445547` | VISUAL-ONLY | the same 10 drivers before (`64ab076`) and after: equal scores | 0 → 0 (39 → 39 presses) | app bundle `Needs marking (` | | |
 
 A landing whose "Nightly verdict" cell is empty is **unverified**. **Do NOT land a fourth restyle while three are
 unverified** — at most three landings can be attributed per red nightly. The user may raise this cap; nobody else may.
