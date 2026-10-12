@@ -1,5 +1,5 @@
 import { Tabs, router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { useTabScreenOptions, tabIcon } from "@/components/TabBar";
 import { useCoachHasPayouts } from "@/lib/useCoachHasPayouts";
 
 export default function CoachLayout() {
@@ -10,24 +10,10 @@ export default function CoachLayout() {
   // Classes and Settings included — so nothing here may await, throw, or
   // early-return on it.
   const hasPayouts = useCoachHasPayouts();
+  const tabScreenOptions = useTabScreenOptions();
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: "#0ea5e9",
-        tabBarInactiveTintColor: "#9ca3af",
-        tabBarStyle: {
-          backgroundColor: "#ffffff",
-          borderTopColor: "#f3f4f6",
-          borderTopWidth: 1,
-          paddingBottom: 6,
-          paddingTop: 6,
-          height: 62,
-        },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
-      }}
-    >
+    <Tabs screenOptions={tabScreenOptions}>
       {/* ⚠ THIS MUST STAY THE FIRST <Tabs.Screen>. expo-router's
           getSortedChildren puts DECLARED screens in declaration order and
           appends undeclared ones alphabetically, and the first is the
@@ -38,18 +24,14 @@ export default function CoachLayout() {
         name="schedule"
         options={{
           title: "Schedule",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon("calendar-outline"),
         }}
       />
       <Tabs.Screen
         name="classes"
         options={{
           title: "Classes",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon("people-outline"),
         }}
         // The attendance screen lives in THIS tab's Stack (classes/_layout.tsx)
         // but is pushed from the SCHEDULE tab — §7.65. Switching tabs only hides
@@ -118,18 +100,14 @@ export default function CoachLayout() {
         options={{
           title: "My Pay",
           href: hasPayouts ? undefined : null,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet-outline" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon("wallet-outline"),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon("settings-outline"),
         }}
       />
     </Tabs>

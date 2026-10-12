@@ -297,7 +297,7 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
    user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
 8. **UI/UX improvements** (M, *Platform and reach*) — **IN PROGRESS: follow `docs/plans/UI_RESTYLE_PLAN.md`.** Logo,
-   tokens and S1 *Coach Schedule* are live (2026-10-12); next is the plan's Phase 1 (Geist, tab bars, primitives).
+   tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* are live (2026-10-12); next is the plan's step 1.3 (primitives).
 9. **Remove the legacy package matcher** (M, *Billing and payments*). Gated: only after Little Orcas seals September
    (it is Wave 6's rollback until then). Independent of 7–8.
 
@@ -1610,9 +1610,8 @@ visible text, so keep words unless the item changes them on purpose):**
 
 1. ~~**Coach Schedule restyle**~~ — **shipped 2026-10-12** (`64ab076` restyle, `7445547` wording; PRD §7.5). Kept as a
    line so the plan's S-numbers still resolve.
-2. **Mobile tab bar to spec** (coach + parent `_layout.tsx`) — labels are 11px `#9ca3af` (~2.5:1), active is colour
-   alone, "Settings"/"Billing" descenders clip to "Settinas"/"Billina". → 12px `#525252`, active Ink 600 + 2px blue
-   indicator, 64px + safe area.
+2. ~~**Mobile tab bar to spec**~~ — **shipped 2026-10-12** (UI restyle step 1.2, `components/TabBar.tsx`). Kept as a
+   line so the plan's S-numbers still resolve.
 3. **Parent invoice card** (Billing → Invoices) — Pay-First (PayNow full-width primary, "Already paid?" text link
    beneath, Info "Claimed · awaiting confirmation" after a claim); "Gross / Net Amount" → "N lessons / Credit / To pay";
    unpaid is amber, money in Ink, true minus.
