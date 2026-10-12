@@ -133,6 +133,16 @@ describe("InvoiceTable", () => {
     expect(cells(p)[7].textContent).toBe("Paid");
   });
 
+  it("a claimed outstanding invoice reads Claimed, with the parent's date beneath", () => {
+    setup({
+      visible: [inv({ id: "inv-1", paid_claimed_at: "2026-10-01T02:00:00Z" })],
+    });
+    const [c] = bodyRows();
+    expect(within(c).getByText("Claimed")).toBeTruthy();
+    expect(within(c).queryByText("Outstanding")).toBeNull();
+    expect(within(c).getByText(/parent says paid/)).toBeTruthy();
+  });
+
   it("Mark Paid appears only on outstanding rows", () => {
     setup({
       visible: [inv({ id: "inv-1" }), inv({ id: "inv-2", status: "paid" })],

@@ -1627,10 +1627,11 @@ row is a month and its state:
 
 | State | Meaning |
 |---|---|
-| **Closed** | The month is sealed, and the date it closed. (Not an invoice count: the seal records only the invoices its own run created, so a month billed across several runs would under-report.) |
-| **Open** (red) | Generation has run (or invoices exist) but the month is not sealed. The row says **why**, from the latest run: *N lessons have unmarked attendance*, *N lessons have no parent to bill*, *Bill <month> first*, *No lessons recorded*, *Last run failed: …*, or *Reopened after sealing*. Any other engine status is shown raw, never as a tick. |
+| **Closed** (green) | The month is sealed, and the date it closed. (Not an invoice count: the seal records only the invoices its own run created, so a month billed across several runs would under-report.) |
+| **Open** (red or amber) | Generation has run (or invoices exist) but the month is not sealed. The row says **why**, from the latest run: *N lessons have unmarked attendance*, *N lessons have no parent to bill*, *Bill <month> first*, *No lessons recorded*, *Last run failed: …*, or *Reopened after sealing*. Any other engine status is shown raw, never as a tick. *(implemented 2026-10-11)* The tag is **red only when that run refused** — unmarked lessons, a child with no parent, an earlier month first, or a failure — because red means someone must unblock it (`DESIGN.md`, *Red Means Stuck*). Otherwise (no lessons recorded, reopened, reason not recorded, an unrecognised status) it is **amber**: generate again. |
 | **Not billed yet** (amber) | The newest billable month, not yet run, once the business's run day has passed — or an earlier month that another month's run says must be billed first. |
 | **Not run yet** (grey) | The newest billable month, before the run day. |
+| **Nothing to bill** (green) | Every billable lesson was package-funded (§7.16). |
 
 - **The reason is a snapshot of the last run**, labelled *"as of last run, 14 Sep, 09:49"*.
   It does not recompute live — the billing engine stays the only copy of the rules. Fixing the
@@ -2944,7 +2945,8 @@ directly, and no gateway takes a percentage. What the product supplies is
   via the edge function), or in the app on **either the invoice list or the invoice
   detail** (`claim_invoice_paid()` RPC) — which records a **timestamped
   claim, never a status change**; claiming twice keeps the first timestamp. The admin
-  sees a *"parent says paid"* badge and a **Claimed** filter (outstanding + claimed —
+  sees the row's status tag read **Claimed** (blue — *implemented 2026-10-11*; it read *Outstanding*
+  before), with *"parent says paid <date>"* beneath it, and a **Claimed** filter (outstanding + claimed —
   the rows to check against the bank first). Confirmation goes through **one RPC for
   every client**, `confirm_invoice_paid()` — gate identical to the `invoices_update`
   policy — which writes `status`/`paid_at`/`paid_marked_by` **and** the

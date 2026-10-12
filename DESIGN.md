@@ -112,8 +112,10 @@ components:
 > `docs/design/`. The name `DESIGN.md` is a standard (Google's DESIGN.md format) that design tools such as
 > Impeccable load automatically, which is why it is not called anything else.
 >
-> **Status (2026-10-11): target, adoption begun.** The **logo is shipped** (below) and **the tokens are in both
-> Tailwind configs** (classes below), unused until a screen migrates. Otherwise the apps today still use Tailwind sky
+> **Status (2026-10-13): target, adoption begun.** The **logo is shipped** (below), **the tokens are in both
+> Tailwind configs** (classes below), the **primitives** are in each app's `components/ui/` (`Button`, `Surface`, `Tag`,
+> `SectionHeading`) and the **status scale is adopted** — every `StatusBadge` in both apps takes its tone from
+> `lib/statusTone.ts` (twin files) through `Tag`. Otherwise the apps today still use Tailwind sky
 > (`#0ea5e9`) and white cards with shadows. Screens move to this system one at a time under BACKLOG
 > *UI/UX improvements* — never in one sweep (the UI drivers assert on visible text). Until a screen is
 > migrated, its code is not evidence against this file. Chosen from three drawn directions; mock-ups:

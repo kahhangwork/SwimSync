@@ -6,10 +6,12 @@ import {
   formatRunStamp,
   monthLabel,
   monthsBefore,
+  monthTone,
   runDayOf,
   reasonFor,
   stillUnclaimed,
   visibleMonths,
+  type BillingMonthRow,
   type BillingPeriod,
   type BillingRun,
   type DeriveInput,
@@ -321,4 +323,34 @@ it("runDayOf defaults to 7 and clamps to 28, as the Invoices page shows it", () 
   expect(runDayOf(null)).toBe(7);
   expect(runDayOf(31)).toBe(28);
   expect(runDayOf(3)).toBe(3);
+});
+
+describe("monthTone — red only when the last run REFUSED (DESIGN.md, Red Means Stuck)", () => {
+  const row = (state: BillingMonthRow["state"], runs: BillingRun[] = []): BillingMonthRow => ({
+    month: "2026-08", period: null, recentRuns: runs, state, needsAttention: false, reason: null,
+  });
+  it("closed and package-funded are done", () => {
+    expect(monthTone(row("closed"))).toBe("success");
+    expect(monthTone(row("package_funded"))).toBe("success");
+  });
+  it("not run yet is neutral; not billed after the run day is amber", () => {
+    expect(monthTone(row("not_run"))).toBe("neutral");
+    expect(monthTone(row("not_billed"))).toBe("warning");
+  });
+  it("open because a run refused is red", () => {
+    expect(monthTone(row("open", [run("2026-08", { status: "incomplete_attendance" })]))).toBe("danger");
+    expect(monthTone(row("open", [run("2026-08", { status: "error", error: "x" })]))).toBe("danger");
+    expect(monthTone(row("open", [unclaimedOpen("2026-08")]))).toBe("danger");
+    expect(monthTone(row("open", [run("2026-08", {
+      status: "earlier_month_unbilled", earlier_unbilled_month: "2026-07",
+    })]))).toBe("danger");
+  });
+  it("open with no recorded reason, or reopened by hand, is amber — re-run it, nothing is stuck", () => {
+    expect(monthTone(row("open"))).toBe("warning");
+    expect(monthTone(row("open", [run("2026-08", { sealed: true, status: "incomplete_attendance" })]))).toBe("warning");
+    expect(monthTone(row("open", [run("2026-08", { status: "nothing_to_bill" })]))).toBe("warning");
+  });
+  it("only the LATEST run counts", () => {
+    expect(monthTone(row("open", [run("2026-08"), run("2026-08", { status: "error" })]))).toBe("warning");
+  });
 });

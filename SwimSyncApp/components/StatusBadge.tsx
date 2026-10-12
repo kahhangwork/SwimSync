@@ -1,52 +1,20 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { Tag } from "@/components/ui/Tag";
+import { statusTone } from "@/lib/statusTone";
 
-type Status =
-  | "Present"
-  | "Absent"
-  | "Cancelled"
-  | "Trial"
-  | "Outstanding"
-  | "Paid"
-  | "Credit Applied"
-  | "Assigned"
-  | "Unassigned"
-  | "Inactive"
-  | "Applied"
-  | "Not Marked"
-  | string;
+// The word's tone is lib/statusTone.ts's; the classes are components/ui/Tag's
+// (this app's Tailwind does not scan lib/ — §7.191).
 
-const statusConfig: Record<string, { bg: string; text: string; label?: string }> = {
-  Present:        { bg: "bg-green-100",  text: "text-green-700" },
-  Absent:         { bg: "bg-gray-100",   text: "text-gray-500" },
-  Cancelled:      { bg: "bg-orange-100", text: "text-orange-600" },
-  Trial:          { bg: "bg-blue-100",   text: "text-blue-600" },
-  Outstanding:    { bg: "bg-red-100",    text: "text-red-600" },
-  Paid:           { bg: "bg-green-100",  text: "text-green-700" },
-  "Credit Applied": { bg: "bg-blue-100", text: "text-blue-600" },
-  Applied:        { bg: "bg-blue-100",   text: "text-blue-600" },
-  Assigned:       { bg: "bg-green-100",  text: "text-green-700" },
-  Unassigned:     { bg: "bg-yellow-100", text: "text-yellow-700" },
-  Inactive:       { bg: "bg-gray-100",   text: "text-gray-500" },
-  "Not Marked":   { bg: "bg-gray-100",   text: "text-gray-400", label: "–" },
-  Active:         { bg: "bg-green-100",  text: "text-green-700" },
-  Pending:        { bg: "bg-yellow-100", text: "text-yellow-700" },
-};
+// A display override for a word whose stored status is not a reader's word.
+const LABEL: Record<string, string> = { "Not Marked": "–" };
 
 interface Props {
-  status: Status;
+  status: string;
+  /** Kept for existing callers; the tag is one size (12px, the text floor). */
   size?: "sm" | "md";
 }
 
-export default function StatusBadge({ status, size = "md" }: Props) {
-  const config = statusConfig[status] ?? { bg: "bg-gray-100", text: "text-gray-500" };
-  const label = config.label ?? status;
-  const textSize = size === "sm" ? "text-xs" : "text-sm";
-  const px = size === "sm" ? "px-2 py-0.5" : "px-3 py-1";
-
-  return (
-    <View className={`rounded-full ${config.bg} ${px} self-start`}>
-      <Text className={`${config.text} ${textSize} font-semibold`}>{label}</Text>
-    </View>
-  );
+/** A status as a WORD in a tag — colour is never the only signal (DESIGN.md). */
+export default function StatusBadge({ status }: Props) {
+  return <Tag label={LABEL[status] ?? status} tone={statusTone(status)} />;
 }

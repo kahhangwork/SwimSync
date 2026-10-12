@@ -16,7 +16,7 @@ const TONE: Record<Tone, string> = {
   success: "bg-status-success-bg text-status-success-text border-status-success-border",
 };
 
-const BASE = "inline-flex items-center rounded-tag border px-1.5 py-0.5 text-label font-medium whitespace-nowrap";
+const BASE = "inline-flex items-center rounded-tag border px-1.5 py-0.5 text-label font-medium";
 
 export function Tag({ tone, className, children }: { tone: Tone; className?: string; children: React.ReactNode }) {
   return <span className={cn(BASE, TONE[tone], className)}>{children}</span>;

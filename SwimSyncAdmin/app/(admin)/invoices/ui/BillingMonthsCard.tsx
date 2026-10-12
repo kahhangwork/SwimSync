@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/Button";
+import { StatusBadge } from "@/components/StatusBadge";
 import { formatSgStamp } from "@/lib/lessonDates";
 import {
   formatRunStamp,
   monthLabel,
+  monthTone,
   visibleMonths,
   type BillingMonthRow,
   type BillingRun,
@@ -135,12 +137,13 @@ export function BillingMonthsCard({
   );
 }
 
-const STATE_STYLE: Record<BillingMonthRow["state"], { dot: string; label: string }> = {
-  closed: { dot: "bg-green-500", label: "Closed" },
-  open: { dot: "bg-red-500", label: "Open" },
-  not_billed: { dot: "bg-amber-500", label: "Not billed yet" },
-  not_run: { dot: "bg-gray-300", label: "Not run yet" },
-  package_funded: { dot: "bg-sky-500", label: "Nothing to bill" },
+// The words. The colour is monthTone()'s — red only when the last run refused.
+const STATE_LABEL: Record<BillingMonthRow["state"], string> = {
+  closed: "Closed",
+  open: "Open",
+  not_billed: "Not billed yet",
+  not_run: "Not run yet",
+  package_funded: "Nothing to bill",
 };
 
 function MonthRow({
@@ -171,7 +174,6 @@ function MonthRow({
   onResendInvoice: (invoiceId: string) => void;
 }) {
   const [showUndelivered, setShowUndelivered] = useState(false);
-  const style = STATE_STYLE[row.state];
   const latest = row.recentRuns[0] ?? null;
   const unclaimedCount = latest?.unclaimed_students?.length ?? 0;
   const blockedCount = latest?.blocking?.length ?? 0;
@@ -187,10 +189,7 @@ function MonthRow({
         >
           {monthLabel(row.month)}
         </button>
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
-          <span className={`h-2 w-2 rounded-full ${style.dot}`} />
-          {style.label}
-        </span>
+        <StatusBadge status={STATE_LABEL[row.state]} tone={monthTone(row)} />
 
         <span className="text-xs text-gray-600">
           {/* The close date only — NOT billing_periods.invoices_issued, which

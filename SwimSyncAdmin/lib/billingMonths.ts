@@ -12,6 +12,7 @@
 // logic path (§7.7); display labels are built in UTC from the string itself.
 
 import { fromJson, type Tables } from "@/lib/database.overrides";
+import type { StatusTone } from "@/lib/statusTone";
 
 export type BillingPeriod = {
   billing_month: string;
@@ -361,6 +362,31 @@ export function attentionSummary(rows: BillingMonthRow[]): string | null {
       ? `${monthLabel(first.month)} is still open — ${first.reason}`
       : `${monthLabel(first.month)} has not been billed yet`;
   return due.length > 1 ? `${head} (+${due.length - 1} more)` : head;
+}
+
+/** The status-scale tone of a month's tag (DESIGN.md → Status scale). Red is
+ *  ONLY for a month the last run REFUSED — something a person must unblock
+ *  (unmarked lessons, a child with no parent, an earlier month, a failure). An
+ *  open month whose reason is unknown or benign is amber: it needs a re-run, not
+ *  a rescue. Mirrors reasonFor()'s order so the words and the colour agree. */
+export function monthTone(row: BillingMonthRow): StatusTone {
+  switch (row.state) {
+    case "closed":
+    case "package_funded":
+      return "success";
+    case "not_run":
+      return "neutral";
+    case "not_billed":
+      return "warning";
+    case "open": {
+      const run = row.recentRuns[0];
+      if (!run || run.sealed) return "warning";
+      if (run.status === ERROR || run.status === INCOMPLETE) return "danger";
+      if ((run.unclaimed_billable ?? 0) > 0) return "danger";
+      if (run.status === EARLIER && run.earlier_unbilled_month) return "danger";
+      return "warning";
+    }
+  }
 }
 
 /** DISPLAY ONLY: a run's timestamptz as "14 Sept, 09:49" in Singapore time,

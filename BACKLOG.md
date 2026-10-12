@@ -1622,9 +1622,12 @@ visible text, so keep words unless the item changes them on purpose):**
    leaves the page a ~180px strip (Students shows one column; Invoices' fields clip).
 6. **Parent invoice detail** — the same Pay-First / Plain Words fix, and the **Lesson Breakdown card renders empty**
    (no rows, no empty text), so a parent cannot see what they are paying for.
-7. **One status scale across every tag** — revive the parked branch `ui/status-scale` (`08fe3d9`: twin
-   `lib/statusTone.ts`, both `StatusBadge`s, Claimed tag, month tones), extended with Due vs Overdue. Rebase it onto the
-   tokens first (its classes predate them).
+7. ~~**One status scale across every tag**~~ — **shipped 2026-10-13** (UI restyle step 1.4: twin `lib/statusTone.ts`,
+   both `StatusBadge`s through `components/ui/Tag`, admin Claimed tag, billing-month tones; PRD §7.7, §7.21). Kept as a
+   line so the plan's S-numbers still resolve. **Still open — Overdue:** there is no due-date source (no `due_date`
+   column, none in the PRD), so every unpaid invoice is *Outstanding* = Due (amber). Showing **Overdue** (red) needs a
+   product decision first — when is an invoice overdue (a fixed day of the month? N days after issue? per business?) —
+   and then a stored due date. Never derive it in a client from the month or the invoice's age.
 8. **Admin Lessons + the sidebar badge** — past unmarked lessons show amber "Needs marking" (→ Danger "Blocks billing");
    the sidebar badge says 20 while the page tab says 2 — one count definition, Danger colour.
 9. **One date style in admin tables** — ISO (`2026-10-11`) or numeric (`11/10/2026`) on Credit Notes, Referrals,

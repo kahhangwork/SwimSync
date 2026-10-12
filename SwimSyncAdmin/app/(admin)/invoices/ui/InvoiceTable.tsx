@@ -115,9 +115,16 @@ export function InvoiceTable({
                   S${inv.net_amount.toFixed(2)}
                 </Td>
                 <Td>
+                  {/* Claimed is its own state, not a footnote under Outstanding
+                      (DESIGN.md's Claimed Is Its Own State Rule). The stored
+                      status stays outstanding until Mark Paid (PRD §7.21). */}
                   <StatusBadge
                     status={
-                      inv.status === "outstanding" ? "Outstanding" : "Paid"
+                      inv.status !== "outstanding"
+                        ? "Paid"
+                        : inv.paid_claimed_at
+                          ? "Claimed"
+                          : "Outstanding"
                     }
                   />
                   {inv.status === "outstanding" && inv.paid_claimed_at && (
