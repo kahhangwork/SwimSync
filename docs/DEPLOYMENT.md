@@ -1189,3 +1189,21 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     + remote dump agree): anon and PUBLIC on none; `authenticated` on the seven RPCs/helpers; matcher internals owner-only.
     Bundle greps: admin "Who can use it", app "Which child is this for?" (the probe first validated on strings the old
     build had). Vercel built serially (~15 min for the third push). CI `38068772597` green. No product flipped; no Generate.
+
+83. **Deploy record (2026-10-11/12): UI restyle Phase 0 — logo 2a (`9edfee4`) then DESIGN.md tokens (`f5609d4`), app-only,
+    two pushes by the user (auto mode refuses a push to `main`).** Gate: nightly `38091614860` green on `f60e917` before
+    the logo; nightly `38182159846` green on `9edfee4` before the tokens. Proof, logo: the served admin login chunk
+    carries the new mark path `M6 32Q13 21`; live `favicon.ico`, `icon.png`, `apple-touch-icon.png` and the app's
+    `logo-mark` asset are byte-identical to the committed rasters. Tokens: no bundle string to grep by design — the
+    compiled CSS of both apps was proven byte-identical before the push; Vercel green on both. CI `38124385958` green
+    (logo).
+
+84. **Deploy RULE (2026-10-12): a VISUAL-ONLY restyle lands without waiting for the next nightly** (user's decision D3,
+    `docs/plans/UI_RESTYLE_PLAN.md` §6; HANDOVER §9 GATE carries the exception). Visual-only =
+    `scripts/check-visual-only.sh origin/main <branch>` prints `VISUAL-ONLY`, or every match it lists is explained by
+    one line in the commit message; the screen's `--only` drivers passed on that exact commit; not a P4 / Phase 4 step.
+    The script advises, it does not block, and its never-visual list overrides the path list (§7.363). Each landing
+    still greps the served bundle for a string only it adds (§7.31). **Rollback:** a red nightly attributed to a
+    restyle → `git revert <sha>` + push in the same session unless the fix is a one-line string; a red freezes further
+    restyle landings until triaged (TESTING §5). Anything not visual-only keeps the nightly gate.
+

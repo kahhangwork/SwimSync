@@ -81,20 +81,22 @@ Decisions this plan makes (the user may overrule; none changes the look):
 
 ## 3. State (update in every commit that ticks a step)
 
-_As of 2026-10-11, nothing below is on `main` yet._
+_As of 2026-10-12: steps 0.1 and 0.2 are on `main`; 0.3 is `ui/restyle-plan`; 2.1 waits on it._
 
 | Branch | Commit | What | Landed? |
 |---|---|---|---|
-| `main` (local, unpushed) | `99c1f51`, `33c8156` | DESIGN.md IPOS line; BACKLOG logo-check done | no |
-| `ui/logo-2a` | `9edfee4` | Step 0.1 — logo 2a everywhere + `brand/render.mjs` | no |
-| `ui/design-tokens` (on `ui/logo-2a`) | `f805461`, `f5609d4` | Step 0.2 — tokens + drift tests; BACKLOG audit filing | no |
-| `ui/coach-schedule` (on `ui/design-tokens`) | see `git log ui/design-tokens..ui/coach-schedule` | Step 2.1 — coach Schedule restyle (words kept; "Sept" per Q1 interim; G-Sept green) + this plan. 11 Schedule drivers green `--only` 2026-10-11 after two fixes: week arrows lost their button role (a `<button disabled>` cannot be clicked past the bound), and `verify-trials` presses the visible class card (it passed on coordinate luck, §7.58) | no |
+| `ui/logo-2a` | `9edfee4` (+ docs `99c1f51`, `33c8156`) | Step 0.1 — logo 2a everywhere + `brand/render.mjs` | **yes**, 2026-10-11 (DEPLOYMENT #83) |
+| `ui/design-tokens` | `f805461`, `f5609d4` | Step 0.2 — tokens + drift tests; BACKLOG audit filing | **yes**, 2026-10-12 (DEPLOYMENT #83) |
+| `ui/restyle-plan` (on `main`) | see `git log origin/main..ui/restyle-plan` | Step 0.3 — this plan, Q1 = "Sept", six GOTCHAS, `check-visual-only.sh`, the D3 exception in HANDOVER §9 GATE + DEPLOYMENT #84 | no |
+| `ui/coach-schedule` (rebase onto `ui/restyle-plan`) | `b0e455f` | Step 2.1 — coach Schedule restyle (words kept; "Sept"; G-Sept green). 11 Schedule drivers green `--only` 2026-10-11 after two fixes: week arrows lost their button role (a `<button disabled>` cannot be clicked past the bound), and `verify-trials` presses the visible class card (it passed on coordinate luck, §7.58). `check-visual-only.sh`: NOT VISUAL-ONLY on 3 lines — `useState` (the fold toggle) ×2, `.sort()` in `blockedMonths` (a display helper) — each must be explained in its commit message to land under D3 | no |
 | `ui/status-scale` (on old `main`) | `08fe3d9` | PARKED — becomes step 1.4 | no |
 
 ⚠ RISK 3 MITIGATION — **Landing ledger** (one row per restyle landing; append, never edit):
 
 | Step | Commit | visual-only? (`check-visual-only.sh` verdict) | `--only` drivers run | NOT FOUND before → after | Bundle string grepped | Next nightly run id | Nightly verdict |
 |---|---|---|---|---|---|---|---|
+| 0.1 logo | `9edfee4` | NOT VISUAL-ONLY (`app.json` splash colour) — landed under the nightly gate | (built 2026-10-11, before this ledger) | — | admin login chunk `M6 32Q13 21`; rasters byte-identical | `38182159846` | green |
+| 0.2 tokens | `f805461`, `f5609d4` | VISUAL-ONLY | none — compiled CSS byte-identical | — | none possible (no visible change) | | |
 
 A landing whose "Nightly verdict" cell is empty is **unverified**. **Do NOT land a fourth restyle while three are
 unverified** — at most three landings can be attributed per red nightly. The user may raise this cap; nobody else may.
@@ -119,9 +121,9 @@ Tick `[x]` in the commit that ships each. **S#** = the BACKLOG ranked item it sa
 - **Never run `run-all-drivers.sh --only …` or `supabase db reset` while a sibling worktree is running** — each
   `--only` resets the shared DB (§7.55). Check `git worktree list` first; any other worktree active → stop and ask.
 
-- [ ] **0.1** Land logo 2a (`ui/logo-2a`). Verify on prod: the favicon and the login tile show the new mark (grep the served admin bundle for `M6 32Q13 21`).
-- [ ] **0.2** Land tokens + drift tests + BACKLOG filing (`ui/design-tokens`). No visual change — compiled CSS proven byte-identical.
-- [ ] **0.3** Land **this plan** + `docs/plans/README.md` row + HANDOVER §9 pointer + the D3 gate exception (§6) written into HANDOVER's GATE line and `docs/DEPLOYMENT.md`.
+- [x] **0.1** Land logo 2a (`ui/logo-2a`). Verify on prod: the favicon and the login tile show the new mark (grep the served admin bundle for `M6 32Q13 21`).
+- [x] **0.2** Land tokens + drift tests + BACKLOG filing (`ui/design-tokens`). No visual change — compiled CSS proven byte-identical.
+- [x] **0.3** Land **this plan** + `docs/plans/README.md` row + HANDOVER §9 pointer + the D3 gate exception (§6) written into HANDOVER's GATE line and `docs/DEPLOYMENT.md`.
   - Correct the GATE line's citation while editing it: HANDOVER's `GATE (§7.1)` mis-cites GOTCHAS §7.1 (an RLS gotcha).
     Cite it as **HANDOVER §9 GATE**.
   - ⚠ RISK 3 MITIGATION — **write `scripts/check-visual-only.sh <base> <head>` in this commit.** It classifies a change

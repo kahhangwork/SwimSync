@@ -441,7 +441,9 @@ which mutate shared seed state — are in the same section.
 2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip. Next build after
-   it: **Wave 9 item 8, UI/UX improvements** (audit first; `DESIGN.md` is the visual system).
+   it: **Wave 9 item 8, UI/UX improvements — IN PROGRESS, follow `docs/plans/UI_RESTYLE_PLAN.md`** (start at its §0;
+   §3 is the state). Logo 2a and the DESIGN.md tokens are live (2026-10-12); coach Schedule (step 2.1) is built on
+   `ui/coach-schedule`, not landed.
 3. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 
@@ -455,7 +457,12 @@ which mutate shared seed state — are in the same section.
 - **A new staff-creating route must mint a `staff_invitations` row** (§7.289); **a new admin surface must name its
   area** in `lib/adminNav.ts` and gate its RPCs with `has_admin_area` (§6ab).
 
-**GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
+**HANDOVER §9 GATE: read the next nightly before the next APP unit merges.** Driver-only units need no gate.
+**Exception — a VISUAL-ONLY restyle** (`docs/plans/UI_RESTYLE_PLAN.md` §6, decision D3, user 2026-10-11) lands without
+waiting, when `scripts/check-visual-only.sh origin/main <branch>` prints `VISUAL-ONLY` (or each match it lists is
+explained by one line in the commit message), its screen's `--only` drivers passed on that exact commit, and it is not
+a P4 / Phase 4 step. At most three unverified landings in a row; **a red nightly freezes restyle landings**, and a red
+attributed to one is reverted (`git revert <sha>` → push) in the same session unless the fix is a one-line string.
 
 **No migration is HELD or in flight.** Latest applied is `20261010000100` (single-child packages), on prod, 0 pending
 (2026-10-11). **B's rollback is valid only until the first seal of a month containing draws** (its header), and it
