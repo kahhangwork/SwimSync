@@ -1,7 +1,7 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-12 (evening) — **§8.148: UI restyle 1.1 Geist + 1.2 tab bars LIVE** on the user's waiver of
-the nightly cap. **Five restyle landings await one nightly** — read it before step 1.3 (primitives)._
+_Last updated: 2026-10-12 (late) — **Little Orcas Sep 2026 confirmed SEALED** on prod (read-only check, no code);
+legacy-matcher removal un-gated. §8.148 stands: **five restyle landings await one nightly** — read it before step 1.3._
 
 _Previously (§8.147, 2026-10-11 → 12) — UI restyle Phase 0 + coach Schedule live (DEPLOYMENT #83–#85)._
 
@@ -433,12 +433,9 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — Wave 9 (BACKLOG Build order)
 
-1. **Little Orcas September is the OWNER's** (unbilled on prod 2026-10-10): *Generate Sep 2026*, *Record it as settled*
-   for the 15 pilot children, and Brayden Ong's 6 + 13 Sept lessons (invite his parent or settle). After it: read
-   `billing_runs` (no `status = 'error'`) and the function logs (no *could not read the database clock*) — engine
-   v35's first real run (DEPLOYMENT #81); failure → revert `ba620c3` → `functions deploy`. Never press Generate
-   yourself. **Its seal also un-gates BACKLOG Wave 9 item 9** (remove the legacy matcher — it now also removes
-   single-child packages' D9 guard and the B rollback's one-child preflight).
+1. **Little Orcas September is SEALED** (2026-10-12 03:49 SGT, 0 invoices: all 16 children incl. Brayden Ong recorded
+   as written-off settlements; 8 live package draws in the month). Engine v35 ran clean (DEPLOYMENT #81; logs unread).
+   **BACKLOG Wave 9 item 9 is UN-GATED** (remove the legacy matcher, + single-child D9 guard + B rollback preflight).
 2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
@@ -467,8 +464,7 @@ a P4 / Phase 4 step. At most three unverified landings in a row; **a red nightly
 attributed to one is reverted (`git revert <sha>` → push) in the same session unless the fix is a one-line string.
 
 **No migration is HELD or in flight.** Latest applied is `20261010000100` (single-child packages), on prod, 0 pending
-(2026-10-11). **B's rollback is valid only until the first seal of a month containing draws** (its header), and it
-now refuses while any one-child package is active or pending.
+(2026-10-11). **B's rollback is SPENT** — Little Orcas sealed Sep 2026 with draws on 2026-10-12 (its header's limit).
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

@@ -1177,6 +1177,9 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     is the next real Generate (Little Orcas Sep 2026): `billing_runs` after 2026-10-10 01:05 UTC with no
     `status = 'error'`, logs without *could not read the database clock*. Any failure → rollback first: revert
     `ba620c3` on a branch → `functions deploy generate-invoices` → `functions list`. ⛔ Never press Generate to prove it.
+    **Exercised (read 2026-10-12, `prod-query-ro.sh`):** Little Orcas' two Sep 2026 runs on v35 (10 Oct 16:18 UTC open
+    on 52 unclaimed; 11 Oct 19:49 UTC sealed) — neither has an error, nor does any run since 2026-10-01. The function logs
+    were NOT read (the read-only script reaches the DB only).
 
 82. **Deploy record (2026-10-11): `20261010000100_single_child_packages` → prod (`supabase db push`, run by the session
     on the user's instruction), then `4476fd9` (migration + types) and `9cb03f8` (apps) to `main`, in that order.** Step 0
