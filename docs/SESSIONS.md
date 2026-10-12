@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.145** | 2026-10-10 | Fixture hygiene ×3 shipped; Wave 9 filed, ranked; single-child packages planned | §7.63, §7.272, §7.304, §7.361 · BACKLOG Wave 9 |
 | **8.144** | 2026-10-09 → 10 | Pin the clock for UI drivers (`--now`); engine v35 on prod, dormant | TESTING §5 · ARCHITECTURE §6af · §7.355–§7.360 · DEPLOYMENT #80, #81 |
 | **8.143** | 2026-10-09 | Wave 6 follow-ups ×3 + "Sept" on every surface, guarded both halves | PRD §7.16, §7.6 · TESTING §5 · §7.302, §7.354 · DEPLOYMENT #79 |
 | **8.142** | 2026-10-07 | G3-apps: neither app takes the UTC date of a timestamp (CI-only) | TESTING §5 · GOTCHAS §7.7, §7.283 |

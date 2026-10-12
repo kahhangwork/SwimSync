@@ -1100,16 +1100,22 @@ The requirement that actually mattered — knowing a lesson *should* have happen
 by **deriving expected lesson dates from the class's `day_of_week` at read time** rather
 than materialising rows ahead of time. This is what makes a forgotten lesson visible:
 
-- The **coach's Schedule tab** leads with **NEEDS MARKING** (past lessons not fully
-  marked) and links straight to marking them; the class roster shows expected-but-missing
+- The **coach's Schedule tab** leads with **Needs marking (N)** (past lessons not fully
+  marked) and links straight to marking them;
+  *(implemented 2026-10-12, UI restyle)* it is styled as the screen's one blocker — a red (Danger) panel above
+  *Today*, a sentence naming what it holds back (*"Sept and Oct can't be billed until these lessons are marked."*),
+  and the screen's only primary button, **Mark oldest lesson**, which opens the oldest row. While it shows, the
+  Mark buttons on *Today*'s cards turn secondary: a routine lesson never outranks the billing blocker (`DESIGN.md`,
+  Blocker-Outranks-Routine). More than 5 rows fold to 3 behind *Show all N*; N is always the whole list. Day
+  labels on this screen read `Sat 26 Sept` (no comma, `DESIGN.md` One Date Style); the class roster shows expected-but-missing
   dates as a distinct *"Not marked"* state.
   > **A lesson whose only attendee is a GUEST counts on both screens** *(corrected
   > 2026-08-10)*. A trial or make-up guest makes a lesson real even when nobody is enrolled
   > in that class — a class between intakes, or one whose students have all moved on, still
   > has that one lesson to teach and mark. Until this was corrected the class roster asked
   > whether anyone was *enrolled* and so showed no lessons and no Mark button at all, while
-  > the Schedule tab asked who was *expected* and listed the same lesson under NEEDS
-  > MARKING. Two coach screens disagreeing about whether a lesson exists is the confusing
+  > the Schedule tab asked who was *expected* and listed the same lesson under *Needs
+  > marking*. Two coach screens disagreeing about whether a lesson exists is the confusing
   > half; the expensive half is that the same lesson blocks billing with no override.
   > **That list is FLOOR-scoped, not week-scoped, and the distinction is load-bearing.**
   > It spans the business's `markable_floor` up to today whatever week the selector
@@ -1118,7 +1124,7 @@ than materialising rows ahead of time. This is what makes a forgotten lesson vis
   > invoice generation outright with no override (§7.7 of this document, HANDOVER §8i).
   > `verify-schedule-week.mjs` is the guard.
 - **Every lesson list states which of five states it is in, and what was recorded**
-  *(implemented)* — on the Schedule tab's lesson cards, the NEEDS MARKING rows and the class
+  *(implemented)* — on the Schedule tab's lesson cards, the *Needs marking* rows and the class
   roster: **Upcoming** (nothing recorded, the class has not ended), **Not marked**
   (nothing recorded, it has), **2 of 4 marked**, **Marked**, and **No students** for an
   empty roster. A breakdown names what was entered — *"2 students · 3 present ·
@@ -1196,12 +1202,12 @@ the admin recorded as covering it (§7.13).
   otherwise see, and marks them — including **both guest types** (trial and make-up), without
   which the guest could not be marked and the billing month could never close (§7.7).
 - The **class's own coach keeps the lesson card**, badged **Covered** and read-only, and it
-  **leaves their NEEDS MARKING list** — a straggler they are not permitted to clear would be a
+  **leaves their *Needs marking* list** — a straggler they are not permitted to clear would be a
   nag with no available action.
 - A **shadow** sees the class's **whole schedule**, read-only, for as long as they are
   assigned — the opposite of a substitute, who sees only the lesson they were named on. They
   never mark, so the main coach stays unambiguous for marking exactly as they are for pay, and
-  a shadowed lesson never enters anybody's NEEDS MARKING list but the marker's.
+  a shadowed lesson never enters anybody's *Needs marking* list but the marker's.
 - **Once a shadow assignment ends, the class disappears from that coach's app** — unless they
   have since become its coach. Their own pay history is unaffected; My Pay reads their payout
   records, not the class.
@@ -1297,7 +1303,7 @@ enrols between the cancel and the billing run is not expected at it either.
 
 What a cancelled lesson means, everywhere at once (one rule, five readers — §7.203):
 - **Parent** — Upcoming shows it struck *Cancelled* with the reason (§7.5).
-- **Coach** — the Schedule card is struck *Cancelled by your admin*; it leaves NEEDS MARKING and
+- **Coach** — the Schedule card is struck *Cancelled by your admin*; it leaves *Needs marking* and
   the class roster's backlog; opening it (from Schedule's DONE list, today's card or the roster's
   Past Sessions) shows *This lesson was cancelled*, naming the class and the admin's reason, with
   **Back to class** and nothing to mark. *(implemented 2026-09-24 — until then that screen never
@@ -3696,8 +3702,8 @@ The following section provides a screen-by-screen reference for each SwimSync us
   invoice list and a Mark Paid button, both now admin-only (§7.9), and the **Today tab
   became Schedule** (below)
 - **Schedule is the default tab**, and it is a WEEK rather than a day: a week selector
-  (Monday-start, fixed) over four sections — **NEEDS MARKING**, **TODAY**, **COMING UP**,
-  **DONE**. It replaced the Today tab outright rather than sitting beside it, because two
+  (Monday-start, fixed) over four sections — **Needs marking**, **Today**, **Coming up**,
+  **Done** (sentence case since 2026-10-12; they were all caps). It replaced the Today tab outright rather than sitting beside it, because two
   tabs both listing today's lessons with marking chips is duplication in the app's most
   prominent navigation
 - Classes tab shows all assigned classes, **grouped by weekday with today's first**, and

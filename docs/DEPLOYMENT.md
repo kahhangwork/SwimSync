@@ -1207,3 +1207,11 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     restyle → `git revert <sha>` + push in the same session unless the fix is a one-line string; a red freezes further
     restyle landings until triaged (TESTING §5). Anything not visual-only keeps the nightly gate.
 
+85. **Deploy record (2026-10-12): UI restyle step 0.3 (`e97d14f`, docs + `check-visual-only.sh`), then coach Schedule
+    restyle (`64ab076`) and its wording (`7445547`) — app-only, both landed under the #84 rule.** Each: CI green on the
+    parent commit, `check-visual-only.sh` (3 explained lines → VISUAL-ONLY respectively), the 10 Schedule drivers
+    `--only` green before and after with equal scores. Bundle greps on `swimsync.sg`: `Mark oldest lesson` (restyle),
+    `Needs marking (` (wording) — both strings absent from the previous `main` (`git grep`). Three landings now await
+    one nightly (the plan's cap). Pushes run by the user (auto mode refuses a push to `main` unless a deploy is asked
+    for explicitly, e.g. `/deploy`).
+

@@ -654,6 +654,10 @@ the shape of the system changes:_
 
 | Path | What |
 |------|------|
+| `DESIGN.md` · `docs/plans/UI_RESTYLE_PLAN.md` | The visual system (final) and the restyle's step-by-step plan; §3 of the plan is the landing state |
+| `scripts/check-visual-only.sh <base> <head>` | Advisory: is a range a VISUAL-ONLY restyle (the relaxed gate, plan §6)? Its never-visual list overrides the path list (§7.363) |
+| `brand/` (+ `brand/render.mjs`) | Logo 2a sources; `render.mjs` rasterises every PNG/ICO through the drivers' playwright-core — regenerate, never hand-edit a raster |
+| `{SwimSyncAdmin,SwimSyncApp}/lib/designTokens.drift.test.ts` | Twins: `DESIGN.md`'s colours, radii and font sizes equal each Tailwind config |
 | `docs/WORKTREES.md` | **How to run two sessions in parallel without clashing** — one writer per shared resource, six phases, two worked examples (with and without a migration) |
 | `.claude/skills/worktree-start/` · `worktree-close/` | The skills that run that protocol. Start goes **after** planning; close goes **before** `/update-docs` |
 | `.claude/skills/run-ui-playwright/drivers/check-teardowns.sh` | CI guard: every `fixtures-*.sql` must have a `-teardown.sql`. Run it locally too |

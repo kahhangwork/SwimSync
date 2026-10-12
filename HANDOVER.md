@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-11 — **§8.146: Single-child packages SHIPPED and LIVE** (migration `20261010000100` on prod, apps
-`9cb03f8`, both bundle greps, CI green). The user added **D11 — one kind per family** in the build. No product flipped._
+_Last updated: 2026-10-12 — **§8.147: UI restyle under way and LIVE in part** — logo 2a, DESIGN.md tokens, the plan
+and the coach Schedule (restyle + wording). Three landings await one nightly; then plan step 1.1 (Geist)._
 
-_Previously (§8.145, 2026-10-10) — Fixture hygiene ×3; Wave 9 filed, ranked and planned._
+_Previously (§8.146, 2026-10-10 → 11) — Single-child packages shipped and live (DEPLOYMENT #82)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -351,6 +351,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.147 (2026-10-11 → 12) — UI restyle: logo, tokens, plan, coach Schedule — all live
+
+**Started Wave 9 item 8 in the user's order; wrote the full restyle plan; landed Phase 0 and step 2.1.** Plan:
+`docs/plans/UI_RESTYLE_PLAN.md` (§3 is the state and the landing ledger). Live: DEPLOYMENT #83–#85.
+
+- **Shipped:** logo 2a (`brand/` + `render.mjs`, all rasters); `DESIGN.md` tokens in both Tailwind configs (CSS
+  byte-identical, drift-tested); the audit as 10 ranked S items (BACKLOG); coach Schedule restyle + wording (PRD §7.5).
+- **Decided by the user:** September is **"Sept"** (§7.302 — `DESIGN.md` corrected); visual-only restyles skip the
+  nightly wait (plan §6, `check-visual-only.sh`, HANDOVER §9 GATE); Geist package approved; drivers change with words.
+- **Found:** §7.363–§7.367 (UI paths holding logic, palette keys are tenant data, `pressByText` misses, `RootLayout`
+  fonts, `<button disabled>`); §7.302 and §7.193 *Hit again*.
+- **Not done:** `ui/status-scale` stays parked (plan 1.4 — built out of order once). No full sweep, no nightly dispatch.
+
 ## 8.146 (2026-10-10 → 11) — Single-child packages, built and deployed in one session
 
 **Shipped Wave 9 item 7 per `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`, root checkout, no worktree** — migration →
@@ -365,20 +378,7 @@ admin → parent app → driver → docs → deploy, each step gated. Live 2026-
   (fixed, `3954b24`). Graduated: ARCHITECTURE §6ae addendum, TESTING §5, BACKLOG *Name the child in package emails*.
 - **Not done:** no Little Orcas product flipped (the owner's call); no full sweep, no Generate.
 
-## 8.145 (2026-10-10) — Fixture hygiene ×3, then Wave 9 filed, ranked and planned
-
-**Shipped the three Foundations S-items §8.144 filed (`4a53ca1`, CI green); filed + ranked two user items; planned the
-first with `/plan-with-confidence` + `/plan-review`.**
-
-- **Shipped:** the trial-onboarding fixture deletes only runs naming its walk-in (§7.63 note); `run-all-drivers.sh
-  --only` tears its fixture down after a PASS (§7.272); CI runs the pinned roundtrip on every weekday (TESTING §5,
-  §7.304 *Promoted*). Each proven red-without / green-with on the real DB.
-- **Planned:** *Single-child packages* — 10 user decisions + 14 inlined risks; nothing built. BACKLOG Wave 9 also holds
-  *UI/UX improvements* (audit first) and *Remove the legacy package matcher* (gated on Little Orcas' September seal).
-- **Not done:** Little Orcas' September Generate (the owner's — a platform admin has no Generate button, and the user
-  asked; declined to work around it). The reviewer's 4 GOTCHAS candidates: applied after close (§7.361 + bullets on §7.165, §7.189, §7.205).
-
-_(§8.144 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.145 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -421,7 +421,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-10: four nightlies in a row GREEN, 73/73** (latest `38003471836`, the first over §8.143 + §8.144).
+**State on 2026-10-12: six nightlies in a row GREEN** (latest `38182159846` on `9edfee4`, the logo). The next one is
+the first over the tokens + coach Schedule landings — read it before any restyle lands (plan §3 ledger).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -440,12 +441,12 @@ which mutate shared seed state — are in the same section.
    single-child packages' D9 guard and the B rollback's one-child preflight).
 2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
-   cancelled/refunded) before that family can buy a one-child package — say so before any flip. Next build after
-   it: **Wave 9 item 8, UI/UX improvements — IN PROGRESS, follow `docs/plans/UI_RESTYLE_PLAN.md`** (start at its §0;
-   §3 is the state). Live 2026-10-12: Phase 0 (logo 2a, tokens, plan) and step 2.1 (coach Schedule + its wording).
-   **First, read the nightly after `7445547`** and fill the plan's §3 ledger verdicts — three landings await it (the
-   cap); red = freeze + revert per §6. **Then step 1.1 (Geist)** — Phase 1 comes before more screens.
-3. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
+   cancelled/refunded) before that family can buy a one-child package — say so before any flip.
+3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
+   Live 2026-10-12: Phase 0 (logo 2a, tokens, plan) and step 2.1 (coach Schedule + its wording). **First, read the
+   nightly after `7445547`** and fill the plan's §3 ledger verdicts — three landings await it (the cap); red = freeze +
+   revert per §6. **Then step 1.1 (Geist)** — Phase 1 comes before more screens.
+4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.

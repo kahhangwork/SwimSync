@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-12 — **UI restyle under way** (Wave 9 item 8): logo, tokens and S1 *Coach Schedule* shipped; the work follows `docs/plans/UI_RESTYLE_PLAN.md`. 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -296,8 +296,8 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 
 7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
    user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
-8. **UI/UX improvements** (M, *Platform and reach*). Target: root `DESIGN.md`. Logo + tokens done and the audit filed
-   2026-10-11; now **one screen per change** — the ranked S list under the item, starting with *Coach Schedule*.
+8. **UI/UX improvements** (M, *Platform and reach*) — **IN PROGRESS: follow `docs/plans/UI_RESTYLE_PLAN.md`.** Logo,
+   tokens and S1 *Coach Schedule* are live (2026-10-12); next is the plan's Phase 1 (Geist, tab bars, primitives).
 9. **Remove the legacy package matcher** (M, *Billing and payments*). Gated: only after Little Orcas seals September
    (it is Wave 6's rollback until then). Independent of 7–8.
 
@@ -1608,11 +1608,8 @@ S item below removes from its own screen.
 **S items, in the order the user accepted 2026-10-11 (each ≤ ~2 h, one screen or one shared component; UI drivers assert on
 visible text, so keep words unless the item changes them on purpose):**
 
-1. **Coach Schedule restyle** (`app/(coach)/schedule`) — a Danger container above everything when past lessons are
-   unmarked, naming the months it blocks ("20 lessons not marked · blocks Sep and Oct billing") with the screen's ONE
-   primary, *Mark attendance* → the oldest; the list collapses to 3 rows + "See all 20" so *Today* is not buried; each
-   lesson card carries one status tag (Blocks billing · Not marked · 3 of 5 marked · Marked · Upcoming); greeting fixed
-   ("Coach Coach Marcus" — the name already holds "Coach"); dates per the One Date Style rule.
+1. ~~**Coach Schedule restyle**~~ — **shipped 2026-10-12** (`64ab076` restyle, `7445547` wording; PRD §7.5). Kept as a
+   line so the plan's S-numbers still resolve.
 2. **Mobile tab bar to spec** (coach + parent `_layout.tsx`) — labels are 11px `#9ca3af` (~2.5:1), active is colour
    alone, "Settings"/"Billing" descenders clip to "Settinas"/"Billina". → 12px `#525252`, active Ink 600 + 2px blue
    indicator, 64px + safe area.

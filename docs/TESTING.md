@@ -432,6 +432,8 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 > **No driver builds a date label outside `lib.mjs`** (2026-10-01). `drivers/check-driver-dates.sh` (CI,
 > `repo-invariants`) refuses `to_char(…'Mon|Dy|Day…')` and any `toLocale*String` / `Intl.DateTimeFormat` call outside
 > `lib.mjs` — labels come from `sgLabel()` / `sgMonthLabel()`, the apps' own en-SG formatter ("Sept", not "Sep").
+> The coach Schedule's day labels drop the comma (`Sat 26 Sept`, scheduleFormat.ts `dayHeading`); match them with
+> `sgDayLabel()`, and ONLY on Schedule text — every other screen still reads `sgLabel()`'s `Sat, 26 Sept` (2026-10-12).
 > A non-label line opts out with `// date-label-ok: <why>` (§7.302).
 >
 > **No pgTAP test or fixture holds an expiring literal date** (2026-10-01). `scripts/check-test-dates.sh` (CI,
@@ -1225,6 +1227,12 @@ and a final assertion that counts rather than tests presence (§7.118).
 See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
+
+### DESIGN.md tokens match the Tailwind configs (2026-10-11)
+
+**`lib/designTokens.drift.test.ts` — twins in BOTH apps (29 checks each).** Parses `DESIGN.md`'s front matter and
+asserts every colour, radius and font size equals the app's Tailwind config. Proven red on a mutated config. Change a
+token in `DESIGN.md` and both configs in one commit.
 
 ### SGT-correct date display (2026-08-30)
 
