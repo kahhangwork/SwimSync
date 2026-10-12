@@ -9,6 +9,7 @@ import { landingFor, isInsideLanding } from "@/lib/landing";
 import { allowsNoSession, isPublicPage } from "@/lib/publicRoutes";
 import { useAppStore } from "@/store/useAppStore";
 import Toast from "@/components/Toast";
+import GeistFonts from "@/components/GeistFonts";
 
 // Pull the tokens out of a Supabase deep link
 // (swimsync://reset-password#access_token=…&refresh_token=…&type=recovery, or
@@ -223,6 +224,7 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="dark" />
+      <GeistFonts />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="welcome" />

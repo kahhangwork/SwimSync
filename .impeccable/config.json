@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-10-12T08:14:35.955Z",
+        "reason": "User's decision 2026-10-11: docs/plans/UI_RESTYLE_PLAN.md §2 D1/D5 and DESIGN.md fix Geist as the only font"
+      }
+    ]
+  }
+}

@@ -135,7 +135,7 @@ disagree — change both together.
 | rounded sm / md / lg | `rounded-tag` (4) · `rounded-control` (6) · `rounded-card` (8) — Tailwind owns `rounded-sm` |
 | display · headline · body · body-secondary · label | `text-display`, `text-headline`, `text-body`, `text-body-secondary`, `text-label` |
 | the floating shadow | `shadow-float` |
-| Geist | `font-geist` — **not loaded yet** in either app; falls back to system-ui |
+| Geist | the default (`sans`) in both apps — admin via `next/font`, app via `components/GeistFonts.tsx`; `font-geist` names it explicitly |
 
 ## Overview
 
@@ -297,7 +297,7 @@ A single stroke: a swell of water that flows into a tick — the lesson marked, 
 - **Lockup:** mark left of the "SwimSync" wordmark in Geist 600, −0.03em.
 - **Shipped 2026-10-11** — `brand/` sources, both `components/Logo.tsx` and every raster (`node brand/render.mjs`;
   production notes in `brand/README.md`). In a tile the mark is ~70% of the tile's width. The lockup's wordmark is
-  still the system font until Geist is loaded with the tokens. IPOS trademark search: run by the owner 2026-10-11,
+  Geist since UI restyle step 1.1. IPOS trademark search: run by the owner 2026-10-11,
   clear.
 
 ### Signature behaviours (from the 2026-10-11 critique)

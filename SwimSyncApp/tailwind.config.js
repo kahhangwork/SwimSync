@@ -62,9 +62,13 @@ module.exports = {
         "body-secondary": ["13px", { lineHeight: "18.85px" }],
         label: ["12px", { lineHeight: "15.6px" }],
       },
-      // Not loaded yet — the app has no Geist font asset; adding one is a new
-      // package and waits for the user's go-ahead. Unused until then.
-      fontFamily: { geist: ["Geist", "system-ui", "sans-serif"] },
+      // Geist is loaded by components/GeistFonts.tsx (400/500/600 faces under
+      // one family). On web it also reaches every RN-web Text, which sets its
+      // own font and so never reads `sans`.
+      fontFamily: {
+        sans: ["Geist", "system-ui", "sans-serif"],
+        geist: ["Geist", "system-ui", "sans-serif"],
+      },
       // The only shadow: things that float (modals, menus, toasts).
       boxShadow: { float: "0 8px 24px rgba(0, 0, 0, 0.08)" },
     },

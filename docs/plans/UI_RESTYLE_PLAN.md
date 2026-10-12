@@ -81,7 +81,7 @@ Decisions this plan makes (the user may overrule; none changes the look):
 
 ## 3. State (update in every commit that ticks a step)
 
-_As of 2026-10-12: Phase 0 and all of 2.1 (`64ab076`, wording `7445547`) are on `main`. **Next session: read the first nightly after `7445547`, fill the three empty "Nightly verdict" cells below, then step 1.1.**_
+_As of 2026-10-12 (evening): Phase 0 and all of 2.1 (`64ab076`, wording `7445547`) are on `main`. Steps 1.1 (Geist) and 1.2 (tab bars) landed the same evening on the user's waiver of the nightly cap. **Next: read the first nightly after them and fill the five empty "Nightly verdict" cells; then step 1.3.**_
 
 | Branch | Commit | What | Landed? |
 |---|---|---|---|
@@ -90,6 +90,7 @@ _As of 2026-10-12: Phase 0 and all of 2.1 (`64ab076`, wording `7445547`) are on 
 | `ui/restyle-plan` | `5c38056`, `cda10ac`, `e97d14f` | Step 0.3 — this plan, Q1 = "Sept", six GOTCHAS, `check-visual-only.sh`, the D3 exception in HANDOVER §9 GATE + DEPLOYMENT #84 | **yes**, 2026-10-12 |
 | `ui/coach-schedule` | `64ab076` | Step 2.1 — coach Schedule restyle (words kept; "Sept"; G-Sept green). 11 Schedule drivers green `--only` 2026-10-11 after two fixes: week arrows lost their button role (a `<button disabled>` cannot be clicked past the bound), and `verify-trials` presses the visible class card (it passed on coordinate luck, §7.58). `check-visual-only.sh`: NOT VISUAL-ONLY on 3 lines — `useState` (the fold toggle) ×2, `.sort()` in `blockedMonths` (a display helper) — each must be explained in its commit message to land under D3 | **yes**, 2026-10-12 |
 | `ui/status-scale` (on old `main`) | `08fe3d9` | PARKED — becomes step 1.4 | no |
+| `ui/geist` | (this commit) | Step 1.1 — Geist in both apps. App: `components/GeistFonts.tsx` beside the root `<Stack/>` (one family, 400/500/600 faces; reaches RN-web Text via `html [dir]` — NOT the class name, which is `css-text-<hash>` in dev but `css-<hash>` in a production build, caught at `/commit-review` and proven on a local `expo export`: computed font Geist, 3 faces loaded); admin: `next/font/google` → `--font-geist` → Tailwind `sans`. NOT VISUAL-ONLY (P4). Before → after on `a1d5a93` → `69045d9`: `app-auth` 29/29, `admin-reset-password` 18/18, `smoke-app` 71/71, `smoke-admin` 64/64, `tenant-provisioning` 15/15, NOT FOUND 0 → 0. **Full local sweep on `69045d9` (user said yes, 2026-10-12): 74/74 PASS, NOT FOUND 0** — on the dev-only class selector; the `[dir]` fix after it re-ran the five drivers above on `c3e1738`: equal scores, except one `tenant-provisioning` run at 14/15 — the new admin's sign-in still read "Signing in…" when the driver's fixed 3 s wait ended (first post-login compile after the admin `.next` was cleared; no admin file changed since `69045d9`) — 15/15 on the immediate re-run. Computed font = Geist on 3 app + 3 admin screens (1440, 1152); faces 400/500/600 loaded; admin `main` fits. Native: splash only — native `Text` does not take Geist yet (store builds out of scope) | **yes**, 2026-10-12 — the user waived the nightly cap |
 
 ⚠ RISK 3 MITIGATION — **Landing ledger** (one row per restyle landing; append, never edit):
 
@@ -99,6 +100,9 @@ _As of 2026-10-12: Phase 0 and all of 2.1 (`64ab076`, wording `7445547`) are on 
 | 0.2 tokens | `f805461`, `f5609d4` | VISUAL-ONLY | none — compiled CSS byte-identical | — | none possible (no visible change) | | |
 | 2.1 Schedule (as built — words kept) | `64ab076` | NOT VISUAL-ONLY on 3 lines, each explained in the commit message (fold toggle `useState` ×2, `.sort()` in a display helper) — landed under D3 | 11 Schedule drivers green 2026-10-11 on the identical app tree (`schedule-week` 21/21, `trials` 16/16, `coach-schedule-roles` 28/28, `cancel-lesson` 29/29, 7 more) | not recorded (built before the ledger) | app bundle `Mark oldest lesson` | | |
 | 2.1 Schedule wording (`7445547`) — `Today ·`, `Needs marking (N)`, `Coming up`, `Done`; day labels `Sat 26 Sept` via `dayHeading` + `sgDayLabel` (`formatSgDate` untouched) | `7445547` | VISUAL-ONLY | the same 10 drivers before (`64ab076`) and after: equal scores | 0 → 0 (39 → 39 presses) | app bundle `Needs marking (` | | |
+| 1.1 Geist | the `load Geist` commit | NOT VISUAL-ONLY (P4; never-visual: both root layouts, package files) — landed on the **user's waiver of the nightly cap, 2026-10-12** (four unverified landings) | 5 before/after equal + full local sweep 74/74 on `69045d9` | 0 → 0 | app bundle `html [dir]{font-family:Geist`; admin `--font-geist` | | |
+
+**2026-10-12: the user waived the cap for 1.1 and 1.2** — five landings now await one nightly; a red one is attributed across all five rows' driver lists.
 
 A landing whose "Nightly verdict" cell is empty is **unverified**. **Do NOT land a fourth restyle while three are
 unverified** — at most three landings can be attributed per red nightly. The user may raise this cap; nobody else may.
@@ -149,7 +153,7 @@ Tick `[x]` in the commit that ships each. **S#** = the BACKLOG ranked item it sa
     is a one-line string. That is safe because a visual-only change carries no data. Then the screen is redone.
 
 ### Phase 1 — foundations (shared, each its own commit)
-- [ ] **1.1** Load **Geist** — admin `next/font/google` in `app/layout.tsx`, app `@expo-google-fonts/geist` via `useFonts` in the root `_layout.tsx` (gate the splash until loaded; fall back to system on error). Set `fontFamily.sans` to Geist in both configs **only after** both load — this IS a global visual change, so screenshot 3 screens per app before/after.
+- [x] **1.1** Load **Geist** — admin `next/font/google` in `app/layout.tsx`, app `@expo-google-fonts/geist` via `useFonts` in the root `_layout.tsx` (gate the splash until loaded; fall back to system on error). Set `fontFamily.sans` to Geist in both configs **only after** both load — this IS a global visual change, so screenshot 3 screens per app before/after.
   - ⚠ RISK 1 MITIGATION — **Do NOT make `RootLayout` return `null`, a splash or anything other than `<Stack/>` while
     fonts load, and do NOT move its auth `useEffect` (the recovery/invite hash detection, `routeForSession`,
     `onAuthStateChange`) below a font-gated subtree.** That effect reads `window.location.hash` synchronously on

@@ -51,8 +51,13 @@ const config: Config = {
         "body-secondary": ["13px", { lineHeight: "18.85px" }],
         label: ["12px", { lineHeight: "15.6px" }],
       },
-      // Not loaded yet — falls back to system-ui until Geist is wired in.
-      fontFamily: { geist: ["Geist", "system-ui", "sans-serif"] },
+      // Geist comes from next/font in app/layout.tsx as --font-geist (a hashed
+      // family name, self-hosted). `sans` is what preflight puts on <html>, so
+      // every screen gets it; `geist` stays as DESIGN.md's named class.
+      fontFamily: {
+        sans: ["var(--font-geist)", "Geist", "system-ui", "sans-serif"],
+        geist: ["var(--font-geist)", "Geist", "system-ui", "sans-serif"],
+      },
       // The only shadow: things that float (modals, menus, toasts).
       boxShadow: { float: "0 8px 24px rgba(0, 0, 0, 0.08)" },
     },
