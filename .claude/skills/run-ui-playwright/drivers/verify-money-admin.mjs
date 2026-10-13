@@ -51,7 +51,7 @@
 // cites `:93` for mutation 2 — the line is `:92` at 3acd04b.)
 
 import { execFileSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, EXPO, rowAction, rowActionCount } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API = "http://127.0.0.1:54321";
