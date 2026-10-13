@@ -10,6 +10,7 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useMyPay } from "@/features/coach-pay/domain/useMyPay";
 import { PayoutCards } from "@/features/coach-pay/ui/PayoutCards";
+import { Surface } from "@/components/ui/Surface";
 
 // ⚠ THIS SCREEN DELIBERATELY SHOWS NO INVOICES.
 //
@@ -42,21 +43,21 @@ export default function CoachPayScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <ScrollView
         contentContainerClassName="px-5 py-6 pb-10"
         showsVerticalScrollIndicator={false}
       >
         <View className="mb-5">
-          <Text className="text-2xl font-bold text-gray-900">My Pay</Text>
-          <Text className="text-sm text-gray-500 mt-0.5">
+          <Text className="text-display font-semibold text-ink">My Pay</Text>
+          <Text className="text-body-secondary text-ink-secondary mt-0.5">
             What you&apos;re paid for teaching
           </Text>
         </View>
 
         {loading ? (
           <View className="items-center justify-center py-16">
-            <ActivityIndicator size="large" color="#0ea5e9" />
+            <ActivityIndicator size="large" color="#2563eb" />
           </View>
         ) : myPayouts.length === 0 ? (
           // Reachable only in a narrow window — the tab is hidden entirely
@@ -64,23 +65,25 @@ export default function CoachPayScreen() {
           // can be removed while the app is open, and a blank screen reads as
           // broken.
           <View className="items-center py-16">
-            <Ionicons name="wallet-outline" size={40} color="#d1d5db" />
-            <Text className="text-gray-400 mt-3 text-center px-8">
+            <Ionicons name="wallet-outline" size={40} color="#6b6b6b" />
+            <Text className="text-body text-ink-secondary mt-3 text-center px-8">
               No pay periods yet. Your business&apos;s admin prepares these.
             </Text>
           </View>
         ) : (
           <>
             {totalPaid > 0 && (
-              <View className="bg-green-50 rounded-2xl p-4 border border-green-100 items-center mb-5">
-                <Text className="text-xs text-green-500">Paid to you so far</Text>
-                <Text className="text-2xl font-bold text-green-600 mt-0.5">
+              // Money is Ink, never green (DESIGN.md: status lives in the
+              // tag, not in the amount's colour). The figure is the hook's.
+              <Surface className="items-center mb-5">
+                <Text className="text-body-secondary text-ink-secondary">Paid to you so far</Text>
+                <Text className="text-display font-semibold text-ink mt-0.5" style={{ fontVariant: ["tabular-nums"] }}>
                   S${totalPaid.toFixed(2)}
                 </Text>
-              </View>
+              </Surface>
             )}
 
-            <Text className="text-sm font-semibold text-gray-900 mb-2">
+            <Text className="text-headline font-semibold text-ink mb-2">
               Your pay
             </Text>
             <PayoutCards myPayouts={myPayouts} breakdowns={breakdowns} />
