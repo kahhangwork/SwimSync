@@ -1648,13 +1648,13 @@ visible text, so keep words unless the item changes them on purpose):**
 - Students: green "Assigned" with no class or coach (packages tenant); greyed "No levels defined" dropdown on every row.
 - Child form: Date of Birth is free text (`YYYY-MM-DD`); Edit Child pre-selects "Male" where the profile shows "—";
   placeholders that look like values ("Emma Tan").
-- Bad public-invoice token is a dead end (no way forward). Calendar legend ~11px, red for "(Sub)", shape-only signal.
+- ~~Bad public-invoice token is a dead end~~ (4.5/4.6: it offers Sign in). Calendar legend ~11px, red for "(Sub)", shape-only signal.
 - Mark Attendance: tab bar highlights Classes when arrived from Schedule. (*Set all* out of thumb reach — fixed in UI
   restyle 2.2: it sits beside Save in a bottom action area.)
 
 **Captured 2026-10-13 (UI restyle step 1.5)** — the six screens the first audit could not reach, all reached with edge
 functions served and real tokens. Fold-ins from them:
-- **Public invoice + package pages show `$88.00`, not `S$`** (`AmountCard.tsx:20`, `OfferCard.tsx:17,21,25` — a bare
+- ~~**Public invoice + package pages show `$88.00`, not `S$`**~~ (fixed in UI restyle 4.5/4.6, with Pay-First and the flat card) (`AmountCard.tsx:20`, `OfferCard.tsx:17,21,25` — a bare
   `${…}` in JSX); "I've paid" is an equal outlined button → a text link under the primary (Pay-First); `bg-sky-50`, sky
   button, shadowed `rounded-2xl` card → Ground, Lane Blue, flat 8px; caption/footer `text-xs text-gray-400`.
 - Public package: "Prefer a different package? Tell your coach." is a dead end → link to the business's contact.
@@ -1667,8 +1667,9 @@ functions served and real tokens. Fold-ins from them:
   inputs; helper in `gray-400`; a sky Save plus a sky "Cancel" link.
 - Join screen (opened from Profile → Add Child) highlights **Home** — the route lives under `home/`; same shape as the
   Mark Attendance tab fold-in. Its greys are `slate-*` and its field label an all-caps 12px "JOIN CODE".
-- Admin reset-password / accept-invite: sky background and button, grey `rounded-xl` inputs, shadowed card; neither
-  page says which account or business it is for.
+- Admin reset-password / accept-invite: ~~sky background and button, grey `rounded-xl` inputs, shadowed card~~ (4.7);
+  **still open:** the reset page does not say which account it is for (needs data the page does not load).
+- Admin login reads "Superadmin access only" — tenant admins and co-admins sign in there too (seen in 4.7; words kept, a copy decision).
 - Admins table: `rounded-full` "invited"/"Owner" pills and three inline actions including a red Delete → one action +
   a "…" menu (add to the Tables fold-in above).
 Screenshots were local only (`capture15/`, not kept).
