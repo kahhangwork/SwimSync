@@ -1,3 +1,7 @@
+-- ⚠ VOID AS WRITTEN since 20261013000100_remove_legacy_package_matcher (2026-10-13): tenants.package_draw_at_marking
+-- is DROPPED, and the bodies or checks below read it. Run 20261013000100_remove_legacy_package_matcher_DOWN.sql
+-- FIRST (it restores the column, ON); the legacy matcher itself is not restored by any rollback.
+--
 -- ROLLBACK for 20261010000100_single_child_packages.sql — restores the 21 function bodies captured from the DB
 -- before it (Step 0; prod md5 = local md5) and drops its two triggers' effect.
 --

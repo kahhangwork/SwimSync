@@ -52,12 +52,6 @@ $$;
 -- ── The business and its people ─────────────────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('a5c00000-0000-0000-0000-000000000001', 'scp-swim', 'SCP Swim', 'SWIM-SCPS');
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM tenants WHERE id = 'a5c00000-0000-0000-0000-000000000001' AND NOT package_draw_at_marking) THEN
-    RAISE EXCEPTION 'scp fixture: the business does not draw at marking — one-child packages are refused there (D9)';
-  END IF;
-END $$;
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,

@@ -79,13 +79,6 @@ INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('e6d00000-0000-0000-0000-000000000001', 'w6pd-swim',   'W6PD Swim',   'SWIM-W6PD'),
   ('e6d00000-0000-0000-0000-000000000002', 'w6pd-months', 'W6PD Months', 'SWIM-W6PM');
 
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM tenants WHERE id::text LIKE 'e6d00000-%' AND NOT package_draw_at_marking) THEN
-    RAISE EXCEPTION 'w6pd fixture: a new business does not draw at marking — migration B (default ON) is not applied';
-  END IF;
-END $$;
-
 -- handle_new_user (trusts metadata for a postgres session) builds profiles, coaches and parents. The first
 -- tenant_admin of a business becomes its owner; is_coach also makes them its coach.
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,

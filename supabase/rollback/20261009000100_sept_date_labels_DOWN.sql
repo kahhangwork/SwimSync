@@ -1,3 +1,7 @@
+-- ⚠ VOID AS WRITTEN since 20261013000100_remove_legacy_package_matcher (2026-10-13): tenants.package_draw_at_marking
+-- is DROPPED, and the bodies or checks below read it. Run 20261013000100_remove_legacy_package_matcher_DOWN.sql
+-- FIRST (it restores the column, ON); the legacy matcher itself is not restored by any rollback.
+--
 -- Rollback for 20261009000100_sept_date_labels.sql.
 -- Restores the 13 bodies as read from the database on 2026-10-09 (before the migration), then drops the helper.
 -- Valid at any time: nothing else references sg_date_label. Messages go back to "Sep".

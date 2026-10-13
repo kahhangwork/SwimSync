@@ -2,18 +2,18 @@
 -- docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md (reviewed; decisions D1–D7 are the user's).
 --
 -- WHAT THIS FILE PROTECTS.
---   (1) the switch: off → nothing draws; it is refused to a client (RISK 1/7);
+--   (1) a non-billable mark draws nothing; the removed switch and its helpers stay gone (Wave 9 item 9);
 --   (2) draw / return / re-draw on a REAL crossing only — an unchanged re-upsert writes nothing (§7.323, D4);
 --   (3) a lesson is funded at most once — invoiced never drawn; drawn never invoiced (PK002); one live draw (RISK 1);
 --   (4) the matcher: FIFO by expiry, category (make-up snapshot), window, exhaustion, settlement, family, tenant;
 --   (5) the D6 guard (PK001): siblings counted as the coach, absent never blocked, re-save allowed, below-floor,
 --       deactivated and cancelled lessons not counted, FAILS OPEN (§7.324);
 --   (6) returns: on delete, on a holiday void, onto a cancelled package; un-voiding still works (CASCADE);
---   (7) backlog preview = backlog draw, idempotent, refused while the switch is off (D5, RISK 8);
---   (8) readers: live = stored when on; unbilled_sealed_lessons excludes a drawn lesson; month funding counts;
+--   (7) backlog preview = backlog draw, idempotent (D5, RISK 8);
+--   (8) readers: live = stored; unbilled_sealed_lessons excludes a drawn lesson; month funding counts;
 --   (9) package_usage caller shapes; grants (§7.87); FK delete actions (§7.327).
 --
--- FIXTURE (prefix f6…). Tenant T (switch flipped ON in case 2), tenant T2 (switch OFF). T created 200 days
+-- FIXTURE (prefix f6…). Tenant T, and tenant T2 (another business of family P's). T created 200 days
 -- ago and never billed, so its floor is its creation date (§7.319) and every dN below is markable. Classes run
 -- on TODAY's weekday; dN = N days ago. Families: P (Ava, Ben), Q (Cai), R (Dee, Eli), S (Fay), B (Gus).
 
@@ -41,10 +41,9 @@ ALTER TABLE f ADD COLUMN x DATE;
 UPDATE f SET x = sws - 1 - ((EXTRACT(DOW FROM sws - 1)::int - EXTRACT(DOW FROM d0)::int + 7) % 7);
 GRANT SELECT ON f TO PUBLIC;
 
--- The switch is set EXPLICITLY (off): since migration B the column DEFAULT is on.
-INSERT INTO tenants (id, slug, display_name, join_code, created_at, package_draw_at_marking) VALUES
-  ('f6000000-0000-0000-0000-0000000000a0','w6-t','W6 T','SWIM-W6TT', app_now() - INTERVAL '200 days', FALSE),
-  ('f6000000-0000-0000-0000-0000000000b0','w6-t2','W6 T2','SWIM-W6T2', app_now() - INTERVAL '200 days', FALSE);
+INSERT INTO tenants (id, slug, display_name, join_code, created_at) VALUES
+  ('f6000000-0000-0000-0000-0000000000a0','w6-t','W6 T','SWIM-W6TT', app_now() - INTERVAL '200 days'),
+  ('f6000000-0000-0000-0000-0000000000b0','w6-t2','W6 T2','SWIM-W6T2', app_now() - INTERVAL '200 days');
 
 CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB) RETURNS VOID AS $$
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -177,12 +176,11 @@ CREATE OR REPLACE FUNCTION pg_temp.as_user(p_uid TEXT) RETURNS VOID AS $$
   SELECT set_config('request.jwt.claims', json_build_object('sub', p_uid, 'role', 'authenticated')::text, true) $$ LANGUAGE sql;
 GRANT EXECUTE ON FUNCTION pg_temp.as_user(TEXT), pg_temp.id(TEXT) TO authenticated;
 
--- ══ 1. Switch OFF → a present mark draws nothing ═══════════════════════════════════════════════════════════
-SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d42 FROM f), 'f6300000-0000-0000-0000-000000000001', 'present');
+-- ══ 1. A non-billable mark draws nothing ═══════════════════════════════════════════════════════════════════
+-- (Was "switch off → nothing draws"; the switch is gone — Wave 9 item 9.)
+SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d42 FROM f), 'f6300000-0000-0000-0000-000000000001', 'absent');
 SELECT is(pg_temp.apps('f6500000-0000-0000-0000-000000000001', (SELECT d42 FROM f), 'f6300000-0000-0000-0000-000000000001'),
-  0, '1: switch off — a present mark writes no draw');
-
-UPDATE tenants SET package_draw_at_marking = TRUE WHERE id = 'f6000000-0000-0000-0000-0000000000a0';
+  0, '1: an absent mark writes no draw');
 
 -- ══ 2. Present → absent writes nothing (nothing was drawn); as the COACH, absent → present draws ═════════════
 SELECT pg_temp.mark('f6500000-0000-0000-0000-000000000001', (SELECT d42 FROM f), 'f6300000-0000-0000-0000-000000000001', 'absent');
@@ -404,7 +402,7 @@ SELECT is((SELECT count(*)::int FROM attendance a JOIN lesson_sessions ls ON ls.
                                 AND pa.student_id = a.student_id AND pa.reversed_at IS NULL)),
   1, '26b: (fixture) exactly one sibling''s d0 lesson is present and undrawn');
 
--- ══ 27–30. Backlog (D5) ═══════════════════════════════════════════════════════════════════════════════════
+-- ══ 27–29. Backlog (D5) ═══════════════════════════════════════════════════════════════════════════════════
 -- Family P's ad-hoc Group lessons in window: Ben Dolphins d35 (exhausted at 14), Ava's d28/d21 are absent.
 -- PK3 = G3 sold now; preview, then draw.
 SELECT pg_temp.sell('f6700000-0000-0000-0000-000000000007','P1','f6600000-0000-0000-0000-000000000001',(SELECT d42 FROM f));
@@ -415,11 +413,6 @@ SELECT is((SELECT count(*)::int FROM pv WHERE funds_this), 1, '27: the preview f
 SELECT is(draw_package_backlog('f6700000-0000-0000-0000-000000000007'), (SELECT count(*)::int FROM pv WHERE funds_this),
   '28: the backlog draw draws exactly the lessons the preview said this package would fund');
 SELECT is(draw_package_backlog('f6700000-0000-0000-0000-000000000007'), 0, '29: a second backlog draw draws nothing');
-RESET ROLE;
-SELECT pg_temp.as_user('f6100000-0000-0000-0000-0000000000b1');
-SET LOCAL ROLE authenticated;
-SELECT throws_ok($$ SELECT draw_package_backlog('f6700000-0000-0000-0000-000000000009') $$,
-  'P0001', 'this business does not draw packages at marking yet', '30: the backlog draw is refused while the switch is off');
 RESET ROLE;
 
 -- ══ 31–37. package_usage caller shapes ════════════════════════════════════════════════════════════════════
@@ -457,7 +450,7 @@ SELECT pg_temp.sell('f6700000-0000-0000-0000-00000000000a','P3','f6600000-0000-0
 -- ══ 38–40. Readers ════════════════════════════════════════════════════════════════════════════════════════
 SELECT is((SELECT count(*)::int FROM package_live_balances() b
             WHERE b.tenant_id = 'f6000000-0000-0000-0000-0000000000a0' AND b.live_value_remaining <> b.value_remaining),
-  0, '38: switch on — every package''s live balance IS its stored balance');
+  0, '38: every package''s live balance IS its stored balance');
 SELECT pg_temp.as_user('f6100000-0000-0000-0000-0000000000a1');
 SET LOCAL ROLE authenticated;
 SELECT ok((SELECT drawn_lessons FROM package_month_funding('f6000000-0000-0000-0000-0000000000a0')
@@ -497,12 +490,12 @@ SELECT is((SELECT count(*)::int FROM unbilled_sealed_lessons('f6000000-0000-0000
   1, '43: the same lesson, its draw reversed, IS listed');
 RESET ROLE;
 
--- ══ 44. The switch is refused to a client ═════════════════════════════════════════════════════════════════
-SELECT pg_temp.as_user('f6100000-0000-0000-0000-0000000000a1');
-SET LOCAL ROLE authenticated;
-SELECT throws_ok($$ UPDATE tenants SET package_draw_at_marking = FALSE WHERE id = 'f6000000-0000-0000-0000-0000000000a0' $$,
-  '42501', NULL, '44: the owner cannot flip the switch');
-RESET ROLE;
+-- ══ 44. The legacy matcher's switch is gone, with its helpers (Wave 9 item 9, 20261013000100) ═══════════════
+SELECT hasnt_column('public', 'tenants', 'package_draw_at_marking', '44: tenants.package_draw_at_marking is dropped');
+SELECT is((SELECT count(*)::int FROM pg_proc
+            WHERE pronamespace = 'public'::regnamespace
+              AND proname IN ('package_backfill_draws', 'guard_one_child_packages_flag')), 0,
+  '44b: the Wave 6 backfill and the D9 switch guard are dropped');
 
 -- ══ 45–49. Grants and structure ═══════════════════════════════════════════════════════════════════════════
 SELECT ok(NOT has_function_privilege('anon', 'public.package_backlog_preview(uuid)', 'EXECUTE')

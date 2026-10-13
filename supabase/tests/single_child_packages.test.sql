@@ -3,28 +3,30 @@
 -- WHAT THIS FILE PROTECTS.
 --   (1) catalogue: one pg_proc row per changed RPC, no anon EXECUTE, the grants a parent's insert needs, and the
 --       draw_rank census — every function that PICKS from package_candidates_for orders by draw_rank (RISK 1);
---   (2) the sale invariant: kind ↔ child, the child is the family's and the business's, flag-off refused (D9);
+--   (2) the sale invariant: kind ↔ child, the child is the family's and the business's;
 --   (3) the pins: no client changes the child; nobody changes the kind (D2); a flip affects new sales only (D6);
 --   (4) D11: one kind per family, switchable once the old kind is used up;
 --   (5) the matcher: the child draws, a sibling is ad-hoc; own pays first (D5) in the draw, the preview, PK001 and
 --       the holiday matcher; PK001 counts only the package child's lessons yet still fires for them (RISK 2);
 --   (6) the backlog and coverage per child; renewal rows per child (D8); offers, supersede and the referral handoff
---       scoped per audience (RISK 3, RISK 4); trials, merges, cross-business moves; the tenant-flag guard (D9);
+--       scoped per audience (RISK 3, RISK 4); trials, merges, cross-business moves;
 --   (7) reassign_package_child: callers, ever-drawn, the extension recompute and the audit row (RISK 10).
 --
 -- PRECONDITIONS (RISK 11, §7.330): every "does not" case is preceded by a check that it COULD — the package is
 -- active, in range, funded, or the same shape draws/blocks for a shared package.
 --
--- FIXTURE (prefix 5c…). Tenant T (flag ON, referrals 10%), T2 (flag ON), T3 (flag OFF), all created 200 days ago
+-- (D9 — the flag-off refusals, cases 2h and 13 — left with the legacy matcher, Wave 9 item 9; so did tenant T3.)
+--
+-- FIXTURE (prefix 5c…). Tenant T (referrals 10%) and T2, both created 200 days ago
 -- and never billed, so every dN is markable. The class runs on the pinned day's weekday (Saturday); dN = N days ago.
--- Families (P1–P13), one concern each: P1 Ava/Ben one-child · P2 Cai/Dee/Wes shared · P3 Eve switch · P4 Fay (T3)
+-- Families (P1–P13), one concern each: P1 Ava/Ben one-child · P2 Cai/Dee/Wes shared · P3 Eve switch · (P4 unused)
 -- · P5 Gus flip · P7 Kim/Lou D5 · P8 Mia/Nia reassign · P9 Oli/Pia + P10 Qin/Ray renewal · P11 Sam/Tom referral
 -- · P12 Uma/Vic trial · P13 Xia/Xia2 merge. Zed is P1's child at T2.
 
 BEGIN;
 SELECT set_config('swimsync.now', '2026-10-10 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(73);
+SELECT plan(70);
 SELECT is(app_today(), '2026-10-10'::date, 'clock pinned');
 
 CREATE TEMP TABLE f AS
@@ -39,11 +41,10 @@ SELECT
   '2026-10-17'::date AS n7;
 GRANT SELECT ON f TO PUBLIC;
 
-INSERT INTO tenants (id, slug, display_name, join_code, created_at, package_draw_at_marking,
+INSERT INTO tenants (id, slug, display_name, join_code, created_at,
                      referral_enabled, referral_discount_type, referral_discount_value) VALUES
-  ('5c000000-0000-0000-0000-0000000000a0','sc-t','SC T','SWIM-SCTT', app_now() - INTERVAL '200 days', TRUE, TRUE, 'percent', 10),
-  ('5c000000-0000-0000-0000-0000000000b0','sc-t2','SC T2','SWIM-SCT2', app_now() - INTERVAL '200 days', TRUE, FALSE, NULL, NULL),
-  ('5c000000-0000-0000-0000-0000000000c0','sc-t3','SC T3','SWIM-SCT3', app_now() - INTERVAL '200 days', FALSE, FALSE, NULL, NULL);
+  ('5c000000-0000-0000-0000-0000000000a0','sc-t','SC T','SWIM-SCTT', app_now() - INTERVAL '200 days', TRUE, 'percent', 10),
+  ('5c000000-0000-0000-0000-0000000000b0','sc-t2','SC T2','SWIM-SCT2', app_now() - INTERVAL '200 days', FALSE, NULL, NULL);
 
 CREATE OR REPLACE FUNCTION pg_temp.mkuser(p_id UUID, p_email TEXT, p_meta JSONB) RETURNS VOID AS $$
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -57,8 +58,6 @@ SELECT pg_temp.mkuser('5c100000-0000-0000-0000-0000000000a1','sc-owner@test.loca
   '{"full_name":"SC Owner","role":"tenant_admin","tenant_id":"5c000000-0000-0000-0000-0000000000a0"}');
 SELECT pg_temp.mkuser('5c100000-0000-0000-0000-0000000000b1','sc-owner2@test.local',
   '{"full_name":"SC Owner2","role":"tenant_admin","tenant_id":"5c000000-0000-0000-0000-0000000000b0"}');
-SELECT pg_temp.mkuser('5c100000-0000-0000-0000-0000000000c9','sc-owner3@test.local',
-  '{"full_name":"SC Owner3","role":"tenant_admin","tenant_id":"5c000000-0000-0000-0000-0000000000c0"}');
 SELECT pg_temp.mkuser('5c100000-0000-0000-0000-0000000000c1','sc-coach@test.local',
   '{"full_name":"SC Coach","role":"coach","tenant_id":"5c000000-0000-0000-0000-0000000000a0"}');
 -- A custom VIEW-only role (packages at view, every other area none).
@@ -77,7 +76,6 @@ SELECT pg_temp.mkuser(('5c100000-0000-0000-0000-0000000000' || lpad(n::text, 2, 
   FROM generate_series(1, 13) n;
 UPDATE tenants SET owner_profile_id = '5c100000-0000-0000-0000-0000000000a1' WHERE id = '5c000000-0000-0000-0000-0000000000a0';
 UPDATE tenants SET owner_profile_id = '5c100000-0000-0000-0000-0000000000b1' WHERE id = '5c000000-0000-0000-0000-0000000000b0';
-UPDATE tenants SET owner_profile_id = '5c100000-0000-0000-0000-0000000000c9' WHERE id = '5c000000-0000-0000-0000-0000000000c0';
 
 CREATE TEMP TABLE ids (k TEXT PRIMARY KEY, v UUID);
 GRANT SELECT ON ids TO PUBLIC;
@@ -91,8 +89,7 @@ CREATE OR REPLACE FUNCTION pg_temp.id(p_k TEXT) RETURNS UUID AS $$ SELECT v FROM
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT pg_temp.id('P' || n), '5c000000-0000-0000-0000-0000000000a0' FROM generate_series(1, 13) n WHERE n <> 4;
 INSERT INTO parent_tenants (parent_id, tenant_id) VALUES
-  (pg_temp.id('P1'), '5c000000-0000-0000-0000-0000000000b0'),
-  (pg_temp.id('P4'), '5c000000-0000-0000-0000-0000000000c0');
+  (pg_temp.id('P1'), '5c000000-0000-0000-0000-0000000000b0');
 
 INSERT INTO class_categories (id, tenant_id, name) VALUES
   ('5c400000-0000-0000-0000-000000000001','5c000000-0000-0000-0000-0000000000a0','SC Group');
@@ -106,9 +103,8 @@ VALUES ('5c500000-0000-0000-0000-000000000001','5c000000-0000-0000-0000-00000000
 INSERT INTO students (id, full_name, assignment_status, is_active, tenant_id)
 SELECT ('5c300000-0000-0000-0000-0000000000' || k)::uuid, 'SC ' || nm, 'assigned', TRUE,
        CASE WHEN k = '17' THEN '5c000000-0000-0000-0000-0000000000b0'::uuid
-            WHEN k = '07' THEN '5c000000-0000-0000-0000-0000000000c0'::uuid
             ELSE '5c000000-0000-0000-0000-0000000000a0'::uuid END
-  FROM (VALUES ('01','Ava'),('02','Ben'),('03','Cai'),('04','Dee'),('05','Wes'),('06','Eve'),('07','Fay'),('08','Gus'),
+  FROM (VALUES ('01','Ava'),('02','Ben'),('03','Cai'),('04','Dee'),('05','Wes'),('06','Eve'),('08','Gus'),
                ('09','Kim'),('0a','Lou'),('0b','Mia'),('0c','Nia'),('0d','Oli'),('0e','Pia'),('0f','Qin'),('10','Ray'),
                ('11','Sam'),('12','Tom'),('13','Uma'),('14','Vic'),('15','Xia'),('16','Xia Dup'),('17','Zed')) v(k, nm);
 CREATE OR REPLACE FUNCTION pg_temp.kid(p_k TEXT) RETURNS UUID AS $$
@@ -116,11 +112,11 @@ CREATE OR REPLACE FUNCTION pg_temp.kid(p_k TEXT) RETURNS UUID AS $$
 GRANT EXECUTE ON FUNCTION pg_temp.kid(TEXT), pg_temp.id(TEXT) TO authenticated;
 INSERT INTO parent_students (parent_id, student_id)
 SELECT pg_temp.id(p), pg_temp.kid(k) FROM (VALUES
-  ('P1','01'),('P1','02'),('P1','17'),('P2','03'),('P2','04'),('P2','05'),('P3','06'),('P4','07'),('P5','08'),
+  ('P1','01'),('P1','02'),('P1','17'),('P2','03'),('P2','04'),('P2','05'),('P3','06'),('P5','08'),
   ('P7','09'),('P7','0a'),('P8','0b'),('P8','0c'),('P9','0d'),('P9','0e'),('P10','0f'),('P10','10'),
   ('P11','11'),('P11','12'),('P12','13'),('P12','14'),('P13','16')) v(p, k);
 
--- Enrolments in SC Dolphins (noon SGT). Wes, Vic, Sam, Tom, Xia, Xia Dup, Zed, Fay, Gus: none.
+-- Enrolments in SC Dolphins (noon SGT). Wes, Vic, Sam, Tom, Xia, Xia Dup, Zed, Gus: none.
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
 SELECT pg_temp.kid(k), '5c500000-0000-0000-0000-000000000001', (d::timestamp + TIME '12:00') AT TIME ZONE 'Asia/Singapore', TRUE
   FROM f, LATERAL (VALUES ('01', f.d28),('02', f.d28),('03', f.d28),('04', f.d28),('06', f.d21),('09', f.d21),('0a', f.d21),
@@ -133,12 +129,10 @@ INSERT INTO package_products (id, tenant_id, name, category_id, lesson_count, ra
   ('5c600000-0000-0000-0000-000000000003','5c000000-0000-0000-0000-0000000000a0','SHX',NULL,5,30.00,20,FALSE),
   ('5c600000-0000-0000-0000-000000000004','5c000000-0000-0000-0000-0000000000a0','OC2',NULL,2,30.00,20,TRUE),
   ('5c600000-0000-0000-0000-000000000005','5c000000-0000-0000-0000-0000000000a0','OC5',NULL,5,30.00,20,TRUE),
-  ('5c600000-0000-0000-0000-000000000006','5c000000-0000-0000-0000-0000000000a0','OC10',NULL,10,30.00,20,TRUE),
-  ('5c600000-0000-0000-0000-000000000007','5c000000-0000-0000-0000-0000000000c0','OCT3',NULL,5,30.00,20,TRUE);
+  ('5c600000-0000-0000-0000-000000000006','5c000000-0000-0000-0000-0000000000a0','OC10',NULL,10,30.00,20,TRUE);
 
 CREATE OR REPLACE FUNCTION pg_temp.prod(p_name TEXT) RETURNS UUID AS $$
-  SELECT id FROM package_products WHERE name = p_name AND tenant_id IN
-    ('5c000000-0000-0000-0000-0000000000a0','5c000000-0000-0000-0000-0000000000c0') $$ LANGUAGE sql STABLE;
+  SELECT id FROM package_products WHERE name = p_name AND tenant_id = '5c000000-0000-0000-0000-0000000000a0' $$ LANGUAGE sql STABLE;
 GRANT EXECUTE ON FUNCTION pg_temp.prod(TEXT) TO authenticated;
 -- A backend sale (as postgres): active, from p_start.
 CREATE OR REPLACE FUNCTION pg_temp.sell(p_id UUID, p_parent TEXT, p_product TEXT, p_start DATE, p_kid TEXT) RETURNS VOID AS $$
@@ -233,9 +227,6 @@ SELECT is((SELECT status || '/' || student_id FROM parent_packages WHERE id = '5
   'pending/' || pg_temp.kid('01'), '2f: ...a pending request tied to Ava');
 SELECT throws_ok($$ SELECT pg_temp.sell(NULL, 'P1', 'OC5', (SELECT d42 FROM f), '17') $$,
   '23514', 'That child belongs to another business.', '2g: the family''s child at another business is refused');
-SELECT throws_ok($$ SELECT pg_temp.sell(NULL, 'P4', 'OCT3', (SELECT d42 FROM f), '07') $$,
-  '23514', 'One-child packages need lessons to draw at marking, which this business has switched off.',
-  '2h: a one-child package in a flag-off business is refused (D9)');
 
 -- ══ 3. Pins ═════════════════════════════════════════════════════════════════════════════════════════════════════
 SELECT pg_temp.as_user(pg_temp.parent_uid('P1'));
@@ -479,12 +470,6 @@ SELECT pg_temp.as_user('5c100000-0000-0000-0000-0000000000f1');
 SELECT throws_ok($$ SELECT reassign_student_tenant(pg_temp.kid('15'), '5c000000-0000-0000-0000-0000000000b0') $$,
   'P0001', 'This child holds a one-child package — reassign, refund or cancel their package first',
   '12c: a child holding a one-child package cannot be moved to another business');
-
--- ══ 13. D9 — the flag cannot go off while a one-child package is held ════════════════════════════════════════════
-SELECT throws_ok($$ UPDATE tenants SET package_draw_at_marking = FALSE WHERE id = '5c000000-0000-0000-0000-0000000000a0' $$,
-  '23514', NULL, '13a: switching draw-at-marking off is refused while one-child packages are held');
-SELECT lives_ok($$ UPDATE tenants SET package_draw_at_marking = FALSE WHERE id = '5c000000-0000-0000-0000-0000000000b0' $$,
-  '13b: control — a business holding none can still switch it off');
 
 SELECT * FROM finish();
 ROLLBACK;

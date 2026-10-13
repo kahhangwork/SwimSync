@@ -15,15 +15,17 @@
 BEGIN;
 SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(13);
+SELECT plan(14);
 SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
--- LEGACY (invoice-time) package mode, set explicitly: since Wave 6 migration B the default is draw-at-marking,
--- and this file pins the invoice-time correction path that still governs switch-off tenants and old invoices.
-INSERT INTO tenants (id, slug, display_name, join_code, package_draw_at_marking) VALUES
-  ('ba000000-0000-0000-0000-000000000001','pkc-a','Pkg Corrections Swim','SWIM-PKCA', FALSE);
+-- This file pins the invoice-time correction path that still governs OLD invoices — the ones the removed
+-- pay-at-the-run matcher wrote (Wave 9 item 9). Packages now draw at marking, so the attendance below is
+-- inserted AFTER its invoice lines: an invoiced lesson is never drawn (package_draw_at_marking.test.sql 8),
+-- which leaves exactly an old invoice's state — the ledger row keyed by invoice_item_id is the only draw.
+INSERT INTO tenants (id, slug, display_name, join_code) VALUES
+  ('ba000000-0000-0000-0000-000000000001','pkc-a','Pkg Corrections Swim','SWIM-PKCA');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
@@ -110,12 +112,6 @@ INSERT INTO lesson_sessions (id, class_id, session_date) VALUES
   ('b6000000-0000-0000-0000-000000000002','be000000-0000-0000-0000-000000000001',
    '2026-09-08'::date);
 
-INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
-  ('b6000000-0000-0000-0000-000000000001','b5000000-0000-0000-0000-000000000001',
-   'present','bd000000-0000-0000-0000-000000000001'),
-  ('b6000000-0000-0000-0000-000000000002','b5000000-0000-0000-0000-000000000001',
-   'present','bd000000-0000-0000-0000-000000000001');
-
 INSERT INTO invoices (id, parent_id, tenant_id, billing_month, gross_amount,
                       package_applied, credit_applied, net_amount, status)
 SELECT 'b7000000-0000-0000-0000-000000000001', parent_id,
@@ -140,6 +136,15 @@ VALUES
 INSERT INTO package_applications (id, parent_package_id, invoice_item_id, amount)
 VALUES ('b9000000-0000-0000-0000-000000000001','bf000000-0000-0000-0000-000000000001',
         'b8000000-0000-0000-0000-000000000001', 40.00);
+
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
+  ('b6000000-0000-0000-0000-000000000001','b5000000-0000-0000-0000-000000000001',
+   'present','bd000000-0000-0000-0000-000000000001'),
+  ('b6000000-0000-0000-0000-000000000002','b5000000-0000-0000-0000-000000000001',
+   'present','bd000000-0000-0000-0000-000000000001');
+SELECT is((SELECT count(*)::int FROM package_applications WHERE parent_package_id = 'bf000000-0000-0000-0000-000000000001')
+          || '/' || (SELECT value_remaining FROM parent_packages WHERE id = 'bf000000-0000-0000-0000-000000000001'),
+  '1/360.00', '(fixture) marking an invoiced lesson draws nothing — the invoice-time row is the only draw');
 
 -- ── Package-funded correction: restore, and ONLY restore ───────────────────
 
@@ -229,9 +234,6 @@ UPDATE parent_packages SET value_remaining = 360.00
 INSERT INTO lesson_sessions (id, class_id, session_date) VALUES
   ('b6000000-0000-0000-0000-000000000003','be000000-0000-0000-0000-000000000001',
    '2026-08-25'::date);
-INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
-  ('b6000000-0000-0000-0000-000000000003','b5000000-0000-0000-0000-000000000001',
-   'present','bd000000-0000-0000-0000-000000000001');
 INSERT INTO invoice_items (id, invoice_id, student_id, lesson_session_id,
                            attendance_status, amount, class_title, session_date, student_name)
 VALUES ('b8000000-0000-0000-0000-000000000003','b7000000-0000-0000-0000-000000000001',
@@ -240,6 +242,10 @@ VALUES ('b8000000-0000-0000-0000-000000000003','b7000000-0000-0000-0000-00000000
         '2026-08-25'::date, 'Corr Kid');
 INSERT INTO package_applications (parent_package_id, invoice_item_id, amount)
 VALUES ('bf000000-0000-0000-0000-000000000001','b8000000-0000-0000-0000-000000000003', 40.00);
+-- Marked after its invoice line, as above: an invoiced lesson draws nothing.
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
+  ('b6000000-0000-0000-0000-000000000003','b5000000-0000-0000-0000-000000000001',
+   'present','bd000000-0000-0000-0000-000000000001');
 
 -- Expire it (postgres may move these fields; clients may not).
 UPDATE parent_packages

@@ -8,8 +8,9 @@
 --   • A parent's request cannot claim a price, a status, or another parent —
 --     snapshots come from the product, via the lifecycle trigger.
 --   • Only non-client roles can move value_remaining (the current_user seam).
---   • package_live_balances() — the ONLY derivation of pending draws — draws
---     locked-rate, respects scope, and leaves the stored balance untouched.
+--   • A present mark draws locked-rate and respects scope, and
+--     package_live_balances() reports that stored balance as-is (since Wave 9
+--     item 9 there are no pending draws to derive).
 --
 -- Runs on its own tenants; self-contained; rolls back.
 
@@ -21,11 +22,11 @@ SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
--- LEGACY (invoice-time) package mode, set explicitly: since Wave 6 migration B the default is draw-at-marking;
--- the marking-time mode is pinned in package_draw_at_marking.test.sql.
-INSERT INTO tenants (id, slug, display_name, join_code, package_draw_at_marking) VALUES
-  ('aa000000-0000-0000-0000-000000000001','pkg-a','Packages Swim A','SWIM-PKGA', FALSE),
-  ('aa000000-0000-0000-0000-000000000002','pkg-b','Packages Swim B','SWIM-PKGB', FALSE);
+-- Packages draw AT MARKING (the only mode since Wave 9 item 9 removed the invoice-time matcher); the draw rules
+-- themselves are pinned in package_draw_at_marking.test.sql.
+INSERT INTO tenants (id, slug, display_name, join_code) VALUES
+  ('aa000000-0000-0000-0000-000000000001','pkg-a','Packages Swim A','SWIM-PKGA'),
+  ('aa000000-0000-0000-0000-000000000002','pkg-b','Packages Swim B','SWIM-PKGB');
 
 -- Admin A is the private-coach shape (tenant_admin AND coach) so tenant A can
 -- own a class. Admin B is a plain tenant admin. The parent is global.
@@ -290,7 +291,7 @@ SELECT is(
      FROM parent_packages WHERE id = 'ff000000-0000-0000-0000-000000000003'),
   TRUE, 'a direct sale is confirmed and dated on creation');
 
--- ── 24-28. package_live_balances(): the one derivation of pending draws ─────
+-- ── 24-28. package_live_balances(): the stored balance, moved at marking ─────
 RESET ROLE;
 
 -- One PRESENT lesson in the Group class (in scope), one in the other-category
@@ -321,14 +322,14 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"ad000000-0000-0000-0000-000000000001"
 SELECT is(
   (SELECT value_remaining FROM parent_packages
     WHERE id = 'ff000000-0000-0000-0000-000000000001'),
-  400.00::numeric,
-  'the STORED balance has not moved — money moves at invoice time only');
+  360.00::numeric,
+  'the STORED balance moved at marking — one locked-rate draw ($40, not the class''s $50)');
 
 SELECT is(
   (SELECT live_value_remaining FROM package_live_balances()
     WHERE parent_package_id = 'ff000000-0000-0000-0000-000000000001'),
   360.00::numeric,
-  'the LIVE balance is down one locked-rate draw ($40, not the class''s $50)');
+  'the LIVE balance IS the stored one — nothing is left to simulate');
 
 SELECT is(
   (SELECT live_lessons_remaining FROM package_live_balances()

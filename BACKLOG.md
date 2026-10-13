@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-13 — **UI restyle Phases 1–2 shipped** (primitives, status scale — S7 Overdue still open —, admin shell S5, all eight coach screens); 1.5 capture fold-ins filed. 2026-10-12 — **Legacy matcher un-gated** (Little Orcas sealed September). **UI restyle under way** (Wave 9 item 8): logo, tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* shipped (Geist open question removed — answered); the work follows `docs/plans/UI_RESTYLE_PLAN.md`. 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-13 — **Legacy package matcher removed** (Wave 9 item 9; follow-up *Simplify the admin's live-balance display* filed). **UI restyle Phases 1–2 shipped** (primitives, status scale — S7 Overdue still open —, admin shell S5, all eight coach screens); 1.5 capture fold-ins filed. 2026-10-12 — **Legacy matcher un-gated** (Little Orcas sealed September). **UI restyle under way** (Wave 9 item 8): logo, tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* shipped (Geist open question removed — answered); the work follows `docs/plans/UI_RESTYLE_PLAN.md`. 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -298,8 +298,8 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
    user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
 8. **UI/UX improvements** (M, *Platform and reach*) — **IN PROGRESS: follow `docs/plans/UI_RESTYLE_PLAN.md`.** Logo,
    tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* are live (2026-10-12); next is the plan's step 1.3 (primitives).
-9. **Remove the legacy package matcher** (M, *Billing and payments*). **Un-gated 2026-10-12** — Little Orcas sealed
-   September (8 draws), so Wave 6's rollback is spent. Independent of 7–8.
+9. ~~*Remove the legacy package matcher*~~ — **shipped 2026-10-13** (engine v36 + `20261013000100`; the D9 guard went
+   with it). Follow-up filed: *Simplify the admin's live-balance display* (S).
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
 (low-balance nudge, automated reminders), Native builds → Push, Bulk WhatsApp, In-app payment gateway. (*Logo check*
@@ -1111,20 +1111,14 @@ confirmed" cannot tell which child it covers.
 The `/package/[token]` public page stays child-free by rule (no child names to an unauthenticated link) — decide
 whether the email may name the child when the link may not. Needs `supabase functions deploy package-emails`.
 
-### Remove the legacy package matcher (pay-at-the-monthly-run) — **M** — _filed 2026-10-10; un-gated 2026-10-12_
-Delete the old way a package pays for a lesson: the engine's own FIFO matcher (`generate-invoices/core.ts`, the
-`drawAtMarking ? [] : packagesByParent…` loop and its writes), `package_live_balances()`'s flag-off simulation, and the
-`tenants.package_draw_at_marking` switch read by six DB functions; then drop the column (engine first, then the
-migration — expand/contract).
+### Simplify the admin's live-balance display — **S** — _filed 2026-10-13, follow-up of Remove the legacy package matcher_
+`package_live_balances()` now returns the stored balance as its "live" one (`20261013000100`), so the admin's
+`HeldTable` "pending draws" branch (`live_value_remaining !== value_remaining`) and the live/stored split in
+`packages/domain/packageRows.ts` and `makeups/domain/makeupRows.ts` can never differ.
 
-**Why:** every tenant has drawn at marking since Wave 6 (all 3 on prod, checked 2026-10-10), so the old path is dead
-code that every package change must still respect — *Single-child packages* had to add a DB block for it (its D9).
-
-**Notes:** **Gate met 2026-10-12** — Little Orcas sealed Sep 2026, which held 8 live draws. Until then the old path WAS
-Wave 6's rollback (`supabase/rollback/20261006000200_package_draw_at_marking_b_DOWN.sql`). After that the rollback
-refuses anyway, so removal costs nothing. Old invoices' "Paid by package" lines are stored data and stay. Needs an
-engine deploy (engine v35's first real run is done — clean, 2026-10-12). Removes *Single-child packages*' D9 guard with it.
-Tests to trim: 4 pgTAP files, `wave6.test.ts` + `test-helpers.ts`, `fixtures-package-draw-at-marking.sql`.
+**Why:** dead UI branches read as a feature to the next person who touches the Packages page. **Notes:** read
+`value_remaining` directly and drop the RPC call where it was only used for the live figure; keep the RPC itself
+(contract: the RETURNS TABLE shape) until no bundle calls it, then drop it in its own migration.
 
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
