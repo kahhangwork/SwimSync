@@ -9,6 +9,8 @@ import { RowMenu, RowMenuItem } from "./RowMenu";
 // MUTATION PROOFS (§7.25) — each applied to RowMenu.tsx, run, reverted:
 //   1. `if (items.length === 0) return null;` → removed → RED: "no items, no trigger"
 //   2. the panel's `onClick={() => setPos(null)}` → removed → RED: "an item runs its handler and closes the menu"
+//   3. scroll listener `follow` → `close` (the first version) → RED: "a scroll keeps it open…" —
+//      and verify-money-admin timed out on Void, 9/44, the run that found it.
 
 describe("RowMenu", () => {
   it("items appear only once the trigger is pressed", () => {
@@ -44,6 +46,17 @@ describe("RowMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("button", { name: "Void" })).toBeNull();
+  });
+
+  it("a scroll keeps it open (an item scrolled into view to be pressed must still be there)", () => {
+    render(
+      <RowMenu>
+        <RowMenuItem>Void</RowMenuItem>
+      </RowMenu>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.scroll(window);
+    expect(screen.getByRole("button", { name: "Void" })).toBeTruthy();
   });
 
   it("no items, no trigger", () => {

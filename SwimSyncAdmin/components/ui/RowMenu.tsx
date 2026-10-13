@@ -41,15 +41,22 @@ export function RowMenu({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
+    // A scroll or resize MOVES the panel with its trigger rather than closing
+    // it: scrolling an item into view to press it (a browser, a screen reader,
+    // a UI driver all do) must not make the item disappear first.
+    const follow = () => {
+      const r = trigger.current?.getBoundingClientRect();
+      if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", follow);
+    window.addEventListener("scroll", follow, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", follow);
+      window.removeEventListener("scroll", follow, true);
     };
   }, [open]);
 
