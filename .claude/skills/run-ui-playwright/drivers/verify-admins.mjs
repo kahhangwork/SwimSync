@@ -22,7 +22,7 @@
 //   gatecoach@swimsync.test    plain coach — the role gate's persona
 
 import os from "node:os";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, rowAction } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => `${SHOT}/admins-${n}`;
@@ -66,8 +66,10 @@ check("owner (tenant_admin + coach) reaches the Admins page",
 check("the owner's own row wears the Owner badge", body.includes("Owner"));
 check("both co-admin shapes are listed",
   body.includes("admincoach@swimsync.test") && body.includes("Admin + Coach"));
+// Deactivate / Delete sit in each row's "…" menu since UI restyle 5.24 — the
+// levers are the menus, counted, not a word in the page text.
 check("the owner sees the management buttons",
-  body.includes("Invite admin") && body.includes("Deactivate"));
+  body.includes("Invite admin") && (await page.getByRole("button", { name: "More actions" }).count()) > 0);
 await page.screenshot({ path: shot("01-owner-view.png"), fullPage: true });
 
 // ── 2. Invite — locally there is no RESEND key, so the WARNING is the pass ──
@@ -95,7 +97,7 @@ body = await page.evaluate(() => document.body.innerText);
 check("resend re-issues the link", body.includes("could not be sent"));
 
 // ── 4. Deactivate a PURE admin: pill flips AND the login is banned ──────────
-await row("adminpure@swimsync.test").getByText("Deactivate").click();
+await (await rowAction(row("adminpure@swimsync.test"), "Deactivate")).click();
 await page.waitForTimeout(3000);
 check("deactivated pure admin's row says so",
   (await row("adminpure@swimsync.test").innerText()).includes("deactivated"));
@@ -126,14 +128,15 @@ body = await page.evaluate(() => document.body.innerText);
 check("a co-admin without Admins & roles is told the page is not in their role",
   body.includes("Your role doesn"), body.slice(0, 300));
 check("a co-admin gets NO management buttons",
-  !body.includes("Invite admin") && !body.includes("Deactivate"));
+  !body.includes("Invite admin") && !body.includes("Deactivate") &&
+    (await page.getByRole("button", { name: "More actions" }).count()) === 0);
 await page.screenshot({ path: shot("04-coadmin-view.png"), fullPage: true });
 
 // ── 7. Deactivate the COACH-admin: no ban — the suspension screen instead ───
 await freshLogin("coach@swimsync.test");
 await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
-await row("admincoach@swimsync.test").getByText("Deactivate").click();
+await (await rowAction(row("admincoach@swimsync.test"), "Deactivate")).click();
 await page.waitForTimeout(3000);
 
 check("a deactivated COACH-admin can still log in (never banned — coaching survives)",
@@ -147,9 +150,7 @@ await page.screenshot({ path: shot("05-suspended.png"), fullPage: true });
 await freshLogin("coach@swimsync.test");
 await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
-await row("admindelete@swimsync.test")
-  .getByRole("button", { name: "Delete", exact: true })
-  .click();
+await (await rowAction(row("admindelete@swimsync.test"), "Delete")).click();
 await page.waitForTimeout(800);
 
 const confirmBtn = page.getByText("Delete account", { exact: true });
@@ -187,9 +188,7 @@ check("the deleted admin's login is dead",
 await freshLogin("coach@swimsync.test");
 await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
-await row("adminhistory@swimsync.test")
-  .getByRole("button", { name: "Delete", exact: true })
-  .click();
+await (await rowAction(row("adminhistory@swimsync.test"), "Delete")).click();
 await page.waitForTimeout(800);
 await page.getByPlaceholder("DELETE").fill("DELETE");
 await page.getByText("Delete account", { exact: true }).click();

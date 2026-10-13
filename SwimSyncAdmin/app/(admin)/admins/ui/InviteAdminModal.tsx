@@ -29,7 +29,7 @@ export function InviteAdminModal(p: Props) {
   return (
     <Modal title="Invite an admin" open={p.open} onClose={p.onClose}>
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-body text-ink-muted">
           They&apos;ll get an email with a link to set their password. What
           they can see and change is set by the role you give them — manage
           roles on the Roles page.
@@ -53,11 +53,11 @@ export function InviteAdminModal(p: Props) {
           value={p.phone}
           onChange={p.setPhone}
         />
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-gray-700">Role</span>
+        <label className="block text-body">
+          <span className="mb-1 block font-medium text-ink-secondary">Role</span>
           <select
             aria-label="Role"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
             value={p.roleId ?? ""}
             onChange={(e) => p.setRoleId(e.target.value)}
           >
@@ -66,18 +66,18 @@ export function InviteAdminModal(p: Props) {
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+        <label className="flex items-center gap-2 text-body text-ink-secondary">
           <input
             type="checkbox"
             checked={p.isCoachInvite}
             onChange={(e) => p.setIsCoachInvite(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-400"
+            className="h-4 w-4 rounded-control border-border-strong text-primary focus:ring-primary"
           />
           They also teach — create a coach account too
         </label>
 
         {p.inviteError && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <p className="text-body text-status-danger-text bg-status-danger-bg rounded-card px-3 py-2">
             {p.inviteError}
           </p>
         )}

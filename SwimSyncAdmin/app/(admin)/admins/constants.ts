@@ -1,9 +1,12 @@
+import type { Tone } from "@/components/ui/Tag";
 // Admins page — module-level constants.
 
 import type { AdminRow } from "./types";
 
-export const STATUS_PILL: Record<NonNullable<AdminRow["status"]>, string> = {
-  active: "bg-green-100 text-green-700",
-  invited: "bg-amber-100 text-amber-700",
-  deactivated: "bg-gray-200 text-gray-600",
+// An admin's account state as a Tag tone (UI restyle 5.24): invited is waiting
+// on the invitee (Info), active is the done state, deactivated is neutral.
+export const STATUS_TONE: Record<NonNullable<AdminRow["status"]>, Tone> = {
+  active: "success",
+  invited: "info",
+  deactivated: "neutral",
 };

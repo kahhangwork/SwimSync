@@ -9,16 +9,16 @@ export function InviteLinkWarning({
   onDismiss: () => void;
 }) {
   return (
-    <div className="mb-4 rounded-xl bg-yellow-50 border border-yellow-200 p-4 text-sm text-yellow-800">
+    <div className="mb-4 rounded-card bg-status-warning-bg border border-status-warning-border p-4 text-body text-status-warning-text">
       <p className="font-semibold mb-1">The invite email could not be sent.</p>
       <p className="mb-2">
         The account exists — pass this one-time link to them yourself:
       </p>
-      <code className="block break-all text-xs bg-white rounded-lg p-2 border border-yellow-200">
+      <code className="block break-all text-label bg-surface rounded-control p-2 border border-status-warning-border">
         {link}
       </code>
       <button
-        className="mt-2 text-xs font-medium text-yellow-700 hover:underline"
+        className="mt-2 text-label font-medium text-status-warning-text hover:underline"
         onClick={onDismiss}
       >
         Dismiss
