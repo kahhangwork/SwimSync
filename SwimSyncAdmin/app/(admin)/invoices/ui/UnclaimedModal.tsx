@@ -42,7 +42,7 @@ export function UnclaimedModal({
       onClose={onClose}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-700">
+        <p className="text-body text-ink-secondary">
           These children attended billable lessons but have no parent account
           yet, so nobody can be invoiced. {formatBillingMonth(genMonth)} stays
           open until each is resolved — otherwise the month would close over
@@ -54,12 +54,12 @@ export function UnclaimedModal({
           {unclaimed.map((u) => (
             <li
               key={u.student_id}
-              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5"
+              className="rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2.5"
             >
-              <p className="text-sm font-semibold text-gray-800">
+              <p className="text-body font-semibold text-ink">
                 {u.student_name ?? "Unnamed student"}
               </p>
-              <p className="mt-0.5 text-xs text-gray-600">
+              <p className="mt-0.5 text-label text-ink-secondary">
                 {u.lessons} billable lesson{u.lessons === 1 ? "" : "s"} ·{" "}
                 {u.earliest_session_date === u.latest_session_date
                   ? formatSgDate(u.earliest_session_date)
@@ -68,7 +68,7 @@ export function UnclaimedModal({
                     )}`}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1 text-xs text-gray-600">
+                <div className="flex items-center gap-1 text-label text-ink-secondary">
                   S$
                   <input
                     value={settleAmount[u.student_id] ?? ""}
@@ -81,7 +81,7 @@ export function UnclaimedModal({
                     inputMode="decimal"
                     placeholder="0.00"
                     aria-label={`Amount received for ${u.student_name ?? "student"}`}
-                    className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs"
+                    className="w-20 rounded-control border border-border-strong px-2 py-1.5 text-label"
                   />
                 </div>
                 <Button
@@ -109,12 +109,12 @@ export function UnclaimedModal({
         </ul>
 
         {settleError && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
             {settleError}
           </p>
         )}
 
-        <p className="text-xs text-gray-600">
+        <p className="text-label text-ink-secondary">
           The better fix is usually to <strong>invite the parent</strong> from
           the Students page — then the lessons bill normally and nothing is
           written off. Settle only when the money was genuinely handled

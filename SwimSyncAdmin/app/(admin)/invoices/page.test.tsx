@@ -43,7 +43,7 @@ vi.mock("./domain/usePendingDebits", () => ({
 }));
 vi.mock("./domain/useUnclaimed", () => ({ useUnclaimed: () => stub({}) }));
 vi.mock("./domain/useOrphans", () => ({ useOrphans: () => stub({}) }));
-vi.mock("./domain/useBillingMonths", () => ({ useBillingMonths: () => stub({}) }));
+vi.mock("./domain/useBillingMonths", () => ({ useBillingMonths: () => stub({ rows: [] }) }));
 vi.mock("./domain/useGenerate", () => ({
   useGenerate: (opts: { afterGenerate: () => Promise<void> }) => {
     h.afterGenerate = opts.afterGenerate;
@@ -57,6 +57,7 @@ vi.mock("./ui/UnclaimedModal", () => ({ UnclaimedModal: () => null }));
 vi.mock("./ui/OrphanReport", () => ({ OrphanReport: () => null }));
 vi.mock("./ui/PendingDebits", () => ({ PendingDebits: () => null }));
 vi.mock("./ui/GenerationPanel", () => ({ GenerationPanel: () => null }));
+vi.mock("./ui/BillingSettingsCard", () => ({ BillingSettingsCard: () => null }));
 vi.mock("./ui/BillingMonthsCard", () => ({ BillingMonthsCard: () => null }));
 vi.mock("./ui/ConfirmGenerateModal", () => ({ ConfirmGenerateModal: () => null }));
 vi.mock("./ui/BlockedLessonsModal", () => ({ BlockedLessonsModal: () => null }));

@@ -35,11 +35,11 @@ export function InvoiceToolbar({
       <div className="flex flex-wrap gap-3 mb-4">
         {/* Scoped search — the dropdown picks the column the term is pushed into,
             so it reaches every invoice in the DB, not the first 1000 (⚠ RISK 3). */}
-        <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-sky-400">
+        <div className="flex overflow-hidden rounded-card border border-border bg-surface focus-within:ring-2 focus-within:ring-primary">
           <select
             value={searchField}
             onChange={(e) => setSearchField(e.target.value as SearchField)}
-            className="border-r border-gray-200 bg-gray-50 px-2 py-2.5 text-sm text-gray-600 focus:outline-none"
+            className="border-r border-border bg-ground px-2 py-2.5 text-body text-ink-secondary focus:outline-none"
             aria-label="Search by"
           >
             <option value="parent">Parent</option>
@@ -50,7 +50,7 @@ export function InvoiceToolbar({
             placeholder={searchField === "student" ? "Search student name…" : "Search parent name…"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-52 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none"
+            className="w-52 px-4 py-2.5 text-body placeholder:text-ink-muted focus:outline-none"
           />
         </div>
         <div className="flex gap-1.5">
@@ -58,10 +58,10 @@ export function InvoiceToolbar({
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+              className={`rounded-card px-3 py-2 text-label font-semibold transition-colors ${
                 statusFilter === f
-                  ? "bg-sky-500 text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  ? "bg-primary text-white"
+                  : "bg-surface border border-border text-ink-secondary hover:bg-ground"
               }`}
             >
               {f}
@@ -80,7 +80,7 @@ export function InvoiceToolbar({
         </div>
       </div>
       {exportNotice && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+        <div className="mb-4 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-2.5 text-body text-status-warning-text">
           {exportNotice}
         </div>
       )}

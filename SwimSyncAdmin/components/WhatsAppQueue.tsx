@@ -91,42 +91,42 @@ export function WhatsAppQueue({
 
   return (
     <Modal title={title} open={open} onClose={onClose}>
-      <p className="text-xs text-gray-500 mb-3">{intro}</p>
+      <p className="text-label text-ink-muted mb-3">{intro}</p>
 
-      <div className="mb-3 text-sm font-medium text-gray-700">
+      <div className="mb-3 text-body font-medium text-ink-secondary">
         {openedIds.size} of {reachable.length} chats opened this round
       </div>
 
-      <div className="max-h-64 overflow-y-auto divide-y divide-gray-100 mb-4">
+      <div className="max-h-64 overflow-y-auto divide-y divide-divider mb-4">
         {reachable.map((r) => (
           <div key={r.id} className="flex items-center justify-between py-2 gap-2">
             <div className="min-w-0">
-              <div className="text-sm text-gray-900 truncate">
+              <div className="text-body text-ink truncate">
                 {r.parentName}
                 {r.subtitle ? (
-                  <span className="text-gray-400"> · {r.subtitle}</span>
+                  <span className="text-ink-muted"> · {r.subtitle}</span>
                 ) : null}
               </div>
-              <div className="text-[11px] text-gray-400">
+              <div className="text-label text-ink-muted">
                 {r.meta}
                 {r.openedStamp &&
                   ` · chat opened ${formatSgStamp(r.openedStamp, DMY)}`}
               </div>
             </div>
             {openedIds.has(r.id) ? (
-              <span className="text-[11px] text-emerald-600 shrink-0">opened</span>
+              <span className="text-label text-status-success-text shrink-0">opened</span>
             ) : next?.id === r.id ? (
-              <span className="text-[11px] text-sky-600 shrink-0">next</span>
+              <span className="text-label text-primary shrink-0">next</span>
             ) : null}
           </div>
         ))}
         {unreachable.length > 0 && (
           <div className="pt-2">
-            <div className="text-[11px] font-semibold text-amber-700 mb-1">
+            <div className="text-label font-semibold text-status-warning-text mb-1">
               Skipped — no usable phone number
             </div>
             {unreachable.map((r) => (
-              <div key={r.id} className="text-[11px] text-gray-500 py-0.5">
+              <div key={r.id} className="text-label text-ink-muted py-0.5">
                 {r.parentName}
                 {r.subtitle ? ` · ${r.subtitle}` : ""}
                 {r.rawPhone

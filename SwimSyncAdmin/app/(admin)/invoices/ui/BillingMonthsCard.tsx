@@ -71,16 +71,16 @@ export function BillingMonthsCard({
   return (
     <div
       data-testid="billing-months"
-      className="mb-5 rounded-2xl border border-gray-200 bg-white p-4"
+      className="mb-5 rounded-card border border-border bg-surface p-4"
     >
-      <p className="text-sm font-semibold text-gray-800">Billing months</p>
+      <p className="text-headline font-semibold text-ink">Billing months</p>
 
       {loadError ? (
-        <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <p className="mt-2 rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
           Could not load billing months: {loadError}
         </p>
       ) : (
-        <ul className="mt-2 divide-y divide-gray-100">
+        <ul className="mt-2 divide-y divide-divider">
           {visible.map((row) => (
             <MonthRow
               key={row.month}
@@ -101,7 +101,7 @@ export function BillingMonthsCard({
       )}
 
       {!loadError && offscreen > 0 && (
-        <p className="mt-2 text-xs text-amber-700">
+        <p className="mt-2 text-label text-status-warning-text">
           {mayNotHaveArrivedLabel(offscreen)} in months not shown
           {!showAll && (
             <>
@@ -109,7 +109,7 @@ export function BillingMonthsCard({
               <button
                 type="button"
                 onClick={() => setShowAll(true)}
-                className="font-medium text-sky-600 hover:underline"
+                className="font-medium text-primary hover:underline"
               >
                 show all months
               </button>
@@ -118,7 +118,7 @@ export function BillingMonthsCard({
         </p>
       )}
       {undeliveredProps.undeliveredError && (
-        <p className="mt-2 text-xs text-amber-700">
+        <p className="mt-2 text-label text-status-warning-text">
           Could not check for invoice emails that may not have arrived:{" "}
           {undeliveredProps.undeliveredError}
         </p>
@@ -128,7 +128,7 @@ export function BillingMonthsCard({
         <button
           type="button"
           onClick={() => setShowAll(!showAll)}
-          className="mt-2 text-xs font-medium text-sky-600 hover:underline"
+          className="mt-2 text-label font-medium text-primary hover:underline"
         >
           {showAll ? "Show fewer" : `Show all ${rows.length} months`}
         </button>
@@ -185,13 +185,13 @@ function MonthRow({
           type="button"
           onClick={() => onSelectMonth(row.month)}
           title="Set the Generate month to this month"
-          className="w-20 text-left text-sm font-semibold text-gray-800 hover:text-sky-600"
+          className="w-20 text-left text-body font-semibold text-ink hover:text-primary"
         >
           {monthLabel(row.month)}
         </button>
         <StatusBadge status={STATE_LABEL[row.state]} tone={monthTone(row)} />
 
-        <span className="text-xs text-gray-600">
+        <span className="text-label text-ink-secondary">
           {/* The close date only — NOT billing_periods.invoices_issued, which
               counts just the SEALING run's invoices (Aug 2026 sealed with 0
               while 9 existed from an earlier run). */}
@@ -204,7 +204,7 @@ function MonthRow({
         </span>
 
         {row.state === "open" && latest && (
-          <span className="text-[11px] text-gray-400">
+          <span className="text-label text-ink-muted">
             as of last run, {formatRunStamp(latest.ran_at)}
           </span>
         )}
@@ -237,7 +237,7 @@ function MonthRow({
               type="button"
               onClick={onToggle}
               aria-expanded={isExpanded}
-              className="flex items-center text-[11px] text-gray-500 hover:text-gray-800"
+              className="flex items-center text-label text-ink-muted hover:text-ink"
             >
               {isExpanded ? (
                 <ChevronDown className="h-3.5 w-3.5" />
@@ -251,23 +251,23 @@ function MonthRow({
       </div>
 
       {/* RISK 6: the stored list is stale, or could not be checked. */}
-      {note && <p className="mt-1 text-xs text-amber-700">{note}</p>}
+      {note && <p className="mt-1 text-label text-status-warning-text">{note}</p>}
 
       {showUndelivered && undelivered.length > 0 && (
         <div
           data-testid={`undelivered-${row.month}`}
-          className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2"
+          className="mt-2 rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2"
         >
-          <p className="mb-1.5 text-[11px] text-amber-900">
+          <p className="mb-1.5 text-label text-status-warning-text">
             These emails were being sent more than a day ago and never confirmed.
             They may have arrived. Resend only if the parent says they did not get it.
           </p>
           <ul className="space-y-1.5">
             {undelivered.map((u) => (
-              <li key={u.invoiceId} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                <span className="font-medium text-gray-800">{u.parentName}</span>
-                <span className="font-mono text-gray-500">{u.reference ?? "—"}</span>
-                <span className="text-gray-500">
+              <li key={u.invoiceId} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
+                <span className="font-medium text-ink">{u.parentName}</span>
+                <span className="font-mono text-ink-muted">{u.reference ?? "—"}</span>
+                <span className="text-ink-muted">
                   sending since{" "}
                   {formatSgStamp(u.claimedAt, {
                     day: "numeric",
@@ -285,7 +285,7 @@ function MonthRow({
                   {resendingInvoice.has(u.invoiceId) ? "Sending…" : "Resend"}
                 </Button>
                 {resendInvoiceError[u.invoiceId] && (
-                  <span className="basis-full text-red-600">{resendInvoiceError[u.invoiceId]}</span>
+                  <span className="basis-full text-status-danger-text">{resendInvoiceError[u.invoiceId]}</span>
                 )}
               </li>
             ))}
@@ -294,7 +294,7 @@ function MonthRow({
       )}
 
       {isExpanded && (
-        <ul className="mt-2 space-y-1 rounded-lg bg-gray-50 px-3 py-2">
+        <ul className="mt-2 space-y-1 rounded-card bg-ground px-3 py-2">
           {row.recentRuns.map((r) => (
             <RunLine key={r.id} run={r} />
           ))}
@@ -307,17 +307,17 @@ function MonthRow({
 function RunLine({ run }: { run: BillingRun }) {
   const who = run.ran_by_name ?? (run.mode === "auto" ? "Automatic" : "—");
   return (
-    <li className="text-[11px] text-gray-600">
-      <span className="font-medium text-gray-800">{formatRunStamp(run.ran_at)}</span>
+    <li className="text-label text-ink-secondary">
+      <span className="font-medium text-ink">{formatRunStamp(run.ran_at)}</span>
       {" · "}
       {who}
       {" · "}
       {run.invoices_created} created
       {" · "}
       {run.status === "error" ? (
-        <span className="text-red-600">failed: {run.error}</span>
+        <span className="text-status-danger-text">failed: {run.error}</span>
       ) : run.sealed ? (
-        <span className="text-green-700">closed the month</span>
+        <span className="text-status-success-text">closed the month</span>
       ) : (
         run.status
       )}

@@ -9,12 +9,14 @@ import { useOrphans } from "./domain/useOrphans";
 import { usePendingDebits } from "./domain/usePendingDebits";
 import { useGenerate } from "./domain/useGenerate";
 import { useBillingMonths } from "./domain/useBillingMonths";
+import { generateBlockedReason } from "./domain/generateBlockedReason";
 import { InvoiceToolbar } from "./ui/InvoiceToolbar";
 import { InvoiceTable } from "./ui/InvoiceTable";
 import { UnclaimedModal } from "./ui/UnclaimedModal";
 import { OrphanReport } from "./ui/OrphanReport";
 import { PendingDebits } from "./ui/PendingDebits";
 import { GenerationPanel } from "./ui/GenerationPanel";
+import { BillingSettingsCard } from "./ui/BillingSettingsCard";
 import { BillingMonthsCard } from "./ui/BillingMonthsCard";
 import { ConfirmGenerateModal } from "./ui/ConfirmGenerateModal";
 import { BlockedLessonsModal } from "./ui/BlockedLessonsModal";
@@ -60,6 +62,14 @@ export default function InvoicesPage() {
   }, []);
 
 
+  // Shown beside Generate, never disabling it (domain/generateBlockedReason.ts).
+  const blocked = generateBlockedReason(months.rows, generate.genMonth);
+  const blockedReason = blocked && {
+    monthLabel: blocked.monthLabel,
+    count: blocked.blocking.length,
+    onReview: () => generate.setBlockedLessons(blocked.blocking),
+  };
+
   return (
     <div>
       <PageHeader
@@ -71,7 +81,7 @@ export default function InvoicesPage() {
           these controls to act on. Said plainly rather than leaving a button
           that looks live and 400s — the tenant switcher arrives in phase 3. */}
       {isPlatformAdmin && !tenantId && (
-        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="mb-5 rounded-card border border-status-warning-border bg-status-warning-bg p-4 text-body text-status-warning-text">
           <strong>Platform admin.</strong> Invoice generation runs for one
           business at a time, and your account is not attached to one. Sign in
           as that business&rsquo;s admin to generate their invoices.
@@ -132,20 +142,7 @@ export default function InvoicesPage() {
         generating={generate.generating}
         onGenerate={generate.openConfirm}
         genResult={generate.genResult}
-        autoEnabled={tenant.autoEnabled}
-        togglingAuto={tenant.togglingAuto}
-        onToggleAuto={tenant.handleToggleAuto}
-        runDay={tenant.runDay}
-        setRunDay={tenant.setRunDay}
-        savingRunDay={tenant.savingRunDay}
-        runDayMessage={tenant.runDayMessage}
-        onSaveRunDay={tenant.handleSaveRunDay}
-        paynowUen={tenant.paynowUen}
-        setPaynowUen={tenant.setPaynowUen}
-        paynowMobile={tenant.paynowMobile}
-        setPaynowMobile={tenant.setPaynowMobile}
-        onSavePaynow={tenant.handleSavePaynow}
-        paynowSaved={tenant.paynowSaved}
+        blockedReason={blockedReason}
       />
 
       <UnclaimedModal
@@ -232,6 +229,23 @@ export default function InvoicesPage() {
         onMarkPaid={list.handleMarkPaid}
         onWhatsApp={(inv) => list.handleWhatsApp(inv, businessName)}
         onCopyLink={list.copyLink}
+      />
+
+      <BillingSettingsCard
+        autoEnabled={tenant.autoEnabled}
+        togglingAuto={tenant.togglingAuto}
+        onToggleAuto={tenant.handleToggleAuto}
+        runDay={tenant.runDay}
+        setRunDay={tenant.setRunDay}
+        savingRunDay={tenant.savingRunDay}
+        runDayMessage={tenant.runDayMessage}
+        onSaveRunDay={tenant.handleSaveRunDay}
+        paynowUen={tenant.paynowUen}
+        setPaynowUen={tenant.setPaynowUen}
+        paynowMobile={tenant.paynowMobile}
+        setPaynowMobile={tenant.setPaynowMobile}
+        onSavePaynow={tenant.handleSavePaynow}
+        paynowSaved={tenant.paynowSaved}
       />
     </div>
   );

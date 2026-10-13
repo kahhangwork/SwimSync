@@ -29,8 +29,8 @@ export function BlockedLessonsModal({
       onClose={onClose}
     >
       <div className="space-y-4">
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-          <p className="text-sm font-semibold text-red-700">
+        <div className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2.5">
+          <p className="text-body font-semibold text-status-danger-text">
             {blockedLessons.length} lesson
             {blockedLessons.length === 1 ? "" : "s"} still need attendance
             marked.
@@ -39,11 +39,11 @@ export function BlockedLessonsModal({
             {blockedLessons.map((b) => (
               <li
                 key={`${b.class_id}-${b.session_date}`}
-                className="text-xs text-gray-700"
+                className="text-label text-ink-secondary"
               >
                 <span className="font-semibold">{b.class_title}</span> ·{" "}
                 {formatSgDate(b.session_date)}
-                <span className="text-red-700">
+                <span className="text-status-danger-text">
                   {" "}
                   ({b.unmarked_student_count} student
                   {b.unmarked_student_count === 1 ? "" : "s"})
@@ -52,7 +52,7 @@ export function BlockedLessonsModal({
             ))}
           </ul>
         </div>
-        <p className="text-xs text-gray-600">
+        <p className="text-label text-ink-secondary">
           Mark these in the coach&apos;s app — or mark them{" "}
           <strong>cancelled</strong> if the lesson didn&apos;t run — then
           generate again. Nothing was billed, so there is nothing to undo.

@@ -23,7 +23,7 @@ export function PendingDebits({
       {pendingDebitError && (
         <p
           data-testid="pending-debit-error"
-          className="mb-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+          className="mb-5 rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text"
         >
           {pendingDebitError}
         </p>
@@ -32,12 +32,12 @@ export function PendingDebits({
       {pendingDebits.length > 0 && (
         <div
           data-testid="pending-debits"
-          className="mb-5 rounded-2xl border border-indigo-300 bg-indigo-50 p-4"
+          className="mb-5 rounded-card border border-status-info-border bg-status-info-bg p-4"
         >
-          <p className="text-sm font-semibold text-indigo-900">
+          <p className="text-body font-semibold text-status-info-text">
             Pending charges — not yet invoiced
           </p>
-          <p className="mt-1 text-xs text-indigo-800">
+          <p className="mt-1 text-label text-status-info-text">
             A correction to an already-paid invoice left this amount owing. It is
             folded onto the family&apos;s next invoice automatically. If the family
             is leaving and has no next invoice, collect it directly, then write it
@@ -50,11 +50,11 @@ export function PendingDebits({
               return (
                 <li
                   key={key}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2.5"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-status-info-border bg-surface px-3 py-2.5"
                 >
-                  <p className="text-sm font-semibold text-gray-800">
+                  <p className="text-body font-semibold text-ink">
                     {row.parent_name}
-                    <span className="ml-2 font-normal text-gray-600">
+                    <span className="ml-2 font-normal text-ink-secondary">
                       owes S${row.debit_balance.toFixed(2)}
                     </span>
                   </p>

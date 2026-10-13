@@ -33,12 +33,12 @@ export function OrphanReport({
   return (
     <div
       data-testid="orphan-report"
-      className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4"
+      className="mb-5 rounded-card border border-status-warning-border bg-status-warning-bg p-4"
     >
-      <p className="text-sm font-semibold text-amber-900">
+      <p className="text-body font-semibold text-status-warning-text">
         Recorded after billing — nobody was billed for these lessons
       </p>
-      <p className="mt-1 text-xs text-amber-800">
+      <p className="mt-1 text-label text-status-warning-text">
         These lessons sit inside a month that was already billed and
         sealed, so no invoice can ever include them. They were recorded
         afterwards — usually a backdated enrolment, make-up, or an
@@ -52,15 +52,15 @@ export function OrphanReport({
           return (
             <li
               key={key}
-              className="rounded-lg border border-amber-200 bg-white px-3 py-2.5"
+              className="rounded-card border border-status-warning-border bg-surface px-3 py-2.5"
             >
-              <p className="text-sm font-semibold text-gray-800">
+              <p className="text-body font-semibold text-ink">
                 {line.student_name ?? "Unnamed student"}
-                <span className="ml-2 font-normal text-gray-500">
+                <span className="ml-2 font-normal text-ink-muted">
                   {formatBillingMonth(line.billing_month)}
                 </span>
               </p>
-              <p className="mt-0.5 text-xs text-gray-600">
+              <p className="mt-0.5 text-label text-ink-secondary">
                 {line.lessons} billable lesson
                 {line.lessons === 1 ? "" : "s"} ·{" "}
                 {line.earliest_session_date === line.latest_session_date
@@ -70,7 +70,7 @@ export function OrphanReport({
                     )}`}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1 text-xs text-gray-600">
+                <div className="flex items-center gap-1 text-label text-ink-secondary">
                   S$
                   <input
                     value={orphanAmount[key] ?? ""}
@@ -83,7 +83,7 @@ export function OrphanReport({
                     inputMode="decimal"
                     placeholder="0.00"
                     aria-label={`Amount received for ${line.student_name ?? "student"}`}
-                    className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs"
+                    className="w-20 rounded-control border border-border-strong px-2 py-1.5 text-label"
                   />
                 </div>
                 <Button
@@ -111,7 +111,7 @@ export function OrphanReport({
       </ul>
 
       {orphanError && (
-        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <p className="mt-3 rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
           {orphanError}
         </p>
       )}

@@ -35,15 +35,15 @@ export function ConfirmGenerateModal({
     >
       <div className="space-y-4">
         {checkingCoverage && (
-          <p className="text-sm text-gray-500">Checking attendance…</p>
+          <p className="text-body text-ink-muted">Checking attendance…</p>
         )}
 
         {coverageError && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
-            <p className="text-sm font-semibold text-amber-800">
+          <div className="rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2.5">
+            <p className="text-body font-semibold text-status-warning-text">
               Couldn&apos;t check attendance.
             </p>
-            <p className="mt-1 text-xs text-gray-600">
+            <p className="mt-1 text-label text-ink-secondary">
               {coverageError}. Generating now is still possible, but nothing has
               verified that every lesson is marked — check the coach&apos;s app,
               or retry.
@@ -52,11 +52,11 @@ export function ConfirmGenerateModal({
         )}
 
         {coverage && hasGaps && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-            <p className="text-sm font-semibold text-red-700">
+          <div className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2.5">
+            <p className="text-body font-semibold text-status-danger-text">
               Cannot generate — some lessons have no attendance marked.
             </p>
-            <p className="mt-1 text-xs text-gray-600">
+            <p className="mt-1 text-label text-ink-secondary">
               Mark these lessons in the coach&apos;s app — or mark them
               cancelled if the lesson didn&apos;t run — then try again. A
               lesson marked <em>after</em> an invoice exists can never be
@@ -67,10 +67,10 @@ export function ConfirmGenerateModal({
               {coverage
                 .filter((c) => c.missingDates.length > 0)
                 .map((c) => (
-                  <li key={c.classId} className="text-xs text-gray-700">
+                  <li key={c.classId} className="text-label text-ink-secondary">
                     <span className="font-semibold">{c.title}</span> —{" "}
                     {c.marked} of {c.expected} lessons marked
-                    <span className="block text-red-700">
+                    <span className="block text-status-danger-text">
                       Missing: {c.missingDates.map((d) => formatSgDate(d)).join(", ")}
                     </span>
                   </li>
@@ -80,20 +80,20 @@ export function ConfirmGenerateModal({
         )}
 
         {coverage && !hasGaps && coverage.length > 0 && (
-          <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700">
+          <p className="rounded-card border border-status-success-border bg-status-success-bg px-3 py-2.5 text-body text-status-success-text">
             All {coverage.length} class{coverage.length === 1 ? "" : "es"} fully
             marked for {formatBillingMonth(genMonth)}.
           </p>
         )}
 
         {coverage && coverage.length === 0 && (
-          <p className="text-sm text-gray-600">
+          <p className="text-body text-ink-secondary">
             No classes with enrolled students to check for{" "}
             {formatBillingMonth(genMonth)}.
           </p>
         )}
 
-        <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-gray-600">
+        <p className="rounded-card border border-border bg-ground px-3 py-2 text-label text-ink-secondary">
           Invoices are based on the attendance recorded now. Parents who already
           have an invoice for this month are skipped.
         </p>

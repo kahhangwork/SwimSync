@@ -47,14 +47,14 @@ export function InvoiceTable({
   return (
     <>
       {loadError && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-3 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           Could not load the invoices: {loadError}. The list below is incomplete
           — do not read it as the full set.
         </div>
       )}
 
       {!loading && !loadError && capped && (
-        <p className="mb-3 text-sm text-amber-700">
+        <p className="mb-3 text-body text-status-warning-text">
           Showing the first {ROW_LIMIT}{" "}
           {searchField === "parent" && search.trim() ? "matches" : "invoices"}.{" "}
           {searchField === "parent" && search.trim()
@@ -68,50 +68,46 @@ export function InvoiceTable({
           <Th sort={sort} sortKey="parent_name">Parent</Th>
           <Th sort={sort} sortKey="student_names">Student(s)</Th>
           <Th sort={sort} sortKey="billing_month" firstDir="desc">Month</Th>
-          <Th sort={sort} sortKey="gross_amount" firstDir="desc">Gross</Th>
-          <Th sort={sort} sortKey="package_applied" firstDir="desc">Package</Th>
-          <Th sort={sort} sortKey="credit_applied" firstDir="desc">Credit</Th>
-          <Th sort={sort} sortKey="net_amount" firstDir="desc">Net</Th>
+          <Th sort={sort} sortKey="gross_amount" firstDir="desc" className="text-right">Gross</Th>
+          <Th sort={sort} sortKey="package_applied" firstDir="desc" className="text-right">Package</Th>
+          <Th sort={sort} sortKey="credit_applied" firstDir="desc" className="text-right">Credit</Th>
+          <Th sort={sort} sortKey="net_amount" firstDir="desc" className="text-right">Net</Th>
           <Th sort={sort} sortKey="status">Status</Th>
           <Th>Action</Th>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={9}>
+              <Td className="text-center text-ink-muted py-8" colSpan={9}>
                 Loading…
               </Td>
             </Tr>
           ) : visible.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={9}>
+              <Td className="text-center text-ink-muted py-8" colSpan={9}>
                 No invoices found.
               </Td>
             </Tr>
           ) : (
             visible.map((inv) => (
               <Tr key={inv.id}>
-                <Td className="font-medium text-gray-900">{inv.parent_name}</Td>
-                <Td className="text-gray-600 text-xs">{inv.student_names}</Td>
+                <Td className="font-medium text-ink">{inv.parent_name}</Td>
+                <Td className="text-ink-secondary text-label">{inv.student_names}</Td>
                 <Td>{formatBillingMonth(inv.billing_month)}</Td>
-                <Td>S${inv.gross_amount.toFixed(2)}</Td>
-                <Td className="text-blue-600">
+                <Td className="text-right tabular-nums text-ink">S${inv.gross_amount.toFixed(2)}</Td>
+                <Td className="text-right tabular-nums">
                   {inv.package_applied > 0
                     ? `−S$${inv.package_applied.toFixed(2)}`
                     : "—"}
                 </Td>
-                <Td className="text-blue-600">
+                <Td className="text-right tabular-nums">
                   {inv.credit_applied > 0
                     ? `−S$${inv.credit_applied.toFixed(2)}`
                     : "—"}
                 </Td>
-                <Td
-                  className={`font-semibold ${
-                    inv.status === "outstanding"
-                      ? "text-red-600"
-                      : "text-green-600"
-                  }`}
-                >
+                {/* Money in Ink, the status in its tag (DESIGN.md's Aligned
+                    Money Rule; UI restyle 5.1) — no longer red/green. */}
+                <Td className="text-right tabular-nums font-semibold text-ink">
                   S${inv.net_amount.toFixed(2)}
                 </Td>
                 <Td>
@@ -129,7 +125,7 @@ export function InvoiceTable({
                   />
                   {inv.status === "outstanding" && inv.paid_claimed_at && (
                     <div
-                      className="text-[10px] text-sky-700 mt-0.5"
+                      className="text-label text-status-info-text mt-0.5"
                       title="The parent tapped 'I've paid' — check your bank, then Mark Paid"
                     >
                       parent says paid{" "}
@@ -169,7 +165,7 @@ export function InvoiceTable({
                         </Button>
                       ) : (
                         <span
-                          className="text-[11px] text-gray-400"
+                          className="text-label text-ink-muted"
                           title="This parent has no usable phone number"
                         >
                           no number
@@ -187,7 +183,7 @@ export function InvoiceTable({
                     </div>
                   )}
                   {inv.status === "outstanding" && inv.reminded_at && (
-                    <div className="text-[10px] text-gray-400 mt-0.5">
+                    <div className="text-label text-ink-muted mt-0.5">
                       chat opened{" "}
                       {formatSgStamp(inv.reminded_at, DMY)}
                     </div>
