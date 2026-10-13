@@ -124,8 +124,9 @@ page.on("pageerror", (e) => pageErrors.push(e.message));
 const drawer = page.getByRole("dialog", { name: "ClsAdm Squad" });
 const section = drawer.locator("section", { hasText: "Shadow coaches" });
 const rows = section.locator("li");
-const errLine = section.locator("p.bg-red-50");
-const warning = section.locator("p.bg-amber-50");
+// By role, not colour class (UI restyle 5.10 — the class is styling, §7.375).
+const errLine = section.locator('p[role="alert"]');
+const warning = section.locator('p[role="status"]');
 const pick = section.locator("select");
 const fromInput = section.locator('input[aria-label="Shadowing from"]');
 const rowTexts = async () => (await rows.allInnerTexts()).map(flat);

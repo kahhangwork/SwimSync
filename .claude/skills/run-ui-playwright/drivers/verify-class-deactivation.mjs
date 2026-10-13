@@ -35,7 +35,7 @@
 // No Expo server is needed: everything here is admin-side.
 
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, rowAction } from "./lib.mjs";
 
 const EMPTY = "c9000000-0000-0000-0000-0000000000e1";
 const ENROLLED = "c9000000-0000-0000-0000-0000000000e2";
@@ -150,7 +150,7 @@ function rowFor(page, title) {
 
     // ── 4-6. Retire the empty class ─────────────────────────────────────────
     console.log("\n4. Retiring the empty class");
-    await rowFor(page, EMPTY_TITLE).first().getByRole("button", { name: /retire/i }).click();
+    await (await rowAction(rowFor(page, EMPTY_TITLE).first(), /^retire$/i)).click(); // the row "…" menu (UI restyle 5.10)
     await page.waitForTimeout(600);
 
     const dialogText = await page.locator("body").innerText();
@@ -206,7 +206,7 @@ function rowFor(page, title) {
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(1500);
 
-    await rowFor(page, ENROLLED_TITLE).first().getByRole("button", { name: /retire/i }).click();
+    await (await rowAction(rowFor(page, ENROLLED_TITLE).first(), /^retire$/i)).click(); // the row "…" menu (UI restyle 5.10)
     await page.waitForTimeout(500);
     await page.getByRole("button", { name: /^retire class$/i }).click();
     await page.waitForTimeout(1800);
@@ -224,7 +224,7 @@ function rowFor(page, title) {
     await page.getByRole("button", { name: /^cancel$/i }).click();
     await page.waitForTimeout(600);
 
-    await rowFor(page, BOOKED_TITLE).first().getByRole("button", { name: /retire/i }).click();
+    await (await rowAction(rowFor(page, BOOKED_TITLE).first(), /^retire$/i)).click(); // the row "…" menu (UI restyle 5.10)
     await page.waitForTimeout(500);
     await page.getByRole("button", { name: /^retire class$/i }).click();
     await page.waitForTimeout(1800);

@@ -33,11 +33,11 @@ export function CancelLessonModal({
       onClose={onClose}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-body text-ink-muted">
           Call off ONE upcoming lesson of this class — rain, the coach away.
           Parents see it struck out under Upcoming with your reason, the coach
           has nothing to mark, and the billing month does not wait for it.{" "}
-          <span className="text-gray-700">A lesson that already happened</span>{" "}
+          <span className="text-ink-secondary">A lesson that already happened</span>{" "}
           is recorded by the coach as cancelled (rain / coach) instead.
         </p>
 
@@ -55,18 +55,18 @@ export function CancelLessonModal({
           onChange={onCancelReason}
           placeholder="e.g. Heavy rain forecast — pool closed"
         />
-        <p className="-mt-2 text-xs text-gray-400">
+        <p className="-mt-2 text-label text-ink-muted">
           Shown to every parent in the class and to the coach.
         </p>
 
         {cancelError && (
-          <p data-testid="cancel-error" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p data-testid="cancel-error" className="rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
             {cancelError}
           </p>
         )}
 
         {cancelDone && (
-          <p data-testid="cancel-done" className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+          <p data-testid="cancel-done" className="rounded-card bg-status-success-bg px-3 py-2 text-body text-status-success-text">
             Cancelled for {cancelDone}. Open the lesson from the Calendar to restore it.
           </p>
         )}

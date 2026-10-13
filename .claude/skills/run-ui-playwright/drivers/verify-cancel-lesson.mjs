@@ -29,7 +29,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, sgLabel, todaySg, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, sgLabel, todaySg, ADMIN, EXPO, rowAction } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -129,8 +129,9 @@ try {
   // ── 4. Classes page entry, on a PAST date: the RPC refuses, the page repeats it ──
   await page.goto(`${ADMIN}/classes`, { waitUntil: "networkidle" });
   const roseRow = page.locator("tr", { hasText: "Cal Rose Full" }).first();
-  await roseRow.getByTestId("cancel-lesson-entry").waitFor({ timeout: 15000 });
-  await roseRow.getByTestId("cancel-lesson-entry").click();
+  // "Cancel a lesson" sits in the row "…" menu since UI restyle 5.10.
+  await roseRow.getByRole("button", { name: "More actions" }).waitFor({ timeout: 15000 });
+  await (await rowAction(roseRow, "Cancel a lesson")).click();
   const dateInput = page.locator('input[type="date"]').last();
   await dateInput.waitFor({ timeout: 5000 });
   await dateInput.fill(lastWeek);

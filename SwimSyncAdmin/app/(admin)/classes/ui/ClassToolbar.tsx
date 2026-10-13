@@ -1,3 +1,4 @@
+import { Tag } from "@/components/ui/Tag";
 import { ROW_LIMIT } from "../constants";
 
 type LocationOption = { id: string; name: string };
@@ -47,14 +48,14 @@ export function ClassToolbar({
           placeholder="Search by class name or coach..."
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          className="w-full max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
+          className="w-full max-w-sm rounded-control border border-border-strong bg-surface px-4 py-2.5 text-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary"
         />
         {locationOptions.length > 1 && (
           <select
             aria-label="Location"
             value={locationFilter}
             onChange={(e) => onLocationFilter(e.target.value)}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            className="rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">All locations</option>
             {locationOptions.map((l) => (
@@ -66,18 +67,16 @@ export function ClassToolbar({
         )}
         {/* Always offered, even at zero, so the answer to "where did that class
             go?" is on the page rather than in someone's memory. */}
-        <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+        <label className="inline-flex items-center gap-2 text-body text-ink-secondary">
           <input
             type="checkbox"
             checked={showRetired}
             onChange={(e) => onShowRetired(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-400"
+            className="h-4 w-4 rounded-control border-border-strong text-primary focus:ring-primary"
           />
           Show retired classes
           {retiredCount > 0 && (
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-              {retiredCount}
-            </span>
+            <Tag tone="neutral">{retiredCount}</Tag>
           )}
         </label>
       </div>
@@ -86,13 +85,13 @@ export function ClassToolbar({
           or permission failure — but a restore that silently did nothing is
           exactly the dead end this page exists to prevent. */}
       {retireError && retireFor === null && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           {retireError}
         </div>
       )}
 
       {!loading && capped && (
-        <p className="mb-3 text-sm text-amber-700">
+        <p className="mb-3 text-body text-status-warning-text">
           Showing the first {ROW_LIMIT} classes — the list is truncated. This is
           not expected; contact support if you see it.
         </p>

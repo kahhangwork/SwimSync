@@ -34,10 +34,10 @@ export function ExtraLessonModal({
       onClose={onClose}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-body text-ink-muted">
           A lesson on a day this class does not normally run — a makeup, or a
           public-holiday shift.{" "}
-          <span className="text-gray-700">
+          <span className="text-ink-secondary">
             {extraFor ? capitalize(extraFor.day_of_week) : ""} lessons need no
             scheduling
           </span>
@@ -58,19 +58,19 @@ export function ExtraLessonModal({
           onChange={onExtraReason}
           placeholder="e.g. Makeup for the National Day holiday"
         />
-        <p className="-mt-2 text-xs text-gray-400">
+        <p className="-mt-2 text-label text-ink-muted">
           The coach sees this on their class, so they know why the lesson is
           there.
         </p>
 
         {extraError && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
             {extraError}
           </p>
         )}
 
         {extraDone && (
-          <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+          <p className="rounded-card bg-status-success-bg px-3 py-2 text-body text-status-success-text">
             Scheduled for {extraDone}. It now appears on the coach&apos;s class,
             and the month will not close until they have marked it.
           </p>
@@ -79,7 +79,7 @@ export function ExtraLessonModal({
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
-            className="rounded-xl px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            className="rounded-card px-4 py-2 text-body font-medium text-ink-secondary hover:bg-ground"
           >
             Close
           </button>

@@ -15,7 +15,7 @@ export function ChangeStartModal({ c }: { c: ChangeStartState }) {
     <Modal title="Change start date" open={t !== null} onClose={c.close}>
       {t && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-body text-ink-secondary">
             <strong>{t.fullName}</strong> in <strong>{t.classTitle}</strong> — currently from{" "}
             {formatSgDate(c.current, { ...DAY, year: "numeric" })}.
           </p>
@@ -23,7 +23,7 @@ export function ChangeStartModal({ c }: { c: ChangeStartState }) {
           {c.dropped.length > 0 && (
             <p
               data-testid="dropped-dates"
-              className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-800"
+              className="rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2 text-label text-status-warning-text"
             >
               {t.fullName} will no longer be expected on:{" "}
               {c.dropped.map((d) => formatSgDate(d, DAY)).join(", ")}. If they missed these, mark
@@ -31,7 +31,7 @@ export function ChangeStartModal({ c }: { c: ChangeStartState }) {
             </p>
           )}
           {c.error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
               {c.error}
             </p>
           )}

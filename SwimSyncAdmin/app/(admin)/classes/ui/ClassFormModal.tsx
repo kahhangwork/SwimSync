@@ -72,13 +72,13 @@ export function ClassFormModal({
 
         <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-body font-medium text-ink-secondary mb-1.5">
             Coach
           </label>
           <select
             value={coachId}
             onChange={(e) => setCoachId(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            className="w-full rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">— Choose a coach —</option>
             {coaches.map((c) => (
@@ -90,14 +90,14 @@ export function ClassFormModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-body font-medium text-ink-secondary mb-1.5">
             Day
           </label>
           <select
             value={day}
             // census: ui-cast (Wave 8) — the options are DAYS (the day_of_week enum) and the "" placeholder.
             onChange={(e) => setDay(e.target.value as Enums<"day_of_week"> | "")}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            className="w-full rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">— Choose a day —</option>
             {DAYS.map((d) => (
@@ -113,13 +113,13 @@ export function ClassFormModal({
             the field when a business has none would leave no way to satisfy
             it. Every business has at least the two defaults. */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Category <span className="text-red-500">*</span>
+          <label className="block text-body font-medium text-ink-secondary mb-1.5">
+            Category <span className="text-status-danger-text">*</span>
           </label>
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            className="w-full rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {/* No "— None —": classes.category_id is NOT NULL
                 (20260725000400), and an option the database refuses is not
@@ -133,7 +133,7 @@ export function ClassFormModal({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-label text-ink-muted">
             What kind of class this is. It decides which prepaid packages can
             pay for it, and what a <strong>trial</strong> of this class costs.
             It does <em>not</em> set the lesson price — that is per class,
@@ -160,13 +160,13 @@ export function ClassFormModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Location <span className="text-red-500">*</span>
+            <label className="block text-body font-medium text-ink-secondary mb-1.5">
+              Location <span className="text-status-danger-text">*</span>
             </label>
             <select
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-full rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Choose a location…</option>
               {pickerOptions.map((l) => (
@@ -176,9 +176,9 @@ export function ClassFormModal({
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-label text-ink-muted">
               Manage the list on the{" "}
-              <a href="/locations" className="text-sky-600 hover:underline">
+              <a href="/locations" className="text-primary hover:underline">
                 Locations
               </a>{" "}
               page.
@@ -195,7 +195,7 @@ export function ClassFormModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-body font-medium text-ink-secondary mb-1.5">
               Max students
             </label>
             <input
@@ -208,15 +208,15 @@ export function ClassFormModal({
               }
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-full rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-label text-ink-muted">
               Blank = the category&apos;s default. Shown on the calendar as
               &ldquo;students / max&rdquo;; nothing is refused on it.
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-body font-medium text-ink-secondary mb-1.5">
               Calendar colour
             </label>
             <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Calendar colour">
@@ -226,8 +226,8 @@ export function ClassFormModal({
                 aria-checked={colour === null}
                 title="No colour"
                 onClick={() => setColour(null)}
-                className={`h-7 w-7 rounded-full border border-gray-300 bg-white text-[10px] text-gray-500 ${
-                  colour === null ? "ring-2 ring-offset-1 ring-gray-400" : ""
+                className={`h-7 w-7 rounded-full border border-border-strong bg-surface text-label text-ink-muted ${
+                  colour === null ? "ring-2 ring-offset-1 ring-border" : ""
                 }`}
               >
                 —
@@ -257,11 +257,11 @@ export function ClassFormModal({
             permanent fictional history, or every price rise reach backwards
             into months already taught. */}
         {moneyChanged && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-            <p className="text-sm font-medium text-amber-900">
+          <div className="rounded-card border border-status-warning-border bg-status-warning-bg p-3 space-y-2">
+            <p className="text-body font-medium text-status-warning-text">
               You changed the price or coach. Which is this?
             </p>
-            <label className="flex items-start gap-2 text-sm text-amber-900">
+            <label className="flex items-start gap-2 text-body text-status-warning-text">
               <input
                 type="radio"
                 className="mt-1"
@@ -274,7 +274,7 @@ export function ClassFormModal({
                 unaffected.
               </span>
             </label>
-            <label className="flex items-start gap-2 text-sm text-amber-900">
+            <label className="flex items-start gap-2 text-body text-status-warning-text">
               <input
                 type="radio"
                 className="mt-1"
@@ -291,7 +291,7 @@ export function ClassFormModal({
         )}
 
         {saveError && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <p className="text-body text-status-danger-text bg-status-danger-bg rounded-card px-3 py-2">
             {saveError}
           </p>
         )}

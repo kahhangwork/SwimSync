@@ -15,7 +15,7 @@
 //        cd SwimSyncAdmin && npm run dev
 import os from "node:os";
 import path from "node:path";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, rowAction } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (name) => path.join(SHOT, name);
@@ -42,7 +42,8 @@ await page.waitForTimeout(1500);
 
 const openEdit = async () => {
   const row = page.locator("tr", { hasText: "Saturday Beginners" });
-  await row.getByRole("button", { name: /Edit/i }).click();
+  // Edit sits in the row "…" menu since UI restyle 5.10 — rowAction opens it.
+  await (await rowAction(row, /^Edit$/)).click();
   await page.waitForTimeout(600);
 };
 

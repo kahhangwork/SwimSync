@@ -1,3 +1,4 @@
+import { Tag } from "@/components/ui/Tag";
 import { Drawer } from "@/components/Drawer";
 import { PackageChip } from "@/components/PackageChip";
 import { assignableClassShadows } from "@/lib/sessionRoster";
@@ -76,24 +77,27 @@ export function RosterDrawer({
       }
     >
       {rosterError ? (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+        <p className="rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
           Couldn&apos;t load the roster: {rosterError}
         </p>
       ) : (
         <div className="space-y-8">
           <section>
-            <h3 className="text-sm font-semibold text-gray-900">
+            <h3 className="text-headline font-semibold text-ink">
               Shadow coaches
             </h3>
-            <p className="mt-0.5 text-xs text-gray-500">
+            <p className="mt-0.5 text-label text-ink-muted">
               A shadow watches every lesson of this class and is paid their own
               shadow rate for each one. It lasts until you end it — this is not
               a per-lesson arrangement. To record a one-off cover instead, use{" "}
               <span className="font-medium">Substitutes</span>.
             </p>
 
+            {/* role="alert" / role="status" are how verify-class-admin finds
+                these two lines — never their colour classes (UI restyle 5.10,
+                §7.375). */}
             {shadowError && (
-              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              <p role="alert" className="mt-2 rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
                 {shadowError}
               </p>
             )}
@@ -103,12 +107,12 @@ export function RosterDrawer({
                 {shadows.map((sh) => (
                   <li
                     key={sh.id}
-                    className="flex flex-wrap items-center gap-2 text-sm"
+                    className="flex flex-wrap items-center gap-2 text-body"
                   >
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-ink">
                       {sh.coach_name}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-label text-ink-muted">
                       {formatSgDate(sh.effective_from)} –{" "}
                       {sh.effective_to
                         ? formatSgDate(sh.effective_to)
@@ -119,14 +123,12 @@ export function RosterDrawer({
                         type="button"
                         disabled={shadowBusy}
                         onClick={() => onEndShadow(sh.coach_id)}
-                        className="text-xs font-medium text-gray-500 underline disabled:opacity-50"
+                        className="text-label font-medium text-ink-muted underline disabled:opacity-50"
                       >
                         End
                       </button>
                     ) : (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                        ended
-                      </span>
+                      <Tag tone="neutral">ended</Tag>
                     )}
                   </li>
                 ))}
@@ -137,7 +139,7 @@ export function RosterDrawer({
               <select
                 value={shadowPick}
                 onChange={(e) => onShadowPick(e.target.value)}
-                className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                className="rounded-control border border-border-strong px-2 py-1 text-body"
               >
                 <option value="">Add a shadow…</option>
                 {assignableClassShadows(
@@ -156,18 +158,18 @@ export function RosterDrawer({
                 type="date"
                 value={shadowFrom}
                 onChange={(e) => onShadowFrom(e.target.value)}
-                className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                className="rounded-control border border-border-strong px-2 py-1 text-body"
                 aria-label="Shadowing from"
               />
               <button
                 type="button"
                 disabled={shadowBusy || !shadowPick}
                 onClick={onAssignShadow}
-                className="rounded-lg bg-sky-500 px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-control bg-primary px-3 py-1 text-body font-medium text-white disabled:opacity-50"
               >
                 Add
               </button>
-              <span className="text-xs text-gray-400">
+              <span className="text-label text-ink-muted">
                 from today if left blank
               </span>
             </div>
@@ -188,7 +190,7 @@ export function RosterDrawer({
               const warn = shadowRateWarning(from, startsOn);
               if (warn === null) return null;
               return (
-                <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <p role="status" className="mt-2 rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2 text-label text-status-warning-text">
                   {warn === "late"
                     ? `This coach's shadow rate only starts on ${formatSgDate(from!)}, after this assignment does.`
                     : "This coach has no shadow rate yet."}{" "}
@@ -201,24 +203,24 @@ export function RosterDrawer({
           </section>
 
           <section>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <h3 className="mb-3 text-label font-semibold uppercase tracking-wide text-ink-muted">
               Enrolled ({openRoster.enrolled.length})
             </h3>
             {openRoster.enrolled.length === 0 ? (
-              <p className="text-sm text-gray-400">
+              <p className="text-body text-ink-muted">
                 Nobody is enrolled in this class yet.
               </p>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-divider">
                 {openRoster.enrolled.map((s) => (
                   <li key={s.student_id} className="py-2.5">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-body font-medium text-ink">
                       {s.full_name}
                       <span className="ml-1.5">
                         <PackageChip coverage={covMap.get(s.student_id)} />
                       </span>
                     </p>
-                    <p className="mt-0.5 text-xs text-gray-500">
+                    <p className="mt-0.5 text-label text-ink-muted">
                       {s.level_label ?? "No level set"} · Joined{" "}
                       {formatSgDate(toSgDate(s.enrolled_at), {
                         day: "numeric",
@@ -230,7 +232,7 @@ export function RosterDrawer({
                         type="button"
                         onClick={() => onChangeStart(s)}
                         aria-label={`Change start date for ${s.full_name}`}
-                        className="font-medium text-sky-600 hover:underline"
+                        className="font-medium text-primary hover:underline"
                       >
                         Change
                       </button>
@@ -243,19 +245,19 @@ export function RosterDrawer({
 
           {openRoster.trials.length > 0 && (
             <section>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <h3 className="mb-3 text-label font-semibold uppercase tracking-wide text-ink-muted">
                 Trials coming up ({openRoster.trials.length})
               </h3>
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-divider">
                 {openRoster.trials.map((t) => (
                   <li key={t.student_id} className="py-2.5">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-body font-medium text-ink">
                       {t.full_name}
                       <span className="ml-1.5">
                         <PackageChip coverage={covMap.get(t.student_id)} />
                       </span>
                     </p>
-                    <p className="mt-0.5 text-xs text-gray-500">
+                    <p className="mt-0.5 text-label text-ink-muted">
                       {t.level_label ?? "No level set"} · Trial on{" "}
                       {formatSgDate(t.session_date)}
                     </p>
@@ -265,7 +267,7 @@ export function RosterDrawer({
               {/* The consequence, in words. A reader who takes the "+1" for
                   class membership is one click from breaking a billing
                   month, so the screen says what would happen. */}
-              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <p className="mt-3 rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2 text-label text-status-warning-text">
                 A guest for this one lesson — not part of the class. Adding
                 them to it would make them expected every week, and a lesson
                 nobody marks blocks the whole month from being invoiced.

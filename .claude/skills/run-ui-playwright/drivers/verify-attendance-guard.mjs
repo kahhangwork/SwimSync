@@ -37,7 +37,7 @@ import os from "node:os";
 import { execSync } from "node:child_process";
 import {
   launch, loginExpo, loginAdmin, tap, dumpText, visibleText, gotoAuthed,
-  pressByText as pressByTextShared, pressClassButton, ADMIN, EXPO,
+  pressByText as pressByTextShared, pressClassButton, ADMIN, EXPO, rowAction,
 } from "./lib.mjs";
 
 // ⚠ THIS DRIVER REACHES EVERY SCREEN BY DEEP LINK, so the screen under test is
@@ -147,7 +147,8 @@ try {
   // that *a* confirmation appeared. Same family as §7.73: never index into a
   // list whose length you do not control.
   const extraRow = apage.locator("tr", { hasText: "Saturday Beginners" });
-  await tap(extraRow.getByText("Extra lesson"), "Extra lesson button (Saturday Beginners row)");
+  // Extra lesson sits in the row "…" menu since UI restyle 5.10 — rowAction opens it.
+  await tap(await rowAction(extraRow, "Extra lesson"), "Extra lesson button (Saturday Beginners row)");
   await apage.waitForTimeout(800);
 
   // The modal titles itself `Extra lesson — <class>`, so this is the cheap
@@ -180,7 +181,7 @@ try {
   // (class, date) double-bills the whole class (§7.7).
   // Re-open from the same scoped row — the modal closes on success.
   if (!(await apage.locator('input[type="date"]').count())) {
-    await tap(extraRow.getByText("Extra lesson"), "Extra lesson button (re-open)");
+    await tap(await rowAction(extraRow, "Extra lesson"), "Extra lesson button (re-open)");
     await apage.waitForTimeout(800);
   }
   await apage.locator('input[type="date"]').fill(D_EXTRA);

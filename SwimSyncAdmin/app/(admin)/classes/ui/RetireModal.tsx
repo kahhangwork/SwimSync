@@ -29,19 +29,19 @@ export function RetireModal({
       onClose={onClose}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-body text-ink-secondary">
           This class stops being scheduled. It disappears from the coach&apos;s
           app, and no new lessons can be marked on it.
         </p>
-        <p className="text-sm text-gray-600">
-          <span className="font-medium text-gray-900">
+        <p className="text-body text-ink-secondary">
+          <span className="font-medium text-ink">
             Lessons it has already taught still bill as normal.
           </span>{" "}
           You can put it back at any time with <em>Restore</em>.
         </p>
 
         {retireError && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
             {retireError}
           </div>
         )}
