@@ -1,40 +1,39 @@
 // Credit Notes Applied, when there are any.
-// Moved VERBATIM from app/(parent)/billing/invoice/[id].tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-G); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/billing/invoice/[id].tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-G). UI restyle step 3.2: a credit is Ink with a true minus, never link-blue.
 import React from "react";
 import { View, Text } from "react-native";
-import Card from "@/components/Card";
+import { Surface } from "@/components/ui/Surface";
 import type { InvoiceDetail } from "../types";
+
+const TABULAR = { fontVariant: ["tabular-nums" as const] };
 
 export function CreditNotesCard(p: { invoice: InvoiceDetail }) {
   const { invoice } = p;
+  if (invoice.credit_notes.length === 0) return null;
   return (
-    <>
-      {/* Credit notes applied */}
-      {invoice.credit_notes.length > 0 && (
-        <Card>
-          <Text className="text-base font-bold text-gray-900 mb-3">
-            Credit Notes Applied
-          </Text>
-          {invoice.credit_notes.map((cn) => (
-            <View
-              key={cn.id}
-              className="flex-row justify-between py-2 border-b border-gray-50"
-            >
-              <View className="flex-1">
-                <Text className="text-sm text-gray-700">{cn.reference_number}</Text>
-                {cn.reason ? (
-                  <Text className="text-xs text-gray-400">{cn.reason}</Text>
-                ) : null}
-              </View>
-              <Text className="text-sm font-medium text-blue-600">
-                −S${cn.amount.toFixed(2)}
-              </Text>
+    <Surface>
+      <Text className="text-headline font-semibold text-ink mb-1">
+        Credit Notes Applied
+      </Text>
+      <View>
+        {invoice.credit_notes.map((cn, i) => (
+          <View
+            key={cn.id}
+            className={`flex-row justify-between gap-3 py-3 ${i > 0 ? "border-t border-divider" : ""}`}
+          >
+            <View className="flex-1">
+              <Text className="text-body text-ink">{cn.reference_number}</Text>
+              {cn.reason ? (
+                <Text className="text-body-secondary text-ink-secondary">{cn.reason}</Text>
+              ) : null}
             </View>
-          ))}
-        </Card>
-      )}
-    </>
+            <Text className="text-body text-ink" style={TABULAR}>
+              −S${cn.amount.toFixed(2)}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </Surface>
   );
 }

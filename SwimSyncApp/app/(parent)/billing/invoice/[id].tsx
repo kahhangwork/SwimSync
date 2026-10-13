@@ -24,23 +24,30 @@ export default function InvoiceDetailScreen() {
     return <NotFoundView />;
   }
 
-  const statusLabel = invoice.status === "outstanding" ? "Outstanding" : "Paid";
+  // A claim never changes the status (PRD §7.21) — the tag only says who the
+  // outstanding invoice is now waiting on (DESIGN.md: Claimed is its own state).
+  const statusLabel =
+    invoice.status === "outstanding"
+      ? invoice.paid_claimed_at
+        ? "Claimed"
+        : "Outstanding"
+      : "Paid";
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <Header statusLabel={statusLabel} />
 
       <ScrollView
-        contentContainerClassName="px-5 pb-10 gap-4"
+        contentContainerClassName="px-5 pb-10 gap-3"
         showsVerticalScrollIndicator={false}
       >
         <SummaryCard invoice={invoice} />
 
+        <PayActions invoice={invoice} claiming={claiming} claimPaid={claimPaid} />
+
         <LineItemsCard invoice={invoice} />
 
         <CreditNotesCard invoice={invoice} />
-
-        <PayActions invoice={invoice} claiming={claiming} claimPaid={claimPaid} />
       </ScrollView>
     </SafeAreaView>
   );
