@@ -90,9 +90,9 @@ export function useStartsOn(classId: string | null): StartsOnState {
 }
 
 const TONE: Record<string, string> = {
-  sealed: "border-amber-200 bg-amber-50 text-amber-800",
-  unbilled: "border-orange-300 bg-orange-50 text-orange-800",
-  quiet: "border-gray-100 bg-gray-50 text-gray-600",
+  sealed: "border-status-warning-border bg-status-warning-bg text-status-warning-text",
+  unbilled: "border-status-warning-border bg-status-warning-bg text-status-warning-text",
+  quiet: "border-border bg-ground text-ink-secondary",
 };
 
 export function StartsOnField({
@@ -111,7 +111,7 @@ export function StartsOnField({
   const warnings = startWarnings(bounds, start.value, childName || "This child");
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="block text-body font-medium text-ink-secondary">
         {label}
         <input
           type="date"
@@ -121,11 +121,11 @@ export function StartsOnField({
           max={bounds.today}
           disabled={bounds.floor === bounds.today}
           onChange={(e) => e.target.value && start.setValue(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+          className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body disabled:bg-ground"
         />
       </label>
       {start.value !== bounds.today && (
-        <p className="text-xs text-gray-500">
+        <p className="text-label text-ink-muted">
           For a child who already swam before today. They are expected from this date on.
         </p>
       )}
@@ -133,13 +133,13 @@ export function StartsOnField({
         <p
           key={w.tone}
           data-tone={w.tone}
-          className={`rounded-lg border px-3 py-2 text-xs ${TONE[w.tone]}`}
+          className={`rounded-control border px-3 py-2 text-label ${TONE[w.tone]}`}
         >
           {w.text}
         </p>
       ))}
       {start.confirmPending && (
-        <p role="alert" className="text-xs font-semibold text-orange-800">
+        <p role="alert" className="text-label font-semibold text-status-warning-text">
           Press {saveLabel} again to confirm this start date.
         </p>
       )}

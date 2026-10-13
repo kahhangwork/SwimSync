@@ -20,7 +20,7 @@ export function ContactHint({ check }: { check: ContactCheck }) {
   return (
     <p
       className={`mt-1 text-[11px] ${
-        check.level === "warn" ? "text-amber-700" : "text-gray-500"
+        check.level === "warn" ? "text-status-warning-text" : "text-ink-muted"
       }`}
     >
       {check.message}

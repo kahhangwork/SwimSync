@@ -125,15 +125,15 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
   }, [redirecting, router]);
 
   if (!resolved || redirecting) {
-    return <div className="p-6 text-gray-500">Loading…</div>;
+    return <div className="p-6 text-ink-muted">Loading…</div>;
   }
 
   if (wrongApp) {
     return (
       <div>
         <PageHeader title="Not this app" />
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
-          <p className="mb-2 font-semibold text-gray-900">
+        <div className="rounded-card border border-border bg-surface p-6 text-body text-ink-secondary">
+          <p className="mb-2 font-semibold text-ink">
             This is the admin panel.
           </p>
           <p>
@@ -150,8 +150,8 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
     return (
       <div>
         <PageHeader title="Access suspended" />
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
-          <p className="mb-2 font-semibold text-gray-900">
+        <div className="rounded-card border border-border bg-surface p-6 text-body text-ink-secondary">
+          <p className="mb-2 font-semibold text-ink">
             Your admin access has been suspended.
           </p>
           <p>
@@ -167,8 +167,8 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
     return (
       <div>
         <PageHeader title="Not this account" />
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
-          <p className="mb-2 font-semibold text-gray-900">
+        <div className="rounded-card border border-border bg-surface p-6 text-body text-ink-secondary">
+          <p className="mb-2 font-semibold text-ink">
             This page shows a single business.
           </p>
           <p>
@@ -176,7 +176,7 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
             cross-tenant lives on{" "}
             <a
               href="/platform"
-              className="font-medium text-sky-600 hover:underline"
+              className="font-medium text-primary hover:underline"
             >
               Platform
             </a>
@@ -191,8 +191,8 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
     return (
       <div>
         <PageHeader title="Not in your role" />
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
-          <p className="mb-2 font-semibold text-gray-900">
+        <div className="rounded-card border border-border bg-surface p-6 text-body text-ink-secondary">
+          <p className="mb-2 font-semibold text-ink">
             Your role doesn&apos;t include this page.
           </p>
           <p>
@@ -209,7 +209,7 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
       <>
         <div
           role="status"
-          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800"
+          className="mb-4 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-2 text-body text-status-warning-text"
         >
           View only — your role can&apos;t change this.
         </div>

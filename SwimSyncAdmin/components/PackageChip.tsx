@@ -29,7 +29,7 @@ export function PackageChip({
   if (coverage.coverage === "ad_hoc") {
     return (
       <span
-        className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500"
+        className="inline-flex items-center rounded-tag border border-status-neutral-border bg-status-neutral-bg px-1.5 py-0.5 text-label font-medium text-status-neutral-text"
         title={
           title ??
           "Billed per lesson by invoice — no prepaid package covers this child's class"
@@ -44,7 +44,7 @@ export function PackageChip({
   const label = coverage.coverage === "mixed" ? "Mixed" : "Package";
   return (
     <span
-      className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700"
+      className="inline-flex items-center rounded-tag border border-status-success-border bg-status-success-bg px-1.5 py-0.5 text-label font-medium text-status-success-text"
       title={
         title ??
         (coverage.coverage === "mixed"

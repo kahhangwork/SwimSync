@@ -50,7 +50,7 @@ export function Logo({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center bg-blue-600",
+        "flex shrink-0 items-center justify-center bg-primary",
         box,
         className
       )}

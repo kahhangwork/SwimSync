@@ -16,7 +16,7 @@ describe("PackageChip", () => {
   it('says "Package · N left" for a covered child', () => {
     render(<PackageChip coverage={pkg(8)} />);
     const chip = screen.getByText("Package · 8 left");
-    expect(chip.className).toContain("bg-emerald-100");
+    expect(chip.className).toContain("bg-status-success-bg");
   });
 
   // Explicit BOTH ways: absence of a package is a positive label, never
@@ -26,7 +26,7 @@ describe("PackageChip", () => {
       <PackageChip coverage={{ coverage: "ad_hoc", lessonsRemaining: null }} />
     );
     const chip = screen.getByText("Ad-hoc");
-    expect(chip.className).toContain("bg-gray-100");
+    expect(chip.className).toContain("bg-status-neutral-bg");
   });
 
   it("renders the mixed state (unreachable today, honest if it ever isn't)", () => {
@@ -44,11 +44,12 @@ describe("PackageChip", () => {
   });
 
   // ⚠ RISK 10 — the chip no longer has amber "low" styling (that verdict lives
-  // on the Students columns now). It is always emerald for a covered child.
-  it("is always emerald — no threshold styling remains", () => {
+  // on the Students columns now). It is always the Success tag for a covered
+  // child (emerald until UI restyle Phase 5 put it on the status scale).
+  it("is always Success-toned — no threshold styling remains", () => {
     render(<PackageChip coverage={pkg(1)} />);
     expect(screen.getByText("Package · 1 left").className).toContain(
-      "bg-emerald-100"
+      "bg-status-success-bg"
     );
   });
 });
