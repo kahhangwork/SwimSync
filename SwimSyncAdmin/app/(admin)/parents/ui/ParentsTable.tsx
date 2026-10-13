@@ -1,5 +1,8 @@
 // Parents page — the families table. Owns its own useTableSort.
 
+import { Button } from "@/components/Button";
+import { Tag } from "@/components/ui/Tag";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PackageChip } from "@/components/PackageChip";
@@ -41,23 +44,23 @@ export function ParentsTable(p: Props) {
       <Tbody>
         {p.loading ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={6}>
+            <Td className="text-center text-ink-muted py-8" colSpan={6}>
               Loading…
             </Td>
           </Tr>
         ) : visible.length === 0 ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={6}>
+            <Td className="text-center text-ink-muted py-8" colSpan={6}>
               No families found.
             </Td>
           </Tr>
         ) : (
           visible.map((f) => (
             <Tr key={`${f.parent_id}:${f.tenant_id}`}>
-              <Td className="font-medium text-gray-900">{f.full_name}</Td>
-              <Td className="text-gray-500">
+              <Td className="font-medium text-ink">{f.full_name}</Td>
+              <Td className="text-ink-muted">
                 <div>{f.email}</div>
-                {f.phone && <div className="text-xs">{f.phone}</div>}
+                {f.phone && <div className="text-label">{f.phone}</div>}
               </Td>
               <Td>
                 <StatusBadge status={f.is_active ? "Active" : "Inactive"} />
@@ -72,7 +75,7 @@ export function ParentsTable(p: Props) {
                   }
                 />
               </Td>
-              <Td className="text-gray-500">
+              <Td className="text-ink-muted">
                 {f.children.length === 0 ? (
                   "—"
                 ) : (
@@ -83,24 +86,28 @@ export function ParentsTable(p: Props) {
                         rather than prevented — a trigger enforcing it would
                         undo join-code reactivation. */}
                     {f.is_active && activeChildCount(f) === 0 && (
-                      <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                      <Tag tone="warning" className="ml-2">
                         none active
-                      </span>
+                      </Tag>
                     )}
                   </span>
                 )}
               </Td>
               <Td>
-                <button
-                  onClick={() => p.openModal(f)}
-                  className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
-                    f.is_active
-                      ? "border-red-200 text-red-600 hover:bg-red-50"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  {f.is_active ? "Set inactive" : "Reactivate"}
-                </button>
+                {/* Reactivate is the inactive family's state action, inline; Set
+                    inactive is destructive, so it sits in the row menu (DESIGN.md
+                    → Tables; UI restyle 5.16). Both open the same confirm modal. */}
+                {f.is_active ? (
+                  <RowMenu>
+                    <RowMenuItem destructive onClick={() => p.openModal(f)}>
+                      Set inactive
+                    </RowMenuItem>
+                  </RowMenu>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => p.openModal(f)}>
+                    Reactivate
+                  </Button>
+                )}
               </Td>
             </Tr>
           ))

@@ -25,7 +25,7 @@ export default function ParentsPage() {
     <div>
       <PageHeader
         title="Parents"
-        subtitle={`${p.families.length} families at this business`}
+        subtitle={`${p.families.length} ${p.families.length === 1 ? "family" : "families"} at this business`}
       />
 
       <ParentsToolbar

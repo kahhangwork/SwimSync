@@ -31,20 +31,20 @@ export function FamilyStatusModal(p: Props) {
         <div className="space-y-4">
           {pending.is_active ? (
             <>
-              <p className="text-sm text-gray-600">
+              <p className="text-body text-ink-secondary">
                 They stop appearing in your lists and stop counting toward
                 attendance here. This only affects{" "}
                 <strong>your business</strong> — if they also have a child with
                 another coach, that is untouched.
               </p>
               {activeChildCount(pending) > 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-                  <p className="text-sm font-medium text-amber-900">
+                <div className="rounded-card border border-status-warning-border bg-status-warning-bg p-3 space-y-2">
+                  <p className="text-body font-medium text-status-warning-text">
                     They have {activeChildCount(pending)} active{" "}
                     {activeChildCount(pending) === 1 ? "child" : "children"}{" "}
                     here.
                   </p>
-                  <label className="flex items-start gap-2 text-sm text-amber-900">
+                  <label className="flex items-start gap-2 text-body text-status-warning-text">
                     <input
                       type="radio"
                       className="mt-1"
@@ -60,7 +60,7 @@ export function FamilyStatusModal(p: Props) {
                       inactive too
                     </span>
                   </label>
-                  <label className="flex items-start gap-2 text-sm text-amber-900">
+                  <label className="flex items-start gap-2 text-body text-status-warning-text">
                     <input
                       type="radio"
                       className="mt-1"
@@ -73,14 +73,14 @@ export function FamilyStatusModal(p: Props) {
               )}
             </>
           ) : (
-            <p className="text-sm text-gray-600">
+            <p className="text-body text-ink-secondary">
               They reappear in your lists. Their{" "}
               <strong>children stay inactive</strong> — reactivate and assign
               each one deliberately, so nobody lands on the wrong roster.
             </p>
           )}
 
-          <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <p className="rounded-control border border-border bg-ground px-3 py-2 text-label text-ink-secondary">
             Nothing is deleted. Attendance, invoices and any credit balance are
             kept exactly as they are.
             {pending.is_active && (
@@ -94,7 +94,7 @@ export function FamilyStatusModal(p: Props) {
           </p>
 
           {p.actionError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
               {p.actionError}
             </p>
           )}

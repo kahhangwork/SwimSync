@@ -15,9 +15,9 @@ export function ParentsToolbar(p: Props) {
         placeholder="Search by parent name or email..."
         value={p.search}
         onChange={(e) => p.setSearch(e.target.value)}
-        className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400 w-72"
+        className="rounded-control border border-border-strong bg-surface px-4 py-2.5 text-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary w-72"
       />
-      <label className="flex items-center gap-2 text-sm text-gray-600">
+      <label className="flex items-center gap-2 text-body text-ink-secondary">
         <input
           type="checkbox"
           checked={p.showInactive}
