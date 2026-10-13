@@ -1,7 +1,6 @@
 // Whose lesson this is (shadow / covered), or the plain instruction.
-// Moved VERBATIM from app/(coach)/classes/[id]/attendance.tsx
-// (COACH_ATTENDANCE_REFACTOR_PLAN.md, Stage 6); props destructured on the first line so
-// the JSX is byte-identical (whitespace aside).
+// Moved from app/(coach)/classes/[id]/attendance.tsx
+// (COACH_ATTENDANCE_REFACTOR_PLAN.md, Stage 6); restyled in UI restyle step 2.2.
 import React from "react";
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,19 +14,20 @@ export default function RoleNotice(p: { notice: ReturnType<typeof roleNotice> })
         // Said where the work would have happened, exactly like `blocked`
         // above — and unlike `blocked` the roster still follows it, because
         // seeing who is expected is the whole reason a shadow is here.
-        <View className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+        // Info: waiting on someone else — the main coach records it.
+        <View className="rounded-card border border-status-info-border bg-status-info-bg p-4">
           <View className="flex-row items-center gap-2">
-            <Ionicons name="eye-outline" size={16} color="#6d28d9" />
-            <Text className="text-sm font-bold text-violet-900">
+            <Ionicons name="eye-outline" size={16} color="#1e40af" />
+            <Text className="text-body font-semibold text-status-info-text">
               {notice.title}
             </Text>
           </View>
-          <Text className="text-xs text-violet-800 mt-1 leading-5">
+          <Text className="text-body-secondary text-ink mt-1">
             {notice.detail}
           </Text>
         </View>
       ) : (
-        <Text className="text-sm text-gray-500 mb-1">
+        <Text className="text-body-secondary text-ink-secondary">
           Tap a status for each student
         </Text>
       )}

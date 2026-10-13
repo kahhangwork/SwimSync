@@ -32,7 +32,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, tap, dumpText, sgLabel, installDerivedClock, EXPO } from "./lib.mjs";
+import { launch, loginExpo, tap, dumpText, sgLabel, installDerivedClock, unmarkedOnMarking, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(
@@ -97,7 +97,7 @@ async function openMissingSaturday() {
 await openMissingSaturday();
 let text = await dumpText(coach);
 check(`Attendance opened at ${missingLabel} with both students`, /Ana Tan/.test(text) && /Ben Tan/.test(text));
-check("Both students start unmarked", (text.match(/Not yet marked/g) || []).length === 2);
+check("Both students start unmarked", (await unmarkedOnMarking(coach)) === 2);
 
 // mark the first student's row Present manually
 await tap(coach.getByText("Present").first(), "row Present (Ana)");
@@ -117,14 +117,14 @@ check("Confirm guard fired when a student was already marked", dialogs.length ==
 check("Confirm message names the count and status",
   /change all 2 students to Cancelled — Coach/i.test(dialogs[dialogs.length - 1] ?? ""));
 text = await dumpText(coach);
-check("After confirm, both rows are Cancelled (Coach)", !/Not yet marked/.test(text) && /Reason:/.test(text));
+check("After confirm, both rows are Cancelled (Coach)", (await unmarkedOnMarking(coach)) === 0 && /Reason:/.test(text));
 
 // ── 2. No-confirm path: fresh screen, one tap, no dialog ─────────────────────
 // Navigate away WITHOUT saving, so 11 Jul reloads clean from the DB.
 await openMissingSaturday();
 text = await dumpText(coach);
 check("Reopened 11 Jul is fresh again (nothing was saved)",
-  (text.match(/Not yet marked/g) || []).length === 2);
+  (await unmarkedOnMarking(coach)) === 2);
 
 const beforeNoConfirm = dialogs.length;
 await tap(coach.getByText("Set all").first(), "Set all button");
@@ -134,7 +134,7 @@ await coach.waitForTimeout(700);
 check("No confirm dialog on an all-unmarked screen", dialogs.length === beforeNoConfirm);
 text = await dumpText(coach);
 check("One tap set every student to Cancelled (Rain)",
-  !/Not yet marked/.test(text) && /Reason:/.test(text));
+  (await unmarkedOnMarking(coach)) === 0 && /Reason:/.test(text));
 await coach.screenshot({ path: shot("setall-cancelled-rain.png"), fullPage: true });
 
 // ── 3. Save persists, and 11 Jul drops out of the unmarked backlog ───────────

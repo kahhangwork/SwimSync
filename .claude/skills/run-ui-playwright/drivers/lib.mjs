@@ -336,6 +336,24 @@ export async function visibleText(page) {
 }
 
 /**
+ * How many cards on the coach's marking screen still carry the "Not marked" tag.
+ *
+ * ⚠ SCOPED TO THE MARKING ROSTER (`data-testid="mark-attendance-roster"`), AND IT
+ * HAS TO BE. Since UI restyle step 2.2 the card's tag says "Not marked" — the same
+ * words as the Schedule tab's NEEDS MARKING chip (`progressLabel`), and that tab
+ * stays MOUNTED under the marking screen (§7.98), so a page-wide count reads one
+ * too many. No visibility filter beyond layout: a deep-linked marking screen sits
+ * inside an `aria-hidden` subtree yet is the screen under test (see pressByText).
+ */
+export async function unmarkedOnMarking(page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="mark-attendance-roster"] *')].filter(
+      (e) => e.children.length === 0 && e.textContent.trim() === "Not marked" && e.getClientRects().length > 0
+    ).length
+  );
+}
+
+/**
  * Press an RN-web Pressable by its exact label text.
  *
  * `click({force:true})` is not enough (§7.58): the screen you navigated away

@@ -8,7 +8,7 @@ describe("statusTone", () => {
   it.each([
     ["Paid", "success"], ["Present", "success"], ["Assigned", "success"], ["Closed", "success"],
     ["Claimed", "info"], ["Pending", "info"], ["Reserved", "info"],
-    ["Outstanding", "warning"], ["Unassigned", "warning"],
+    ["Outstanding", "warning"], ["Unassigned", "warning"], ["Not marked", "warning"],
     ["Overdue", "danger"],
     ["Absent", "neutral"], ["Inactive", "neutral"], ["Expired", "neutral"],
   ] as const)("%s → %s", (word, tone) => {
@@ -118,8 +118,8 @@ describe("every rendered status word has a decided tone", () => {
     ...badgeLiterals(),
     // Billing months (BillingMonthsCard passes its own tone, but the word still has one).
     "Closed", "Open", "Not billed yet", "Not run yet", "Nothing to bill",
-    // The parent app's attendance dash.
-    "Not Marked",
+    // The parent app's attendance dash, and the coach marking card's tag (UI restyle 2.2).
+    "Not Marked", "Not marked",
   ]);
 
   it.each([...words].sort())("%s", (w) => {

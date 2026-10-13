@@ -55,7 +55,7 @@
 // shadowing notice ABOVE a Save button — the notice alone would not have caught it.
 
 import { execFileSync } from "node:child_process";
-import { launch, loginExpo, pressByText, visibleText, installDerivedClock, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, pressByText, visibleText, installDerivedClock, unmarkedOnMarking, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API_URL = "http://127.0.0.1:54321";
@@ -286,8 +286,8 @@ try {
   // ── 3. The FIRST save of a lesson with no session row ─────────────────────
   check("PRECONDITION: the Fresh class has no lesson_sessions row", sql(freshSessionsQ) === "", sql(freshSessionsQ));
   t = await openMarking(page, FRESH, null, "CoachMark Freshkid");
-  check("the Fresh screen shows Freshkid unmarked ('Not yet marked')",
-    /CoachMark Freshkid/.test(t) && /Not yet marked/.test(t) && /CoachMark Fresh · /.test(t));
+  check("the Fresh screen shows Freshkid unmarked (the 'Not marked' tag)",
+    /CoachMark Freshkid/.test(t) && (await unmarkedOnMarking(page)) >= 1 && /CoachMark Fresh · /.test(t));
   const n2 = cnRequests.length;
   const pressedFresh = await pressInCard(page, "CoachMark Freshkid", "Present");
   if (pressedFresh !== "ok") throw new Error(`Present for Freshkid: ${pressedFresh}`);

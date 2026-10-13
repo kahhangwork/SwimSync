@@ -1,11 +1,19 @@
-// One card per student: name, kind chip, status buttons, sub-type pickers.
-// Moved VERBATIM from app/(coach)/classes/[id]/attendance.tsx
-// (COACH_ATTENDANCE_REFACTOR_PLAN.md, Stage 6); props destructured on the first line so
-// the JSX is byte-identical (whitespace aside).
+// One card per student: name, kind, the card's tag, status buttons, sub-type pickers.
+// Moved from app/(coach)/classes/[id]/attendance.tsx (COACH_ATTENDANCE_REFACTOR_PLAN.md,
+// Stage 6); restyled to DESIGN.md in UI restyle step 2.2 — what each press reports is
+// unchanged.
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
+import { Surface } from "@/components/ui/Surface";
+import { Tag } from "@/components/ui/Tag";
+import { statusTone } from "@/lib/statusTone";
 import type { AttState, StudentRow, TopStatus } from "../types";
-import { TOP_STATUSES } from "../constants";
+import { SEGMENT_BOX, SEGMENT_LABEL, TOP_STATUSES } from "../constants";
+
+/** A sub-type choice (Rain/Coach, Paid/Free): the Selected fill when chosen. */
+const SUB_BOX = "min-h-11 px-4 rounded-control border items-center justify-center";
+const SUB_CHOSEN = `${SUB_BOX} bg-selected border-ink`;
+const SUB_IDLE = `${SUB_BOX} bg-surface border-border-strong`;
 
 export default function StudentMarkList(p: {
   students: StudentRow[];
@@ -18,9 +26,9 @@ export default function StudentMarkList(p: {
   return (
     <>
       {students.length === 0 ? (
-        <View className="bg-white rounded-2xl p-6 items-center border border-gray-100">
-          <Text className="text-gray-400 text-sm">No students enrolled</Text>
-        </View>
+        <Surface className="items-center">
+          <Text className="text-body text-ink-secondary">No students enrolled</Text>
+        </Surface>
       ) : (
         students.map((student) => {
           const state = attendance[student.id] ?? {
@@ -28,73 +36,46 @@ export default function StudentMarkList(p: {
             sub: null,
           };
           return (
-            <View
-              key={student.id}
-              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
-            >
-              {/* Student name */}
-              <View className="flex-row items-center gap-3 mb-3">
-                <View className="w-9 h-9 rounded-full bg-sky-100 items-center justify-center">
-                  <Text className="text-sky-600 font-bold text-sm">
-                    {student.full_name.charAt(0)}
+            <Surface key={student.id}>
+              {/* Name, kind, and the card's one tag (top-right). The tag says
+                  what still needs doing — "Not marked" — never the chosen
+                  word: a second "Present" leaf on the card would be pressed by
+                  the drivers' index-based pressByText in place of the next
+                  child's button. The chosen word shows on its own button. */}
+              <View className="flex-row items-start gap-2 mb-3">
+                <View className="flex-1">
+                  <Text className="text-body font-semibold text-ink">
+                    {student.full_name}
                   </Text>
-                </View>
-                <Text className="text-sm font-semibold text-gray-800">
-                  {student.full_name}
-                </Text>
-                {student.attendedOnly && (
-                  // Not a weekly regular — say which kind. A TRIAL is
-                  // someone the coach is meeting for the first time and the
-                  // status they pick decides what the family is charged; a
-                  // MAKE-UP is an enrolled child guesting from another class
-                  // for this one lesson.
-                  <View
-                    className={`px-2 py-0.5 rounded-full ${
-                      student.isTrial
-                        ? "bg-sky-100"
-                        : student.isMakeup
-                          ? "bg-emerald-100"
-                          : "bg-amber-100"
-                    }`}
-                  >
-                    <Text
-                      className={`text-[10px] font-semibold ${
-                        student.isTrial
-                          ? "text-sky-700"
-                          : student.isMakeup
-                            ? "text-emerald-700"
-                            : "text-amber-700"
-                      }`}
-                    >
+                  {student.attendedOnly && (
+                    // Not a weekly regular — say which kind. A TRIAL is
+                    // someone the coach is meeting for the first time and the
+                    // status they pick decides what the family is charged; a
+                    // MAKE-UP is an enrolled child guesting from another class
+                    // for this one lesson.
+                    <Text className="text-body-secondary text-ink-secondary">
                       {student.isTrial
                         ? "Trial"
                         : student.isMakeup
                           ? "Make-up"
                           : "Not enrolled"}
                     </Text>
-                  </View>
+                  )}
+                </View>
+                {state.top === "unmarked" && (
+                  <Tag label="Not marked" tone={statusTone("Not marked")} />
+                )}
+                {state.top === "holiday" && (
+                  <Tag label="Public Holiday" tone={statusTone("Public Holiday")} />
                 )}
               </View>
-
-              {/* Unmarked indicator */}
-              {state.top === "unmarked" && (
-                <View className="flex-row items-center gap-1.5 mb-2">
-                  <View className="w-2 h-2 rounded-full bg-gray-300" />
-                  <Text className="text-xs text-gray-400 font-medium">
-                    Not yet marked
-                  </Text>
-                </View>
-              )}
 
               {/* Public-holiday void — read-only. Set by the admin; a coach
                   cannot change it (the DB guard refuses), so no buttons show. */}
               {state.top === "holiday" && (
-                <View className="flex-row items-center gap-1.5 mb-1">
-                  <View className="w-2 h-2 rounded-full bg-purple-400" />
-                  <Text className="text-xs text-purple-500 font-medium">
-                    Public holiday — no charge
-                  </Text>
-                </View>
+                <Text className="text-body-secondary text-ink-secondary">
+                  Public holiday — no charge
+                </Text>
               )}
 
               {/* Top-level status buttons. A make-up guest gets the ordinary
@@ -106,24 +87,22 @@ export default function StudentMarkList(p: {
               <View className="flex-row gap-2">
                 {TOP_STATUSES.filter(
                   ({ key }) => !(student.isMakeup && key === "trial")
-                ).map(({ key, label, ring, bg }) => {
+                ).map(({ key, label }) => {
                   const isSelected = state.top === key;
+                  const tone = statusTone(label);
                   return (
                     <TouchableOpacity
                       key={key}
                       disabled={readOnly}
                       onPress={() => setTop(student.id, key)}
-                      className={`flex-1 py-2 rounded-xl border-2 items-center ${
-                        isSelected
-                          ? `${ring} ${bg}`
-                          : "border-gray-200 bg-gray-50"
-                      } ${readOnly && !isSelected ? "opacity-50" : ""}`}
+                      accessibilityState={{ selected: isSelected, disabled: readOnly }}
+                      className={`${SEGMENT_BOX[isSelected ? tone : "idle"]} ${
+                        readOnly && !isSelected ? "opacity-50" : ""
+                      }`}
                     >
-                      <Text
-                        className={`text-xs font-semibold ${
-                          isSelected ? "text-white" : "text-gray-500"
-                        }`}
-                      >
+                      {/* The word is the touchable's DIRECT child — pressByText
+                          dispatches on the matched leaf's parent (§7.365). */}
+                      <Text className={SEGMENT_LABEL[isSelected ? tone : "idle"]}>
                         {label}
                       </Text>
                     </TouchableOpacity>
@@ -135,7 +114,7 @@ export default function StudentMarkList(p: {
               {/* Cancelled sub-type */}
               {state.top === "cancelled" && (
                 <View className="mt-3 flex-row gap-2 items-center">
-                  <Text className="text-xs text-gray-500 mr-1">Reason:</Text>
+                  <Text className="text-body-secondary text-ink-secondary mr-1">Reason:</Text>
                   {[
                     { key: "rain", label: "Rain" },
                     { key: "coach", label: "Coach" },
@@ -144,16 +123,15 @@ export default function StudentMarkList(p: {
                       key={key}
                       disabled={readOnly}
                       onPress={() => setSub(student.id, key)}
-                      className={`px-4 py-1.5 rounded-full border ${
-                        state.sub === key
-                          ? "bg-orange-500 border-orange-500"
-                          : "bg-white border-gray-300"
-                      }`}
+                      accessibilityState={{ selected: state.sub === key, disabled: readOnly }}
+                      className={state.sub === key ? SUB_CHOSEN : SUB_IDLE}
                     >
                       <Text
-                        className={`text-xs font-semibold ${
-                          state.sub === key ? "text-white" : "text-gray-600"
-                        }`}
+                        className={
+                          state.sub === key
+                            ? "text-body font-semibold text-ink"
+                            : "text-body font-medium text-ink-secondary"
+                        }
                       >
                         {label}
                       </Text>
@@ -165,7 +143,7 @@ export default function StudentMarkList(p: {
               {/* Trial sub-type */}
               {state.top === "trial" && (
                 <View className="mt-3 flex-row gap-2 items-center">
-                  <Text className="text-xs text-gray-500 mr-1">Trial type:</Text>
+                  <Text className="text-body-secondary text-ink-secondary mr-1">Trial type:</Text>
                   {[
                     { key: "paid", label: "Paid" },
                     { key: "free", label: "Free" },
@@ -174,16 +152,15 @@ export default function StudentMarkList(p: {
                       key={key}
                       disabled={readOnly}
                       onPress={() => setSub(student.id, key)}
-                      className={`px-4 py-1.5 rounded-full border ${
-                        state.sub === key
-                          ? "bg-blue-500 border-blue-500"
-                          : "bg-white border-gray-300"
-                      }`}
+                      accessibilityState={{ selected: state.sub === key, disabled: readOnly }}
+                      className={state.sub === key ? SUB_CHOSEN : SUB_IDLE}
                     >
                       <Text
-                        className={`text-xs font-semibold ${
-                          state.sub === key ? "text-white" : "text-gray-600"
-                        }`}
+                        className={
+                          state.sub === key
+                            ? "text-body font-semibold text-ink"
+                            : "text-body font-medium text-ink-secondary"
+                        }
                       >
                         {label}
                       </Text>
@@ -191,7 +168,7 @@ export default function StudentMarkList(p: {
                   ))}
                 </View>
               )}
-            </View>
+            </Surface>
           );
         })
       )}

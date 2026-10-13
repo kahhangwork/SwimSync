@@ -1,67 +1,49 @@
-// AttendanceHeader — title, lesson line, and the "Set all" toggle. Pinned: the
-// bulk toggle exists only when there is someone to mark AND the view is
-// editable. A read-only (sealed/past) lesson offering "Set all" would invite a
-// whole-class rewrite of an already-billed lesson.
+// AttendanceHeader — title and lesson line. Pinned: a read-only lesson is titled
+// "Lesson Attendance", an editable one "Mark Attendance" (verify-coach-marking reads
+// the title as a whole line). "Set all" moved to AttendanceActions in UI restyle
+// step 2.2 — its tests moved with it.
 //
 // MUTATION PROOFS (§7.25) — each applied to AttendanceHeader.tsx, run, reverted,
 // `git diff --exit-code` clean after:
-//   1. `students.length > 0 && !readOnly &&` → `students.length > 0 &&`
-//      → RED: "read-only hides Set all and says 'Lesson Attendance'"
-//   2. `setMenuOpen((v) => !v)` → `setMenuOpen(() => true)`
-//      → RED: "Set all toggles the menu"
+//   1. `readOnly ? "Lesson Attendance" : "Mark Attendance"` → `"Mark Attendance"`
+//      → RED: "read-only says 'Lesson Attendance'"
+//   2. `onPress={() => leaveScreen()}` → `onPress={() => {}}`
+//      → RED: "the back chevron leaves the screen"
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react-native";
 import AttendanceHeader from "./AttendanceHeader";
-import type { StudentRow } from "../types";
 
 jest.mock("@expo/vector-icons", () => {
   const { Text } = jest.requireActual("react-native");
   return { Ionicons: (p: { name: string }) => <Text>{`icon:${p.name}`}</Text> };
 });
 
-const KIDS: StudentRow[] = [{ id: "s1", full_name: "Anna Tan" }];
-
-function renderHeader(over: Partial<{ readOnly: boolean; students: StudentRow[] }> = {}) {
-  const setMenuOpen = jest.fn();
+function renderHeader(over: Partial<{ readOnly: boolean }> = {}) {
   const leaveScreen = jest.fn();
   render(
     <AttendanceHeader
       readOnly={over.readOnly ?? false}
       classTitle="Tadpoles"
       date="2026-09-21"
-      students={over.students ?? KIDS}
-      menuOpen={false}
-      setMenuOpen={setMenuOpen}
       leaveScreen={leaveScreen}
     />
   );
-  return { setMenuOpen, leaveScreen };
+  return { leaveScreen };
 }
 
 describe("AttendanceHeader", () => {
-  it("an editable lesson with students offers Set all", () => {
+  it("an editable lesson says 'Mark Attendance' and names the lesson", () => {
     renderHeader();
     expect(screen.getByText("Mark Attendance")).toBeTruthy();
-    expect(screen.getByText("Set all")).toBeTruthy();
+    expect(screen.getByText(/^Tadpoles · /)).toBeTruthy();
+    // Set all is no longer up here — it is in the bottom action area.
+    expect(screen.queryByText("Set all")).toBeNull();
   });
 
-  it("read-only hides Set all and says 'Lesson Attendance'", () => {
+  it("read-only says 'Lesson Attendance'", () => {
     renderHeader({ readOnly: true });
     expect(screen.getByText("Lesson Attendance")).toBeTruthy();
-    expect(screen.queryByText("Set all")).toBeNull();
-  });
-
-  it("no students → no Set all", () => {
-    renderHeader({ students: [] });
-    expect(screen.queryByText("Set all")).toBeNull();
-  });
-
-  it("Set all toggles the menu", () => {
-    const { setMenuOpen } = renderHeader();
-    fireEvent.press(screen.getByText("Set all"));
-    const updater = setMenuOpen.mock.calls[0][0] as (v: boolean) => boolean;
-    expect(updater(false)).toBe(true);
-    expect(updater(true)).toBe(false);
+    expect(screen.queryByText("Mark Attendance")).toBeNull();
   });
 
   it("the back chevron leaves the screen", () => {

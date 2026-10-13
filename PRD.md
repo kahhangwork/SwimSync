@@ -1404,7 +1404,9 @@ session id — the row may not exist yet). There the admin:
 #### Bulk "Set all to…" *(implemented)*
 
 The most common whole-class case — a lesson rained off, or everyone present — is a one-tap
-**"Set all ▾"** menu in the Mark Attendance header. It sets every enrolled student to a
+**"Set all"** menu in the Mark Attendance screen's bottom action area, beside Save (moved
+there from the header in UI restyle step 2.2, within a thumb's reach; the menu opens upward).
+It sets every enrolled student to a
 single status at once (Present, Absent, Cancelled — Rain, or Cancelled — Coach), which the
 coach then adjusts individually. It **overwrites** all students — **except a public-holiday
 void, which it leaves exactly as it is** (admin-owned and read-only to a coach; fixed
@@ -3664,7 +3666,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Today's Classes** | List of today's classes with student count; quick-action buttons | Default landing screen; highlight current/next class. *(implemented — each card also carries its **attendance state** and a breakdown of what was recorded, §7.6, and names **guests separately** from students: "4 students + 1 guest", §7.20)* |
 | **My Classes** | Every class the coach teaches, **grouped by weekday with today first** | *(implemented 2026-08-02)* The tab's landing screen. It always opens here: the attendance screen lives in this tab's stack but is pushed from Today, and a leftover one used to be what the coach saw instead (§7.80) |
 | **Class Roster** | Student list for selected class; attendance status per student | Tap student row to mark/edit attendance |
-| **Mark Attendance** | Status picker per student: Present, Absent, Cancelled, Trial | Minimal taps; if Trial, sub-prompt for Paid/Free; **"Set all ▾"** header shortcut to set every student at once (§7.6); batch save |
+| **Mark Attendance** | Status picker per student: Present, Absent, Cancelled, Trial | Minimal taps; if Trial, sub-prompt for Paid/Free; **"Set all"** shortcut beside Save in the bottom action area to set every student at once (§7.6); an unmarked student carries a **"Not marked"** Warning tag; batch save |
 | **Edit Past Attendance** | Calendar/date picker; select lesson; edit status | Warning shown if lesson already invoiced; confirm triggers credit note |
 | **My Pay** | The coach's own `coach_payouts` — period, amount, draft vs paid | *(implemented 2026-08-02 — replaced the Invoices/Credit Notes screens, §7.9)* **Hidden entirely when the coach has no payouts**, which is the finished state for a private coach (§7.13), not missing setup. Only ever their own; a colleague's pay is not inferable |
 | ~~Invoices~~ / ~~Credit Notes~~ | — | **Removed from the coach app 2026-08-02.** Both live on the admin panel, which is the only surface with the reference, the QR and the reminder queue (§7.9, §7.21) |

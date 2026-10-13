@@ -4,7 +4,7 @@
 //
 //   neutral  nothing to do yet          (Absent, Inactive, Not run yet)
 //   info     waiting on someone else    (Claimed, Pending, Reserved)
-//   warning  needs doing soon           (Outstanding — i.e. Due, Unassigned)
+//   warning  needs doing soon           (Outstanding — i.e. Due, Unassigned, Not marked)
 //   danger   stuck or overdue           (Overdue, Failed)
 //   success  done                       (Paid, Present, Closed)
 //
@@ -49,6 +49,10 @@ const TONES: Record<string, StatusTone> = {
   Unassigned: "warning",
   "Not billed yet": "warning",
   Open: "warning",
+  // The coach's marking card before a status is chosen (UI restyle 2.2). Its own
+  // key, apart from the parent attendance dash's "Not Marked" (neutral, shown as
+  // "–"): on the coach's screen it is the job still to do.
+  "Not marked": "warning",
   // danger — stuck or overdue
   Overdue: "danger",
   Failed: "danger",

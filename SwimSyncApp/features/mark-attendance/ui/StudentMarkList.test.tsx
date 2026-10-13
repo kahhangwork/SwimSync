@@ -3,7 +3,8 @@
 // row, and the row's status IS the charge (present/absent bill, cancelled_* and
 // trial_free do not, trial_paid bills at the trial rate). So what is pinned:
 //   • each press reports the RIGHT child and the RIGHT status/sub-type;
-//   • the current mark is visible (selected = white label; unmarked says so);
+//   • the current mark is visible (selected = its status tone; unmarked = a
+//     "Not marked" Warning tag);
 //   • a make-up guest cannot be marked Trial (that would price it at the trial
 //     rate — the engine prices a mismark at the class rate, this is the
 //     affordance);
@@ -22,8 +23,10 @@
 //      → RED: "read-only disables every status and sub-type press"
 //   5. Trial sub-type `setSub(student.id, key)` → `setSub(student.id, "paid")`
 //      → RED: "the trial sub-type reports paid vs free …"
-//   6. `isSelected ? "text-white"` → `isSelected ? "text-gray-500"`
+//   6. `SEGMENT_LABEL[isSelected ? tone : "idle"]` → `SEGMENT_LABEL["idle"]`
 //      → RED: "renders each child's current mark"
+//   7. The "Not marked" Tag's `tone={statusTone("Not marked")}` → `tone="neutral"`
+//      → RED: "an unmarked child's tag is Warning"
 import React from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react-native";
 import StudentMarkList from "./StudentMarkList";
@@ -76,9 +79,10 @@ function card(name: string) {
 }
 
 /** Under jest NativeWind does NOT compile className to a style — the class
- *  string arrives on the host element as-is. The selected label is white. */
+ *  string arrives on the host element as-is. A chosen label is in its status
+ *  tone (`text-status-…`); an unchosen one is Ink Secondary. */
 function isSelected(el: ReturnType<typeof screen.getByText>) {
-  return /\btext-white\b/.test(el.props.className ?? "");
+  return /\btext-status-/.test(el.props.className ?? "");
 }
 
 describe("StudentMarkList", () => {
@@ -97,12 +101,17 @@ describe("StudentMarkList", () => {
     });
     const anna = card("Anna Tan");
     const ben = card("Ben Lim");
-    expect(anna.queryByText("Not yet marked")).toBeNull();
-    expect(ben.getByText("Not yet marked")).toBeTruthy();
-    // Selected button's label is white; the others are grey.
+    expect(anna.queryByText("Not marked")).toBeNull();
+    expect(ben.getByText("Not marked")).toBeTruthy();
+    // The chosen button's label is in its tone; the others are not.
     expect(isSelected(anna.getByText("Present"))).toBe(true);
     expect(isSelected(anna.getByText("Absent"))).toBe(false);
     expect(isSelected(ben.getByText("Present"))).toBe(false);
+  });
+
+  it("an unmarked child's tag is Warning (DESIGN.md: Not marked = needs doing soon)", () => {
+    renderList({ students: [BEN] });
+    expect(screen.getByText("Not marked").props.className).toContain("text-status-warning-text");
   });
 
   it("pressing a status reports that child and that status", () => {
@@ -146,7 +155,7 @@ describe("StudentMarkList", () => {
     expect(card("Mia Ong").queryByText("Trial")).toBeNull();
     expect(card("Mia Ong").getByText("Present")).toBeTruthy();
     expect(card("Anna Tan").getByText("Trial")).toBeTruthy();
-    // The trial child's chip AND its Trial button.
+    // The trial child's kind line AND its Trial button.
     expect(card("Tom Goh").getAllByText("Trial")).toHaveLength(2);
   });
 

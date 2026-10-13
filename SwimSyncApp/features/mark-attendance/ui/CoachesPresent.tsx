@@ -1,10 +1,10 @@
 // The shadows' presence ticks — pre-ticked; a row in session_coach_absences means ABSENT.
-// Moved VERBATIM from app/(coach)/classes/[id]/attendance.tsx
-// (COACH_ATTENDANCE_REFACTOR_PLAN.md, Stage 6); props destructured on the first line so
-// the JSX is byte-identical (whitespace aside).
+// Moved from app/(coach)/classes/[id]/attendance.tsx
+// (COACH_ATTENDANCE_REFACTOR_PLAN.md, Stage 6); restyled in UI restyle step 2.2.
 import React from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
+import { Surface } from "@/components/ui/Surface";
 
 export default function CoachesPresent(p: {
   readOnly: boolean;
@@ -23,11 +23,11 @@ export default function CoachesPresent(p: {
           nowhere; the failure mode of a pre-ticked one is an overpayment,
           which appears as a line on the Wages page and can be seen. */}
       {!readOnly && shadowsHere.length > 0 && (
-        <View className="mt-6 rounded-2xl border border-gray-200 bg-white p-4">
-          <Text className="text-sm font-semibold text-gray-900">
+        <Surface className="mt-2">
+          <Text className="text-headline font-semibold text-ink">
             Coaches present
           </Text>
-          <Text className="mt-0.5 text-xs text-gray-500">
+          <Text className="mt-0.5 text-body-secondary text-ink-secondary">
             Untick anyone who wasn&apos;t here — they won&apos;t be paid for
             this lesson.
           </Text>
@@ -43,17 +43,17 @@ export default function CoachesPresent(p: {
                   )
                 )
               }
-              className="mt-3 flex-row items-center"
+              className="mt-1 min-h-11 flex-row items-center"
             >
               <View
-                className={`h-5 w-5 items-center justify-center rounded border ${
+                className={
                   sh.present
-                    ? "bg-blue-500 border-blue-500"
-                    : "bg-white border-gray-300"
-                }`}
+                    ? "h-5 w-5 items-center justify-center rounded-tag border bg-ink border-ink"
+                    : "h-5 w-5 items-center justify-center rounded-tag border bg-surface border-border-strong"
+                }
               >
                 {sh.present && (
-                  <Text className="text-xs font-bold text-white">✓</Text>
+                  <Text className="text-label font-semibold text-white">✓</Text>
                 )}
               </View>
               {/* ⚠ THE NAME IS ITS OWN LEAF <Text>, DIRECTLY INSIDE THE
@@ -64,16 +64,16 @@ export default function CoachesPresent(p: {
                   leaf at all, so it cannot be pressed by text and the tick
                   becomes untestable. */}
               <Text
-                className={`ml-2.5 text-sm ${
-                  sh.present ? "text-gray-900" : "text-gray-400"
-                }`}
+                className={
+                  sh.present ? "ml-2.5 text-body text-ink" : "ml-2.5 text-body text-ink-muted"
+                }
               >
                 {sh.name}
               </Text>
-              <Text className="ml-1 text-xs text-gray-400">· shadowing</Text>
+              <Text className="ml-1 text-label text-ink-muted">· shadowing</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </Surface>
       )}
     </>
   );

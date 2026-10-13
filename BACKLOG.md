@@ -1652,7 +1652,8 @@ visible text, so keep words unless the item changes them on purpose):**
 - Child form: Date of Birth is free text (`YYYY-MM-DD`); Edit Child pre-selects "Male" where the profile shows "—";
   placeholders that look like values ("Emma Tan").
 - Bad public-invoice token is a dead end (no way forward). Calendar legend ~11px, red for "(Sub)", shape-only signal.
-- Mark Attendance: *Set all* top-right out of thumb reach; tab bar highlights Classes when arrived from Schedule.
+- Mark Attendance: tab bar highlights Classes when arrived from Schedule. (*Set all* out of thumb reach — fixed in UI
+  restyle 2.2: it sits beside Save in a bottom action area.)
 
 **Captured 2026-10-13 (UI restyle step 1.5)** — the six screens the first audit could not reach, all reached with edge
 functions served and real tokens. Fold-ins from them:

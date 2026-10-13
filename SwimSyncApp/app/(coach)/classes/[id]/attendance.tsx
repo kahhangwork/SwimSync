@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import { SafeAreaView, ScrollView } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import PrimaryButton from "@/components/PrimaryButton";
 import { useAttendanceLoad } from "@/features/mark-attendance/domain/useAttendanceLoad";
 import { useSaveAttendance } from "@/features/mark-attendance/domain/useSaveAttendance";
 import { useMarking } from "@/features/mark-attendance/domain/useMarking";
@@ -14,6 +13,7 @@ import RoleNotice from "@/features/mark-attendance/ui/RoleNotice";
 import StudentMarkList from "@/features/mark-attendance/ui/StudentMarkList";
 import CoachesPresent from "@/features/mark-attendance/ui/CoachesPresent";
 import SetAllMenu from "@/features/mark-attendance/ui/SetAllMenu";
+import AttendanceActions from "@/features/mark-attendance/ui/AttendanceActions";
 
 export default function MarkAttendanceScreen() {
   const { id } = useLocalSearchParams<{
@@ -116,19 +116,20 @@ export default function MarkAttendanceScreen() {
   const { readOnly, notice } = roleView(role);
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <AttendanceHeader
         readOnly={readOnly}
         classTitle={classTitle}
         date={date}
-        students={students}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
         leaveScreen={leaveScreen}
       />
 
+      {/* testID: the drivers count "Not marked" tags INSIDE the roster —
+          the Schedule tab mounted underneath has its own "Not marked" chips
+          (lib.mjs unmarkedOnMarking). */}
       <ScrollView
-        contentContainerClassName="px-5 pb-10 gap-3"
+        testID="mark-attendance-roster"
+        contentContainerClassName="px-5 pb-6 gap-3"
         showsVerticalScrollIndicator={false}
       >
         <RoleNotice notice={notice} />
@@ -146,18 +147,20 @@ export default function MarkAttendanceScreen() {
           shadowsHere={shadowsHere}
           setShadowsHere={setShadowsHere}
         />
-
-        {/* No save button at all when the lesson is not mine to mark. A
-            disabled one would still read as "this is my job, and it is
-            broken"; its absence plus the notice above says whose job it is. */}
-        {!readOnly && (
-          <PrimaryButton
-            label={saving ? "Saving…" : "Save Attendance"}
-            onPress={handleSave}
-            className="mt-2"
-          />
-        )}
       </ScrollView>
+
+      {/* No action area at all when the lesson is not mine to mark. A
+          disabled Save would still read as "this is my job, and it is
+          broken"; its absence plus the notice above says whose job it is. */}
+      {!readOnly && (
+        <AttendanceActions
+          hasStudents={students.length > 0}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          saving={saving}
+          onSave={handleSave}
+        />
+      )}
 
       {/* Set-all dropdown (rendered last so it stacks above the list) */}
       <SetAllMenu menuOpen={menuOpen} setMenuOpen={setMenuOpen} onSetAll={onSetAll} />

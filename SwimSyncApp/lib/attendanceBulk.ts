@@ -7,16 +7,18 @@ export type BulkOption = {
   label: string; // "Present", "Cancelled — Rain", …
   top: BulkTop;
   sub: "rain" | "coach" | null;
-  dot: string; // tailwind bg for the colour dot (mirrors TOP_STATUSES palette)
+  // No colour here: the menu's dot is features/mark-attendance/constants.ts
+  // BULK_DOT, keyed by `top`. A class string in lib/ is purged — the app's
+  // Tailwind does not scan lib/ (§7.191).
 };
 
 // Trial is deliberately excluded — a whole class of trials never happens, and its
 // paid/free split would need a sub-type prompt. It stays a per-student choice.
 export const SET_ALL_OPTIONS: BulkOption[] = [
-  { label: "Present", top: "present", sub: null, dot: "bg-green-500" },
-  { label: "Absent", top: "absent", sub: null, dot: "bg-gray-400" },
-  { label: "Cancelled — Rain", top: "cancelled", sub: "rain", dot: "bg-orange-500" },
-  { label: "Cancelled — Coach", top: "cancelled", sub: "coach", dot: "bg-orange-500" },
+  { label: "Present", top: "present", sub: null },
+  { label: "Absent", top: "absent", sub: null },
+  { label: "Cancelled — Rain", top: "cancelled", sub: "rain" },
+  { label: "Cancelled — Coach", top: "cancelled", sub: "coach" },
 ];
 
 export type BulkState = { top: BulkTop; sub: "rain" | "coach" | null };

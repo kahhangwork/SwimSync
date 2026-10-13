@@ -94,6 +94,7 @@
 import { execSync } from "node:child_process";
 import {
   launch, loginAdmin, loginExpo, pressByText, gotoAuthed, sgLabel, ADMIN, EXPO, visibleText,
+  unmarkedOnMarking,
 } from "./lib.mjs";
 
 const CLASS_A = "c7000000-0000-0000-0000-00000000000a";
@@ -164,8 +165,9 @@ const LESSON_LABEL = sgLabel(PATTERN_DATE);
   // in this repo that MARKS attendance uses the default 1280×900
   // (verify-bulk-setall.mjs, verify-unmarked-lessons.mjs). On the 420-wide
   // mobile viewport the status buttons render but a press on them does nothing —
-  // measured here: "Not yet marked" stayed at 2 after both a normal and a forced
-  // click, and check 14 failed while checks 12 and 13 passed on the same screen.
+  // measured here: "Not yet marked" (since 2.2 the "Not marked" tag) stayed at 2
+  // after both a normal and a forced click, and check 14 failed while checks 12
+  // and 13 passed on the same screen.
   // A screen that renders is not a screen that can be operated.
   const { browser, ctx, page } = await launch();
 
@@ -431,8 +433,8 @@ const LESSON_LABEL = sgLabel(PATTERN_DATE);
   // ⚠ REACHED BY TAPPING THE BACKLOG ROW, NOT BY A DEEP LINK — and that is a
   // behavioural difference, not a stylistic one. A deep-linked marking screen
   // RENDERS correctly (the roster and the guest are both there) but does not
-  // accept a press on a status button: measured, "Not yet marked" stayed at 2
-  // after both a normal and a forced click. Every driver that marks attendance
+  // accept a press on a status button: measured, "Not yet marked" (since 2.2 the
+  // "Not marked" tag) stayed at 2 after both a normal and a forced click. Every driver that marks attendance
   // in this repo navigates in-app (verify-bulk-setall.mjs), and it is also the
   // real journey — the coach taps the straggler on their Schedule tab.
   // ⚠ pressByText, NOT a Playwright click. RN-web's press handler lives on the
@@ -451,7 +453,7 @@ const LESSON_LABEL = sgLabel(PATTERN_DATE);
     "the engine expects the guest, the block has no override (§8i), no screen says why"
   );
 
-  const unmarkedBefore = (mtext.match(/Not yet marked/g) ?? []).length;
+  const unmarkedBefore = await unmarkedOnMarking(page);
   // ⚠ EVERY STUDENT, NOT ONE. handleSave() refuses the whole save with a toast
   // if ANY student is still unmarked — so marking only the enrolled child left
   // the trial guest blank and wrote ZERO rows, silently on RN-web where
@@ -463,7 +465,7 @@ const LESSON_LABEL = sgLabel(PATTERN_DATE);
   await pressByText(page, "Present", 1);
   // The status has to land in React state before Save reads it.
   await page.waitForTimeout(2500);
-  const stillUnmarked = ((await visibleText(page)).match(/Not yet marked/g) ?? []).length;
+  const stillUnmarked = await unmarkedOnMarking(page);
   check(
     "13b — both the enrolled child and the guest can be given a status",
     stillUnmarked === 0,
@@ -517,7 +519,7 @@ const LESSON_LABEL = sgLabel(PATTERN_DATE);
   await gotoAuthed(page, `${EXPO}/classes/${CLASS_A}/attendance?date=${PATTERN_DATE}`);
   await page.waitForTimeout(6000);
   mtext = await marking();
-  const unmarkedAfter = (mtext.match(/Not yet marked/g) ?? []).length;
+  const unmarkedAfter = await unmarkedOnMarking(page);
   // ⚠ COUNTED, NOT MATCHED. `/Present/.test(...)` was the first version of this
   // check and it is VACUOUS: "Present" is a button LABEL, on screen whether or
   // not anybody is marked, so it passed while zero rows had been written. The

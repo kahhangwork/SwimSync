@@ -1,10 +1,10 @@
 // This date cannot be marked — shown INSTEAD of the roster.
-// Moved VERBATIM from app/(coach)/classes/[id]/attendance.tsx
-// (COACH_ATTENDANCE_REFACTOR_PLAN.md, Stage 6); props destructured on the first line so
-// the JSX is byte-identical (whitespace aside).
+// Moved from app/(coach)/classes/[id]/attendance.tsx (COACH_ATTENDANCE_REFACTOR_PLAN.md,
+// Stage 6); restyled in UI restyle step 2.2.
 import React from "react";
 import { View, Text, TouchableOpacity, SafeAreaView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Button } from "@/components/ui/Button";
 import type { MarkableCheck } from "@/lib/attendanceWindow";
 import { formatDate } from "../domain/attendanceStatus";
 
@@ -16,35 +16,34 @@ export default function BlockedLesson(p: {
 }) {
   const { classTitle, date, blocked, leaveScreen } = p;
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <View className="flex-row items-center px-5 pt-4 pb-3">
-        <TouchableOpacity onPress={() => leaveScreen()} className="mr-3">
-          <Ionicons name="chevron-back" size={24} color="#0ea5e9" />
+        <TouchableOpacity
+          onPress={() => leaveScreen()}
+          accessibilityLabel="Back"
+          className="w-11 h-11 -ml-3 items-center justify-center"
+        >
+          <Ionicons name="chevron-back" size={24} color="#0a0a0a" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-lg font-bold text-gray-900">
+          <Text className="text-display font-semibold text-ink">
             Mark Attendance
           </Text>
-          <Text className="text-xs text-gray-500">
+          <Text className="text-body-secondary text-ink-secondary">
             {classTitle} · {formatDate(date)}
           </Text>
         </View>
       </View>
 
       <View className="flex-1 items-center justify-center px-8">
-        <Ionicons name="lock-closed-outline" size={44} color="#cbd5e1" />
-        <Text className="text-base font-bold text-gray-900 mt-3 text-center">
+        <Ionicons name="lock-closed-outline" size={44} color="#6b6b6b" />
+        <Text className="text-headline font-semibold text-ink mt-3 text-center">
           {blocked.title}
         </Text>
-        <Text className="text-sm text-gray-500 mt-2 text-center leading-5">
+        <Text className="text-body text-ink-secondary mt-2 text-center">
           {blocked.detail}
         </Text>
-        <TouchableOpacity
-          onPress={() => leaveScreen()}
-          className="mt-6 px-5 py-3 rounded-xl bg-sky-500"
-        >
-          <Text className="text-white font-semibold">Back to class</Text>
-        </TouchableOpacity>
+        <Button label="Back to class" onPress={() => leaveScreen()} className="mt-6" />
       </View>
     </SafeAreaView>
   );
