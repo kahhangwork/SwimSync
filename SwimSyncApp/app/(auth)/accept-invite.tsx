@@ -7,7 +7,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import PrimaryButton from "@/components/PrimaryButton";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import Logo from "@/components/Logo";
 import { useAcceptInvite } from "@/features/accept-invite/domain/useAcceptInvite";
 
@@ -26,6 +27,11 @@ import { useAcceptInvite } from "@/features/accept-invite/domain/useAcceptInvite
  * The markup stays here (docs/refactor/BATCH_FGH_PLAN.md, app fence); the state,
  * the invite check and the first-password sequence live in
  * features/accept-invite/domain/useAcceptInvite.
+ *
+ * UI restyle step 4.4 (DESIGN.md): Ground, a flat card, DESIGN.md inputs, the
+ * required mark in Ink Muted (red is for stuck), the error in Danger text. The
+ * placeholders "Sarah Lim" / "9123 4567" are how verify-app-auth finds the
+ * fields, so they stay as written.
  */
 export default function AcceptInviteScreen() {
   const {
@@ -46,8 +52,8 @@ export default function AcceptInviteScreen() {
 
   if (checking) {
     return (
-      <View className="flex-1 bg-sky-50 items-center justify-center">
-        <Text className="text-gray-500">Checking your invite…</Text>
+      <View className="flex-1 bg-ground items-center justify-center">
+        <Text className="text-body text-ink-secondary">Checking your invite…</Text>
       </View>
     );
   }
@@ -55,44 +61,44 @@ export default function AcceptInviteScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-sky-50"
+      className="flex-1 bg-ground"
     >
       <ScrollView
-        contentContainerClassName="flex-grow justify-center px-6 py-12"
+        contentContainerClassName="flex-grow justify-center px-5 py-12 max-w-xl w-full mx-auto"
         keyboardShouldPersistTaps="handled"
       >
         <View className="items-center mb-8">
           <Logo size="md" className="mb-3" />
-          <Text className="text-2xl font-bold text-gray-900">
+          <Text className="text-display font-semibold text-ink">
             Welcome to SwimSync
           </Text>
-          <Text className="text-gray-500 mt-1 text-sm text-center">
+          <Text className="text-body text-ink-secondary mt-1 text-center">
             {childName
               ? `${childName} is already set up. Choose a password to see their attendance and invoices.`
               : "Choose a password to finish setting up your account."}
           </Text>
         </View>
 
-        <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 gap-4">
+        <Surface className="gap-4">
           {/* Asked BEFORE the password, because it is about them rather than
               about security, and because a blank name is what made an invited
               family look like no family at all on the coach's roster. */}
           <View>
-            <Text className="text-sm font-medium text-gray-700 mb-1.5">
-              Your name <Text className="text-red-500">*</Text>
+            <Text className="text-body font-medium text-ink mb-1.5">
+              Your name <Text className="text-ink-muted">*</Text>
             </Text>
             <TextInput
               value={fullName}
               onChangeText={setFullName}
               placeholder="Sarah Lim"
               autoCapitalize="words"
-              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-              placeholderTextColor="#9ca3af"
+              className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+              placeholderTextColor="#6b6b6b"
             />
           </View>
 
           <View>
-            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+            <Text className="text-body font-medium text-ink mb-1.5">
               Phone number
             </Text>
             <TextInput
@@ -100,13 +106,13 @@ export default function AcceptInviteScreen() {
               onChangeText={setPhone}
               placeholder="9123 4567"
               keyboardType="phone-pad"
-              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-              placeholderTextColor="#9ca3af"
+              className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+              placeholderTextColor="#6b6b6b"
             />
           </View>
 
           <View>
-            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+            <Text className="text-body font-medium text-ink mb-1.5">
               Password
             </Text>
             <TextInput
@@ -114,13 +120,13 @@ export default function AcceptInviteScreen() {
               onChangeText={setPassword}
               placeholder="••••••••"
               secureTextEntry
-              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-              placeholderTextColor="#9ca3af"
+              className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+              placeholderTextColor="#6b6b6b"
             />
           </View>
 
           <View>
-            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+            <Text className="text-body font-medium text-ink mb-1.5">
               Confirm Password
             </Text>
             <TextInput
@@ -128,23 +134,23 @@ export default function AcceptInviteScreen() {
               onChangeText={setConfirm}
               placeholder="••••••••"
               secureTextEntry
-              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-              placeholderTextColor="#9ca3af"
+              className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+              placeholderTextColor="#6b6b6b"
             />
           </View>
 
           {error && (
-            <Text className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+            <Text className="text-body text-status-danger-text">
               {error}
             </Text>
           )}
 
-          <PrimaryButton
+          <Button
             label={loading ? "Setting up..." : "Set Password"}
             onPress={handleSetPassword}
-            className="mt-2"
+            className="mt-1"
           />
-        </View>
+        </Surface>
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -9,13 +9,18 @@ import {
   Platform,
 } from "react-native";
 import { router } from "expo-router";
-import PrimaryButton from "@/components/PrimaryButton";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import Logo from "@/components/Logo";
 import { useForgotPassword } from "@/features/forgot-password/domain/useForgotPassword";
 
 // Forgot password (docs/refactor/BATCH_FGH_PLAN.md, app fence): the markup stays
 // here; the send lives in features/forgot-password/domain/useForgotPassword, the
 // redirect target in …/resetRedirectTo.
+//
+// UI restyle step 4.4 (DESIGN.md): Ground, a flat card, DESIGN.md input, the
+// shared Button, the back link a 44px Lane Blue link. Words unchanged; what Send
+// does (and where the email's link points) is useForgotPassword's.
 
 export default function ForgotPasswordScreen() {
   const {
@@ -29,48 +34,48 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-sky-50"
+      className="flex-1 bg-ground"
     >
       <ScrollView
-        contentContainerClassName="flex-grow justify-center px-6 py-12"
+        contentContainerClassName="flex-grow justify-center px-5 py-12 max-w-xl w-full mx-auto"
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
         <TouchableOpacity
           onPress={() => router.replace("/(auth)/login")}
-          className="mb-6"
+          className="min-h-11 justify-center self-start mb-4"
         >
-          <Text className="text-sky-500 text-base">← Back to sign in</Text>
+          <Text className="text-body font-medium text-primary">← Back to sign in</Text>
         </TouchableOpacity>
 
         <View className="items-center mb-8">
           <Logo size="md" className="mb-3" />
-          <Text className="text-2xl font-bold text-gray-900">Reset Password</Text>
-          <Text className="text-gray-500 mt-1 text-sm text-center">
+          <Text className="text-display font-semibold text-ink">Reset Password</Text>
+          <Text className="text-body text-ink-secondary mt-1 text-center">
             Enter your email and we'll send you a link to reset your password
           </Text>
         </View>
 
         {/* Form card */}
-        <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <Surface>
           {sent ? (
             <View>
-              <Text className="text-base font-semibold text-gray-900 mb-2">
+              <Text className="text-headline font-semibold text-ink mb-2">
                 Check your email
               </Text>
-              <Text className="text-sm text-gray-500 mb-6">
+              <Text className="text-body text-ink-secondary mb-5">
                 If an account exists for {email.trim()}, we've sent a link to
                 reset your password. Open it on this device to continue.
               </Text>
-              <PrimaryButton
+              <Button
                 label="Back to Sign In"
                 onPress={() => router.replace("/(auth)/login")}
               />
             </View>
           ) : (
-            <>
-              <View className="mb-6">
-                <Text className="text-sm font-medium text-gray-700 mb-1.5">
+            <View className="gap-4">
+              <View>
+                <Text className="text-body font-medium text-ink mb-1.5">
                   Email
                 </Text>
                 <TextInput
@@ -79,18 +84,18 @@ export default function ForgotPasswordScreen() {
                   placeholder="you@email.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-                  placeholderTextColor="#9ca3af"
+                  className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+                  placeholderTextColor="#6b6b6b"
                 />
               </View>
 
-              <PrimaryButton
+              <Button
                 label={loading ? "Sending..." : "Send Reset Link"}
                 onPress={handleSend}
               />
-            </>
+            </View>
           )}
-        </View>
+        </Surface>
       </ScrollView>
     </KeyboardAvoidingView>
   );
