@@ -2,6 +2,9 @@
 // docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md. Markup verbatim from page.tsx;
 // the sort moved with the header row it drives.
 
+import { Tag } from "@/components/ui/Tag";
+import { Button } from "@/components/Button";
+import { formatSgStamp } from "@/lib/lessonDates";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { StudentCoverage } from "@/lib/packageCoverage";
@@ -54,20 +57,20 @@ export function StudentTable(p: StudentTableProps) {
       <Tbody>
         {p.loading ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={7}>
+            <Td className="text-center text-ink-muted py-8" colSpan={7}>
               Loading…
             </Td>
           </Tr>
         ) : visible.length === 0 ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={7}>
+            <Td className="text-center text-ink-muted py-8" colSpan={7}>
               No students found.
             </Td>
           </Tr>
         ) : (
           visible.map((s) => (
             <Tr key={s.id}>
-              <Td className="font-medium text-gray-900">{s.full_name}</Td>
+              <Td className="font-medium text-ink">{s.full_name}</Td>
               <Td>
                 <LevelSelect
                   student={s}
@@ -76,14 +79,14 @@ export function StudentTable(p: StudentTableProps) {
                   onChange={(levelId) => p.onSetLevel(s, levelId)}
                 />
               </Td>
-              <Td className="text-gray-500">
+              <Td className="text-ink-muted">
                 {isUnclaimed(s) ? (
-                  <span
-                    className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700"
+                  <Tag
+                    tone="warning"
                     title="Added by a coach before this family registered. Their billable lessons cannot be invoiced until the parent has an account."
                   >
                     No parent account
-                  </span>
+                  </Tag>
                 ) : (
                   s.parent_name
                 )}
@@ -95,30 +98,39 @@ export function StudentTable(p: StudentTableProps) {
               {(() => {
                 const cov = p.covMap.get(s.id);
                 const adHoc = !cov || cov.coverage === "ad_hoc";
-                const amber = cov?.low ? "text-amber-700 font-medium" : "text-gray-600";
+                const amber = cov?.low ? "text-status-warning-text font-medium" : "text-ink-secondary";
                 return (
                   <>
-                    <Td className={adHoc ? "text-gray-400" : amber}>
+                    <Td className={adHoc ? "text-ink-muted" : amber}>
                       {adHoc ? "Ad-hoc" : cov?.packageName ?? "Package"}
                     </Td>
-                    <Td className={adHoc ? "text-gray-400" : amber}>
+                    <Td className={adHoc ? "text-ink-muted" : amber}>
                       {adHoc || cov?.lessonsRemaining == null
                         ? "—"
                         : `${cov.lessonsRemaining} left`}
                     </Td>
-                    <Td className="text-gray-500">
-                      {adHoc || !cov?.expiresOn ? "—" : cov.expiresOn}
+                    <Td className="text-ink-muted">
+                      {adHoc || !cov?.expiresOn
+                        ? "—"
+                        : formatSgStamp(cov.expiresOn, { day: "numeric", month: "short", year: "numeric" })}
                     </Td>
                   </>
                 );
               })()}
               <Td>
-                <StatusBadge status={statusLabel(s)} />
+                {/* Tag only what is not routine (BACKLOG fold-in): an Assigned
+                    child is the normal case — a plain word, not a green tag that
+                    says nothing (and said "Assigned" on children with no class). */}
+                {statusLabel(s) === "Assigned" ? (
+                  <span className="text-ink-secondary">Assigned</span>
+                ) : (
+                  <StatusBadge status={statusLabel(s)} />
+                )}
               </Td>
               {/* VIEW-ONLY chips — one per class, showing that a child is in
                   more than one class. Adding a class and ending one both live
                   in the Actions drawer now. */}
-              <Td className="text-gray-500">
+              <Td className="text-ink-muted">
                 {s.classes.length === 0 ? (
                   "—"
                 ) : (
@@ -127,7 +139,7 @@ export function StudentTable(p: StudentTableProps) {
                       <span
                         key={c.id}
                         title={`${c.title}${c.coach_name ? ` · ${c.coach_name}` : ""}`}
-                        className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700"
+                        className="inline-flex items-center rounded-tag border border-border bg-ground px-1.5 py-0.5 text-label text-ink-secondary"
                       >
                         {c.day ? capitalizeDay(c.day) : c.title}
                         {c.start ? ` ${c.start}` : ""}
@@ -136,7 +148,7 @@ export function StudentTable(p: StudentTableProps) {
                   </div>
                 )}
               </Td>
-              <Td className="text-gray-500">
+              <Td className="text-ink-muted">
                 {/* DISTINCT coaches. Two classes with the same coach must not
                     print the name twice. */}
                 {[...new Set(s.classes.map((c) => c.coach_name).filter(Boolean))].join(
@@ -147,13 +159,9 @@ export function StudentTable(p: StudentTableProps) {
                   glance-and-set controls (Level dropdown, class chips + Add
                   class) stay inline in their own columns — Decision 10. */}
               <Td>
-                <button
-                  onClick={() => p.onActions(s)}
-                  disabled={p.busyId === s.id}
-                  className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                >
+                <Button size="sm" variant="outline" onClick={() => p.onActions(s)} disabled={p.busyId === s.id}>
                   Actions
-                </button>
+                </Button>
               </Td>
             </Tr>
           ))

@@ -14,25 +14,25 @@ export function RenameModal({ rename }: { rename: RenameState }) {
       onClose={rename.close}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-body text-ink-secondary">
           Set this child&apos;s name — for example, replacing a coach&apos;s
           placeholder with the full name their parent provided. This changes
           the name shown across SwimSync. Invoices already issued keep the name
           they were billed under.
         </p>
         <label className="block">
-          <span className="text-xs font-semibold text-gray-600">
+          <span className="text-label font-semibold text-ink-secondary">
             Child&apos;s name
           </span>
           <input
             value={rename.renameName}
             onChange={(e) => rename.setRenameName(e.target.value)}
             placeholder="Anya Rahman"
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </label>
         {rename.renameError && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
             {rename.renameError}
           </p>
         )}

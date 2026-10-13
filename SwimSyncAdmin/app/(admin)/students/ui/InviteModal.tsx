@@ -14,14 +14,14 @@ export function InviteModal({ invite }: { invite: InviteState }) {
       onClose={invite.close}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-body text-ink-secondary">
           We&apos;ll email them a link to set a password.{" "}
           {inviting?.full_name} will already be on their account, along with
           the attendance already marked — so the lessons can be invoiced
           normally.
         </p>
         <label className="block">
-          <span className="text-xs font-semibold text-gray-600">
+          <span className="text-label font-semibold text-ink-secondary">
             Parent&apos;s email <span className="font-normal">(optional)</span>
           </span>
           <input
@@ -29,15 +29,15 @@ export function InviteModal({ invite }: { invite: InviteState }) {
             value={inviteEmail}
             onChange={(e) => invite.setInviteEmail(e.target.value)}
             placeholder="parent@example.com"
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </label>
         {inviteResult && (
           <p
-            className={`rounded-lg px-3 py-2 text-xs break-all ${
+            className={`rounded-card px-3 py-2 text-label break-all ${
               inviteSent
-                ? "bg-green-50 text-green-800"
-                : "bg-gray-50 text-gray-700"
+                ? "bg-status-success-bg text-status-success-text"
+                : "bg-ground text-ink-secondary"
             }`}
           >
             {inviteSent ? "✓ " : ""}

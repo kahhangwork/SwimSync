@@ -13,14 +13,14 @@ export function ListNotices(p: {
   return (
     <>
       {p.loadError && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-3 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           Could not load the students: {p.loadError}. The table below is incomplete
           — do not read it as the full list.
         </div>
       )}
 
       {!p.loading && !p.loadError && p.capped && (
-        <p className="mb-3 text-sm text-amber-700">
+        <p className="mb-3 text-body text-status-warning-text">
           Showing the first {ROW_LIMIT} {p.searching ? "matches" : "students"}.{" "}
           {p.searching
             ? "Refine your search to narrow them."

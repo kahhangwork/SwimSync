@@ -39,47 +39,47 @@ export function ActionsDrawer(p: ActionsDrawerProps) {
       {drawerFor && (
         <div className="space-y-6 px-6 py-5">
           <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <h3 className="mb-2 text-label font-semibold uppercase tracking-wide text-ink-muted">
               Parent
             </h3>
             <div className="space-y-2">
               {drawerFor.is_active && isUnclaimed(drawerFor) && (
                 <button
                   onClick={act(p.onInvite)}
-                  className="w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-left text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                  className="w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-left text-body font-semibold text-ink hover:bg-ground disabled:bg-status-neutral-bg disabled:text-ink-muted"
                 >
                   Invite parent
                 </button>
               )}
               <button
                 onClick={act(p.onContact)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="w-full rounded-control border border-border px-3 py-2 text-left text-body font-semibold text-ink-secondary hover:bg-ground"
               >
                 Contact details
               </button>
               {drawerReferral && (drawerReferral.referred || drawerReferral.brought > 0) && (
                 <a
                   href="/referrals"
-                  className="block rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600 hover:bg-gray-100"
+                  className="block rounded-control border border-border bg-ground px-3 py-2 text-label text-ink-secondary hover:bg-selected"
                 >
                   {drawerReferral.referred ? "Referred by a friend" : ""}
                   {drawerReferral.referred && drawerReferral.brought > 0 ? " · " : ""}
                   {drawerReferral.brought > 0
                     ? `Referred ${drawerReferral.brought} ${drawerReferral.brought === 1 ? "friend" : "friends"}`
                     : ""}
-                  <span className="text-sky-600"> → Referrals</span>
+                  <span className="text-primary"> → Referrals</span>
                 </a>
               )}
             </div>
           </div>
           <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <h3 className="mb-2 text-label font-semibold uppercase tracking-wide text-ink-muted">
               Student
             </h3>
             <div className="space-y-2">
               <button
                 onClick={act(p.onRename)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="w-full rounded-control border border-border px-3 py-2 text-left text-body font-semibold text-ink-secondary hover:bg-ground"
               >
                 Rename
               </button>
@@ -90,14 +90,14 @@ export function ActionsDrawer(p: ActionsDrawerProps) {
                   uses. */}
               <button
                 onClick={act(p.onGrade)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="w-full rounded-control border border-border px-3 py-2 text-left text-body font-semibold text-ink-secondary hover:bg-ground"
               >
                 Grade skills
               </button>
               {drawerFor.is_active && (
                 <button
                   onClick={act(p.onInactive)}
-                  className="w-full rounded-lg border border-red-200 px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
+                  className="w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-left text-body font-semibold text-status-danger-text hover:bg-status-danger-bg disabled:bg-status-neutral-bg disabled:text-ink-muted"
                 >
                   Set inactive
                 </button>
@@ -109,29 +109,29 @@ export function ActionsDrawer(p: ActionsDrawerProps) {
               as the inline controls were. */}
           {drawerFor.is_active && (
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <h3 className="mb-2 text-label font-semibold uppercase tracking-wide text-ink-muted">
                 Classes
               </h3>
               <div className="space-y-2">
                 {drawerFor.classes.length === 0 ? (
-                  <p className="text-sm text-gray-400">Not in any class yet.</p>
+                  <p className="text-body text-ink-muted">Not in any class yet.</p>
                 ) : (
                   drawerFor.classes.map((c) => (
                     <div
                       key={c.id}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2"
+                      className="flex items-center justify-between gap-2 rounded-control border border-border px-3 py-2"
                     >
-                      <span className="text-sm text-gray-700">
+                      <span className="text-body text-ink-secondary">
                         {c.day ? capitalizeDay(c.day) : c.title}
                         {c.start ? ` ${c.start}` : ""}
                         {c.coach_name ? (
-                          <span className="text-gray-400"> · {c.coach_name}</span>
+                          <span className="text-ink-muted"> · {c.coach_name}</span>
                         ) : null}
                       </span>
                       <button
                         onClick={act((s) => p.onRemove(s, c))}
                         aria-label={`Remove ${drawerFor.full_name} from ${c.title}`}
-                        className="rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                        className="rounded-control border border-border-strong bg-surface px-2 py-1 text-label font-semibold text-status-danger-text hover:bg-status-danger-bg"
                       >
                         Remove
                       </button>
@@ -140,7 +140,7 @@ export function ActionsDrawer(p: ActionsDrawerProps) {
                 )}
                 <button
                   onClick={act(p.onAddClass)}
-                  className="w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-left text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                  className="w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-left text-body font-semibold text-ink hover:bg-ground disabled:bg-status-neutral-bg disabled:text-ink-muted"
                 >
                   + Add class
                 </button>

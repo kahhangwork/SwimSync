@@ -25,7 +25,7 @@ export function AddStudentModal(p: {
   return (
     <Modal title="Add a student" open={add.addOpen} onClose={add.close}>
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-body text-ink-secondary">
           For a child who is already attending but whose parent hasn&apos;t
           signed up yet. They&apos;ll appear on the coach&apos;s roster
           straight away; invite the parent whenever they&apos;re ready and
@@ -33,22 +33,22 @@ export function AddStudentModal(p: {
         </p>
 
         <label className="block">
-          <span className="text-xs font-semibold text-gray-600">
+          <span className="text-label font-semibold text-ink-secondary">
             Child&apos;s full name
           </span>
           <input
             value={add.addName}
             onChange={(e) => add.setAddName(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </label>
 
         <label className="block">
-          <span className="text-xs font-semibold text-gray-600">Class</span>
+          <span className="text-label font-semibold text-ink-secondary">Class</span>
           <select
             value={add.addClassId}
             onChange={(e) => add.setAddClassId(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
           >
             <option value="">Choose a class…</option>
             {p.classOptions.map((c) => (
@@ -68,51 +68,51 @@ export function AddStudentModal(p: {
         )}
 
         <label className="block">
-          <span className="text-xs font-semibold text-gray-600">
+          <span className="text-label font-semibold text-ink-secondary">
             Date of birth <span className="font-normal">(optional)</span>
           </span>
           <input
             type="date"
             value={add.addDob}
             onChange={(e) => add.setAddDob(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </label>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs font-semibold text-gray-600">
-              Parent&apos;s phone <span className="text-red-500">*</span>
+            <span className="text-label font-semibold text-ink-secondary">
+              Parent&apos;s phone <span className="text-status-danger-text">*</span>
             </span>
             <input
               value={add.addPhone}
               onChange={(e) => add.setAddPhone(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
             />
             {/* Advisory. The phone stays REQUIRED (the Add button below is
                 disabled without one); its shape never gates submit. */}
             <ContactHint check={checkSgPhone(add.addPhone)} />
           </label>
           <label className="block">
-            <span className="text-xs font-semibold text-gray-600">
+            <span className="text-label font-semibold text-ink-secondary">
               Parent&apos;s email <span className="font-normal">(optional)</span>
             </span>
             <input
               type="email"
               value={add.addEmail}
               onChange={(e) => add.setAddEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
             />
             <ContactHint check={checkEmail(add.addEmail)} />
           </label>
         </div>
-        <p className="-mt-1 text-[11px] text-gray-400">
+        <p className="-mt-1 text-label text-ink-muted">
           Both optional, and both save you work later — the email is what the
           invite goes to.
         </p>
 
         {add.addError && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
             {add.addError}
           </p>
         )}
@@ -128,17 +128,17 @@ export function AddStudentModal(p: {
             const Row = (c: RosterCandidate) => (
               <li key={c.student_id}>
                 <span className="font-medium">{c.full_name}</span>{" "}
-                <span className="text-amber-700">— {describeCandidate(c)}</span>
+                <span className="text-status-warning-text">— {describeCandidate(c)}</span>
               </li>
             );
             return (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2 text-label text-status-warning-text">
                 <p className="font-semibold">
                   This may already be on your roster
                 </p>
                 {strong.length > 0 && (
                   <>
-                    <p className="mt-1 text-[11px] text-amber-700">
+                    <p className="mt-1 text-label text-status-warning-text">
                       Same phone number:
                     </p>
                     <ul className="ml-4 list-disc">{strong.map(Row)}</ul>
@@ -146,13 +146,13 @@ export function AddStudentModal(p: {
                 )}
                 {weak.length > 0 && (
                   <>
-                    <p className="mt-1 text-[11px] text-amber-700">
+                    <p className="mt-1 text-label text-status-warning-text">
                       Same name:
                     </p>
                     <ul className="ml-4 list-disc">{weak.map(Row)}</ul>
                   </>
                 )}
-                <p className="mt-2 text-[11px]">
+                <p className="mt-2 text-label">
                   If this is a new child (a sibling can share a phone), add
                   them anyway. If it is the same child, close this and find
                   them on the roster instead.

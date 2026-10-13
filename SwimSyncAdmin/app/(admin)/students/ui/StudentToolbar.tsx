@@ -32,11 +32,11 @@ export function StudentToolbar(p: StudentToolbarProps) {
       {/* Scoped search: the dropdown picks the ONE column the term is pushed
           into, so it reaches the whole table in the DB instead of filtering
           the first 1000 rows in the browser (⚠ RISK 3). */}
-      <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-sky-400">
+      <div className="flex overflow-hidden rounded-control border border-border bg-surface focus-within:ring-2 focus-within:ring-primary">
         <select
           value={p.searchField}
           onChange={(e) => p.onSearchField(e.target.value as SearchField)}
-          className="border-r border-gray-200 bg-gray-50 px-2 py-2.5 text-sm text-gray-600 focus:outline-none"
+          className="border-r border-border-strong bg-ground px-2 py-2.5 text-body text-ink-secondary focus:outline-none"
           aria-label="Search by"
         >
           <option value="student">Student</option>
@@ -47,7 +47,7 @@ export function StudentToolbar(p: StudentToolbarProps) {
           placeholder={p.searchField === "parent" ? "Search parent name…" : "Search student name…"}
           value={p.search}
           onChange={(e) => p.onSearch(e.target.value)}
-          className="w-56 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none"
+          className="w-56 px-4 py-2.5 text-body placeholder:text-ink-muted focus:outline-none"
         />
       </div>
       <div className="flex gap-1.5">
@@ -55,10 +55,10 @@ export function StudentToolbar(p: StudentToolbarProps) {
           <button
             key={f}
             onClick={() => p.onStatusFilter(f)}
-            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+            className={`rounded-control px-3 py-2 text-label font-semibold transition-colors ${
               p.statusFilter === f
-                ? "bg-sky-500 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                ? "bg-selected text-ink border border-border-strong"
+                : "bg-surface border border-border text-ink-secondary hover:bg-ground"
             }`}
           >
             {f}
@@ -72,10 +72,10 @@ export function StudentToolbar(p: StudentToolbarProps) {
         {p.unclaimedCount > 0 && (
           <button
             onClick={p.onToggleUnclaimed}
-            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+            className={`rounded-control px-3 py-2 text-label font-semibold transition-colors ${
               p.unclaimedOnly
-                ? "bg-amber-500 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                ? "bg-selected text-ink border border-border-strong"
+                : "bg-surface border border-border text-ink-secondary hover:bg-ground"
             }`}
             title="Children a coach added before the family registered. Their billable lessons cannot be invoiced, and they hold the billing month open until the parent is invited or the money is recorded as settled."
           >
@@ -84,19 +84,19 @@ export function StudentToolbar(p: StudentToolbarProps) {
         )}
         <button
           onClick={p.onToggleLow}
-          className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+          className={`rounded-control px-3 py-2 text-label font-semibold transition-colors ${
             p.lowOnly
-              ? "bg-amber-500 text-white"
-              : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+              ? "bg-selected text-ink border border-border-strong"
+              : "bg-surface border border-border text-ink-secondary hover:bg-ground"
           }`}
           title="Families whose prepaid package is nearly used up — time to remind them to renew. Counts lessons attended but not yet invoiced."
         >
           Package running low
         </button>
         {p.lowOnly && (
-          <span className="text-xs text-gray-600">
+          <span className="text-label text-ink-secondary">
             at {p.threshold} lessons or fewer, or expiring within {p.expiryDays} days ·{" "}
-            <Link href="/packages" className="font-semibold text-sky-600 hover:underline">
+            <Link href="/packages" className="font-semibold text-primary hover:underline">
               Change on Packages
             </Link>
           </span>

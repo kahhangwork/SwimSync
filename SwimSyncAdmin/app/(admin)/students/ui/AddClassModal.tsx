@@ -24,7 +24,7 @@ export function AddClassModal({ addClass }: { addClass: AddClassState }) {
       {addClassFor && (
         <div className="space-y-4">
           {addClassFor.classes.length > 0 && (
-            <p className="text-sm text-gray-600">
+            <p className="text-body text-ink-secondary">
               Already in{" "}
               <strong>
                 {addClassFor.classes.map((c) => c.title).join(", ")}
@@ -32,12 +32,12 @@ export function AddClassModal({ addClass }: { addClass: AddClassState }) {
               . This adds another — it does not move them.
             </p>
           )}
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-body font-medium text-ink-secondary">
             Class
             <select
               value={addClass.addClassChoice}
               onChange={(e) => addClass.setAddClassChoice(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
             >
               <option value="">Choose a class…</option>
               {addClass.classOptions
@@ -58,13 +58,13 @@ export function AddClassModal({ addClass }: { addClass: AddClassState }) {
               saveLabel="Add class"
             />
           )}
-          <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <p className="rounded-control border border-border bg-ground px-3 py-2 text-label text-ink-secondary">
             An enrolled child is expected at this class <strong>every week</strong>,
             and an unmarked lesson blocks invoicing for the whole business. For a
             one-off visit, book a make-up instead.
           </p>
           {addClass.addClassError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
               {addClass.addClassError}
             </p>
           )}

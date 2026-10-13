@@ -12,14 +12,14 @@ export function MergeModal({ merge }: { merge: MergeState }) {
     <Modal open={merging !== null} onClose={merge.close} title="Merge these two records?">
       {merging && (
         <div className="space-y-4">
-          <div className="rounded-lg border border-gray-200 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <div className="rounded-card border border-border p-3">
+            <p className="text-label font-semibold uppercase tracking-wide text-ink-muted">
               Kept
             </p>
-            <p className="mt-1 font-medium text-gray-900">
+            <p className="mt-1 font-medium text-ink">
               {merging.survivor.full_name}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-body text-ink-muted">
               {merging.survivor.lessons} lesson
               {merging.survivor.lessons === 1 ? "" : "s"} recorded
               {merging.survivor.date_of_birth
@@ -28,14 +28,14 @@ export function MergeModal({ merge }: { merge: MergeState }) {
             </p>
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <div className="rounded-card border border-border p-3">
+            <p className="text-label font-semibold uppercase tracking-wide text-ink-muted">
               Deleted
             </p>
-            <p className="mt-1 font-medium text-gray-900">
+            <p className="mt-1 font-medium text-ink">
               {merging.duplicate.full_name}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-body text-ink-muted">
               {merging.duplicate.lessons} lesson
               {merging.duplicate.lessons === 1 ? "" : "s"} recorded
               {merging.duplicate.date_of_birth
@@ -44,7 +44,7 @@ export function MergeModal({ merge }: { merge: MergeState }) {
             </p>
           </div>
 
-          <p className="text-sm text-gray-600">
+          <p className="text-body text-ink-secondary">
             The parent account, any trial bookings and any settlements move
             across to the record being kept, along with a date of birth or
             gender it is missing. Nothing already recorded on the kept record
@@ -52,14 +52,14 @@ export function MergeModal({ merge }: { merge: MergeState }) {
           </p>
 
           {merging.eitherWay && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <p className="rounded-card bg-status-warning-bg px-3 py-2 text-label text-status-warning-text">
               Neither record has any lessons, so it does not matter much which
               survives — but check the spelling of the name you are keeping.
             </p>
           )}
 
           {merge.mergeError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
               {merge.mergeError}
             </p>
           )}

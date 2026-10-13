@@ -21,7 +21,7 @@ export function StatusChangeModal({ status }: { status: StudentStatusState }) {
       >
         {pending && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-body text-ink-secondary">
               {pending.mode === "inactive"
                 ? "They stop appearing on rosters and stop counting toward attendance. EVERY active class enrolment is closed at the same time."
                 : `They come off this class's roster only. ${
@@ -33,13 +33,13 @@ export function StatusChangeModal({ status }: { status: StudentStatusState }) {
             {/* Siblings are a CHOICE — the admin may be removing one child
                 while the others keep attending. Only shown when there are any. */}
             {pending.mode === "inactive" && siblings.length > 0 && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-                <p className="text-sm font-medium text-amber-900">
+              <div className="rounded-card border border-status-warning-border bg-status-warning-bg p-3 space-y-2">
+                <p className="text-body font-medium text-status-warning-text">
                   {siblings.length === 1
                     ? `${siblings[0].full_name} is also in this family.`
                     : `${siblings.map((c) => c.full_name).join(", ")} are also in this family.`}
                 </p>
-                <label className="flex items-start gap-2 text-sm text-amber-900">
+                <label className="flex items-start gap-2 text-body text-status-warning-text">
                   <input
                     type="radio"
                     className="mt-1"
@@ -53,7 +53,7 @@ export function StatusChangeModal({ status }: { status: StudentStatusState }) {
                       : " — the others keep attending"}
                   </span>
                 </label>
-                <label className="flex items-start gap-2 text-sm text-amber-900">
+                <label className="flex items-start gap-2 text-body text-status-warning-text">
                   <input
                     type="radio"
                     className="mt-1"
@@ -69,7 +69,7 @@ export function StatusChangeModal({ status }: { status: StudentStatusState }) {
                 with no active children here is no longer a customer here. So it
                 is stated, not asked. */}
             {pending.mode === "inactive" && lastActive && (
-              <p className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+              <p className="rounded-control border border-border bg-surface px-3 py-2 text-body text-ink-secondary">
                 That leaves no active children, so{" "}
                 <strong>{pending.student.parent_name}</strong> will be marked
                 inactive at this business too. They can rejoin any time with your
@@ -77,7 +77,7 @@ export function StatusChangeModal({ status }: { status: StudentStatusState }) {
               </p>
             )}
 
-            <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <p className="rounded-control border border-border bg-ground px-3 py-2 text-label text-ink-secondary">
               Attendance and billing history are kept, and lessons they have
               already attended this month will still be invoiced. Any credit
               balance is untouched.
@@ -101,7 +101,7 @@ export function StatusChangeModal({ status }: { status: StudentStatusState }) {
       </Modal>
 
       {status.actionError && (
-        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="mt-3 rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
           {status.actionError}
         </p>
       )}

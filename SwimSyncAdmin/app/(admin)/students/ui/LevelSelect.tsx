@@ -13,12 +13,21 @@ export function LevelSelect(p: {
   saving: boolean;
   onChange: (levelId: string | null) => void;
 }) {
+  // No ladder yet: one muted dash, not a greyed dropdown on every row (BACKLOG
+  // fold-in; UI restyle 5.9). The title says where levels are made.
+  if (p.levels.length === 0) {
+    return (
+      <span className="text-ink-muted" title="No levels defined — add them on the Levels page">
+        —
+      </span>
+    );
+  }
   return (
     <select
       value={p.student.level_id ?? ""}
       onChange={(e) => p.onChange(e.target.value || null)}
       disabled={p.levels.length === 0 || p.saving}
-      className="rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
+      className="h-[1.875rem] rounded-control border border-border-strong bg-surface px-2 text-body text-ink focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-status-neutral-bg disabled:text-ink-muted"
     >
       <option value="">{p.levels.length === 0 ? "No levels defined" : "—"}</option>
       {p.levels.map((l) => (

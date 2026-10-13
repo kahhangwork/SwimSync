@@ -88,7 +88,7 @@ export default function StudentsPage() {
   return (
     <div>
       {grading.levelError && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           {grading.levelError}
         </div>
       )}

@@ -12,8 +12,8 @@ import type { DupPair } from "../domain/duplicateStudents";
 export function DuplicateBanner(p: { pairs: DupPair[]; onReview: (pair: DupPair) => void }) {
   if (p.pairs.length === 0) return null;
   return (
-    <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-      <p className="text-sm font-semibold text-amber-800">
+    <div className="mb-5 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-3">
+      <p className="text-body font-semibold text-status-warning-text">
         {p.pairs.length === 1
           ? "Two records may be the same child"
           : `${p.pairs.length} pairs of records may be the same child`}
@@ -22,9 +22,9 @@ export function DuplicateBanner(p: { pairs: DupPair[]; onReview: (pair: DupPair)
         {p.pairs.map((pair) => (
           <div
             key={`${pair.survivor.id}:${pair.duplicate.id}`}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-control bg-surface px-3 py-2"
           >
-            <p className="text-sm text-gray-700">
+            <p className="text-body text-ink-secondary">
               <span className="font-medium">{pair.survivor.full_name}</span>{" "}
               ({pair.survivor.lessons} lesson
               {pair.survivor.lessons === 1 ? "" : "s"}) and{" "}
@@ -35,7 +35,7 @@ export function DuplicateBanner(p: { pairs: DupPair[]; onReview: (pair: DupPair)
             {pair.needsHuman ? (
               // merge_students() refuses this outright. Say so here rather
               // than offering a button that only produces an error.
-              <span className="text-xs font-medium text-red-700">
+              <span className="text-label font-medium text-status-danger-text">
                 Both have lessons recorded — sort this one out by hand
               </span>
             ) : (

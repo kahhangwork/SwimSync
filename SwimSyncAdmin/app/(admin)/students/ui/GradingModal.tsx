@@ -22,18 +22,18 @@ export function GradingModal(p: { grading: GradingState; tenantId: string | null
       onClose={g.closeGrading}
     >
       {g.gradeError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
           Could not load this child&apos;s skills: {g.gradeError}. Close and try
           again — an empty list here is a failed query, not an ungraded child.
         </div>
       ) : g.gradingFor &&
         !gridVisibleWhileLoading(g.gradeLoading, g.gradeRoster[0]?.id ?? null, g.gradingFor.id) ? (
         // A reload of THIS child keeps the grid (and its messages) mounted.
-        <p className="py-6 text-center text-sm text-gray-400">Loading…</p>
+        <p className="py-6 text-center text-body text-ink-muted">Loading…</p>
       ) : p.tenantId && g.gradingFor ? (
         // Visible but click-proof while it re-reads (see ClassGridSection).
         <div aria-busy={g.gradeLoading} className={`space-y-3${g.gradeLoading ? " pointer-events-none opacity-60" : ""}`}>
-          <p className="text-sm text-gray-600">
+          <p className="text-body text-ink-secondary">
             Click a grade to cycle it. Changes save straight away. Grades from
             before today show greyed with the date they were given.
           </p>
