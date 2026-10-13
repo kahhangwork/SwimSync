@@ -360,8 +360,8 @@ The plan's §3 ledger is the per-step record; the parent-visible changes are in 
   3.6 (DOB picker) and 3.10 (Join / auth); nightly dispatched after the deploy on their word.
 - **Found:** §7.367 hit again (`accessibilityRole="button"` → a `<button>` with no `tabindex`) — promoted to the plan's
   §5 recipe. Review found Cancel on a pending package has no confirmation — filed in BACKLOG, not fixed in a restyle.
-- **Not done:** the plan's prod spot-check for 3.2 (refused: called by ABSOLUTE path, which the allow rule's prefix misses);
-  whether a credit note can be negative (now printed `−S$…`) is unverified; no `/commit-review` per step (one review pass).
+- **Prod-checked after:** 25 invoices, 1–8 lines each, parent-readable (3.2 RISK 13 closed); 0 credit notes on prod
+  (BACKLOG *A credit note's amount has no positivity check*). **Not done:** no `/commit-review` per step (one review pass).
 
 ## 8.150 (2026-10-13, evening) — legacy package matcher removed (Wave 9 item 9), live
 
