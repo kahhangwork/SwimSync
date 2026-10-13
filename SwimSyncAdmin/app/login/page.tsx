@@ -1,8 +1,12 @@
 "use client";
 
+// UI restyle step 4.7 (DESIGN.md): Ground, a flat 8px card, 36px inputs (Border
+// Strong, Lane Blue focus), the shared Button, the error in Danger text. Words,
+// the submit button and what it does are unchanged.
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { Button } from "@/components/ui/Button";
 import { useLogin } from "./domain/useLogin";
 
 export default function LoginPage() {
@@ -11,25 +15,25 @@ export default function LoginPage() {
     useLogin();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-sky-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-ground px-4">
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="flex flex-col items-center mb-8">
           <Logo size="lg" className="mb-3" />
-          <h1 className="text-2xl font-bold text-gray-900">SwimSync Admin</h1>
-          <p className="text-sm text-gray-500 mt-1">Superadmin access only</p>
+          <h1 className="text-display font-semibold text-ink">SwimSync Admin</h1>
+          <p className="text-body text-ink-secondary mt-1">Superadmin access only</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-7">
-          <h2 className="text-lg font-bold text-gray-900 mb-5">Sign In</h2>
+        <div className="bg-surface rounded-card border border-border p-6">
+          <h2 className="text-headline font-semibold text-ink mb-5">Sign In</h2>
 
           <form
             onSubmit={(e) => handleLogin(e, (href) => router.push(href))}
             className="space-y-4"
           >
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-body font-medium text-ink mb-1.5">
                 Email
               </label>
               <input
@@ -38,11 +42,11 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                className="w-full h-9 rounded-control border border-border-strong bg-surface px-3 text-body text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-body font-medium text-ink mb-1.5">
                 Password
               </label>
               <input
@@ -51,27 +55,27 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                className="w-full h-9 rounded-control border border-border-strong bg-surface px-3 text-body text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2"
               />
             </div>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              <p className="text-body text-status-danger-text">
                 {error}
               </p>
             )}
 
-            <button
+            <Button
               type="submit"
               disabled={loading}
-              className="block w-full rounded-xl bg-sky-500 py-2.5 text-center text-sm font-semibold text-white hover:bg-sky-600 transition-colors disabled:opacity-60"
+              className="w-full"
             >
               {loading ? "Signing in…" : "Sign In"}
-            </button>
+            </Button>
 
             <Link
               href="/forgot-password"
-              className="block text-center text-sm text-sky-600 hover:text-sky-700"
+              className="block text-center text-body font-medium text-primary hover:underline underline-offset-2"
             >
               Forgot password?
             </Link>
