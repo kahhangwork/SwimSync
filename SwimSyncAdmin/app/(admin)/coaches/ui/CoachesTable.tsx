@@ -54,7 +54,7 @@ export function CoachesTable(p: Props) {
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-body font-semibold ${
                       coach.disabled_at
                         ? "bg-status-neutral-bg text-ink-muted"
-                        : "bg-status-info-bg text-primary"
+                        : "bg-selected text-ink-secondary"
                     }`}
                   >
                     {coach.full_name.charAt(0)}

@@ -22,7 +22,7 @@
 //   gatecoach@swimsync.test    plain coach — the role gate's persona
 
 import os from "node:os";
-import { launch, loginAdmin, ADMIN, rowAction } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, rowAction, rowActionCount } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => `${SHOT}/admins-${n}`;
@@ -69,7 +69,7 @@ check("both co-admin shapes are listed",
 // Deactivate / Delete sit in each row's "…" menu since UI restyle 5.24 — the
 // levers are the menus, counted, not a word in the page text.
 check("the owner sees the management buttons",
-  body.includes("Invite admin") && (await page.getByRole("button", { name: "More actions" }).count()) > 0);
+  body.includes("Invite admin") && (await rowActionCount(row("adminpure@swimsync.test"), "Deactivate")) === 1);
 await page.screenshot({ path: shot("01-owner-view.png"), fullPage: true });
 
 // ── 2. Invite — locally there is no RESEND key, so the WARNING is the pass ──

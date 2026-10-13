@@ -367,10 +367,15 @@ email to your own address and complete it, and open one live public invoice link
     copy. Check both **signed out and signed in as another parent** (`onPublicRoute` must keep the page).
 
 ### Phase 5 — admin panel (billing first, then operations)
+_2026-10-14 (user): build ALL of Phase 5 on `ui/admin-phase5` (no `/plan-with-confidence` — the plan exists). **Verification:**
+nightly `38430764913` is the before-baseline, each step's must-pass drivers run `--only`, and **ONE full local sweep on the
+finished branch — approved by the user up front**. **Landing: three pushes** — billing (5.0–5.6) → operations (5.7–5.28) →
+platform (5.29 + close-out), each waiting for a green nightly before the next. Added in the build: **5.0** shared chrome
+(Table, PageHeader, Modal, Drawer, legacy Button) and `components/ui/RowMenu.tsx` (the row "…" menu, first used in 5.2)._
 ⚠ RISK 11 MITIGATION (governs all of Phase 5) — screenshots at 1440, 1280, 1152 and 390px. The `main` overflow
 assertion from 1.6 holds on every table screen. Driver geometry is asserted in rem (§7.193). Driver header regexes
 are case-insensitive or read `textContent` (§7.362).
-- [ ] **5.1** Invoices (S4 — Generate disabled with the reason; S10 — move PayNow + auto-generation settings off the Generate card; Pending charges; Billing months) · [ ] **5.2** Credit notes (minus, Ink, one inline action, clipped column) · [ ] **5.3** Packages (one primary per section; Awaiting confirmation → Info) · [ ] **5.4** Wages · [ ] **5.5** Referrals · [ ] **5.6** Accounting.
+- [x] **5.1** Invoices (S4 — Generate disabled with the reason; S10 — move PayNow + auto-generation settings off the Generate card; Pending charges; Billing months) · [x] **5.2** Credit notes (minus, Ink, one inline action, clipped column) · [x] **5.3** Packages (one primary per section; Awaiting confirmation → Info) · [x] **5.4** Wages · [x] **5.5** Referrals · [x] **5.6** Accounting.
   - ⚠ RISK 2 MITIGATION (5.1, S4) — **"Generate disabled with the reason" shows a reason the page already has; it
     never adds a new client-side precondition.** If the existing button is enabled today in a state the server then
     refuses, the restyle keeps it enabled and shows the server's refusal. **Do NOT add a client check that can disable
@@ -382,7 +387,7 @@ are case-insensitive or read `textContent` (§7.362).
   - ⚠ RISK 2 MITIGATION (5.1, S10) — moving the PayNow / auto-generation settings is a **move, not a rewrite**. The
     save handlers and the fields they write stay byte-identical (`git diff -M` shows the handler moved unchanged).
     `--only tenant-branding`, `--only paynow-fallback` green.
-- [ ] **5.7** Lessons (S8 — past unmarked = Danger "Blocks billing"; one count with the sidebar) · [ ] **5.8** Dashboard · [ ] **5.9** Students · [ ] **5.10** Classes · [ ] **5.11** Calendar (remove `border-l-4` side-tabs; legend ≥12px) · [ ] **5.12** Attendance log · [ ] **5.13** Assessment · [ ] **5.14** Unassigned · [ ] **5.15** Parent requests (claims) · [ ] **5.16** Parents · [ ] **5.17** Coaches · [ ] **5.18** Trials · [ ] **5.19** Make-ups · [ ] **5.20** Substitutes · [ ] **5.21** Holidays · [ ] **5.22** Levels · [ ] **5.23** Locations · [ ] **5.24** Admins · [ ] **5.25** Roles · [ ] **5.26** Change history · [ ] **5.27** Lesson detail (`/lessons/[classId]/[date]`) · [ ] **5.28** Assessment class (`/assessment/[classId]`).
+- [x] **5.7** Lessons (S8 — past unmarked = Danger "Blocks billing"; one count with the sidebar) · [x] **5.8** Dashboard · [x] **5.9** Students · [x] **5.10** Classes · [x] **5.11** Calendar (remove `border-l-4` side-tabs; legend ≥12px) · [x] **5.12** Attendance log · [x] **5.13** Assessment · [x] **5.14** Unassigned · [x] **5.15** Parent requests (claims) · [x] **5.16** Parents · [x] **5.17** Coaches · [x] **5.18** Trials · [x] **5.19** Make-ups · [x] **5.20** Substitutes · [x] **5.21** Holidays · [x] **5.22** Levels · [x] **5.23** Locations · [x] **5.24** Admins · [x] **5.25** Roles · [x] **5.26** Change history · [x] **5.27** Lesson detail (`/lessons/[classId]/[date]`) · [x] **5.28** Assessment class (`/assessment/[classId]`).
   - ⚠ RISK 2 MITIGATION (5.7) — "Blocks billing" labels the rows the page **already** counts as past-unmarked.
     "One count with the sidebar" means both read the **same existing source**. **Assertion:** the Lessons count equals
     the sidebar badge equals the count the billing guard reports for the fixture (`--only unmarked-lessons`, `--only
@@ -393,7 +398,7 @@ are case-insensitive or read `textContent` (§7.362).
     (`scripts/prod-query-ro.sh`) resolves to a non-neutral swatch. `--only admin-calendar`, `--only class-edit` green.
   - ⚠ RISK 8 MITIGATION (5.24, 5.25) — Admins and Roles grant access. The role/area pickers keep the same values;
     `--only admins`, `--only roles`, `--only front-desk-role` green. **NOT visual-only if any handler line moves.**
-- [ ] **5.29** Platform panel (`/platform`).
+- [x] **5.29** Platform panel (`/platform`).
   - ⚠ RISK 4 MITIGATION — cross-tenant: `--only platform-admin`, `--only platform-admin-scope`, `--only
     platform-controls`, `--only tenant-suspension` green; suspend/unsuspend handlers untouched.
 - S9 (one date style in admin tables) is done screen by screen inside 5.x, through `formatSgStamp`.

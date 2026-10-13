@@ -14,7 +14,7 @@
 //    absolutely-positioned panel on the last rows.
 //  • Nothing renders when there are no items — callers pass only the actions
 //    that apply, and an empty menu is not a menu.
-import { useEffect, useRef, useState } from "react";
+import { Children, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,29 @@ export function RowMenu({
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const panelId = useId();
   const open = pos !== null;
+
+  // Where the panel goes: under the trigger, or ABOVE it when there is not room
+  // below (the last rows of a long table sit at the bottom of the scroll area —
+  // a downward-only panel put their items off-screen, unreachable). Measured
+  // against clientWidth / clientHeight so a scrollbar never shifts it.
+  const place = () => {
+    const r = trigger.current?.getBoundingClientRect();
+    if (!r) return;
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const h = panel.current?.offsetHeight ?? 0;
+    const below = r.bottom + 4;
+    const top = below + h > vh - 4 && r.top - h - 4 >= 4 ? r.top - h - 4 : below;
+    setPos((p) => (p && p.top === top && p.right === vw - r.right ? p : { top, right: vw - r.right }));
+  };
+
+  // Once the panel exists it has a height: place it again, before paint.
+  useLayoutEffect(() => {
+    if (open) place();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -39,15 +61,15 @@ export function RowMenu({
       close();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") {
+        close();
+        trigger.current?.focus(); // never strand keyboard focus on <body>
+      }
     };
     // A scroll or resize MOVES the panel with its trigger rather than closing
     // it: scrolling an item into view to press it (a browser, a screen reader,
     // a UI driver all do) must not make the item disappear first.
-    const follow = () => {
-      const r = trigger.current?.getBoundingClientRect();
-      if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
-    };
+    const follow = place;
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     window.addEventListener("resize", follow);
@@ -60,7 +82,10 @@ export function RowMenu({
     };
   }, [open]);
 
-  const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
+  // Children.toArray drops false / null / undefined and flattens arrays, so a
+  // caller's `{cond && <RowMenuItem/>}` or an empty `.map()` never yields a
+  // trigger that opens an empty panel.
+  const items = Children.toArray(children);
   if (items.length === 0) return null;
 
   return (
@@ -69,13 +94,12 @@ export function RowMenu({
         ref={trigger}
         type="button"
         aria-label={label}
-        aria-haspopup="true"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         title={label}
         onClick={() => {
           if (open) return setPos(null);
-          const r = trigger.current!.getBoundingClientRect();
-          setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+          place();
         }}
         className="inline-flex h-[1.875rem] w-[1.875rem] items-center justify-center rounded-control border border-transparent text-ink-secondary transition-colors hover:border-border-strong hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
@@ -84,6 +108,7 @@ export function RowMenu({
       {open && (
         <div
           ref={panel}
+          id={panelId}
           data-row-menu
           style={{ top: pos.top, right: pos.right }}
           // Any press inside closes it — the item's own onClick has already run.

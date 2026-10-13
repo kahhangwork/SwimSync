@@ -65,7 +65,7 @@ export function CategoriesSection({
             return (
               <li
                 key={c.id}
-                className="flex w-[36rem] items-center justify-between gap-3 rounded-control border border-border bg-surface px-3 py-2 text-body"
+                className="flex w-full max-w-[36rem] flex-wrap items-center justify-between gap-3 rounded-control border border-border bg-surface px-3 py-2 text-body"
               >
                 <span className="font-medium text-ink">{c.name}</span>
                 <div className="flex items-center gap-2">
