@@ -23,7 +23,7 @@ import { LessonsList } from "./ui/LessonsList";
 
 export default function LessonsPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="text-body text-ink-muted">Loading…</div>}>
       <LessonsInner />
     </Suspense>
   );
@@ -40,7 +40,7 @@ function LessonsInner() {
         mode={l.mode}
         anchor={l.anchor}
         range={l.range}
-        needsCount={l.needsCount}
+        backlogCount={l.backlogCount}
         location={l.location}
         coach={l.coach}
         locations={l.locations}
@@ -50,11 +50,11 @@ function LessonsInner() {
         bumpFloor={l.bumpFloor}
       />
 
-      {l.error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Could not load lessons: {l.error}</div>}
-      {l.loading && <p className="text-sm text-gray-400">Loading…</p>}
+      {l.error && <div role="alert" className="mb-3 rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">Could not load lessons: {l.error}</div>}
+      {l.loading && <p className="text-body text-ink-muted">Loading…</p>}
 
       {!l.loading && !l.error && l.lessons.length === 0 && (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+        <div className="rounded-card border border-dashed border-border-strong bg-surface p-8 text-center text-body text-ink-secondary">
           {l.mode === "needs" ? "Everything up to today is marked. Nothing needs attention." : "No lessons in this week."}
         </div>
       )}

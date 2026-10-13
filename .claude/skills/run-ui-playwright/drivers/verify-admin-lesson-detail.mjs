@@ -66,10 +66,11 @@ try {
   // ── Badge parity (§7.18, RISK 5): the sidebar Lessons badge (RPC
   // tenant_unmarked_lesson_count, the FULL markable-window backlog) MUST equal
   // the page's mode=needs row count (same backlog). Read BEFORE any marking
-  // below changes N. NOTE the week-mode "Needs marking (N)" tab is deliberately
-  // NOT compared: its needsCount is scoped to the current week's range, a
-  // legitimately different number from the full-window badge. (Nightly runs
-  // ~04:30 SGT, before the fixture lessons' 11:00/11:30 end — no clock flake.)
+  // below changes N. Since UI restyle 5.7 (BACKLOG S8: "one count with the
+  // sidebar") the week-mode "Needs marking (N)" tab reads the SAME function as
+  // the badge, so it is compared too — before 5.7 it counted the visible week
+  // only (the audit's badge 20 / tab 2). (Nightly runs ~04:30 SGT, before the
+  // fixture lessons' 11:00/11:30 end — no clock flake.)
   await page.goto(`${ADMIN}/lessons`, { waitUntil: "networkidle" });
   await page.getByTestId("needs-marking-toggle").waitFor({ timeout: 15000 });
   const badgeEl = page.locator('[title*="still need"][title*="marking"]');
@@ -80,6 +81,16 @@ try {
   // the 2026-09-13 nightly flake). Poll the render, don't race it (§7.237).
   await badgeEl.first().waitFor({ timeout: 15000 });
   const badgeN = (await badgeEl.count()) > 0 ? parseInt((await badgeEl.first().innerText()).trim(), 10) : 0;
+  // The tab's count arrives from its own read; poll it rather than race it.
+  const tabEl = page.getByTestId("needs-marking-toggle");
+  let tabText = "";
+  for (let i = 0; i < 40 && !/\(\d+\)/.test(tabText); i++) { // clock-real: a poll bound (elapsed time, not a date)
+    tabText = (await tabEl.innerText()).trim();
+    if (!/\(\d+\)/.test(tabText)) await page.waitForTimeout(250); // clock-real: a poll interval (elapsed time, not a date)
+  }
+  const tabN = parseInt((tabText.match(/\((\d+)\)/) ?? [, "0"])[1], 10);
+  check(`Lessons week tab "Needs marking (N)" == sidebar badge (S8, one count: tab ${tabN} / badge ${badgeN})`,
+    tabN === badgeN && tabN >= 1, tabText);
   await page.goto(`${ADMIN}/lessons?mode=needs`, { waitUntil: "networkidle" });
   await page.getByTestId("lesson-row").first().waitFor({ timeout: 15000 });
   const rowN = await page.getByTestId("lesson-row").count();

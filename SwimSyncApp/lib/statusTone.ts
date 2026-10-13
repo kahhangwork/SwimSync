@@ -53,8 +53,12 @@ const TONES: Record<string, StatusTone> = {
   // key, apart from the parent attendance dash's "Not Marked" (neutral, shown as
   // "–"): on the coach's screen it is the job still to do.
   "Not marked": "warning",
+  "Partly marked": "warning",
   // danger — stuck or overdue
   Overdue: "danger",
+  // A PAST lesson still unmarked: its month cannot bill, and the guard has no
+  // override (admin Lessons, UI restyle 5.7 — BACKLOG S8).
+  "Blocks billing": "danger",
   Failed: "danger",
   // neutral — everything else is spelled out so a reader sees it was decided
   Absent: "neutral",

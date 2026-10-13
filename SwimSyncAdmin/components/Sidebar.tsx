@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut, ChevronDown, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { fetchUnmarkedLessonCount } from "@/lib/unmarkedLessonCount";
 import { Logo } from "@/components/Logo";
 import { Tag, type Tone } from "@/components/ui/Tag";
 import {
@@ -122,9 +123,9 @@ export function Sidebar() {
     // The RPC authorises per tenant (platform admins have none — skip). A RAISE
     // (e.g. a stale tenant_id) renders no badge, never a crash or NaN.
     if (!tenantId) return;
-    supabase
-      .rpc("tenant_unmarked_lesson_count", { p_tenant: tenantId })
-      .then(({ data, error }) => setNeedsMarking(error ? 0 : Number(data ?? 0)));
+    // The same function the Lessons page's "Needs marking (N)" tab reads — one
+    // count, one source (lib/unmarkedLessonCount.ts, BACKLOG S8).
+    fetchUnmarkedLessonCount(tenantId).then((n) => setNeedsMarking(n ?? 0));
   }, [pathname, tenantId]);
 
   useEffect(() => {

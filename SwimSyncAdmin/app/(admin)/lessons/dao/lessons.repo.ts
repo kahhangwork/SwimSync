@@ -7,3 +7,4 @@
 export { loadCalendarData } from "@/lib/calendarData";
 export type { CalendarData, CalendarLoad } from "@/lib/calendarData";
 export { fetchMarkableFloor } from "@/lib/markableFloor";
+export { fetchUnmarkedLessonCount } from "@/lib/unmarkedLessonCount";

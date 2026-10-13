@@ -8,7 +8,13 @@ import {
 import { todayInSg } from "@/lib/lessonDates";
 import { nowMinutesInSg } from "@/lib/timeOfDay";
 import { markableWindowStart } from "@/lib/attendanceWindow";
-import { loadCalendarData, fetchMarkableFloor, type CalendarData } from "../dao/lessons.repo";
+import { usePermissions } from "@/components/PermissionsProvider";
+import {
+  loadCalendarData,
+  fetchMarkableFloor,
+  fetchUnmarkedLessonCount,
+  type CalendarData,
+} from "../dao/lessons.repo";
 import { lessonView } from "./lessonRows";
 
 export type LessonsMode = "week" | "needs";
@@ -80,6 +86,21 @@ export function useLessons() {
     };
   }, [range.from, range.to]);
 
+  // The floor-to-now backlog for the "Needs marking (N)" tab — the SAME function
+  // the sidebar badge reads (S8: one count), re-read whenever the lessons reload
+  // so a mark made elsewhere moves both together. Never the week's own count.
+  const { tenantId } = usePermissions();
+  const [backlogCount, setBacklogCount] = useState<number | null>(null);
+  useEffect(() => {
+    let stale = false;
+    fetchUnmarkedLessonCount(tenantId).then((n) => {
+      if (!stale) setBacklogCount(n);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [tenantId, floorTick, data]);
+
   const all = useMemo(
     () => (data ? buildCalendarLessons({ range, today, nowMinutes, ...data }) : []),
     [data, range, today, nowMinutes]
@@ -103,6 +124,7 @@ export function useLessons() {
     error,
     lessons: view.lessons,
     needsCount: view.needsCount,
+    backlogCount,
     days: view.days,
     byDate: view.byDate,
     locations,
