@@ -80,7 +80,7 @@ Decisions this plan makes (the user may overrule; none changes the look):
 ---
 
 ## 3. State (update in every commit that ticks a step)
-_2026-10-14 (later): **Phase 5 landed in ONE push on the user's word** — the next nightly is the verdict for all of it (three ledger rows above, blank until read). Not run after the build: the full local sweep (stopped on the user's word after 1 driver) and `money-admin` on its RowMenu fix._
+_2026-10-14 (later): **Phase 5 landed in ONE push on the user's word** — the next nightly is the verdict for all of it (three ledger rows above, blank until read). **The user's prod hand-check PASSED** (Invoices Generate enabled + Billing settings at the foot; Classes row menu; Lessons tab count = sidebar badge). Not run after the build: the full local sweep (stopped on the user's word after 1 driver) and `money-admin` on its RowMenu fix._
 _2026-10-14: nightly `38430764913` read **green** — 4.1–4.7 verified (with the user's prod hand-check); zero unverified landings. Phase 5 built on `ui/admin-phase5`._
 
 _As of 2026-10-12 (evening): Phase 0 and all of 2.1 (`64ab076`, wording `7445547`) are on `main`. Steps 1.1 (Geist) and 1.2 (tab bars) landed the same evening on the user's waiver of the nightly cap. **Next: read the first nightly after them and fill the five empty "Nightly verdict" cells; then step 1.3.**_

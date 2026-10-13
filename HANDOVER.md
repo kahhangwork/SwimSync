@@ -416,7 +416,7 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-10-14:** `38430764913` read **GREEN** — Phase 4 verified. Then **all of Phase 5 (admin panel, 5.0–5.29)
-landed in one push on the user's word** — the NEXT nightly is its verdict: read it, fill the plan's three Phase 5 ledger
+landed in one push on the user's word**; the user's prod hand-check PASSED — the NEXT nightly is its verdict: read it, fill the plan's three Phase 5 ledger
 rows, and land nothing more until it is green. 11 drivers were edited for the row "…" menu and have not run since. Previous: `38397974946` GREEN 74/74 (Phase 3).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
