@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-13 — **UI restyle Phases 1 and 2 complete and live** (1.3–1.6, 2.2–2.8; DEPLOYMENT #87). Nightly
-`38360405197` (dispatched by the user on `f53d55d`) verifies 1.6 + 2.2–2.8 — read it before any further landing._
+_Last updated: 2026-10-13 (evening) — **Legacy package matcher removed and live** (engine v36 + `20261013000100`;
+DEPLOYMENT #88). Nightly `38360405197` read green (74/74) — every restyle landing verified. Next: restyle Phase 3._
 
-_Previously (§8.147, 2026-10-11 → 12) — UI restyle Phase 0 + coach Schedule live (DEPLOYMENT #83–#85)._
+_Previously (§8.149, 2026-10-12 late → 13) — UI restyle Phases 1 and 2 live (DEPLOYMENT #87)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -351,6 +351,17 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.150 (2026-10-13, evening) — legacy package matcher removed (Wave 9 item 9), live
+
+**Packages pay ONE way now: drawn at marking.** Engine v36 matches no package; `20261013000100` dropped
+`tenants.package_draw_at_marking`, the D9 guards and the Wave 6 backfill. Live: DEPLOYMENT #88 (engine first — a contract).
+
+- **Decided by the user:** plan without `/plan-with-confidence` (a filed deletion); "deploy" after local proof.
+- **Kept, not deleted:** 10 of 12 engine-matcher tests converted to marking-time (TESTING §5); each edited function lost
+  only its switch test — `guard_package_draw_order` keeps its NULL-tenant early return (migration header).
+- **Also:** nightly `38360405197` green → the plan's eight §3 verdict cells filled.
+- **Not done:** the admin's dead "pending draws" display (BACKLOG *Simplify the admin's live-balance display*).
+
 ## 8.149 (2026-10-12 late → 13) — UI restyle 1.3–1.6 and 2.2–2.8, all live
 
 **Phase 1 finished, then all of Phase 2** (`docs/plans/UI_RESTYLE_PLAN.md` §3 = the per-step record). Live: DEPLOYMENT #87.
@@ -364,20 +375,7 @@ inside a file read at the start of every session.
 - **Not done:** public pages still show `$` not `S$` (BACKLOG, plan 4.5/4.6); Coach Pay has no thousands separator
   (BACKLOG fold-in); Overdue waits on a due-date decision (BACKLOG S7).
 
-## 8.148 (2026-10-12, evening) — UI restyle 1.1 Geist + 1.2 tab bars, both live
-
-**Built, swept and landed plan steps 1.1 and 1.2** (`docs/plans/UI_RESTYLE_PLAN.md` §3). Live: DEPLOYMENT #86.
-
-- **Shipped:** Geist in both apps (`85230ee`); the coach + parent tab bars to DESIGN.md, BACKLOG S2 (`1892d6a`).
-- **Decided by the user:** a full local sweep for 1.1 (74/74 PASS); **then waived the nightly cap for both** — five
-  restyle landings now await one nightly. 1.2 had no full sweep (its 19 tab drivers `--only`, equal scores).
-- **Found:** §7.368 (RN-web class names differ dev/prod — caught at review; would have shipped Geist invisible),
-  §7.369 (jest ignores `components/` tests), §7.370 (lid-close sleep stalled a batch), §7.371 (stale Tailwind in
-  `next dev`).
-- **Not done:** no live tap-through of the tab bar (no prod sign-in; bundle grep only). Native `Text` does not take
-  Geist (store builds out of scope).
-
-_(§8.147 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.148 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -395,10 +393,9 @@ Everything below is the monthly loop from here on:
    `SELECT status, count(*) FROM invoices GROUP BY 1;` is the honest scoreboard. The
    WhatsApp queue (Invoices → *WhatsApp reminders*, with the **Claimed** filter) is the
    chasing tool when a future month needs it.
-2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) — 9 invoices, the unclaimed child settled. The
-   owner confirmed it on the live card on 2026-09-23: *Aug 2026 · Closed on 22 Sep*. Keep
-   September marked as it happens (the coach's **NEEDS MARKING** list is the tracker) and bill it in early
-   October. **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
+2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) and **Little Orcas September is SEALED**
+   (2026-10-12, 0 invoices — all package-funded or settled). Keep October marked as it happens (the coach's
+   **NEEDS MARKING** list is the tracker) and bill it in early November. **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
    > apart from students**, so the head-count finally agrees with the number of marks the
    > lesson actually needs, and the **Classes tab lands on the class list** rather than
@@ -420,9 +417,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-13:** `38331575542` (scheduled, `552ee75`) GREEN — 1.3/1.4 verified. **`38360405197`** (dispatched by
-the user, `f53d55d`) is the first over **eight unverified restyle landings** (1.6, 2.2–2.8 — the user raised the cap):
-read it, fill those cells in the plan's §3 ledger; a red is attributed across those eight rows' driver lists.
+**State on 2026-10-13:** `38360405197` (dispatched by the user, `f53d55d`) GREEN, 74/74 — 1.6 and 2.2–2.8 verified,
+zero unverified restyle landings. `706934f` (legacy matcher removal) is not yet under a nightly; the package drivers
+passed `--only` on it.
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -435,13 +432,13 @@ which mutate shared seed state — are in the same section.
 
 1. **Little Orcas September is SEALED** (2026-10-12 03:49 SGT, 0 invoices: all 16 children incl. Brayden Ong recorded
    as written-off settlements; 8 live package draws in the month). Engine v35 ran clean (DEPLOYMENT #81; logs unread).
-   **BACKLOG Wave 9 item 9 is UN-GATED** (remove the legacy matcher, + single-child D9 guard + B rollback preflight).
+   **Wave 9 item 9 SHIPPED 2026-10-13** (§8.150) — first live Generate on engine v36 is the next billing run.
 2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
-   **Phases 0–2 are live** (2026-10-13). **First, read nightly `38360405197`** and fill the eight empty §3 verdict cells;
-   red = freeze + revert per §6. **Then Phase 3 (parent app), step 3.1** — its head note: money screens, RISK 2. The
+   **Phases 0–2 are live and verified** (2026-10-13). **Next: Phase 3 (parent app), step 3.1** — its head note: money
+   screens, RISK 2. The
    public `$`→`S$` bug is plan 4.5/4.6 (Phase 4, stricter gate). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
@@ -463,8 +460,8 @@ explained by one line in the commit message), its screen's `--only` drivers pass
 a P4 / Phase 4 step. At most three unverified landings in a row; **a red nightly freezes restyle landings**, and a red
 attributed to one is reverted (`git revert <sha>` → push) in the same session unless the fix is a one-line string.
 
-**No migration is HELD or in flight.** Latest applied is `20261010000100` (single-child packages), on prod, 0 pending
-(2026-10-11). **B's rollback is SPENT** — Little Orcas sealed Sep 2026 with draws on 2026-10-12 (its header's limit).
+**No migration is HELD or in flight.** Latest applied is `20261013000100` (legacy matcher removed), on prod, 0 pending
+(2026-10-13). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

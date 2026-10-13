@@ -1514,6 +1514,14 @@ in auto mode and its email-retry skip (§7.265, §7.266). No run-day test writes
   17 of 18 migration-A mutations red (the 18th, the candidate ORDER BY, is cosmetic — every consumer re-sorts);
   backfill filters red-proven. **Legacy invoice-time tests now set their tenant's switch OFF explicitly**
   (`lesson_packages`, `package_corrections`, the Deno helper's `drawAtMarking ?? false`) — the default is on.
+- **Wave 9 item 9 (2026-10-13, `20261013000100`) removed the switch, so all of the above changed:** `_b` is deleted;
+  `package_draw_at_marking` keeps 62 (case 1 is now "an absent mark draws nothing", 30 gone, 44/44b assert the column
+  and functions are dropped); `single_child_packages` 70 (2h, 13a/13b and tenant T3 gone); `lesson_packages` pins
+  stored = live after a marking draw (red with the draw trigger disabled); `package_corrections` marks AFTER its hand-built
+  invoice lines — marked first, the lesson draws and PK002 then refuses the line. Deno: `packages.test.ts` converted
+  10 engine-matcher tests to marking-time assertions (draw + balance + invoice; expiry boundary and holiday tail red
+  with `<=` → `<` in `package_candidates_for`) and dropped 2; `makeups.test.ts` dropped its 2 invoice-time snapshot
+  tests (pgTAP case 13 holds the rule); W6-5 pins ad-hoc figures; the helper's `drawAtMarking` option is gone.
 - **Deno** `wave6.test.ts` (W6-1..7: package-only month = no invoice + seals, mixed = ad-hoc lines only, ordering
   guard both ways, ad-hoc parity on vs off, fail closed, no engine matching). Mutants run with `--no-check` (§7.329).
   `checkInvariants` refuses a lesson both invoiced and drawn; `teardown()` deletes package draws first.

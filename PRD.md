@@ -2201,8 +2201,7 @@ cash paid always equals value granted — nothing to reconcile.
   - **Change child** *(packages:edit)* moves a one-child package to a sibling **only while no lesson has ever drawn
     from it** (a reversed draw still counts); otherwise *"A lesson has already drawn from this package — refund it
     instead."* Holiday/cancel extensions are recomputed for the new child, and the change is audited.
-  - **Limits.** One-child packages need draw-at-marking (every business has it); the database refuses one where it
-    is off, and refuses switching it off while one is held. A child holding one cannot be moved to another
+  - **Limits.** A child holding one cannot be moved to another
     business until it is reassigned, refunded or cancelled. Package emails do not name the child yet (BACKLOG).
 - **Scoped by class category** — the business's own grouping of classes ("Group",
   "Private"), spendable at every class in the category including ones added later; a

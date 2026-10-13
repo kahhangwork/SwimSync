@@ -1235,3 +1235,12 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     to verify 1.6 + 2.2–2.8. Every push: CI repo invariants locally first, `--only` drivers before = after, CI green
     after. Proof per landing is the plan §3 ledger's "Bundle string grepped" cell. **A shell pipe of a 2 MB bundle into
     `grep -c` read empty in a polling loop** — download the bundle to a file and grep the file.
+
+88. **Deploy record (2026-10-13): legacy package matcher removed — a CONTRACT, so engine first.** `generate-invoices`
+    v35 → **v36** (`6632202`; deployed source downloaded: no `package_draw_at_marking` read, no matcher), THEN
+    `20261013000100_remove_legacy_package_matcher` (`supabase db push`, run by the session on the user's "deploy"),
+    THEN `706934f` to `main` (apps = regenerated types only). **v35 fails closed without the column** — the reverse of
+    the usual migrations-first order. Before writing: 8 function md5s prod = local; all 3 tenants ON. Rollback rehearsed
+    in one transaction (UP → DOWN → 8 bodies + ACLs byte-identical). Prod after: 0 pending; column gone; backfill +
+    D9 guard functions gone; 6 rewritten bodies md5 = local; ACLs = local, no anon; `package_live_balances()` 1 row,
+    live = stored. CI `38373848395` green; both sites 200 (no bundle string — types compile to identical JS). No Generate.

@@ -813,7 +813,7 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/lib/permissions.ts` (+ test) · `components/PermissionsProvider.tsx` | The role model the panel reads: 8 areas, `can()`, `gridProblem()` (mirrors `set_role_grid`), `isWithin()`; the provider loads `my_admin_permissions` once (§6ab) |
 | `SwimSyncAdmin/app/(admin)/roles/` | The Roles page — roles, holders, the 8×3 grid; owner-only writes (D9) |
 | `SwimSyncAdmin/lib/enrolmentStart.ts` (+ rpc, test) · `components/StartsOnField.tsx` | *Starts on*: bounds → today-only fallback, sealed / unbilled / this-month warnings, the second press, dropped dates (§6ad) |
-| `supabase/migrations/20261006000100…_a.sql` · `…000200…_b.sql` · `supabase/tests/package_draw_at_marking{,_b}.test.sql` · `generate-invoices/wave6.test.ts` | Wave 6 (§6ae): the matcher, draw/return triggers, PK001 guard, PK002 backstop, the four RPCs; B = switch on + backfill |
+| `supabase/migrations/20261006000100…_a.sql` · `…000200…_b.sql` · `supabase/tests/package_draw_at_marking.test.sql` (`_b` deleted with its backfill, `20261013000100`) · `generate-invoices/wave6.test.ts` | Wave 6 (§6ae): the matcher, draw/return triggers, PK001 guard, PK002 backstop, the four RPCs; B = switch on + backfill |
 | `supabase/migrations/20261010000100_single_child_packages.sql` (+ `supabase/rollback/…_DOWN.sql`) · `supabase/tests/single_child_packages.test.sql` · admin `packages/domain/{singleChild,useChangeChild}.ts` · `ui/ChangeChildModal.tsx` · app `features/billing/domain/billingFormat.ts` (`childrenForProduct`, `requestStudentFor`) · `drivers/verify-single-child-packages.mjs` | Single-child packages (§6ae addendum): `student_id` + `draw_rank`, the kind/child pins, D11, Change child, the picker |
 | `supabase/migrations/20261006000300_app_clock.sql` · `…000400_clock_decide_ops` · `…000500_clock_stamp_feeds` · `supabase/tests/app_clock{,_edges}.test.sql` · `supabase/tests/http/app_clock_locks.sh` · `scripts/check-{pgtap,migration}-clock.sh` · `scripts/check-functions-sg-date.sh` · `scripts/lib/pgtap-pin.sh` | Wave 7 (§6af): the injectable clock, its two locks, the frozen census; G1–G3 + the shared pin predicate |
 | `supabase/migrations/20261009000200_api_clock_pin.sql` · `generate-invoices/clock.ts` · `drivers/lib.mjs` (`nowSg`/`todaySg`/`sql`/wrapped `launch()`) · `drivers/check-driver-clock.sh` · `scripts/clock-unpin.sh` · `drivers/_TEMPLATE.mjs` · `drivers/_TEMPLATE-fixture.sql` | Pin the clock for UI drivers (§6af addendum): the local-only API pin, the engine's DB clock, `run-all-drivers.sh --now`, the driver clock guard and the template a new driver copies |
@@ -960,14 +960,15 @@ Plan: `docs/plans/WAVE4_START_DATE_FRONT_DESK_PLAN.md`.
 **The rule lives once, in SQL.** `package_candidates_for(session, student)` is the only package-matching code
 (family = every linked parent; tenant from the class; make-up category snapshot; window; FIFO by expiry; and the
 eligibility — not invoiced, not already drawn, not settled). The attendance trigger (`trg_attendance_package_draw`
-→ `package_draw_for` / `package_return_for`), the D6 guard, the backlog preview and draw, and migration B's
-backfill (`package_backfill_draws`) all call it. **The engine no longer matches packages** when the switch is on —
-it drops drawn lessons and bills the rest at class price. `package_live_balances()` stops simulating for
-switch-on tenants (live = stored). **Do not re-add a matcher in TypeScript or in a reader.**
+→ `package_draw_for` / `package_return_for`), the D6 guard, and the backlog preview and draw all call it. **The
+engine never matches packages** — it drops drawn lessons and bills the rest at class price; `package_live_balances()`
+returns the stored balance (live = stored). **Do not re-add a matcher in TypeScript or in a reader.**
 
-**One switch.** `tenants.package_draw_at_marking` (default **on** since B; "nobody" in `guard_tenant_columns`) is
-read by every consumer. **Never add a second** (`DISABLE TRIGGER`, an `app_settings` key, an env var) — two
-switches that disagree is a double-billing window (§7.325).
+**No switch, since 2026-10-13.** `tenants.package_draw_at_marking` and the engine's pay-at-the-run matcher it chose
+were removed together (engine v36, `20261013000100`, BACKLOG Wave 9 item 9; DEPLOYMENT #88) — drawing at marking is
+the only mode. **Never re-introduce a mode switch** (`DISABLE TRIGGER`, an `app_settings` key, an env var): two
+paths that can disagree is a double-billing window (§7.325). Old invoices' invoice-time ledger rows stay, and the
+correction trigger still reverses them.
 
 **Funded at most once, both directions in the DB:** the draw refuses an invoiced lesson; `trg_invoice_item_not_drawn`
 refuses an invoice line for a drawn lesson (PK002). The ledger (`package_applications`) has two shapes — legacy
@@ -986,9 +987,8 @@ by a catalogue census in `single_child_packages.test.sql` (§7.361). The draw's 
 the deadlock-avoidance order, not the draw order. **The kind is a sold term**: shared↔one-child is refused for every
 role, the child for every client; only `reassign_package_child` (unused only) and `merge_students` move it. **One kind
 per family** (D11) is enforced at INSERT by `assert_package_kind_free` under a per-family advisory lock — do not move
-it to the UI. The flag-off legacy matcher pools across siblings, so the DB refuses a one-child package where the flag
-is off and refuses turning it off while one is held (`trg_guard_one_child_packages_flag`) — removed together with the
-legacy matcher (BACKLOG).
+it to the UI. (Its D9 guards — refusing one-child packages where the flag was off — left with the legacy matcher,
+`20261013000100`.)
 
 ### 6af. The database has ONE injectable clock — `app_now()` / `app_today()`; prod can never move it (2026-10-06)
 
