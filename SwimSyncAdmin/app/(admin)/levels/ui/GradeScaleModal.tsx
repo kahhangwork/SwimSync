@@ -12,7 +12,7 @@ export function GradeScaleModal(p: { l: LevelsState }) {
   return (
     <Modal open={p.l.scaleOpen} onClose={() => p.l.setScaleOpen(false)} title="Grading scale">
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-body text-ink-secondary">
           The scale coaches grade each child&rsquo;s skills against, lowest
           first. The <span className="font-medium">top</span> grade counts a
           skill as done. Rename freely; a grade a child has been given
@@ -20,12 +20,12 @@ export function GradeScaleModal(p: { l: LevelsState }) {
         </p>
 
         {p.l.gradeScale.length === 0 ? (
-          <p className="text-sm text-gray-400">No grades yet.</p>
+          <p className="text-body text-ink-muted">No grades yet.</p>
         ) : (
           <ol className="space-y-2">
             {p.l.gradeScale.map((g, i) => (
               <li key={g.id} className="flex items-center gap-2">
-                <span className="w-5 text-right text-xs text-gray-400">{i + 1}.</span>
+                <span className="w-5 text-right text-label text-ink-muted">{i + 1}.</span>
                 {/* Rename on blur or Enter — a curriculum's grade names are
                     edited rarely, so an explicit save button is overkill. */}
                 <input
@@ -35,12 +35,12 @@ export function GradeScaleModal(p: { l: LevelsState }) {
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   }}
                   disabled={p.l.scaleBusy}
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                  className="flex-1 rounded-control border border-border-strong px-3 py-1.5 text-body"
                 />
                 <button
                   onClick={() => p.l.removeGrade(g)}
                   disabled={p.l.scaleBusy}
-                  className="px-1 text-gray-400 hover:text-red-600 disabled:opacity-30"
+                  className="px-1 text-ink-muted hover:text-status-danger-text disabled:opacity-30"
                   aria-label="Remove grade"
                 >
                   &times;
@@ -58,14 +58,14 @@ export function GradeScaleModal(p: { l: LevelsState }) {
               if (e.key === "Enter") p.l.addGrade();
             }}
             placeholder="Expert"
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            className="flex-1 rounded-control border border-border-strong px-3 py-1.5 text-body"
           />
           <Button onClick={p.l.addGrade} disabled={p.l.scaleBusy || !p.l.newGrade.trim()}>
             Add grade
           </Button>
         </div>
 
-        {p.l.scaleError && <p className="text-sm text-red-600">{p.l.scaleError}</p>}
+        {p.l.scaleError && <p className="text-body text-status-danger-text">{p.l.scaleError}</p>}
 
         <div className="flex justify-end">
           <Button variant="outline" onClick={() => p.l.setScaleOpen(false)}>

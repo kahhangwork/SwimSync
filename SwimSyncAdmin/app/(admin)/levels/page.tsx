@@ -49,9 +49,9 @@ export default function LevelsPage() {
       {/* A one-line hint at what the scale is for, shown only once a scale
           exists (it always does — seeded per business). */}
       {lv.gradeScale.length > 0 ? (
-        <p className="mb-4 text-xs text-gray-500">
+        <p className="mb-4 text-label text-ink-muted">
           Coaches grade each child&rsquo;s skills on your{" "}
-          <span className="font-medium text-gray-700">
+          <span className="font-medium text-ink-secondary">
             {lv.gradeScale.map((g) => g.label).join(" → ")}
           </span>{" "}
           scale. The top grade counts a skill as done.

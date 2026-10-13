@@ -7,11 +7,11 @@ export function LevelsTable(p: { l: LevelsState }) {
   return (
     <>
       {p.l.loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-body text-ink-muted">Loading…</p>
       ) : p.l.levels.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
-          <p className="font-medium text-gray-900">No levels yet</p>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-control border border-border bg-surface p-8 text-center">
+          <p className="font-medium text-ink">No levels yet</p>
+          <p className="mt-1 text-body text-ink-muted">
             Add the rungs you actually use — &ldquo;Seahorse&rdquo;,
             &ldquo;SwimSafer Level 1&rdquo;, whatever your business calls them.
             Until then a child&rsquo;s class name is the only signal of their level.
@@ -34,11 +34,11 @@ export function LevelsTable(p: { l: LevelsState }) {
             {p.l.visible.map((l, li) => (
               <React.Fragment key={l.id}>
                 <Tr>
-                  <Td className="text-gray-500">{l.sort_order}</Td>
-                  <Td className="font-medium text-gray-900">
+                  <Td className="text-ink-muted">{l.sort_order}</Td>
+                  <Td className="font-medium text-ink">
                     {l.label}
                     {l.note && (
-                      <div className="mt-0.5 text-xs font-normal italic text-gray-500">
+                      <div className="mt-0.5 text-label font-normal italic text-ink-muted">
                         {l.note}
                       </div>
                     )}
@@ -48,7 +48,7 @@ export function LevelsTable(p: { l: LevelsState }) {
                       onClick={() =>
                         p.l.setExpanded(p.l.expanded === l.id ? null : l.id)
                       }
-                      className="text-sm font-medium text-sky-600 hover:underline"
+                      className="text-body font-medium text-primary hover:underline"
                     >
                       {l.skills.length === 0
                         ? "Add skills"
@@ -58,7 +58,7 @@ export function LevelsTable(p: { l: LevelsState }) {
                       {p.l.expanded === l.id ? " \u25be" : " \u25b8"}
                     </button>
                   </Td>
-                  <Td className="text-gray-500">
+                  <Td className="text-ink-muted">
                     {/* The number is ACTIVE children. A level can read 0 while
                         departed children still hold it, and the Remove dialog
                         will then say so — this title closes that gap on the page
@@ -92,15 +92,15 @@ export function LevelsTable(p: { l: LevelsState }) {
 
                 {p.l.expanded === l.id && (
                   <Tr>
-                    <Td colSpan={5} className="bg-gray-50">
+                    <Td colSpan={5} className="bg-ground">
                       <div className="py-2">
-                        <p className="mb-2 text-xs text-gray-500">
+                        <p className="mb-2 text-label text-ink-muted">
                           What is taught at this level, in teaching order. The
                           coach and the child&rsquo;s parent both see this.
                         </p>
 
                         {l.skills.length === 0 ? (
-                          <p className="mb-3 text-sm text-gray-400">
+                          <p className="mb-3 text-body text-ink-muted">
                             No skills listed yet.
                           </p>
                         ) : (
@@ -108,16 +108,16 @@ export function LevelsTable(p: { l: LevelsState }) {
                             {l.skills.map((sk, i) => (
                               <li
                                 key={sk.id}
-                                className="flex items-center gap-2 text-sm text-gray-800"
+                                className="flex items-center gap-2 text-body text-ink"
                               >
-                                <span className="w-5 text-right text-gray-400">
+                                <span className="w-5 text-right text-ink-muted">
                                   {i + 1}.
                                 </span>
                                 <span className="flex-1">{sk.label}</span>
                                 <button
                                   onClick={() => p.l.moveSkill(l, i, -1)}
                                   disabled={i === 0 || p.l.skillBusy}
-                                  className="px-1 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                                  className="px-1 text-ink-muted hover:text-ink-secondary disabled:opacity-30"
                                   aria-label="Move up"
                                 >
                                   &uarr;
@@ -125,7 +125,7 @@ export function LevelsTable(p: { l: LevelsState }) {
                                 <button
                                   onClick={() => p.l.moveSkill(l, i, 1)}
                                   disabled={i === l.skills.length - 1 || p.l.skillBusy}
-                                  className="px-1 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                                  className="px-1 text-ink-muted hover:text-ink-secondary disabled:opacity-30"
                                   aria-label="Move down"
                                 >
                                   &darr;
@@ -133,7 +133,7 @@ export function LevelsTable(p: { l: LevelsState }) {
                                 <button
                                   onClick={() => p.l.removeSkill(sk)}
                                   disabled={p.l.skillBusy}
-                                  className="px-1 text-gray-400 hover:text-red-600 disabled:opacity-30"
+                                  className="px-1 text-ink-muted hover:text-status-danger-text disabled:opacity-30"
                                   aria-label="Remove skill"
                                 >
                                   &times;
@@ -151,7 +151,7 @@ export function LevelsTable(p: { l: LevelsState }) {
                               if (e.key === "Enter") p.l.addSkill(l);
                             }}
                             placeholder="Aeroplane Kick"
-                            className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                            className="flex-1 rounded-control border border-border-strong px-3 py-1.5 text-body"
                           />
                           <Button
                             onClick={() => p.l.addSkill(l)}
@@ -161,7 +161,7 @@ export function LevelsTable(p: { l: LevelsState }) {
                           </Button>
                         </div>
                         {p.l.skillError && (
-                          <p className="mt-2 text-sm text-red-600">{p.l.skillError}</p>
+                          <p className="mt-2 text-body text-status-danger-text">{p.l.skillError}</p>
                         )}
                       </div>
                     </Td>
