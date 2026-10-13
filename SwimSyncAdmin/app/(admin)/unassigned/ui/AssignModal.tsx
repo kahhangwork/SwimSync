@@ -31,20 +31,20 @@ export function AssignModal(p: Props) {
     >
       <div className="space-y-4">
         {assignModal && (
-          <div className="rounded-xl bg-gray-50 p-3 text-sm">
-            <p className="font-medium text-gray-900">{assignModal.full_name}</p>
-            <p className="text-gray-500">Parent: {assignModal.parent_name}</p>
+          <div className="rounded-card bg-ground p-3 text-body">
+            <p className="font-medium text-ink">{assignModal.full_name}</p>
+            <p className="text-ink-muted">Parent: {assignModal.parent_name}</p>
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-body font-medium text-ink-secondary mb-1.5">
             Select Coach
           </label>
           <select
             value={p.selectedCoachId}
             onChange={(e) => p.selectCoach(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            className="w-full rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">— Choose a coach —</option>
             {p.coaches.map((c) => (
@@ -56,14 +56,14 @@ export function AssignModal(p: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-body font-medium text-ink-secondary mb-1.5">
             Select Class
           </label>
           <select
             value={p.selectedClassId}
             onChange={(e) => p.setSelectedClassId(e.target.value)}
             disabled={!p.selectedCoachId}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-50"
+            className="w-full rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
           >
             <option value="">— Choose a class —</option>
             {p.classOptions.map((c) => (
@@ -84,7 +84,7 @@ export function AssignModal(p: Props) {
         )}
 
         {p.assignError && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <p role="alert" className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
             {p.assignError}
           </p>
         )}

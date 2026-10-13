@@ -28,21 +28,21 @@ export function UnassignedTable(p: Props) {
       <Tbody>
         {p.loading ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={3}>
+            <Td className="text-center text-ink-muted py-8" colSpan={3}>
               Loading…
             </Td>
           </Tr>
         ) : visible.length === 0 ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={3}>
+            <Td className="text-center text-ink-muted py-8" colSpan={3}>
               No unassigned children found.
             </Td>
           </Tr>
         ) : (
           visible.map((student) => (
             <Tr key={student.id}>
-              <Td className="font-medium text-gray-900">{student.full_name}</Td>
-              <Td className="text-gray-500">
+              <Td className="font-medium text-ink">{student.full_name}</Td>
+              <Td className="text-ink-muted">
                 {student.parent_name}
                 <span className="ml-1.5">
                   <PackageChip coverage={p.covMap.get(student.id)} />
