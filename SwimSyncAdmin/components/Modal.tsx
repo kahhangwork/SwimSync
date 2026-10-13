@@ -23,20 +23,20 @@ export function Modal({ title, open, onClose, children, size = "md" }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
       {/* Panel */}
       <div
-        className={`relative z-10 flex w-full max-h-[90vh] flex-col rounded-2xl bg-white shadow-xl ${
+        className={`relative z-10 flex w-full max-h-[90vh] flex-col rounded-card border border-border bg-surface shadow-float ${
           size === "lg" ? "max-w-2xl" : "max-w-md"
         }`}
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-3">
-          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+          <h2 className="text-headline font-semibold text-ink">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            className="rounded-control p-1.5 text-ink-muted hover:bg-selected hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <X className="h-4 w-4" />
           </button>

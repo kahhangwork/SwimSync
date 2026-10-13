@@ -6,12 +6,12 @@ import { sortRows, type SortDir, type SortValue } from "@/lib/tableSort";
 
 export function Table({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("w-full overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm", className)}>
+    <div className={cn("w-full overflow-x-auto rounded-card border border-border bg-surface", className)}>
       {/* The last column absorbs the leftover width — see the note on <Th>.
           Done here, once, with a descendant selector rather than a prop every
           table has to remember: `th:last-child` beats the cell's own `w-px` on
           specificity, so every table gets it and no table can forget it. */}
-      <table className="w-full text-sm [&_th:last-child]:w-full [&_td:last-child]:w-full">
+      <table className="w-full text-body [&_th:last-child]:w-full [&_td:last-child]:w-full">
         {children}
       </table>
     </div>
@@ -43,7 +43,7 @@ export function Table({ children, className }: { children: React.ReactNode; clas
  */
 export function Thead({ children }: { children: React.ReactNode }) {
   return (
-    <thead className="border-b border-gray-200 bg-gray-50">
+    <thead className="border-b border-border bg-ground">
       <tr>{children}</tr>
     </thead>
   );
@@ -114,7 +114,7 @@ export function Th({
     <th
       aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : sortable ? "none" : undefined}
       className={cn(
-        "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 w-px",
+        "px-4 py-3 text-left text-label font-medium text-ink-muted w-px",
         wrap ? "max-w-xs whitespace-normal" : "whitespace-nowrap",
         className
       )}
@@ -123,9 +123,9 @@ export function Th({
         <button
           type="button"
           onClick={() => sort!.toggle(sortKey!, firstDir)}
-          // The <th> is already uppercase/tracked; the button inherits it and
-          // only adds the affordance. `group` drives the arrow's hover state.
-          className="group inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+          // The button inherits the <th>'s Label type and only adds the
+          // affordance. `group` drives the arrow's hover state.
+          className="group inline-flex items-center gap-1 transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-tag"
           title={`Sort by ${typeof children === "string" ? children : "this column"}`}
         >
           {children}
@@ -146,26 +146,26 @@ export function Th({
 function SortArrow({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) {
     return (
-      <svg viewBox="0 0 10 16" aria-hidden="true" className="h-3 w-2.5 shrink-0 text-gray-300 transition-colors group-hover:text-gray-500">
+      <svg viewBox="0 0 10 16" aria-hidden="true" className="h-3 w-2.5 shrink-0 text-border-strong transition-colors group-hover:text-ink-muted">
         <path d="M5 2 L8.5 6 H1.5 Z" fill="currentColor" />
         <path d="M5 14 L8.5 10 H1.5 Z" fill="currentColor" />
       </svg>
     );
   }
   return (
-    <svg viewBox="0 0 10 16" aria-hidden="true" className="h-3 w-2.5 shrink-0 text-sky-600">
+    <svg viewBox="0 0 10 16" aria-hidden="true" className="h-3 w-2.5 shrink-0 text-primary">
       {dir === "asc" ? <path d="M5 3 L9 9 H1 Z" fill="currentColor" /> : <path d="M5 13 L9 7 H1 Z" fill="currentColor" />}
     </svg>
   );
 }
 
 export function Tbody({ children }: { children: React.ReactNode }) {
-  return <tbody className="divide-y divide-gray-100">{children}</tbody>;
+  return <tbody className="divide-y divide-divider">{children}</tbody>;
 }
 
 export function Tr({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <tr className={cn("hover:bg-gray-50 transition-colors", className)}>
+    <tr className={cn("hover:bg-ground transition-colors", className)}>
       {children}
     </tr>
   );
@@ -187,7 +187,7 @@ export function Td({
     <td
       colSpan={colSpan}
       className={cn(
-        "px-4 py-3 text-gray-700 w-px",
+        "px-4 py-3 text-ink-secondary w-px",
         wrap ? "max-w-xs whitespace-normal" : "whitespace-nowrap",
         className
       )}

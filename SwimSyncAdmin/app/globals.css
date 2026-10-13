@@ -20,5 +20,5 @@ html { font-size: 16px; }
 @media (max-width: 1152px) { html { font-size: 13px; } }
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-ground text-ink;
 }

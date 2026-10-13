@@ -37,7 +37,7 @@ export function Drawer({ title, subtitle, open, onClose, children }: Props) {
     <div className="fixed inset-0 z-50">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
       {/* Panel — pinned right, full height, its own scroll */}
@@ -45,19 +45,19 @@ export function Drawer({ title, subtitle, open, onClose, children }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="absolute inset-y-0 right-0 z-10 flex h-full w-full max-w-md flex-col bg-white shadow-xl"
+        className="absolute inset-y-0 right-0 z-10 flex h-full w-full max-w-md flex-col border-l border-border bg-surface shadow-float"
       >
-        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+        <div className="flex items-start justify-between border-b border-divider px-6 py-5">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+            <h2 className="text-headline font-semibold text-ink">{title}</h2>
             {subtitle && (
-              <p className="mt-0.5 text-sm text-gray-500">{subtitle}</p>
+              <p className="mt-0.5 text-body-secondary text-ink-secondary">{subtitle}</p>
             )}
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-control p-1.5 text-ink-muted transition-colors hover:bg-selected hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <X className="h-4 w-4" />
           </button>
