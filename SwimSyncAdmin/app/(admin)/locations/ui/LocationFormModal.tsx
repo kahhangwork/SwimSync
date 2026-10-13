@@ -43,57 +43,57 @@ export function LocationFormModal({
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
             Location name
           </label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Bishan Swimming Complex"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Address <span className="font-normal text-gray-400">(optional)</span>
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
+            Address <span className="font-normal text-ink-muted">(optional)</span>
           </label>
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="1 Bishan Street 14, Singapore 579767"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-label text-ink-muted">
             Shown to parents so they know where to go.
           </p>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Notes <span className="font-normal text-gray-400">(optional)</span>
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
+            Notes <span className="font-normal text-ink-muted">(optional)</span>
           </label>
           <input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Park at Basement 2; enter via the side gate"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
             Order
           </label>
           <input
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
             inputMode="numeric"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-label text-ink-muted">
             Lowest first — the order locations appear in every dropdown.
           </p>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-body text-status-danger-text">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={close} disabled={busy}>
             Cancel

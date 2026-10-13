@@ -21,7 +21,7 @@ export function RemoveLocationModal({
       onClose={() => setRemoving(null)}
       title="Remove this location?"
     >
-      <p className="text-sm text-gray-600">
+      <p className="text-body text-ink-secondary">
         {removing && removing.active_class_count > 0 ? (
           <>
             &ldquo;{removing.name}&rdquo; is used by{" "}

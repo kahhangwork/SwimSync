@@ -1,3 +1,4 @@
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { Table, Thead, Th, Tbody, Tr, Td, type TableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import type { Location } from "../types";
@@ -24,21 +25,21 @@ export function LocationsTable({ visible, sort, openEdit, setRemoving }: Props) 
       <Tbody>
         {visible.map((l) => (
           <Tr key={l.id}>
-            <Td className="text-gray-500">{l.sort_order}</Td>
-            <Td className="font-medium text-gray-900">
+            <Td className="text-ink-muted">{l.sort_order}</Td>
+            <Td className="font-medium text-ink">
               {l.name}
               {l.address && (
-                <div className="mt-0.5 text-xs font-normal text-gray-500">
+                <div className="mt-0.5 text-label font-normal text-ink-muted">
                   {l.address}
                 </div>
               )}
               {l.notes && (
-                <div className="mt-0.5 text-xs font-normal italic text-gray-500">
+                <div className="mt-0.5 text-label font-normal italic text-ink-muted">
                   {l.notes}
                 </div>
               )}
             </Td>
-            <Td className="text-gray-500">
+            <Td className="text-ink-muted">
               <span
                 title={
                   l.retired_class_count > 0
@@ -52,13 +53,17 @@ export function LocationsTable({ visible, sort, openEdit, setRemoving }: Props) 
               </span>
             </Td>
             <Td>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => openEdit(l)}>
+              {/* Edit inline; Remove (it archives the place) in the row menu —
+                  DESIGN.md → Tables, UI restyle 5.23. Same handlers. */}
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={() => openEdit(l)}>
                   Edit
                 </Button>
-                <Button variant="outline" onClick={() => setRemoving(l)}>
-                  Remove
-                </Button>
+                <RowMenu>
+                  <RowMenuItem destructive onClick={() => setRemoving(l)}>
+                    Remove
+                  </RowMenuItem>
+                </RowMenu>
               </div>
             </Td>
           </Tr>

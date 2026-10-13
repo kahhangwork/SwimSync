@@ -46,17 +46,17 @@ export default function LocationsPage() {
         !form.creating &&
         form.editing === null &&
         list.removing === null && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
             {list.error}
           </div>
         )}
 
       {list.loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-body text-ink-muted">Loading…</p>
       ) : list.locations.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
-          <p className="font-medium text-gray-900">No locations yet</p>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-control border border-border bg-surface p-8 text-center">
+          <p className="font-medium text-ink">No locations yet</p>
+          <p className="mt-1 text-body text-ink-muted">
             Add the pools and centres you teach at. Every class is then set to one
             of them, and parents see where their child&rsquo;s class is held.
           </p>

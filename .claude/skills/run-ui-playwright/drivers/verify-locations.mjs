@@ -18,7 +18,7 @@
 // cleanup removes nothing else. The driver's locations are never attached to a
 // class, so archiving them always succeeds — it leaves the ladder as it found
 // it, and a crashed run self-heals on the next one.
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, rowAction } from "./lib.mjs";
 
 const PREFIX = "LocDrv ";
 const BISHAN = `${PREFIX}Bishan`;
@@ -30,12 +30,12 @@ const check = (ok, label, detail = "") => {
   else { fail++; console.log("  FAIL", label, detail ? `\n        ${detail}` : ""); }
 };
 
-// Remove one location by name: the row's Remove button, then the confirm
-// dialog's. Both are "Remove"; the dialog renders after the table, so the last
-// match is the dialog's.
+// Remove one location by name: the row's Remove (in its "…" menu since UI
+// restyle 5.23 — rowAction opens it), then the confirm dialog's. Both are
+// "Remove"; the dialog renders after the table, so the last match is the dialog's.
 async function removeLocation(page, name) {
   const row = page.getByRole("row").filter({ hasText: name });
-  await row.getByRole("button", { name: "Remove" }).first().click();
+  await (await rowAction(row, "Remove")).click();
   await page.waitForTimeout(500);
   await page.getByRole("button", { name: /^Remov/ }).last().click();
   await page.waitForTimeout(1200);
