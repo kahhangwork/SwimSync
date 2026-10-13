@@ -26,15 +26,15 @@ export default function PayNowScreen() {
   } = usePayNow();
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <Header />
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#0ea5e9" />
+          <ActivityIndicator size="large" color="#2563eb" />
         </View>
       ) : (
-        <View className="flex-1 items-center px-6 pt-4">
+        <View className="flex-1 items-center px-5 pt-1">
           <AmountBanner netAmount={netAmount} billingMonth={billingMonth} packageName={packageName} />
 
           <QrCard businessName={businessName} dynamicQr={dynamicQr} payee={payee} showPayableId={showPayableId} proxy={proxy} netAmount={netAmount} reference={reference} unconfigured={unconfigured} />

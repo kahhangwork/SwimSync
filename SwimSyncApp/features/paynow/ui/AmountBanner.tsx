@@ -1,32 +1,33 @@
 // The amount to pay, with the billing month or package name.
-// Moved VERBATIM from app/(parent)/billing/paynow.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-G); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/billing/paynow.tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-G). UI restyle step 3.3: a plain card, the amount in Ink — an amount to
+// pay is not an alarm (DESIGN.md's Red Means Stuck Rule). The figure is the
+// hook's, printed as-is.
 import React from "react";
-import { View, Text } from "react-native";
+import { Text } from "react-native";
+import { Surface } from "@/components/ui/Surface";
 import type { usePayNow } from "../domain/usePayNow";
 
 type PayNow = ReturnType<typeof usePayNow>;
 
 export function AmountBanner(p: Pick<PayNow, "netAmount" | "billingMonth" | "packageName">) {
   const { netAmount, billingMonth, packageName } = p;
+  if (netAmount === null) return null;
   return (
-    <>
-      {/* Amount banner */}
-      {netAmount !== null && (
-        <View className="w-full bg-red-50 border border-red-100 rounded-2xl p-4 mb-6 items-center">
-          <Text className="text-sm text-red-500 mb-1">Amount to Pay</Text>
-          <Text className="text-3xl font-bold text-red-600">
-            S${netAmount.toFixed(2)}
-          </Text>
-          {billingMonth && (
-            <Text className="text-xs text-red-400 mt-1">{billingMonth}</Text>
-          )}
-          {packageName && (
-            <Text className="text-xs text-red-400 mt-1">{packageName}</Text>
-          )}
-        </View>
+    <Surface className="w-full mb-3 items-center">
+      <Text className="text-body-secondary text-ink-secondary">To pay</Text>
+      <Text
+        className="text-display font-semibold text-ink mt-0.5"
+        style={{ fontVariant: ["tabular-nums"] }}
+      >
+        S${netAmount.toFixed(2)}
+      </Text>
+      {billingMonth && (
+        <Text className="text-body-secondary text-ink-secondary mt-1">{billingMonth}</Text>
       )}
-    </>
+      {packageName && (
+        <Text className="text-body-secondary text-ink-secondary mt-1">{packageName}</Text>
+      )}
+    </Surface>
   );
 }
