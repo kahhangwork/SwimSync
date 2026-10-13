@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-13 (night) — **UI restyle Phase 3 live** (all ten parent screens, DEPLOYMENT #89); nightly
-`38397974946` green (74/74), zero unverified landings. Next: restyle Phase 4 (auth + public, stricter gate)._
+_Last updated: 2026-10-14 — **UI restyle Phase 4 live** (auth + public screens, DEPLOYMENT #90); nightly
+`38430764913` dispatched on the user's word — **read it first**. Next: the user's prod hand-check, then Phase 5._
 
-_Previously (§8.150, 2026-10-13 evening) — legacy package matcher removed, live (DEPLOYMENT #88)._
+_Previously (§8.151, 2026-10-13 night) — UI restyle Phase 3 live (ten parent screens, DEPLOYMENT #89)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -351,6 +351,16 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.152 (2026-10-14) — UI restyle Phase 4: auth + public screens, live
+
+**4.1–4.7 shipped in one push** (`1dd228c`, DEPLOYMENT #90), on the user's call: build all of Phase 4, then ONE nightly
+(dispatched, `38430764913`). Per-step record: the plan's §3 ledger; parent-visible changes: PRD §7.21 and §14.1.
+
+- **Held:** no changed line touches `router.`/`auth.`/`signUp`/`signIn`/`disabled=` (the Phase 4 assertion); 18
+  drivers before = after, NOT FOUND 0 → 0; every new driver check proven red on the old build.
+- **Found:** a driver selecting by colour class went blind (§7.375, fixed by `role="alert"`). **Not done:** package
+  page's contact link and the admin reset page naming its account (both need data; BACKLOG fold-ins).
+
 ## 8.151 (2026-10-13, night) — UI restyle Phase 3: the ten parent screens, live and nightly-green
 
 **All of Phase 3 (3.1–3.10) shipped in one push** (`9f67aee`, DEPLOYMENT #89); nightly `38397974946` green, 74/74.
@@ -363,18 +373,7 @@ The plan's §3 ledger is the per-step record; the parent-visible changes are in 
 - **Prod-checked after:** 25 invoices, 1–8 lines each, parent-readable (3.2 RISK 13 closed); 0 credit notes on prod
   (BACKLOG *A credit note's amount has no positivity check*). **Not done:** no `/commit-review` per step (one review pass).
 
-## 8.150 (2026-10-13, evening) — legacy package matcher removed (Wave 9 item 9), live
-
-**Packages pay ONE way now: drawn at marking.** Engine v36 matches no package; `20261013000100` dropped
-`tenants.package_draw_at_marking`, the D9 guards and the Wave 6 backfill. Live: DEPLOYMENT #88 (engine first — a contract).
-
-- **Decided by the user:** plan without `/plan-with-confidence` (a filed deletion); "deploy" after local proof.
-- **Kept, not deleted:** 10 of 12 engine-matcher tests converted to marking-time (TESTING §5); each edited function lost
-  only its switch test — `guard_package_draw_order` keeps its NULL-tenant early return (migration header).
-- **Also:** nightly `38360405197` green → the plan's eight §3 verdict cells filled.
-- **Not done:** the admin's dead "pending draws" display (BACKLOG *Simplify the admin's live-balance display*).
-
-_(§8.149 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.150 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -416,8 +415,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-13 (night):** `38397974946` (dispatched by the user, `9f67aee`) GREEN, 74/74 — Phase 3 (3.1–3.10)
-and `706934f` (legacy matcher removal) verified; zero unverified restyle landings.
+**State on 2026-10-14:** `38430764913` (dispatched on the user's word, on `1dd228c`) is the verdict for **seven
+unverified Phase 4 landings** (4.1–4.7) — read it, fill the plan's seven verdict cells, and land nothing more until it is
+green. Previous: `38397974946` GREEN 74/74 (Phase 3).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -435,9 +435,11 @@ which mutate shared seed state — are in the same section.
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
-   **Phases 0–3 are live and verified** (2026-10-13). **Next: Phase 4 (auth + public), step 4.1** — a stricter gate:
-   never visual-only (§6, P4), so propose the full sweep or land under the HANDOVER §9 GATE. The public `$`→`S$` bug
-   is 4.5/4.6. Small, separate: BACKLOG *Cancelling a package request has no confirmation* (S, not visual-only). Keep the lid open during any local batch (§7.370).
+   **Phases 0–3 verified; Phase 4 live 2026-10-14, unverified until `38430764913` is read.** Then the **user's prod
+   hand-check** (Phase 4 head: sign in on both sites, a reset email to their own address, one live public invoice link);
+   a red → `git revert` + push. **Next build: Phase 5 (admin panel), step 5.1** — two of its drivers select by colour
+   class (§7.375): fix them by role in the step that restyles them. Small, separate: BACKLOG *Cancelling a package
+   request has no confirmation* (S). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 

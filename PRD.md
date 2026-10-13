@@ -2928,6 +2928,11 @@ directly, and no gateway takes a percentage. What the product supplies is
   the you-can't-scan-your-own-screen case; amount and reference are selectable text.
   Every failure mode returns one identical not-found response. The page is where the
   WhatsApp reminder link lands.
+  *(implemented 2026-10-14, UI restyle 4.5/4.6 — on both public pages, invoice and package,
+  every amount reads **`S$`** (it was a bare `$`); **Save QR image** is the one primary
+  button and **I've paid** a text link beneath it; a claim shows a blue acknowledgement
+  panel, Paid / Active a green one. The not-found page is no longer a dead end: it offers
+  **Sign in to SwimSync**, a link the parent presses — not a redirect)*
 - **WhatsApp reminders, by click-to-chat** *(Phase 2, implemented 2026-08-02)*. Every
   outstanding invoice row has a **WhatsApp** button: it opens a pre-filled chat
   (wa.me — free, ToS-compliant; the fixed message carries business name, children,
@@ -3645,7 +3650,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 
 | Screen | Key Elements | Notes |
 |--------|-------------|-------|
-| **Login / Register** | Email, password fields; Register / Login toggle | Simple form; forgot password link |
+| **Login / Register** | Email, password fields; Register / Login toggle | Simple form; forgot password link. *(implemented 2026-10-14, UI restyle 4.1–4.4 — Welcome, Sign In, Register, Forgot / Reset password and Accept-invite share DESIGN.md's flat card, labelled 44px inputs and one Lane Blue primary; every word unchanged. The admin panel's four sign-in pages follow in 4.7)* |
 | **Home Dashboard** | List of children with status badges; outstanding amount summary | Tap child card to drill down; show "Not Assigned Yet" if applicable. *(implemented 2026-10-13, UI restyle 3.4 — a card carries a status tag **only when the state is not routine** (Unassigned, Inactive); an active, assigned child has none. The family's outstanding total is an amber (Due) card, not red)* |
 | **Add / Edit Child** | Name, DOB, gender, notes fields | Form with save/cancel; validation on required fields (no swimming-ability field — see §5.1). *(implemented 2026-10-13 — Date of Birth is the **browser's date picker** on the web; a native build keeps the `YYYY-MM-DD` text field. Either way the stored value is the same `YYYY-MM-DD`)* |
 | **Child Profile** | Child details card; assignment status; class info if assigned | Show coach name, class day/time/location when assigned |

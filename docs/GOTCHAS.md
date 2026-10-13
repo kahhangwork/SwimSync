@@ -39,7 +39,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371 |
@@ -3083,3 +3083,12 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     app's "today" were different days. Before blaming a change, compare the log's mtime with its fixture log's —
     if they sit either side of 00:00 SGT, re-run, or pin the clock (`--now '<day> <time>+08'`) for batches that may
     run late. (2026-10-13, UI restyle 1.3 baseline.)
+
+375. **A driver that finds an element by its COLOUR class goes blind when a restyle changes the class — and reads
+    as a product failure.** `verify-admin-reset-password` located the error line as `p.text-red-600`; UI restyle 4.7
+    made it `text-status-danger-text`, and two checks reported *"(no error shown)"* while the page refused both
+    passwords correctly (its own hash-unchanged check still passed). Cost: one 18-driver batch read as a regression.
+    Fix: give the element a role (`role="alert"` on an error line) and select by role — `p[role="alert"]`, the `p`
+    because Next's route announcer is also `role=alert`. Before restyling a screen, grep its drivers for `locator("<tag>.`
+    with a colour class. Still waiting in Phase 5: `verify-class-admin` (`p.bg-red-50`), `verify-packages-admin`
+    (`div.border-red-200.bg-red-50`). (2026-10-14, UI restyle 4.7; recipe note in `UI_RESTYLE_PLAN.md` §5.)

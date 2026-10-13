@@ -1251,3 +1251,10 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     CI repo invariants locally; 24 parent drivers `--only` before (`fc2252d`) = after. Live bundle on swimsync.sg carried
     `No lessons are listed on this invoice` and `type:"date"` ~60 s after the push. Nightly `38397974946` (dispatched on
     the user's word) green, 74/74.
+
+90. **Deploy record (2026-10-14): UI restyle Phase 4 — auth + public screens, one push.** App-only (no migration, no
+    function; `migration list --linked` 0 pending, the app diff adds no `.rpc(`/`.select(`/`.from(`), so no backend gate:
+    `ui/auth-phase4` → `main` as `1dd228c` (4.1–4.7 + the `role="alert"` fix + docs). Every Phase 4 step keeps the gate
+    (P4); the user chose to build all seven and run one nightly. Before the push: CI repo invariants locally; 18 drivers
+    `--only` before (`c5453ec`) = after. Live: swimsync.sg's bundle carried `Sign in to SwimSync` within ~3 min;
+    admin.swimsync.sg's `/login` served `bg-ground` once its Vercel build finished (~12 min). Nightly `38430764913` dispatched on the user's word.
