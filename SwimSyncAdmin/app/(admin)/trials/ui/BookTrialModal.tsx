@@ -10,14 +10,14 @@ export function BookTrialModal(p: { t: TrialsState }) {
     <Modal title="Book a trial" open={p.t.bookOpen} onClose={() => p.t.setBookOpen(false)}>
       <div className="space-y-4">
         <label className="block">
-          <span className="text-xs font-semibold text-gray-600">Class</span>
+          <span className="text-label font-semibold text-ink-secondary">Class</span>
           <select
             value={p.t.bookClass}
             onChange={(e) => {
               p.t.setBookClass(e.target.value);
               p.t.setBookDate("");
             }}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
           >
             <option value="">Choose a class…</option>
             {p.t.classes.map((c) => (
@@ -29,12 +29,12 @@ export function BookTrialModal(p: { t: TrialsState }) {
         </label>
 
         <label className="block">
-          <span className="text-xs font-semibold text-gray-600">Lesson</span>
+          <span className="text-label font-semibold text-ink-secondary">Lesson</span>
           <select
             value={p.t.bookDate}
             onChange={(e) => p.t.setBookDate(e.target.value)}
             disabled={!p.t.bookClass}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+            className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body disabled:bg-ground"
           >
             <option value="">
               {p.t.bookClass ? "Choose a date…" : "Choose a class first"}
@@ -45,22 +45,22 @@ export function BookTrialModal(p: { t: TrialsState }) {
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-[11px] text-gray-400">
+          <span className="mt-1 block text-label text-ink-muted">
             Only the days this class actually runs.
           </span>
         </label>
 
-        <div className="rounded-lg border border-gray-200 p-3">
-          <p className="mb-2 text-xs font-semibold text-gray-600">Who is trying?</p>
+        <div className="rounded-card border border-border p-3">
+          <p className="mb-2 text-label font-semibold text-ink-secondary">Who is trying?</p>
           {p.t.eligible.length > 0 && (
             <label className="block mb-2">
-              <span className="text-[11px] text-gray-500">
+              <span className="text-label text-ink-muted">
                 A child already in SwimSync
               </span>
               <select
                 value={p.t.bookExisting}
                 onChange={(e) => p.t.setBookExisting(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
               >
                 <option value="">— someone new —</option>
                 {p.t.eligible.map((k) => (
@@ -69,7 +69,7 @@ export function BookTrialModal(p: { t: TrialsState }) {
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-[11px] text-gray-400">
+              <span className="mt-1 block text-label text-ink-muted">
                 Only children who aren&apos;t currently in a class.
               </span>
             </label>
@@ -81,7 +81,7 @@ export function BookTrialModal(p: { t: TrialsState }) {
                 value={p.t.bookName}
                 onChange={(e) => p.t.setBookName(e.target.value)}
                 placeholder="Child's name"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
               />
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div>
@@ -89,7 +89,7 @@ export function BookTrialModal(p: { t: TrialsState }) {
                     value={p.t.bookPhone}
                     onChange={(e) => p.t.setBookPhone(e.target.value)}
                     placeholder="Parent's phone *"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
                   />
                   {/* Advisory only. The phone stays required — that guard
                       lives in handleBook() and is untouched — but a number
@@ -103,12 +103,12 @@ export function BookTrialModal(p: { t: TrialsState }) {
                     onChange={(e) => p.t.setBookEmail(e.target.value)}
                     placeholder="Parent's email (optional)"
                     type="email"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
                   />
                   <ContactHint check={checkEmail(p.t.bookEmail)} />
                 </div>
               </div>
-              <p className="mt-1 text-[11px] text-gray-400">
+              <p className="mt-1 text-label text-ink-muted">
                 The phone is required: it is how this child is matched to
                 their parent&apos;s account later, because names get written
                 many different ways. The email is optional — it makes that
@@ -119,7 +119,7 @@ export function BookTrialModal(p: { t: TrialsState }) {
         </div>
 
         {p.t.bookError && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
             {p.t.bookError}
           </p>
         )}

@@ -8,12 +8,12 @@ export function UnpricedNotice(p: { t: TrialsState }) {
   return (
     <>
       {p.t.unpriced.length > 0 && (
-        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800">
+        <div className="mb-5 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-3">
+          <p className="text-body font-semibold text-status-warning-text">
             Set a price for {p.t.unpriced.length === 1 ? "this class type" : "these class types"}:{" "}
             {p.t.unpriced.map((c) => c.name).join(", ")}
           </p>
-          <p className="mt-1 text-xs text-amber-700">
+          <p className="mt-1 text-label text-status-warning-text">
             Until you do, a paid trial of those classes is charged at the
             class&apos;s own lesson price. Nothing is blocked — but it is
             probably not what you want to charge someone trying you out.

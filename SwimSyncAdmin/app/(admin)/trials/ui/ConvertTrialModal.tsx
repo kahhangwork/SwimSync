@@ -14,11 +14,11 @@ export function ConvertTrialModal(p: { t: TrialsState }) {
     >
       {p.t.convertTarget && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-body text-ink-secondary">
             Enrol <strong>{p.t.convertTarget.student_name}</strong> into{" "}
             <strong>{p.t.convertTarget.class_title}</strong>?
           </p>
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2 text-label text-status-warning-text">
             This makes them <strong>expected every week</strong> from now on. An
             unmarked lesson then blocks that class&apos;s billing month — so only
             convert a child who is really joining. The trial lesson above still
@@ -32,7 +32,7 @@ export function ConvertTrialModal(p: { t: TrialsState }) {
           />
 
           {p.t.convertError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
               {p.t.convertError}
             </p>
           )}

@@ -7,32 +7,32 @@ export function PastUnmarkedPanel(p: { t: TrialsState }) {
   return (
     <>
       {p.t.past.length > 0 && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-700">
+        <div className="mb-6 rounded-card border border-status-danger-border bg-status-danger-bg p-4">
+          <p className="text-body font-semibold text-status-danger-text">
             {p.t.past.length} trial{p.t.past.length === 1 ? "" : "s"} still need marking
           </p>
-          <p className="mt-0.5 mb-3 text-xs text-red-700">
+          <p className="mt-0.5 mb-3 text-label text-status-danger-text">
             These lessons have passed and the coach hasn&apos;t recorded them.
             The billing month stays open until they do — mark them in the coach
             app, or cancel the booking if the trial never happened.
           </p>
           <ul className="space-y-1">
             {p.t.past.map((b) => (
-              <li key={b.id} className="flex items-center gap-3 text-xs text-gray-800">
+              <li key={b.id} className="flex items-center gap-3 text-label text-ink">
                 <span className="font-semibold">{b.student_name}</span>
-                <span className="text-gray-500">
+                <span className="text-ink-muted">
                   {b.class_title} · {formatSgDate(b.session_date)}
                 </span>
                 <div className="ml-auto flex items-center gap-2">
                   <button
                     onClick={() => p.t.openConvert(b)}
-                    className="rounded-lg border border-sky-300 bg-white px-2 py-0.5 font-semibold text-sky-700 hover:bg-sky-50"
+                    className="rounded-control border border-border-strong bg-surface px-2 py-0.5 font-semibold text-ink hover:bg-ground"
                   >
                     Convert to enrolled
                   </button>
                   <button
                     onClick={() => p.t.handleCancel(b.id)}
-                    className="rounded-lg border border-gray-300 px-2 py-0.5 font-semibold text-gray-600 hover:bg-white"
+                    className="rounded-control border border-border-strong px-2 py-0.5 font-semibold text-ink-secondary hover:bg-surface"
                   >
                     Cancel
                   </button>
