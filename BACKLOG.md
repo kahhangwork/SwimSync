@@ -1606,7 +1606,8 @@ visible text, so keep words unless the item changes them on purpose):**
    line so the plan's S-numbers still resolve.
 2. ~~**Mobile tab bar to spec**~~ — **shipped 2026-10-12** (UI restyle step 1.2, `components/TabBar.tsx`). Kept as a
    line so the plan's S-numbers still resolve.
-3. **Parent invoice card** (Billing → Invoices) — Pay-First (PayNow full-width primary, "Already paid?" text link
+3. ~~**Parent invoice card**~~ — **shipped 2026-10-13** (UI restyle step 3.1). Kept as a line so the plan's S-numbers
+   still resolve. (Billing → Invoices) — Pay-First (PayNow full-width primary, "Already paid?" text link
    beneath, Info "Claimed · awaiting confirmation" after a claim); "Gross / Net Amount" → "N lessons / Credit / To pay";
    unpaid is amber, money in Ink, true minus.
 4. **Admin Invoices: Generate disabled with the reason** — today a live primary while the seed month has 20 unmarked
@@ -1615,7 +1616,8 @@ visible text, so keep words unless the item changes them on purpose):**
 5. ~~**Admin sidebar stacks below 800px**~~ — **shipped 2026-10-13** (UI restyle step 1.6: top bar + drawer below 800px,
    Ground sidebar, Selected fill, status-coloured badges; PRD *Sidebar navigation*). Kept as a line so the plan's
    S-numbers still resolve. (S8's badge half is done; its Lessons-page half is not.)
-6. **Parent invoice detail** — the same Pay-First / Plain Words fix, and the **Lesson Breakdown card renders empty**
+6. ~~**Parent invoice detail**~~ — **shipped 2026-10-13** (UI restyle step 3.2; the empty breakdown was empty data — the
+   card now says so). Kept as a line so the plan's S-numbers still resolve. Was: the same Pay-First / Plain Words fix, and the **Lesson Breakdown card renders empty**
    (no rows, no empty text), so a parent cannot see what they are paying for.
 7. ~~**One status scale across every tag**~~ — **shipped 2026-10-13** (UI restyle step 1.4: twin `lib/statusTone.ts`,
    both `StatusBadge`s through `components/ui/Tag`, admin Claimed tag, billing-month tones; PRD §7.7, §7.21). Kept as a
@@ -1669,6 +1671,18 @@ functions served and real tokens. Fold-ins from them:
 - Admins table: `rounded-full` "invited"/"Owner" pills and three inline actions including a red Delete → one action +
   a "…" menu (add to the Tables fold-in above).
 Screenshots were local only (`capture15/`, not kept).
+
+### Cancelling a package request has no confirmation — **S** — _filed 2026-10-13_
+Billing → Packages → a pending package's **Cancel** calls `cancelRequest` → `cancelPackageRequest` at once: no
+`confirmAction`, no undo. That includes a renewal OFFER the business prepared (`offered_by`). Found reviewing UI restyle
+3.8, which moved Cancel from a bordered button beside Pay to a text link 12px under the full-width Pay via PayNow — the
+handler did not change, but it is now in the thumb's path.
+
+**Why:** one mis-tap discards a coach-prepared offer, and the parent must ask the business to prepare it again.
+
+**Fix:** wrap the call in `confirmAction` (never `Alert.alert` — a no-op on RN-web), or render it as the shared
+`Button variant="destructive"` with a `confirm`. `verify-app-money` D presses this Cancel; `launch()` accepts
+`window.confirm`, so the driver keeps passing — prove it with `--only app-money`. Not visual-only.
 
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
