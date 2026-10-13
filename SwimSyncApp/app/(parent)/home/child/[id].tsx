@@ -33,11 +33,11 @@ export default function ChildProfileScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <Header />
 
       <ScrollView
-        contentContainerClassName="px-5 pb-10 gap-4"
+        contentContainerClassName="px-5 pb-10 gap-3"
         showsVerticalScrollIndicator={false}
       >
         <ProfileCard child={child} age={age} />

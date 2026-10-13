@@ -1,7 +1,6 @@
 // The back chevron and title.
-// Moved VERBATIM from app/(parent)/home/child/[id].tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-F); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/home/child/[id].tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-F); DESIGN.md in UI restyle step 3.5.
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
@@ -9,14 +8,16 @@ import { Ionicons } from "@expo/vector-icons";
 
 export function Header() {
   return (
-    <>
-      {/* Header */}
-      <View className="flex-row items-center px-5 pt-4 pb-3 bg-sky-50">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
-          <Ionicons name="chevron-back" size={24} color="#0ea5e9" />
-        </TouchableOpacity>
-        <Text className="text-lg font-bold text-gray-900 flex-1">Child Profile</Text>
-      </View>
-    </>
+    <View className="flex-row items-center gap-2 px-3 pt-4 pb-3 bg-ground">
+      <TouchableOpacity
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        className="w-11 h-11 items-center justify-center"
+      >
+        <Ionicons name="chevron-back" size={24} color="#2563eb" />
+      </TouchableOpacity>
+      <Text className="text-headline font-semibold text-ink flex-1">Child Profile</Text>
+    </View>
   );
 }

@@ -1,27 +1,25 @@
 // The two quick-action buttons.
-// Moved VERBATIM from app/(parent)/home/child/[id].tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-F); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/home/child/[id].tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-F); DESIGN.md in UI restyle step 3.5 — both secondary: neither is the
+// thing this screen exists for, so neither takes the one Lane Blue primary.
 import React from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
-import PrimaryButton from "@/components/PrimaryButton";
+import { Button } from "@/components/ui/Button";
 
 export function QuickActions() {
   return (
-    <>
-      {/* Quick actions */}
-      <View className="gap-3">
-        <PrimaryButton
-          label="View Attendance History"
-          onPress={() => router.push("/(parent)/attendance")}
-        />
-        <PrimaryButton
-          label="View Invoices"
-          variant="outline"
-          onPress={() => router.push("/(parent)/billing")}
-        />
-      </View>
-    </>
+    <View className="gap-3">
+      <Button
+        variant="secondary"
+        label="View Attendance History"
+        onPress={() => router.push("/(parent)/attendance")}
+      />
+      <Button
+        variant="secondary"
+        label="View Invoices"
+        onPress={() => router.push("/(parent)/billing")}
+      />
+    </View>
   );
 }

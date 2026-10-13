@@ -1,10 +1,11 @@
 // What this level teaches, and the child's grades against it.
-// Moved VERBATIM from app/(parent)/home/child/[id].tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-F); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/home/child/[id].tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-F). UI restyle step 3.5: each grade is a tag — the top grade Success,
+// any other neutral (as on the coach's Grade screen, step 2.5).
 import React from "react";
 import { View, Text } from "react-native";
-import Card from "@/components/Card";
+import { Surface } from "@/components/ui/Surface";
+import { Tag } from "@/components/ui/Tag";
 import { summariseSkillProgress } from "@/lib/skillProgress";
 import type { ChildDetail } from "../types";
 
@@ -27,21 +28,21 @@ export function LevelCard(p: { child: ChildDetail }) {
             child.scale
           );
           return (
-            <Card>
-              <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-base font-bold text-gray-900">
+            <Surface>
+              <View className="flex-row items-center justify-between gap-3 mb-1">
+                <Text className="text-headline font-semibold text-ink flex-1">
                   {child.level_label}
                 </Text>
                 {/* The headline: how many skills are at the top grade. Only
                     shown once a scale exists and there is something to count. */}
                 {summary.total > 0 && summary.topGradeLabel ? (
-                  <Text className="text-xs font-semibold text-gray-500">
+                  <Text className="text-label font-medium text-ink-secondary" style={{ fontVariant: ["tabular-nums"] }}>
                     {summary.doneCount} of {summary.total} at {summary.topGradeLabel}
                   </Text>
                 ) : null}
               </View>
               {child.level_note ? (
-                <Text className="text-xs italic text-gray-500 mb-3">
+                <Text className="text-body-secondary text-ink-secondary mb-3">
                   {child.level_note}
                 </Text>
               ) : (
@@ -51,35 +52,21 @@ export function LevelCard(p: { child: ChildDetail }) {
                 <View className="gap-2">
                   {summary.skills.map((sk, i) => (
                     <View key={sk.id} className="flex-row items-center gap-2.5">
-                      <Text className="text-sky-500 font-semibold text-sm w-4">
+                      <Text className="text-body font-semibold text-ink-muted w-5" style={{ fontVariant: ["tabular-nums"] }}>
                         {i + 1}
                       </Text>
-                      <Text className="text-sm text-gray-700 flex-1">{sk.label}</Text>
+                      <Text className="text-body text-ink flex-1">{sk.label}</Text>
                       {/* The grade the coach recorded, or nothing yet. */}
                       {sk.grade ? (
-                        <View
-                          className={
-                            "px-2.5 py-1 rounded-full " +
-                            (sk.done ? "bg-green-100" : "bg-sky-100")
-                          }
-                        >
-                          <Text
-                            className={
-                              "text-xs font-semibold " +
-                              (sk.done ? "text-green-700" : "text-sky-700")
-                            }
-                          >
-                            {sk.grade.label}
-                          </Text>
-                        </View>
+                        <Tag label={sk.grade.label} tone={sk.done ? "success" : "neutral"} />
                       ) : (
-                        <Text className="text-xs text-gray-300">Not yet graded</Text>
+                        <Text className="text-label text-ink-muted">Not yet graded</Text>
                       )}
                     </View>
                   ))}
                 </View>
               ) : null}
-            </Card>
+            </Surface>
           );
         })()
       ) : null}
