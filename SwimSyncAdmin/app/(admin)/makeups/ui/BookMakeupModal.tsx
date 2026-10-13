@@ -10,14 +10,14 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
     <Modal title="Book a make-up" open={p.m.bookOpen} onClose={() => p.m.setBookOpen(false)}>
       <div className="space-y-4">
         <div>
-          <span className="text-xs font-semibold text-gray-600">Child</span>
+          <span className="text-label font-semibold text-ink-secondary">Child</span>
           {p.m.kid ? (
             // Chosen. One line naming child + class, and a Change control —
             // re-opening the search is how you un-pick.
-            <div className="mt-1 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
-              <span className="text-sm text-sky-900">
+            <div className="mt-1 flex items-center justify-between rounded-card border border-status-info-border bg-status-info-bg px-3 py-2">
+              <span className="text-body text-status-info-text">
                 <span className="font-semibold">{p.m.kid.full_name}</span>
-                <span className="text-sky-700">
+                <span className="text-primary">
                   {" "}
                   — {p.m.kid.home_classes.map((c) => c.title).join(" · ")}
                 </span>
@@ -28,7 +28,7 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
                   p.m.setBookClass("");
                   p.m.setBookDate("");
                 }}
-                className="rounded-lg border border-sky-300 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-white"
+                className="rounded-control border border-border-strong bg-surface px-2 py-0.5 text-label font-semibold text-ink hover:bg-ground"
               >
                 Change
               </button>
@@ -41,11 +41,11 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
                 value={p.m.kidQuery}
                 onChange={(e) => p.m.setKidQuery(e.target.value)}
                 autoFocus
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+              <div className="mt-1 max-h-56 overflow-y-auto rounded-control border border-border divide-y divide-divider">
                 {p.m.kidMatches.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-gray-400">
+                  <p className="px-3 py-2 text-label text-ink-muted">
                     No enrolled child matches “{p.m.kidQuery}”.
                   </p>
                 ) : (
@@ -58,25 +58,25 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
                         p.m.setBookClass("");
                         p.m.setBookDate("");
                       }}
-                      className="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-sky-50"
+                      className="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left text-body hover:bg-ground"
                     >
-                      <span className="font-medium text-gray-800">
+                      <span className="font-medium text-ink">
                         {k.full_name}
                       </span>
-                      <span className="shrink-0 text-xs text-gray-500">
+                      <span className="shrink-0 text-label text-ink-muted">
                         {k.home_classes.map((c) => c.title).join(" · ")}
                       </span>
                     </button>
                   ))
                 )}
                 {p.m.kidMatches.length > KID_RESULTS_CAP && (
-                  <p className="px-3 py-1.5 text-[11px] text-gray-400">
+                  <p className="px-3 py-1.5 text-label text-ink-muted">
                     {p.m.kidMatches.length - KID_RESULTS_CAP} more — keep typing to
                     narrow it down.
                   </p>
                 )}
               </div>
-              <span className="mt-1 block text-[11px] text-gray-400">
+              <span className="mt-1 block text-label text-ink-muted">
                 Only children currently enrolled in a class. The search matches
                 the child&apos;s name or their class&apos;s name.
               </span>
@@ -91,7 +91,7 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
             prices the invoice line. */}
         {p.m.kid && p.m.kid.home_classes.length > 1 && (
           <label className="block">
-            <span className="text-xs font-semibold text-gray-600">
+            <span className="text-label font-semibold text-ink-secondary">
               Which class is this making up?
             </span>
             <select
@@ -104,7 +104,7 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
                 p.m.setBookClass("");
                 p.m.setBookDate("");
               }}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
             >
               <option value="">Choose the class they missed…</option>
               {p.m.kid.home_classes.map((c) => (
@@ -117,7 +117,7 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
         )}
 
         {p.m.kid && p.m.kid.home_classes.length > 1 && !p.m.homeClass ? (
-          <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <p className="rounded-control border border-border bg-ground px-3 py-2 text-label text-ink-secondary">
             {p.m.kid.full_name} is in {p.m.kid.home_classes.length} classes. Pick the one
             they missed and the rest of the form will follow.
           </p>
@@ -126,11 +126,11 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
           // here: the private-coach one (only one class of its kind exists),
           // and — since Wave 2 — a child who is already in EVERY class of
           // their kind. Both have the same answer.
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-            <p className="text-xs font-semibold text-amber-800">
+          <div className="rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2.5">
+            <p className="text-label font-semibold text-status-warning-text">
               No other class of the same kind to join.
             </p>
-            <p className="mt-1 text-xs text-amber-700">
+            <p className="mt-1 text-label text-status-warning-text">
               {p.m.kid.home_classes.length > 1
                 ? `${p.m.kid.full_name} is already in every class of this kind, so there is`
                 : `${p.m.homeClass.title} is the only class of its kind, so there is`}{" "}
@@ -145,7 +145,7 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
         ) : (
           <>
             <label className="block">
-              <span className="text-xs font-semibold text-gray-600">
+              <span className="text-label font-semibold text-ink-secondary">
                 Class to join
               </span>
               <select
@@ -155,7 +155,7 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
                   p.m.setBookDate("");
                 }}
                 disabled={!p.m.bookKid}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+                className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body disabled:bg-ground"
               >
                 <option value="">
                   {p.m.bookKid ? "Choose a class…" : "Choose a child first"}
@@ -166,18 +166,18 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-[11px] text-gray-400">
+              <span className="mt-1 block text-label text-ink-muted">
                 Only classes of the same kind as the child&apos;s own.
               </span>
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold text-gray-600">Lesson</span>
+              <span className="text-label font-semibold text-ink-secondary">Lesson</span>
               <select
                 value={p.m.bookDate}
                 onChange={(e) => p.m.setBookDate(e.target.value)}
                 disabled={!p.m.bookClass}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+                className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body disabled:bg-ground"
               >
                 <option value="">
                   {p.m.bookClass ? "Choose a date…" : "Choose a class first"}
@@ -188,7 +188,7 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-[11px] text-gray-400">
+              <span className="mt-1 block text-label text-ink-muted">
                 The days this class runs, plus any extra lesson its admin has
                 scheduled.
               </span>
@@ -197,13 +197,13 @@ export function BookMakeupModal(p: { m: MakeupsState }) {
         )}
 
         {p.m.expiryWarning && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2 text-label text-status-warning-text">
             {p.m.expiryWarning}
           </p>
         )}
 
         {p.m.bookError && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
             {p.m.bookError}
           </p>
         )}

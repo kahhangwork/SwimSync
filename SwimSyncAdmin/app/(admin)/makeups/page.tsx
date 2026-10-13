@@ -30,7 +30,7 @@ export default function MakeupsPage() {
   const m = useMakeups();
 
   if (m.loading) {
-    return <p className="text-sm text-gray-500">Loading…</p>;
+    return <p className="text-body text-ink-muted">Loading…</p>;
   }
 
   return (
@@ -46,13 +46,13 @@ export default function MakeupsPage() {
 
       <UpcomingTable m={m} />
 
-      <p className="mt-4 max-w-2xl text-xs text-gray-500">
+      <p className="mt-4 max-w-2xl text-label text-ink-muted">
         A make-up stays in the child&apos;s own kind of class — group with
         group, private with private. If the family has a prepaid package, the
         attended make-up draws from it; otherwise it bills at the child&apos;s
         own class price. To repeat a lesson with the child&apos;s <em>own</em>{" "}
         class on another day, use <strong>Extra lesson</strong> on the{" "}
-        <Link href="/classes" className="font-semibold text-blue-600 hover:underline">
+        <Link href="/classes" className="font-semibold text-primary hover:underline">
           Classes
         </Link>{" "}
         page instead.
