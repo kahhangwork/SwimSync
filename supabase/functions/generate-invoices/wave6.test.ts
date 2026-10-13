@@ -1,13 +1,13 @@
 // Wave 6 — package lessons draw AT MARKING; the engine bills only ad-hoc lessons.
 // docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md §1.2 (engine v33).
 //
-// With tenants.package_draw_at_marking on, the attendance trigger draws the package
-// when a lesson is marked (migration 20261006000100); the engine must (a) never
-// bill a drawn lesson, (b) never match packages itself, (c) still seal a month
-// whose lessons were all package-funded (D2: optional Generate, 0 invoices),
-// (d) not let a drawn earlier month block a later one (ordering guard arm 1),
-// (e) behave identically for a business with no packages, and (f) FAIL CLOSED
-// when it cannot read which lessons were drawn.
+// The attendance trigger draws the package when a lesson is marked (migration
+// 20261006000100; since Wave 9 item 9 the only way a package pays); the engine
+// must (a) never bill a drawn lesson, (b) never match packages itself, (c) still
+// seal a month whose lessons were all package-funded (D2: optional Generate, 0
+// invoices), (d) not let a drawn earlier month block a later one (ordering guard
+// arm 1), (e) bill a business with no packages exactly as before, and (f) FAIL
+// CLOSED when it cannot read which lessons were drawn.
 //
 // Dates are 2027 on purpose: the D6 guard reads the REAL clock, and lessons after
 // today are never "unmarked", so the guard stays out of these engine tests.
@@ -72,7 +72,7 @@ async function isSealed(s: Scenario, month: string): Promise<boolean> {
 }
 
 Deno.test("W6-1: a package-only month issues NO invoice and NO email — and still seals (D2)", async () => {
-  const s = await newScenario({ price: 50, billing: monthEnded("2027-01"), drawAtMarking: true });
+  const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
   try {
     const pkg = await sellPackage(s, { lessons: 10, rate: 40, start: "2027-01-01" });
     const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
@@ -96,7 +96,7 @@ Deno.test("W6-1: a package-only month issues NO invoice and NO email — and sti
 });
 
 Deno.test("W6-2: a mixed family's invoice carries ONLY the ad-hoc lesson, at the class price (D1)", async () => {
-  const s = await newScenario({ price: 50, billing: monthEnded("2027-01"), drawAtMarking: true });
+  const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
   try {
     const pkg = await sellPackage(s, { lessons: 1, rate: 40, start: "2027-01-01" });
     const a = await s.addSession("2027-01-02"); await s.mark(a, "present"); // drawn
@@ -126,7 +126,7 @@ Deno.test("W6-2: a mixed family's invoice carries ONLY the ad-hoc lesson, at the
 const CLOCK = new Date("2027-04-08T02:00:00Z");
 
 Deno.test("W6-3: an earlier unsealed month whose present lessons were ALL drawn does not block a later one", async () => {
-  const s = await newScenario({ price: 50, enrolledAt: "2027-01-01", drawAtMarking: true });
+  const s = await newScenario({ price: 50, enrolledAt: "2027-01-01" });
   try {
     await sellPackage(s, { lessons: 1, rate: 40, start: "2027-01-01" });
     const jan = await s.addSession("2027-01-02"); await s.mark(jan, "present"); // drawn
@@ -146,7 +146,7 @@ Deno.test("W6-3: an earlier unsealed month whose present lessons were ALL drawn 
 });
 
 Deno.test("W6-4: ...but ONE undrawn present lesson in that earlier month still blocks", async () => {
-  const s = await newScenario({ price: 50, enrolledAt: "2027-01-01", drawAtMarking: true });
+  const s = await newScenario({ price: 50, enrolledAt: "2027-01-01" });
   try {
     await sellPackage(s, { lessons: 1, rate: 40, start: "2027-01-01" });
     const j1 = await s.addSession("2027-01-02"); await s.mark(j1, "present"); // drawn
@@ -166,38 +166,38 @@ Deno.test("W6-4: ...but ONE undrawn present lesson in that earlier month still b
   }
 });
 
-Deno.test("W6-5: AD-HOC PARITY — a business with no packages bills identically with the switch on or off", async () => {
-  async function run(on: boolean) {
-    const s = await newScenario({ price: 30, billing: monthEnded("2027-01"), drawAtMarking: on });
-    try {
-      const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
-      const b = await s.addSession("2027-01-09"); await s.mark(b, "trial_paid");
-      const c = await s.addSession("2027-01-16"); await s.mark(c, "absent");
-      await s.completeMonth("2027-01");
-      const res = await generateInvoices(s.db, {
-        tenant_id: s.tenantId, mode: "manual", billing_month: "2027-01", now: s.now,
-      });
-      const inv = await getInvoice(s.db, s.parentId, "2027-01");
-      const { data: lines } = await s.db.from("invoice_items")
-        .select("session_date, amount, attendance_status").eq("invoice_id", inv?.id ?? "")
-        .order("session_date");
-      return {
-        status: res.status, created: res.invoices_created, emails: (res.created ?? []).length,
-        gross: Number(inv?.gross), net: Number(inv?.net), pkg: Number(inv?.package_applied),
-        lines: (lines ?? []).map((l) => `${l.session_date}:${Number(l.amount)}:${l.attendance_status}`),
-      };
-    } finally {
-      await s.teardown();
-    }
+const W6_5_EXPECTED = {
+  status: "complete — billing month sealed", created: 1, emails: 1, gross: 60, net: 60, pkg: 0,
+  lines: ["2027-01-02:30:present", "2027-01-09:30:trial_paid"],
+};
+
+Deno.test("W6-5: AD-HOC — a business with no packages bills present and trial_paid at the class price, absent free", async () => {
+  // Was the switch-on/off parity test; the switch is gone, so the off run's figures are pinned instead.
+  const s = await newScenario({ price: 30, billing: monthEnded("2027-01") });
+  try {
+    const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
+    const b = await s.addSession("2027-01-09"); await s.mark(b, "trial_paid");
+    const c = await s.addSession("2027-01-16"); await s.mark(c, "absent");
+    await s.completeMonth("2027-01");
+    const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", billing_month: "2027-01", now: s.now,
+    });
+    const inv = await getInvoice(s.db, s.parentId, "2027-01");
+    const { data: lines } = await s.db.from("invoice_items")
+      .select("session_date, amount, attendance_status").eq("invoice_id", inv?.id ?? "")
+      .order("session_date");
+    assertEquals({
+      status: res.status, created: res.invoices_created, emails: (res.created ?? []).length,
+      gross: Number(inv?.gross), net: Number(inv?.net), pkg: Number(inv?.package_applied),
+      lines: (lines ?? []).map((l) => `${l.session_date}:${Number(l.amount)}:${l.attendance_status}`),
+    }, W6_5_EXPECTED);
+  } finally {
+    await s.teardown();
   }
-  const off = await run(false);
-  const on = await run(true);
-  assertEquals(on, off);
-  assertEquals(off.created, 1);
 });
 
 Deno.test("W6-6: FAIL CLOSED — an unreadable drawn set returns package_mode_unreadable, no invoice, no seal", async () => {
-  const s = await newScenario({ price: 50, billing: monthEnded("2027-01"), drawAtMarking: true });
+  const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
   try {
     const a = await s.addSession("2027-01-02"); await s.mark(a, "present"); // no package: ad-hoc
     await s.completeMonth("2027-01");
@@ -230,8 +230,8 @@ Deno.test("W6-6: FAIL CLOSED — an unreadable drawn set returns package_mode_un
   }
 });
 
-Deno.test("W6-7: with the switch on the ENGINE matches no package — a lesson kept ad-hoc is invoiced at the class price", async () => {
-  const s = await newScenario({ price: 50, billing: monthEnded("2027-01"), drawAtMarking: true });
+Deno.test("W6-7: the ENGINE matches no package — a lesson kept ad-hoc is invoiced at the class price", async () => {
+  const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
   try {
     // Marked BEFORE the package existed (D5 "Keep as ad-hoc": no backlog draw).
     const a = await s.addSession("2027-01-02"); await s.mark(a, "present");

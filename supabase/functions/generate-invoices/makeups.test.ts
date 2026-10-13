@@ -10,9 +10,9 @@
 //   package draw or lost ad-hoc revenue).
 //
 //   PRICING — an ad-hoc make-up guest pays their HOME class's effective-dated
-//   rate on the lesson's own date, never the host class's. A package family
-//   draws at the package's locked rate against the category SNAPSHOTTED on the
-//   booking (§7.45 — classes.category_id is mutable and money depends on it).
+//   rate on the lesson's own date, never the host class's. (A package family's
+//   make-up draws AT MARKING against the category SNAPSHOTTED on the booking —
+//   §7.45; that rule lives in package_candidates_for and its pgTAP case 13.)
 //
 // The class weekday defaults to SATURDAY, so host-class dates below are
 // Saturdays; the second class runs SUNDAY.
@@ -66,46 +66,6 @@ async function addGuestKid(s: Scenario, classId: string): Promise<string> {
     student_id: kid,
   });
   return kid;
-}
-
-async function addProduct(
-  s: Scenario,
-  opts: { lessons: number; rate: number; categoryId?: string | null }
-): Promise<string> {
-  const { data, error } = await s.db
-    .from("package_products")
-    .insert({
-      tenant_id: s.tenantId,
-      name: `${opts.lessons} lessons @ ${opts.rate} (${s.tag})`,
-      category_id: opts.categoryId ?? null,
-      lesson_count: opts.lessons,
-      rate_per_lesson: opts.rate,
-      validity_months: 12,
-    })
-    .select("id")
-    .single();
-  if (error || !data) throw new Error(`addProduct: ${error?.message}`);
-  return data.id as string;
-}
-
-async function buyPackage(
-  s: Scenario,
-  productId: string,
-  confirmedAt: string
-): Promise<string> {
-  const { data, error } = await s.db
-    .from("parent_packages")
-    .insert({
-      tenant_id: s.tenantId,
-      parent_id: s.parentId,
-      product_id: productId,
-      status: "active",
-      confirmed_at: confirmedAt,
-    })
-    .select("id")
-    .single();
-  if (error || !data) throw new Error(`buyPackage: ${error?.message}`);
-  return data.id as string;
 }
 
 // ── THE TRIPWIRE (⚠ RISK 1) ─────────────────────────────────────────────────
@@ -296,52 +256,6 @@ Deno.test("the home rate is EFFECTIVE-DATED: a raise after the make-up date does
   }
 });
 
-Deno.test("⚠ THE SNAPSHOT TEST: a package draws for the make-up even after the HOST class is re-tagged", async () => {
-  const s = await newScenario({ price: 40, billing: monthEnded("2029-07") });
-  try {
-    const home = await addHomeClass(s, { price: 35 });
-    const kid = await addGuestKid(s, home);
-    const productId = await addProduct(s, {
-      lessons: 10, rate: 30, categoryId: s.categoryId,
-    });
-    const pkgId = await buyPackage(s, productId, "2029-06-01T04:00:00Z");
-
-    const sess = await s.addSession("2029-07-07");
-    await s.mark(sess, "present");
-    await s.mark(sess, "present", kid);
-    await s.bookMakeup(kid, "2029-07-07", { homeClassId: home });
-
-    // The admin re-tags the HOST class after the booking. The booking's
-    // category snapshot must keep the draw; the member's own lesson follows
-    // the live category and correctly stops matching.
-    await s.db
-      .from("classes")
-      .update({ category_id: s.categoryId2 })
-      .eq("id", s.classId);
-
-    await s.completeMonth("2029-07");
-    await s.completeMonth("2029-07", home);
-
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", billing_month: "2029-07", now: s.now,
-    });
-
-    const inv = await getInvoice(s.db, s.parentId, "2029-07");
-    assertEquals(inv!.gross, 70, "40 (member, now uncovered) + 30 (guest at the LOCKED package rate)");
-    assertEquals(inv!.package_applied, 30, "exactly the guest's line drew");
-    assertEquals(inv!.net, 40);
-
-    const { data: pkg } = await s.db
-      .from("parent_packages").select("value_remaining").eq("id", pkgId).single();
-    assertEquals(Number(pkg!.value_remaining), 270, "300 − one locked-rate draw");
-
-    const chk = await checkInvariants(s.db, s.parentId);
-    assert(chk.ok, chk.problems.join("; "));
-  } finally {
-    await s.teardown();
-  }
-});
-
 Deno.test("a guest who does not turn up bills NOTHING, and the month closes", async () => {
   const s = await newScenario({ price: 40, billing: monthEnded("2029-08") });
   try {
@@ -447,49 +361,6 @@ Deno.test("a make-up into an admin-scheduled OFF-SCHEDULE session bills and gate
     assertEquals(res.sealed, true);
     const inv = await getInvoice(s.db, s.parentId, "2029-10");
     assertEquals(inv!.gross, 75, "40 (member, extra lesson) + 35 (guest at home rate)");
-  } finally {
-    await s.teardown();
-  }
-});
-
-// ⚠ RISK 5 — the SQL simulation and the engine must not drift.
-Deno.test("package_live_balances() predicts a make-up draw EXACTLY, even after a host re-tag", async () => {
-  const s = await newScenario({ price: 40, billing: monthEnded("2029-11") });
-  try {
-    const home = await addHomeClass(s, { price: 35 });
-    const kid = await addGuestKid(s, home);
-    const productId = await addProduct(s, {
-      lessons: 10, rate: 30, categoryId: s.categoryId,
-    });
-    const pkgId = await buyPackage(s, productId, "2029-10-01T04:00:00Z");
-
-    const sess = await s.addSession("2029-11-03");
-    await s.mark(sess, "present");
-    await s.mark(sess, "present", kid);
-    await s.bookMakeup(kid, "2029-11-03", { homeClassId: home });
-    await s.db
-      .from("classes")
-      .update({ category_id: s.categoryId2 })
-      .eq("id", s.classId);
-    await s.completeMonth("2029-11");
-    await s.completeMonth("2029-11", home);
-
-    // The PREDICTION, before any invoice exists.
-    const { data: pred } = await s.db.rpc("package_live_balances");
-    const mine = (pred ?? []).find(
-      (r: { parent_package_id: string }) => r.parent_package_id === pkgId
-    );
-    assertEquals(Number(mine!.live_value_remaining), 270,
-      "the simulation sees the pending make-up draw through the booking's snapshot");
-
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", billing_month: "2029-11", now: s.now,
-    });
-
-    // The SETTLEMENT equals the prediction.
-    const { data: pkg } = await s.db
-      .from("parent_packages").select("value_remaining").eq("id", pkgId).single();
-    assertEquals(Number(pkg!.value_remaining), 270, "prediction == settlement");
   } finally {
     await s.teardown();
   }

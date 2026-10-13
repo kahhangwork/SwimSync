@@ -439,7 +439,7 @@ async function generateForTenant(
   const { data: classes, error: clsErr } = await supabase
     .from("classes")
     .select(
-      "id, title, price_per_lesson, day_of_week, category_id, is_active, deactivated_at"
+      "id, title, price_per_lesson, day_of_week, is_active, deactivated_at"
     )
     .eq("tenant_id", tenantId)   // isolation: RLS does not apply to service_role
     .order("id");
@@ -451,7 +451,7 @@ async function generateForTenant(
   // is resolved against its HOME class as well as its host.
   const { data: makeupRows, error: makeupErr } = await supabase
     .from("makeup_bookings")
-    .select("student_id, class_id, session_date, category_id, home_class_id")
+    .select("student_id, class_id, session_date, home_class_id")
     .eq("tenant_id", tenantId)
     .is("cancelled_at", null)
     .gte("session_date", monthStart)
@@ -529,9 +529,6 @@ async function generateForTenant(
     // when a child is renamed later. Reading it live is the same mistake as
     // reading classes.price_per_lesson at generation time.
     student_name: string | null;
-    // The class's category at generation time — used ONLY to match packages
-    // in phase 2. NOT a column on invoice_items; stripped before insert.
-    class_category_id: string | null;
   };
 
   const log: unknown[] = [];
@@ -627,11 +624,8 @@ async function generateForTenant(
     // are merged into ONE bookingsByDate so expectedStudentsOn() and
     // datesToCheck stay on their existing contract — no edit to
     // attendanceCompleteness.ts, whose three copies are pinned byte-identical.
-    /** (student, date) → the booking's snapshots, for pricing and packages. */
-    const makeupInfo = new Map<
-      string,
-      { homeClassId: string; categoryId: string }
-    >();
+    /** (student, date) → the booking's home class, for pricing. */
+    const makeupInfo = new Map<string, { homeClassId: string }>();
     // Lists COPIED, not aliased: new Map(bookedByDate) shares the arrays, and
     // pushing a make-up guest into a date that already holds a trial would
     // silently mutate bookedByDate too.
@@ -646,7 +640,6 @@ async function generateForTenant(
       bookingsByDate.set(d, list);
       makeupInfo.set(`${m.student_id}:${d}`, {
         homeClassId: m.home_class_id as string,
-        categoryId: m.category_id as string,
       });
     }
 
@@ -1035,18 +1028,11 @@ async function generateForTenant(
           // Throws if no rate is in force — see rates.ts for why that must
           // never degrade to 0 or to cls.price_per_lesson.
           const sessionDate = sessionDateMap[sessId];
-          // A make-up guest's line carries the BOOKING's snapshots: the
-          // category it was arranged under (so a package matches even if the
-          // host class is re-tagged afterwards — §7.45), and a title marker so
-          // the parent's invoice explains a host-class line at a home-class
-          // price. Enrolment wins, as in priceFor: a member is not a guest.
-          //
-          // Known, accepted edge: package_live_balances() COALESCEs to the
-          // snapshot whenever a live booking exists — it has no enrolment-wins
-          // arm — so a MEMBER with a stray booking diverges from the engine's
-          // category if the host is also re-tagged. Reaching that state means
-          // transferring a child INTO their own host class after booking; the
-          // chip discrepancy is transient and settles at invoicing.
+          // A make-up guest's line carries a title marker so the parent's
+          // invoice explains a host-class line at a home-class price.
+          // Enrolment wins, as in priceFor: a member is not a guest. (The
+          // booking's category snapshot matters only to package matching,
+          // which happens at marking — package_candidates_for, §7.45.)
           const mk = makeupInfo.get(`${ps.student_id}:${sessionDate}`);
           const isGuest =
             !!mk &&
@@ -1061,9 +1047,6 @@ async function generateForTenant(
             class_title: isGuest ? `${cls.title} (make-up)` : cls.title,
             session_date: sessionDate,
             student_name: studentNameById.get(ps.student_id) ?? null,
-            class_category_id: isGuest
-              ? mk!.categoryId
-              : ((cls.category_id as string | null) ?? null),
           });
         }
       }
@@ -1202,30 +1185,19 @@ async function generateForTenant(
     };
   }
 
-  // ── Wave 6: lessons a package ALREADY paid for at marking ─────────────────
-  // docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md. With the tenant's switch
-  // on, attendance triggers draw the package the moment a lesson is marked, so
-  // a drawn lesson is PAID and must never reach an invoice line (the DB backstop
-  // on invoice_items would refuse it — PK002 — and fail the run's write). The
-  // drawn set is dropped UNCONDITIONALLY: before migration B no such rows exist,
-  // so a switch-off run is byte-for-byte today's.
+  // ── Lessons a package ALREADY paid for at marking ─────────────────────────
+  // docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md. Attendance triggers draw
+  // the package the moment a lesson is marked (package_candidates_for is the one
+  // matching rule), so a drawn lesson is PAID and must never reach an invoice
+  // line (the DB backstop on invoice_items would refuse it — PK002 — and fail
+  // the run's write). The engine matches no package itself: the pay-at-the-run
+  // matcher and its tenants.package_draw_at_marking switch were removed
+  // (BACKLOG Wave 9 item 9). Every remaining item is ad-hoc at its class price.
   //
-  // ⚠ FAIL CLOSED (RISK 1, §7.325): an unreadable switch or drawn set returns
+  // ⚠ FAIL CLOSED (RISK 1, §7.325): an unreadable drawn set returns
   // package_mode_unreadable — no invoice, no seal, never a throw (§7.265). Do NOT
-  // default the switch to false or the drawn set to empty: either one bills a
-  // lesson the family already paid for.
-  const { data: modeRow, error: modeErr } = await supabase
-    .from("tenants")
-    .select("package_draw_at_marking")
-    .eq("id", tenantId)
-    .maybeSingle();
-  if (modeErr || typeof modeRow?.package_draw_at_marking !== "boolean") {
-    return packageModeUnreadable(
-      modeErr ? modeErr.message : "the business's package mode is missing"
-    );
-  }
-  const drawAtMarking: boolean = modeRow.package_draw_at_marking;
-
+  // default the drawn set to empty: that bills a lesson the family already paid
+  // for.
   const itemSessionIds = [
     ...new Set([...parentItems.values()].flat().map((i) => i.lesson_session_id)),
   ];
@@ -1269,61 +1241,6 @@ async function generateForTenant(
         `No invoices were generated and the month was left open — generate again.`,
       results: log,
     };
-  }
-
-  // Holiday extensions are now event-driven: a lesson marked 'holiday' extends
-  // its covering package as it is marked (recompute_holiday trigger,
-  // 20260818000700), so expires_on is already current here — no pre-billing
-  // recompute pass is needed. (The old calendar-scan recompute_package_extensions
-  // is retired.)
-
-  // ── Active prepaid packages for this tenant, in draw order ────────────────
-  // FIFO by earliest expiry (tie: confirmed_at, then id) — the exact order
-  // package_live_balances() simulates; a Deno test pins the two against each
-  // other so the derivation and the real draw cannot drift apart (§7.18).
-  // Isolation: explicit tenant filter — RLS does not apply to service_role.
-  const { data: pkgRows, error: pkgErr } = await supabase
-    .from("parent_packages")
-    .select(
-      "id, parent_id, category_id, rate_per_lesson, value_remaining, start_date, expires_on"
-    )
-    .eq("tenant_id", tenantId)
-    .eq("status", "active")
-    .order("expires_on", { ascending: true })
-    .order("confirmed_at", { ascending: true })
-    .order("id", { ascending: true });
-  if (pkgErr) throw new Error(pkgErr.message);
-
-  type ActivePackage = {
-    id: string;
-    category_id: string | null;
-    rate: number;
-    remaining: number;
-    startsOn: string;
-    endsOn: string;
-    drawn: number;
-  };
-  const packagesByParent = new Map<string, ActivePackage[]>();
-  for (const p of pkgRows ?? []) {
-    const list = packagesByParent.get(p.parent_id as string) ?? [];
-    list.push({
-      id: p.id as string,
-      category_id: (p.category_id as string | null) ?? null,
-      rate: Number(p.rate_per_lesson),
-      remaining: Number(p.value_remaining),
-      // Coverage is judged against the LESSON's own date: from the package's
-      // explicit start_date through its stored effective expiry. A package
-      // bought mid-month covers lessons from its start onward, and a package
-      // that has expired by GENERATION time still pays for lessons taken while
-      // it was live. expires_on is the ONE effective end (start + validity +
-      // holiday + cancel + manual extensions), written by package_effective_end in the
-      // DB — never re-derive it here, or it forks from package_live_balances
-      // and the §7.18 pin breaks silently (⚠ RISK 2 prohibition).
-      startsOn: String(p.start_date),
-      endsOn: String(p.expires_on),
-      drawn: 0,
-    });
-    packagesByParent.set(p.parent_id as string, list);
   }
 
   // ── Phase 2: create ONE invoice per parent, across all their classes ──────
@@ -1378,35 +1295,6 @@ async function generateForTenant(
       continue;
     }
 
-    // ── Prepaid packages: cover in-scope lessons at the PACKAGE's locked rate ─
-    // Chronological items, packages FIFO by expiry. A covered line is REPRICED
-    // to the package rate — the package IS a price agreement, so the invoice
-    // line records what the family actually pays, not the walk-in price. An
-    // uncovered line (out of scope, outside the window, or the package cannot
-    // fully fund it) keeps its class_rate_on price: the shortfall path is
-    // today's ad-hoc billing, unchanged. A parent with no packages never
-    // enters this block and takes the exact statements they always did.
-    // Wave 6: with the switch on, packages are drawn at marking ONLY — the SQL
-    // matcher (package_candidates_for) is the one rule, and this loop must not
-    // be a second copy. Every remaining item is ad-hoc at its class price.
-    const pkgs = drawAtMarking ? [] : packagesByParent.get(parentId) ?? [];
-    const pkgDrawByItem = new Map<number, { pkg: ActivePackage; amount: number }>();
-    let packageApplied = 0;
-    for (let idx = 0; idx < items.length; idx++) {
-      const it = items[idx];
-      for (const p of pkgs) {
-        if (p.category_id && p.category_id !== it.class_category_id) continue;
-        if (it.session_date < p.startsOn || it.session_date > p.endsOn) continue;
-        if (p.remaining < p.rate) continue; // never a partial draw
-        p.remaining -= p.rate;
-        p.drawn += p.rate;
-        it.amount = p.rate; // locked rate, whatever the class charges walk-ins
-        pkgDrawByItem.set(idx, { pkg: p, amount: p.rate });
-        packageApplied += p.rate;
-        break;
-      }
-    }
-
     // Credit available FROM THIS TENANT. Never crosses: a note earned at a
     // school is not spendable against a private coach's invoice, or one
     // business ends up paying another's bill. Pools freely across this parent's
@@ -1424,12 +1312,11 @@ async function generateForTenant(
     // against the debit-inclusive base so the two net. The values below are an
     // ESTIMATE for the insert; the RPC trues up net/credit/balance_adjustment.
     const debit = Number(balanceRow?.debit_balance ?? 0);
-    // Gross sums the FINAL line amounts (package-repriced where covered).
-    // Package covers its own lines by construction; credit notes then apply
-    // to whatever cash remains — the two pots never overlap.
+    // Every line is ad-hoc (a package-funded lesson was drawn at marking and
+    // dropped above), so credit notes apply to the whole gross.
     const gross = items.reduce((s, i) => s + i.amount, 0);
-    const credit = Math.min(available, Math.max(gross - packageApplied, 0));
-    const net = gross - packageApplied - credit;
+    const credit = Math.min(available, Math.max(gross, 0));
+    const net = gross - credit;
 
     // Insert invoice
     const { data: invoice, error: invErr } = await supabase
@@ -1439,7 +1326,7 @@ async function generateForTenant(
         tenant_id: tenantId,
         billing_month: billingMonth,
         gross_amount: gross,
-        package_applied: packageApplied,
+        package_applied: 0, // only pre-removal invoices carry a value here
         credit_applied: credit,
         net_amount: net,
         status: net === 0 ? "paid" : "outstanding",
@@ -1462,20 +1349,9 @@ async function generateForTenant(
     // parent an invoice with no line items — and the credit-note trigger,
     // which keys off invoice_items, could never fire for those lessons.
     // Stop before touching money.
-    //
-    // class_category_id is engine-internal (package matching) — stripped here,
-    // NOT a column. .select() returns the new ids so package draws can ledger
-    // against their invoice_item_id; rows are matched back by
-    // (lesson_session_id, student_id), which attendance makes unique.
-    const { data: insertedItems, error: itemsErr } = await supabase
+    const { error: itemsErr } = await supabase
       .from("invoice_items")
-      .insert(
-        items.map(({ class_category_id: _cat, ...i }) => ({
-          invoice_id: invoice.id,
-          ...i,
-        }))
-      )
-      .select("id, lesson_session_id, student_id");
+      .insert(items.map((i) => ({ invoice_id: invoice.id, ...i })));
 
     if (itemsErr) {
       invoiceWriteFailed = true;
@@ -1485,73 +1361,6 @@ async function generateForTenant(
         error: `invoice_items insert failed: ${itemsErr.message}`,
       });
       continue;
-    }
-
-    // ── Record package draws: ledger rows + balance decrements ──────────────
-    // A failure here is money-shaped: the invoice's lines are already priced
-    // at package rates, so draws that fail to record would hand out the
-    // package price without consuming the package. Flag invoiceWriteFailed —
-    // an unsealed month is the retry path (§7.17: a failed write must never
-    // be sealed over).
-    if (packageApplied > 0) {
-      const itemIdByKey = new Map(
-        (insertedItems ?? []).map((r) => [
-          `${r.lesson_session_id}:${r.student_id}`,
-          r.id as string,
-        ])
-      );
-
-      const ledgerRows: {
-        parent_package_id: string;
-        invoice_item_id: string;
-        amount: number;
-      }[] = [];
-      let ledgerMappingFailed = false;
-      for (const [idx, draw] of pkgDrawByItem) {
-        const it = items[idx];
-        const itemId = itemIdByKey.get(`${it.lesson_session_id}:${it.student_id}`);
-        if (!itemId) {
-          ledgerMappingFailed = true;
-          break;
-        }
-        ledgerRows.push({
-          parent_package_id: draw.pkg.id,
-          invoice_item_id: itemId,
-          amount: draw.amount,
-        });
-      }
-
-      const { error: ledgerErr } = ledgerMappingFailed
-        ? { error: { message: "could not match a drawn item to its inserted row" } }
-        : await supabase.from("package_applications").insert(ledgerRows);
-
-      if (ledgerErr) {
-        invoiceWriteFailed = true;
-        log.push({
-          parent_id: parentId,
-          invoice_id: invoice.id,
-          error: `package_applications insert failed: ${ledgerErr.message}`,
-        });
-        continue;
-      }
-
-      for (const p of pkgs) {
-        if (p.drawn <= 0) continue;
-        const { error: balErr } = await supabase
-          .from("parent_packages")
-          .update({ value_remaining: p.remaining })
-          .eq("id", p.id)
-          .eq("tenant_id", tenantId); // isolation: service_role bypasses RLS
-        if (balErr) {
-          invoiceWriteFailed = true;
-          log.push({
-            parent_id: parentId,
-            invoice_id: invoice.id,
-            error: `package balance update failed for ${p.id}: ${balErr.message}`,
-          });
-        }
-        p.drawn = 0; // settled; p.remaining already reflects the draws
-      }
     }
 
     // ── Draw credit + true up the invoice in ONE DB transaction (Item 2) ─────
@@ -1571,7 +1380,7 @@ async function generateForTenant(
     // double-draw window to guard — skip the round-trip.
     let creditApplied = credit;
     let balanceAdjustment = 0;
-    let netApplied = gross - packageApplied - creditApplied;
+    let netApplied = gross - creditApplied;
     if (credit > 0 || debit > 0) {
       const { data: allocated, error: creditErr } = await supabase.rpc(
         "apply_credit_to_invoice",
@@ -1615,7 +1424,7 @@ async function generateForTenant(
       tenant_id: tenantId,
       billing_month: billingMonth,
       gross,
-      package: packageApplied,
+      package: 0,
       credit: creditApplied,
       balance_adjustment: balanceAdjustment,
       net: netApplied,
@@ -1631,7 +1440,7 @@ async function generateForTenant(
       invoice_id: invoice.id,
       billing_month: billingMonth,
       gross,
-      package: packageApplied,
+      package: 0,
       credit: creditApplied,
       net: netApplied,
     });

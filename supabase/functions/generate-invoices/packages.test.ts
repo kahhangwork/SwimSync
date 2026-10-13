@@ -1,24 +1,27 @@
-// Prepaid lesson packages — engine integration tests (PACKAGES_DESIGN.md §3).
+// Prepaid lesson packages — what the INVOICE looks like for a package family
+// (PACKAGES_DESIGN.md §3). A package pays for a lesson at MARKING (the
+// attendance trigger → package_candidates_for); the engine bills only what was
+// not drawn, at the class price. The pay-at-the-run matcher these tests were
+// first written against was removed (BACKLOG Wave 9 item 9); each test keeps its
+// rule and now asserts it end to end — the draw, the balance, and the invoice.
 //
 // What is pinned here:
 //   • THE TRIPWIRE: a parent with no package produces exactly the invoice
 //     they always did (⚠ RISK 1 — package logic must not leak into the
-//     ad-hoc path). This is a regression guard by design: it passes on the
-//     pre-package engine too, and that is the claim it makes.
-//   • Locked-rate drawdown: a covered line costs the PACKAGE's rate, not the
-//     class's walk-in price — in both directions.
+//     ad-hoc path). This is a regression guard by design.
+//   • Locked rate: a drawn lesson costs the PACKAGE's rate, and never reaches
+//     the invoice at the class's walk-in price.
 //   • Chronological exhaustion cutover, FIFO by earliest expiry, the expiry
-//     boundary ON expires_on, coverage starting at confirmation, category
-//     scope, and package-then-credit precedence.
-//   • ⚠ RISK 4: package_live_balances()'s prediction equals the engine's
-//     settled result — the derivation and the draw cannot drift silently.
+//     boundary ON expires_on, coverage from the start date (confirmation or an
+//     explicit later start), category scope, holiday-extension tail, and
+//     credit notes covering the cash remainder.
+//   • package_live_balances() reports the stored balance — the draw already
+//     moved it, so there is nothing left to predict.
 //
-// All feature tests fail on the pre-package engine (it never drew a cent),
-// which is §7.25's discrimination requirement satisfied by construction; the
-// tripwire is the one deliberate exception and is labelled above.
+// Dates are 2027 on purpose: the D6 guard reads the REAL clock, and lessons
+// after today are never "unmarked", so the guard stays out of these tests.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateInvoices } from "./core.ts";
 import {
   newScenario,
@@ -108,6 +111,24 @@ async function buyPackage(
   return data.id as string;
 }
 
+async function liveDraws(s: Scenario, pkgId: string): Promise<string[]> {
+  const { data } = await s.db
+    .from("package_applications")
+    .select("lesson_session_id, amount")
+    .eq("parent_package_id", pkgId)
+    .is("reversed_at", null);
+  return (data ?? []).map((r) => `${r.lesson_session_id}:${Number(r.amount)}`).sort();
+}
+
+async function invoiceLines(s: Scenario, invoiceId: string): Promise<string[]> {
+  const { data } = await s.db
+    .from("invoice_items")
+    .select("session_date, amount")
+    .eq("invoice_id", invoiceId)
+    .order("session_date");
+  return (data ?? []).map((r) => `${r.session_date}:${Number(r.amount)}`);
+}
+
 async function pkgRemaining(s: Scenario, pkgId: string): Promise<number> {
   const { data } = await s.db
     .from("parent_packages")
@@ -161,7 +182,12 @@ Deno.test("TRIPWIRE (⚠ RISK 1): a parent with NO package gets exactly the pre-
 
 // ── Locked-rate coverage ─────────────────────────────────────────────────────
 
-Deno.test("a covered lesson costs the PACKAGE rate, not the class's walk-in price; fully covered ⇒ paid", async () => {
+const run = (s: Scenario, month: string) =>
+  generateInvoices(s.db, {
+    tenant_id: s.tenantId, mode: "manual", force: true, billing_month: month, now: s.now,
+  });
+
+Deno.test("a drawn lesson costs the PACKAGE rate, not the class's walk-in price; fully drawn ⇒ no invoice", async () => {
   // Class charges $50 walk-in; the package locked $40.
   const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
   try {
@@ -170,34 +196,14 @@ Deno.test("a covered lesson costs the PACKAGE rate, not the class's walk-in pric
 
     const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
     const b = await s.addSession("2027-01-09"); await s.mark(b, "present");
+    assertEquals(await liveDraws(s, pkgId), [`${a}:40`, `${b}:40`].sort(), "2 × $40 locked — NOT 2 × $50");
+    assertEquals(await pkgRemaining(s, pkgId), 320); // 400 − 80
     await s.completeMonth("2027-01");
 
-    const res = await generateInvoices(s.db, {
-      tenant_id: s.tenantId,
-      mode: "manual",
-      force: true,
-      billing_month: "2027-01",
-      now: s.now,
-    });
-    assertEquals(res.invoices_created, 1);
-    assertEquals(res.created![0].package, 80);
-
-    const inv = await getInvoice(s.db, s.parentId, "2027-01");
-    assertEquals(inv!.gross, 80); // 2 × $40 locked — NOT 2 × $50
-    assertEquals(inv!.package_applied, 80);
-    assertEquals(inv!.net, 0);
-    assertEquals(inv!.status, "paid");
-
-    assertEquals(await pkgRemaining(s, pkgId), 320); // 400 − 80
-
-    const { data: items } = await s.db
-      .from("invoice_items").select("id").eq("invoice_id", inv!.id);
-    const { data: apps } = await s.db
-      .from("package_applications")
-      .select("amount")
-      .in("invoice_item_id", (items ?? []).map((i) => i.id))
-      .is("reversed_at", null);
-    assertEquals((apps ?? []).length, 2);
+    const res = await run(s, "2027-01");
+    assertEquals(res.invoices_created, 0);
+    assertEquals(await getInvoice(s.db, s.parentId, "2027-01"), null, "nothing left to bill");
+    assertEquals(await pkgRemaining(s, pkgId), 320, "the engine never draws again");
 
     const chk = await checkInvariants(s.db, s.parentId);
     assert(chk.ok, chk.problems.join("; "));
@@ -215,26 +221,15 @@ Deno.test("exhaustion cuts over CHRONOLOGICALLY: earliest lessons draw, the rest
     const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
     const b = await s.addSession("2027-01-09"); await s.mark(b, "present");
     await s.completeMonth("2027-01");
+    await run(s, "2027-01");
 
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
-
-    const inv = await getInvoice(s.db, s.parentId, "2027-01");
-    assertEquals(inv!.gross, 90); // $40 covered + $50 ad-hoc
-    assertEquals(inv!.package_applied, 40);
-    assertEquals(inv!.net, 50);
+    // The EARLIER lesson drew; the later one is the invoice.
+    assertEquals(await liveDraws(s, pkgId), [`${a}:40`]);
     assertEquals(await pkgRemaining(s, pkgId), 0);
-
-    // The EARLIER lesson took the package rate.
-    const { data: items } = await s.db
-      .from("invoice_items")
-      .select("session_date, amount")
-      .eq("invoice_id", inv!.id)
-      .order("session_date");
-    assertEquals(Number(items![0].amount), 40);
-    assertEquals(Number(items![1].amount), 50);
+    const inv = await getInvoice(s.db, s.parentId, "2027-01");
+    assertEquals(await invoiceLines(s, inv!.id), ["2027-01-09:50"]);
+    assertEquals(inv!.package_applied, 0);
+    assertEquals(inv!.net, 50);
   } finally {
     await s.teardown();
   }
@@ -255,12 +250,6 @@ Deno.test("two packages: the one expiring FIRST draws first, whatever the purcha
     );
 
     const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
-    await s.completeMonth("2027-01");
-
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
 
     assertEquals(await pkgRemaining(s, soon), 0);  // drew
     assertEquals(await pkgRemaining(s, late), 40); // untouched
@@ -269,7 +258,7 @@ Deno.test("two packages: the one expiring FIRST draws first, whatever the purcha
   }
 });
 
-Deno.test("expiry boundary: a lesson ON expires_on is covered; one after it bills ad-hoc despite remaining value", async () => {
+Deno.test("expiry boundary: a lesson ON expires_on draws; one after it bills ad-hoc despite remaining value", async () => {
   // Validity is WEEKS now: 12 months ⇒ 52 weeks = 364 days. Start 2026-07-11
   // (a Saturday) ⇒ expires_on = start + 364 = 2027-07-10, the same Saturday
   // the sessions fall on. The explicit start makes the boundary exact instead
@@ -282,17 +271,12 @@ Deno.test("expiry boundary: a lesson ON expires_on is covered; one after it bill
     const a = await s.addSession("2027-07-10"); await s.mark(a, "present"); // ON expiry
     const b = await s.addSession("2027-07-17"); await s.mark(b, "present"); // after
     await s.completeMonth("2027-07");
+    await run(s, "2027-07");
 
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-07", now: s.now,
-    });
-
-    const inv = await getInvoice(s.db, s.parentId, "2027-07");
-    assertEquals(inv!.package_applied, 40); // only the on-expiry lesson
-    assertEquals(inv!.gross, 90);
-    assertEquals(inv!.net, 50);
+    assertEquals(await liveDraws(s, pkgId), [`${a}:40`], "only the on-expiry lesson drew");
     assertEquals(await pkgRemaining(s, pkgId), 40); // one lesson left, expired unspent
+    const inv = await getInvoice(s.db, s.parentId, "2027-07");
+    assertEquals(await invoiceLines(s, inv!.id), ["2027-07-17:50"]);
   } finally {
     await s.teardown();
   }
@@ -308,16 +292,12 @@ Deno.test("coverage starts at confirmation: a lesson BEFORE the purchase bills a
     const a = await s.addSession("2027-03-06"); await s.mark(a, "present"); // before purchase
     const b = await s.addSession("2027-03-20"); await s.mark(b, "present"); // after
     await s.completeMonth("2027-03");
+    await run(s, "2027-03");
 
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-03", now: s.now,
-    });
-
-    const inv = await getInvoice(s.db, s.parentId, "2027-03");
-    assertEquals(inv!.gross, 90);           // $50 ad-hoc + $40 covered
-    assertEquals(inv!.package_applied, 40);
+    assertEquals(await liveDraws(s, pkgId), [`${b}:40`]);
     assertEquals(await pkgRemaining(s, pkgId), 360);
+    const inv = await getInvoice(s.db, s.parentId, "2027-03");
+    assertEquals(await invoiceLines(s, inv!.id), ["2027-03-06:50"]);
   } finally {
     await s.teardown();
   }
@@ -344,52 +324,41 @@ Deno.test("category scope: only classes IN the category draw; others bill ad-hoc
     await s.mark(b, "present", s.studentId2);
     await s.completeMonth("2027-01");
     await s.completeMonth("2027-01", s.classId2);
+    await run(s, "2027-01");
 
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
-
-    const inv = await getInvoice(s.db, s.parentId, "2027-01");
-    assertEquals(inv!.gross, 55);           // $25 covered + $30 ad-hoc
-    assertEquals(inv!.package_applied, 25);
-    assertEquals(inv!.net, 30);
+    assertEquals(await liveDraws(s, pkgId), [`${a}:25`]);
     assertEquals(await pkgRemaining(s, pkgId), 225);
+    const inv = await getInvoice(s.db, s.parentId, "2027-01");
+    assertEquals(await invoiceLines(s, inv!.id), ["2027-01-03:30"]);
   } finally {
     await s.teardown();
   }
 });
 
-Deno.test("precedence: the package covers its lines, credit notes then cover the CASH remainder", async () => {
+Deno.test("precedence: the package pays its lessons at marking; credit notes cover the CASH remainder", async () => {
   const s = await newScenario({ price: 30, billing: monthEnded("2027-06") });
   try {
     // Month 1 (May 2027): bill one $30 lesson, then correct it to absent —
     // the trigger issues a $30 credit note into the tenant balance.
     const m1 = await s.addSession("2027-05-01"); await s.mark(m1, "present");
     await s.completeMonth("2027-05");
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-05", now: s.now,
-    });
+    await run(s, "2027-05");
     await s.mark(m1, "absent"); // billable → non-billable on an invoiced lesson
     assertEquals(await s.tenantCreditBalance(), 30);
 
     // Month 2 (June 2027): a 1-lesson package plus two lessons.
     const productId = await addProduct(s, { lessons: 1, rate: 40 });
-    await buyPackage(s, productId, "2027-06-01T04:00:00Z");
+    const pkgId = await buyPackage(s, productId, "2027-06-01T04:00:00Z");
     const a = await s.addSession("2027-06-05"); await s.mark(a, "present");
     const b = await s.addSession("2027-06-12"); await s.mark(b, "present");
     await s.completeMonth("2027-06");
+    await run(s, "2027-06");
 
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-06", now: s.now,
-    });
-
+    assertEquals(await liveDraws(s, pkgId), [`${a}:40`], "the package pays ITS lesson");
     const inv = await getInvoice(s.db, s.parentId, "2027-06");
-    assertEquals(inv!.gross, 70);            // $40 covered + $30 ad-hoc
-    assertEquals(inv!.package_applied, 40);  // package covers ITS line
-    assertEquals(inv!.credit_applied, 30);   // credit covers the cash rest
+    assertEquals(inv!.gross, 30);           // only the $30 ad-hoc lesson
+    assertEquals(inv!.package_applied, 0);
+    assertEquals(inv!.credit_applied, 30);  // credit covers the cash rest
     assertEquals(inv!.net, 0);
     assertEquals(inv!.status, "paid");
     assertEquals(await s.tenantCreditBalance(), 0);
@@ -401,101 +370,7 @@ Deno.test("precedence: the package covers its lines, credit notes then cover the
   }
 });
 
-// ── ⚠ RISK 1: a failed package write must leave the month UNSEALED ──────────
-// The engine has no transactions: invoice → items → package ledger → balance
-// are independent writes. If the ledger insert fails, the invoice's lines are
-// already priced at package rates with no recorded draw — a mismatch a human
-// must reconcile. The engine's whole obligation is to FLAG it (log + hold the
-// month open, §7.17: a failed write must never be sealed over). Fault
-// injection is a client shim: generateInvoices takes the client as a
-// parameter, so a wrapper that fails exactly the package_applications insert
-// is the whole harness. The assertions below are precisely the flag's effect,
-// so deleting the invoiceWriteFailed set on this path fails this test.
-
-function failPackageLedger(real: SupabaseClient): SupabaseClient {
-  return new Proxy(real, {
-    get(target, prop, receiver) {
-      if (prop === "from") {
-        return (table: string) =>
-          table === "package_applications"
-            ? {
-                // Reads pass through (engine v33 reads the drawn set — Wave 6);
-                // only the ledger WRITE fails.
-                select: (...args: unknown[]) =>
-                  (target.from(table).select as (...a: unknown[]) => unknown)(...args),
-                insert: () =>
-                  Promise.resolve({
-                    data: null,
-                    error: { message: "injected ledger failure (test)" },
-                  }),
-              }
-            : target.from(table);
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  }) as SupabaseClient;
-}
-
-Deno.test("a failed package-ledger write holds the month OPEN and touches no balance", async () => {
-  const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
-  try {
-    const productId = await addProduct(s, { lessons: 10, rate: 40 });
-    const pkgId = await buyPackage(s, productId, "2026-12-01T04:00:00Z");
-
-    const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
-    await s.completeMonth("2027-01");
-
-    // Run 1: the ledger write fails.
-    const res = await generateInvoices(failPackageLedger(s.db), {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
-
-    assertEquals(res.sealed, false, "a month with a failed write must not seal");
-    const { data: sealRows } = await s.db
-      .from("billing_periods")
-      .select("billing_month")
-      .eq("tenant_id", s.tenantId)
-      .eq("billing_month", "2027-01");
-    assertEquals((sealRows ?? []).length, 0, "no billing_periods row was written");
-
-    // The failure is LOGGED against the parent, not swallowed.
-    assert(
-      (res.results ?? []).some((r) =>
-        JSON.stringify(r).includes("injected ledger failure")
-      ),
-      "the failed write is named in the run log"
-    );
-
-    // Balance untouched: the decrement is sequenced AFTER the ledger, so a
-    // ledger failure must not spend the package.
-    assertEquals(await pkgRemaining(s, pkgId), 400);
-
-    // The known mismatch state this flag exists to surface: the invoice
-    // carries package pricing with no live ledger rows — and checkInvariants
-    // DETECTS it, which is what makes the mismatch reconcilable rather than
-    // silent.
-    const inv = await getInvoice(s.db, s.parentId, "2027-01");
-    assertEquals(inv!.package_applied, 40);
-    const chk = await checkInvariants(s.db, s.parentId);
-    assert(!chk.ok, "checkInvariants must flag the invoice/ledger mismatch");
-
-    // Run 2, healthy client: the parent is skipped (no double-billing) and
-    // the month NOW seals — the retry path the open month exists for.
-    const res2 = await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
-    assertEquals(res2.invoices_created, 0);
-    assertEquals(res2.sealed, true, "a clean retry seals the month");
-  } finally {
-    await s.teardown();
-  }
-});
-
-// ── ⚠ RISK 4: the RPC's prediction equals the engine's settled result ───────
-
-Deno.test("package_live_balances() predicts EXACTLY what the engine settles", async () => {
+Deno.test("package_live_balances() reports the STORED balance — the draw already moved it", async () => {
   const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
   try {
     const productId = await addProduct(s, { lessons: 10, rate: 40 });
@@ -503,33 +378,16 @@ Deno.test("package_live_balances() predicts EXACTLY what the engine settles", as
 
     const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
     const b = await s.addSession("2027-01-09"); await s.mark(b, "present");
-    await s.completeMonth("2027-01");
 
-    // BEFORE generation: stored balance untouched, live balance predicted.
     const { data: liveRows, error: rpcErr } = await s.db.rpc("package_live_balances");
     if (rpcErr) throw new Error(`rpc: ${rpcErr.message}`);
     const mine = (liveRows as Record<string, unknown>[]).find(
       (r) => r.parent_package_id === pkgId
     );
     assert(mine, "RPC returned no row for the package");
-    assertEquals(Number(mine!.value_remaining), 400);
+    assertEquals(Number(mine!.value_remaining), 320);
     assertEquals(Number(mine!.live_value_remaining), 320);
     assertEquals(Number(mine!.live_lessons_remaining), 8);
-
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
-
-    // AFTER: the engine settled to the RPC's prediction — no drift.
-    assertEquals(await pkgRemaining(s, pkgId), 320);
-
-    // And the RPC's live balance now matches the stored one (nothing pending).
-    const { data: liveAfter } = await s.db.rpc("package_live_balances");
-    const after = (liveAfter as Record<string, unknown>[]).find(
-      (r) => r.parent_package_id === pkgId
-    );
-    assertEquals(Number(after!.live_value_remaining), 320);
   } finally {
     await s.teardown();
   }
@@ -537,7 +395,7 @@ Deno.test("package_live_balances() predicts EXACTLY what the engine settles", as
 
 // ── ⚠ RISK 2: the re-anchor to start_date (not SGT-of-confirmed_at) ──────────
 
-Deno.test("start_date AFTER confirmation: a lesson between confirm and start is NOT funded (engine and RPC agree)", async () => {
+Deno.test("start_date AFTER confirmation: a lesson between confirm and start is NOT funded", async () => {
   // Confirmed 2027-03-01, but the admin dated the package to start 2027-03-15.
   // The 2027-03-13 Saturday lesson falls in that gap → ad-hoc; 2027-03-20 is
   // inside the window → funded. Before the re-anchor the window opened at the
@@ -550,25 +408,12 @@ Deno.test("start_date AFTER confirmation: a lesson between confirm and start is 
     const gap = await s.addSession("2027-03-13"); await s.mark(gap, "present"); // before start
     const inWin = await s.addSession("2027-03-20"); await s.mark(inWin, "present"); // inside
     await s.completeMonth("2027-03");
+    await run(s, "2027-03");
 
-    // The RPC predicts a single funded lesson (only the in-window one).
-    const { data: liveRows } = await s.db.rpc("package_live_balances");
-    const mine = (liveRows as Record<string, unknown>[]).find(
-      (r) => r.parent_package_id === pkgId
-    );
-    assert(mine, "RPC returned no row for the package");
-    assertEquals(Number(mine!.live_value_remaining), 360); // 400 - one $40 draw
-
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-03", now: s.now,
-    });
-
+    assertEquals(await liveDraws(s, pkgId), [`${inWin}:40`]);
+    assertEquals(await pkgRemaining(s, pkgId), 360);
     const inv = await getInvoice(s.db, s.parentId, "2027-03");
-    assertEquals(inv!.package_applied, 40); // only the in-window lesson drew
-    assertEquals(inv!.gross, 90);           // covered lesson at pkg rate 40 + ad-hoc at 50
-    assertEquals(inv!.net, 50);             // $90 - $40 package
-    assertEquals(await pkgRemaining(s, pkgId), 360); // engine settled to the RPC's number
+    assertEquals(await invoiceLines(s, inv!.id), ["2027-03-13:50"]);
   } finally {
     await s.teardown();
   }
@@ -595,16 +440,12 @@ Deno.test("a holiday extension funds a lesson in the tail that would otherwise b
 
     // The tail lesson (2027-01-23 > nominal end 2027-01-16, ≤ extended 2027-01-23).
     const tail = await s.addSession("2027-01-23"); await s.mark(tail, "present");
-    await s.completeMonth("2027-01");
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
-
-    const inv = await getInvoice(s.db, s.parentId, "2027-01");
-    assertEquals(inv!.package_applied, 30, "the tail lesson was funded by the extension");
-    assertEquals(inv!.net, 0, "billed at the package rate, fully covered");
+    assertEquals(await liveDraws(s, pkgId), [`${tail}:30`], "the tail lesson was funded by the extension");
     assertEquals(await pkgRemaining(s, pkgId), 270);
+
+    await s.completeMonth("2027-01");
+    await run(s, "2027-01");
+    assertEquals(await getInvoice(s.db, s.parentId, "2027-01"), null, "nothing left to bill");
   } finally {
     await s.teardown();
   }
@@ -612,7 +453,7 @@ Deno.test("a holiday extension funds a lesson in the tail that would otherwise b
 
 // ── ⚠ RISK 4: a holiday extension cannot touch an already-SEALED month ───────
 
-Deno.test("extending a package after a month is sealed changes no invoice and no balance", async () => {
+Deno.test("extending a package after a month is sealed changes no balance, and a re-run bills nothing", async () => {
   const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
   try {
     // The scenario's class is Saturdays; the student is enrolled. A package
@@ -622,41 +463,30 @@ Deno.test("extending a package after a month is sealed changes no invoice and no
 
     const jan = await s.addSession("2027-01-09"); await s.mark(jan, "present");
     await s.completeMonth("2027-01");
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
-
-    const before = await getInvoice(s.db, s.parentId, "2027-01");
-    assertEquals(before!.package_applied, 30); // the January lesson drew
-    assertEquals(await pkgRemaining(s, pkgId), 270);
+    const res = await run(s, "2027-01");
+    assertEquals(res.sealed, true);
+    assertEquals(await pkgRemaining(s, pkgId), 270); // the January lesson drew
 
     // Now void a DIFFERENT in-window Saturday (2027-01-16, already a
     // cancelled_rain session from completeMonth) as a 'holiday'. That extends the
     // package's expiry — proving the event fired — without touching the sealed
-    // January invoice: cancelled_rain→holiday is non-billable→non-billable, so no
-    // credit note, and holiday draws nothing.
+    // month: cancelled_rain→holiday is non-billable→non-billable, so no credit
+    // note, and holiday draws nothing.
     const { data: sat16 } = await s.db.from("lesson_sessions")
       .select("id").eq("class_id", s.classId).eq("session_date", "2027-01-16").single();
     await s.mark(sat16!.id, "holiday");
     const { data: pkg } = await s.db
       .from("parent_packages")
-      .select("holiday_extension_days, expires_on, value_remaining")
+      .select("holiday_extension_days, value_remaining")
       .eq("id", pkgId)
       .single();
     assertEquals(pkg!.holiday_extension_days, 7, "extended by 7 days");
-
-    // …but the SEALED January invoice and the balance are untouched, and a
-    // re-run bills nothing new.
     assertEquals(Number(pkg!.value_remaining), 270, "balance unchanged by the extension");
-    await generateInvoices(s.db, {
-      tenant_id: s.tenantId, mode: "manual", force: true,
-      billing_month: "2027-01", now: s.now,
-    });
-    const after = await getInvoice(s.db, s.parentId, "2027-01");
-    assertEquals(after!.package_applied, before!.package_applied, "invoice unchanged");
-    assertEquals(after!.net, before!.net, "net unchanged");
-    assertEquals(await pkgRemaining(s, pkgId), 270, "no second draw");
+
+    const res2 = await run(s, "2027-01");
+    assertEquals(res2.invoices_created ?? 0, 0);
+    assertEquals(await getInvoice(s.db, s.parentId, "2027-01"), null, "still nothing billed");
+    assertEquals(await liveDraws(s, pkgId), [`${jan}:30`], "no second draw");
   } finally {
     await s.teardown();
   }

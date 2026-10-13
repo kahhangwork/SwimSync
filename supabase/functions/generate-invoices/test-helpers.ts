@@ -291,10 +291,6 @@ export async function newScenario(
      *  monthEnded(). Sets `enrolledAt`, exposes `now`/`billingMonth` on the
      *  scenario, and makes completeMonth() inherit the same clock. */
     billing?: BillingWindow;
-    /** Wave 6: the tenant draws packages AT MARKING (tenants.package_draw_at_marking).
-     *  Off unless asked, so every pre-Wave-6 test runs in legacy mode on its own tenant
-     *  (set explicitly — the column DEFAULT is on since migration B). */
-    drawAtMarking?: boolean;
   } = {}
 ): Promise<Scenario> {
   const db = svc();
@@ -342,8 +338,6 @@ export async function newScenario(
       slug: `test-${tag}`,
       display_name: `Test Tenant ${tag}`,
       join_code: `SWIM-${tag.slice(0, 4).toUpperCase()}`,
-      // Explicit both ways: since migration B the column DEFAULT is on (Wave 6).
-      package_draw_at_marking: opts.drawAtMarking ?? false,
     })
     .select("id")
     .single();
