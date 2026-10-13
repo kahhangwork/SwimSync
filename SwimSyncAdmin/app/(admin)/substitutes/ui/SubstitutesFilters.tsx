@@ -1,7 +1,7 @@
 import type { ClassRow } from "../domain/substituteRows";
 
 const inputClass =
-  "rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400";
+  "rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary";
 
 type Props = {
   classes: ClassRow[];
@@ -14,7 +14,7 @@ type Props = {
 export function SubstitutesFilters({ classes, classId, month, onClass, onMonth }: Props) {
   return (
     <div className="mb-4 flex flex-wrap items-end gap-3">
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-500">
+      <label className="flex flex-col gap-1 text-label font-medium text-ink-muted">
         Class
         <select value={classId} onChange={(e) => onClass(e.target.value)} className={inputClass}>
           <option value="">Choose a class…</option>
@@ -25,7 +25,7 @@ export function SubstitutesFilters({ classes, classId, month, onClass, onMonth }
           ))}
         </select>
       </label>
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-500">
+      <label className="flex flex-col gap-1 text-label font-medium text-ink-muted">
         Month
         <input type="month" value={month} onChange={(e) => onMonth(e.target.value)} className={inputClass} />
       </label>

@@ -1,3 +1,4 @@
+import { Tag } from "@/components/ui/Tag";
 import { Button } from "@/components/Button";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
 import { formatSgDate } from "@/lib/lessonDates";
@@ -46,13 +47,13 @@ export function SubstitutesTable({
       <Tbody>
         {loading ? (
           <Tr>
-            <Td className="py-8 text-center text-gray-400" colSpan={3}>
+            <Td className="py-8 text-center text-ink-muted" colSpan={3}>
               Loading…
             </Td>
           </Tr>
         ) : lessons.length === 0 ? (
           <Tr>
-            <Td className="py-8 text-center text-gray-400" colSpan={3}>
+            <Td className="py-8 text-center text-ink-muted" colSpan={3}>
               {loadError
                 ? "Could not load the lessons — see the error above."
                 : "This class has no lessons in that month."}
@@ -64,27 +65,27 @@ export function SubstitutesTable({
 
             return (
               <Tr key={lesson.session_date}>
-                <Td className="font-medium text-gray-900">
+                <Td className="font-medium text-ink">
                   {formatSgDate(lesson.session_date)}
                   {lesson.off_pattern && (
-                    <span className="ml-1.5 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                    <Tag tone="neutral" className="ml-1.5">
                       Extra
-                    </span>
+                    </Tag>
                   )}
                 </Td>
 
                 <Td>
-                  <span className="text-gray-900">{lesson.main.name}</span>
+                  <span className="text-ink">{lesson.main.name}</span>
                   {lesson.main.is_cover ? (
-                    <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    <Tag tone="info" className="ml-1.5">
                       Covering for {selected.coach_name}
-                    </span>
+                    </Tag>
                   ) : lesson.main.assigned ? (
-                    <span className="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                    <Tag tone="neutral" className="ml-1.5">
                       Assigned
-                    </span>
+                    </Tag>
                   ) : (
-                    <span className="ml-1.5 text-xs text-gray-400">
+                    <span className="ml-1.5 text-label text-ink-muted">
                       class coach
                     </span>
                   )}
@@ -96,7 +97,7 @@ export function SubstitutesTable({
                       <select
                         value={pickedCoach}
                         onChange={(e) => setPickedCoach(e.target.value)}
-                        className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                        className="rounded-control border border-border-strong px-2 py-1 text-body"
                       >
                         <option value="">Who taught it?</option>
                         {/* Exclude the class's own coach: they teach it anyway,
@@ -130,7 +131,7 @@ export function SubstitutesTable({
                       <button
                         type="button"
                         onClick={() => openPicker(lesson.session_date)}
-                        className="text-sm font-medium text-sky-600 underline"
+                        className="text-body font-medium text-primary underline"
                       >
                         {lesson.main.assigned ? "Change" : "Assign a substitute"}
                       </button>
@@ -147,7 +148,7 @@ export function SubstitutesTable({
                               `${formatSgDate(lesson.session_date)} is back with ${selected.coach_name}.`
                             )
                           }
-                          className="text-sm font-medium text-gray-500 underline disabled:opacity-50"
+                          className="text-body font-medium text-ink-muted underline disabled:opacity-50"
                         >
                           Clear
                         </button>

@@ -49,7 +49,7 @@ export default function LessonCoachesPage() {
         onMonth={s.selectMonth}
       />
 
-      <p className="mb-4 max-w-3xl text-xs text-gray-500">
+      <p className="mb-4 max-w-3xl text-label text-ink-muted">
         A lesson with no assignment is taught by the class&rsquo;s own coach —
         that is the normal state, and nothing needs recording for it. Assigning
         a substitute moves that <strong>one</strong> lesson onto their list: they
@@ -59,7 +59,7 @@ export default function LessonCoachesPage() {
       </p>
 
       {s.pickerError && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-3 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           Could not load the classes and coaches: {s.pickerError}. Names may show
           as &ldquo;Unknown coach&rdquo; and the pickers may be empty — reload
           before assigning anybody.
@@ -67,20 +67,20 @@ export default function LessonCoachesPage() {
       )}
 
       {s.loadError && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-3 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           Could not load the roster: {s.loadError}. The lessons below are
           incomplete — do not read an empty row as &ldquo;no substitute&rdquo;.
         </div>
       )}
 
       {s.message && (
-        <div className="mb-3 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
+        <div className="mb-3 rounded-card bg-status-info-bg px-3 py-2 text-body text-status-info-text">
           {s.message}
         </div>
       )}
 
       {!s.selected ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
+        <div className="rounded-card border border-border bg-surface p-6 text-body text-ink-secondary">
           Choose a class to see its lessons.
         </div>
       ) : (
