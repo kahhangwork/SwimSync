@@ -435,9 +435,8 @@ which mutate shared seed state — are in the same section.
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
-   **Phases 0–3 verified; Phase 4 live 2026-10-14, unverified until `38430764913` is read.** Then the **user's prod
-   hand-check** (Phase 4 head: sign in on both sites, a reset email to their own address, one live public invoice link);
-   a red → `git revert` + push. **Next build: Phase 5 (admin panel), step 5.1** — two of its drivers select by colour
+   **Phases 0–3 verified; Phase 4 live 2026-10-14, unverified until `38430764913` is read.** The **user's prod
+   hand-check PASSED** (2026-10-14). **Next build: Phase 5 (admin panel), step 5.1** — two of its drivers select by colour
    class (§7.375): fix them by role in the step that restyles them. Small, separate: BACKLOG *Cancelling a package
    request has no confirmation* (S). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
