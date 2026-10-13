@@ -1664,8 +1664,8 @@ functions served and real tokens. Fold-ins from them:
 - **Admin Calendar Week hides Sunday at 1440px** (the grid scrolls inside its own box: 1264 vs 1138px); a full class is
   drawn red with a red "FULL" (Red Means Stuck → neutral/warning); 10–11px text in `LessonCard` / `TimeGrid`; a class
   with no capacity shows a bare "1" where the legend promises "enrolled + guests / max".
-- Coach Pay: green money and a green `rounded-2xl` total box → Ink; "Paid"/"Draft" as grey text → status tags; violet
-  correction chip (outside the status scale); `toFixed(2)` → `S$1,260.00`.
+- Coach Pay: `toFixed(2)` → `S$1,260.00` (no thousands separator yet — wants one shared money formatter, not a
+  per-screen one). (Green money, the green total box, grey Paid/Draft and the violet chip — fixed in UI restyle 2.6.)
 - Parent Contact: placeholders that look like values ("9123 4567", "Blk 123 Clementi Ave 3"); grey-filled `rounded-xl`
   inputs; helper in `gray-400`; a sky Save plus a sky "Cancel" link.
 - Join screen (opened from Profile → Add Child) highlights **Home** — the route lives under `home/`; same shape as the
