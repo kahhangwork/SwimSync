@@ -1,13 +1,17 @@
 // The Packages tab: the family's packages, the ones for sale, and the referral card.
-// Moved VERBATIM from app/(parent)/billing/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-G); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/billing/index.tsx (docs/refactor/BATCH_FGH_PLAN.md, App L-G).
+// UI restyle step 3.8: flat cards, money and counts in Ink (tabular), a pending
+// package Info. Pay-First on a pending package (Pay via PayNow the primary, Cancel a
+// link under it); the products for sale are equal choices, so each "Request & pay"
+// is a secondary button, not a row of primaries. Every figure, condition and
+// handler is the one this file already had — nothing is recomputed (plan ⚠ RISK 2).
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import StatusBadge from "@/components/StatusBadge";
-import Card from "@/components/Card";
+import { Surface } from "@/components/ui/Surface";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 import { formatDate, childrenForProduct, requestStudentFor } from "../domain/billingFormat";
 import { ReferralSection } from "./ReferralSection";
 import { PackageUsageList } from "./PackageUsageList";
@@ -15,6 +19,8 @@ import { usePackageUsage } from "../domain/usePackageUsage";
 import type { useBilling } from "../domain/useBilling";
 
 type Billing = ReturnType<typeof useBilling>;
+
+const TABULAR = { fontVariant: ["tabular-nums" as const] };
 
 export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "products" | "requestingId" | "requestPackage" | "cancelRequest" | "familyChildren">) {
   const { packageError, packages, products, requestingId, requestPackage, cancelRequest, familyChildren } = p;
@@ -25,33 +31,33 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
     <>
       <>
         {packageError && (
-          <View className="bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-            <Text className="text-sm text-red-600">{packageError}</Text>
+          <View className="bg-status-danger-bg border border-status-danger-border rounded-card px-4 py-3">
+            <Text className="text-body text-status-danger-text">{packageError}</Text>
           </View>
         )}
 
         {packages.length === 0 && products.length === 0 && (
           <View className="items-center py-16">
-            <Ionicons name="cube-outline" size={40} color="#d1d5db" />
-            <Text className="text-gray-400 mt-3 text-center px-8">
+            <Ionicons name="cube-outline" size={40} color="#6b6b6b" />
+            <Text className="text-body text-ink-secondary mt-3 text-center px-8">
               Your coach doesn&apos;t offer prepaid packages yet.
             </Text>
           </View>
         )}
 
         {packages.map((pkg) => (
-          <Card key={pkg.id}>
-            <View className="flex-row items-start justify-between mb-2">
-              <View className="flex-1 pr-2">
-                <Text className="text-base font-bold text-gray-900">
+          <Surface key={pkg.id}>
+            <View className="flex-row items-start justify-between gap-3 mb-2">
+              <View className="flex-1">
+                <Text className="text-headline font-semibold text-ink">
                   {pkg.name}
                 </Text>
-                <Text className="text-xs font-medium text-sky-600 mt-0.5">
+                <Text className="text-body-secondary text-ink-secondary mt-0.5">
                   {pkg.business_name}
                   {pkg.category_name ? ` · ${pkg.category_name} classes` : ""}
                 </Text>
                 {pkg.child_name && (
-                  <Text className="text-xs font-semibold text-gray-700 mt-0.5">
+                  <Text className="text-body-secondary font-semibold text-ink mt-0.5">
                     For {pkg.child_name} only
                   </Text>
                 )}
@@ -65,14 +71,14 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
             {pkg.status === "active" ? (
               <>
                 <View className="items-center py-3">
-                  <Text className="text-3xl font-bold text-gray-900">
+                  <Text className="text-display font-semibold text-ink" style={TABULAR}>
                     {pkg.live_lessons_remaining ??
                       Math.floor(pkg.total_value / pkg.rate_per_lesson)}
                   </Text>
-                  <Text className="text-sm text-gray-500">
+                  <Text className="text-body text-ink-secondary">
                     lessons remaining
                   </Text>
-                  <Text className="text-xs text-gray-400 mt-1">
+                  <Text className="text-body-secondary text-ink-secondary mt-1" style={TABULAR}>
                     S$
                     {(pkg.live_value_remaining ?? pkg.total_value).toFixed(2)}{" "}
                     of S${pkg.total_value.toFixed(2)}
@@ -81,22 +87,22 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                 {/* Lessons your child has attended show here the same
                     day; the money itself moves on the monthly invoice. */}
                 {pkg.expires_on && (
-                  <View className="flex-row justify-between pt-2 border-t border-gray-100">
-                    <Text className="text-xs text-gray-500">Valid until</Text>
-                    <Text className="text-xs text-gray-700">
+                  <View className="flex-row justify-between pt-2 border-t border-divider">
+                    <Text className="text-body-secondary text-ink-secondary">Valid until</Text>
+                    <Text className="text-body-secondary text-ink">
                       {formatDate(pkg.expires_on)}
                     </Text>
                   </View>
                 )}
                 {pkg.holiday_extension_days > 0 && (
-                  <Text className="mt-1 text-xs text-gray-400">
+                  <Text className="mt-1 text-body-secondary text-ink-secondary">
                     Includes +{pkg.holiday_extension_days} day
                     {pkg.holiday_extension_days === 1 ? "" : "s"} for public
                     holidays
                   </Text>
                 )}
                 {pkg.cancel_extension_days > 0 && (
-                  <Text className="mt-1 text-xs text-gray-400">
+                  <Text className="mt-1 text-body-secondary text-ink-secondary">
                     Includes +{pkg.cancel_extension_days} day
                     {pkg.cancel_extension_days === 1 ? "" : "s"} for cancelled
                     lessons
@@ -107,57 +113,59 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
             ) : (
               <>
                 {pkg.offered_by ? (
-                  <Text className="text-sm text-gray-600 mb-3">
+                  <Text className="text-body text-ink mb-3">
                     {pkg.business_name} has prepared your next package —{" "}
                     {pkg.lesson_count} lessons ·{" "}
                     S${pkg.amount_payable.toFixed(2)}. Pay via PayNow to
                     activate it.
                   </Text>
                 ) : (
-                  <Text className="text-sm text-gray-600 mb-3">
+                  <Text className="text-body text-ink mb-3">
                     {pkg.lesson_count} lessons ·{" "}
                     S${pkg.amount_payable.toFixed(2)}. Waiting for{" "}
                     {pkg.business_name} to confirm your PayNow payment.
                   </Text>
                 )}
                 {pkg.discount_amount > 0 && (
-                  <Text className="text-xs font-medium text-emerald-600 -mt-2 mb-3">
+                  <Text className="text-body-secondary text-ink-secondary -mt-2 mb-3" style={TABULAR}>
                     Referral discount: −S${pkg.discount_amount.toFixed(2)}{" "}
                     off S${pkg.total_value.toFixed(2)}
                   </Text>
                 )}
-                <View className="flex-row gap-2">
+                <View>
                   <TouchableOpacity
                     onPress={() =>
                       router.push(
                         `/(parent)/billing/paynow?packageId=${pkg.id}`
                       )
                     }
-                    className="flex-1 bg-sky-500 rounded-xl py-2.5 items-center"
+                    className="min-h-11 px-4 rounded-control items-center justify-center bg-primary"
                   >
-                    <Text className="text-sm font-semibold text-white">
+                    <Text className="text-body font-semibold text-white">
                       Pay via PayNow
                     </Text>
                   </TouchableOpacity>
+                  {/* Cancelling a request is the second decision, not an equal
+                      one (Pay-First); it asks before it acts (cancelRequest). */}
                   <TouchableOpacity
                     onPress={() => cancelRequest(pkg)}
-                    className="px-4 rounded-xl py-2.5 items-center border border-gray-200"
+                    className="min-h-11 items-center justify-center"
                   >
-                    <Text className="text-sm font-semibold text-gray-500">
+                    <Text className="text-body font-semibold text-status-danger-text">
                       Cancel
                     </Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
-          </Card>
+          </Surface>
         ))}
 
         {products.length > 0 && (
           <>
-            <Text className="text-sm font-bold text-gray-700 mt-3 mb-1">
+            <SectionHeading className="mt-3 mb-1">
               Buy a package
-            </Text>
+            </SectionHeading>
             {products.map((p) => {
               // D7 — which child a one-child product is for: shown when there is
               // one child at this business, asked when several, refused when none.
@@ -165,18 +173,18 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
               const studentId = requestStudentFor(p, eligible, childChoice[p.id]);
               const blocked = p.single_child && (eligible.length === 0 || !studentId);
               return (
-              <Card key={p.id}>
-                <Text className="text-base font-bold text-gray-900">
+              <Surface key={p.id}>
+                <Text className="text-headline font-semibold text-ink">
                   {p.name}
                 </Text>
-                <Text className="text-xs font-medium text-sky-600 mt-0.5 mb-2">
+                <Text className="text-body-secondary text-ink-secondary mt-0.5 mb-2">
                   {p.business_name}
                   {p.category_name ? ` · ${p.category_name} classes` : ""}
                 </Text>
-                <Text className="text-sm text-gray-600 mb-3">
+                <Text className="text-body text-ink mb-3">
                   {p.lesson_count} lessons at S$
                   {p.rate_per_lesson.toFixed(2)} each —{" "}
-                  <Text className="font-bold text-gray-900">
+                  <Text className="font-semibold text-ink" style={TABULAR}>
                     S${(p.lesson_count * p.rate_per_lesson).toFixed(2)}
                   </Text>
                   , valid {p.validity_weeks} week
@@ -185,16 +193,16 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                 {p.single_child && (
                   <View className="mb-3" testID={`child-picker-${p.id}`}>
                     {eligible.length === 0 ? (
-                      <Text className="text-sm text-amber-700">
+                      <Text className="text-body text-status-warning-text">
                         Add your child at this business first.
                       </Text>
                     ) : eligible.length === 1 ? (
-                      <Text className="text-sm text-gray-700">
-                        For <Text className="font-bold">{eligible[0].name}</Text>
+                      <Text className="text-body text-ink">
+                        For <Text className="font-semibold">{eligible[0].name}</Text>
                       </Text>
                     ) : (
                       <>
-                        <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+                        <Text className="text-body font-medium text-ink mb-1.5">
                           Which child is this for?
                         </Text>
                         <View className="flex-row flex-wrap gap-2">
@@ -204,11 +212,11 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                               <TouchableOpacity
                                 key={k.id}
                                 onPress={() => setChildChoice((c) => ({ ...c, [p.id]: k.id }))}
-                                className={`rounded-full px-3 py-1.5 border ${on ? "bg-sky-500 border-sky-500" : "border-gray-300"}`}
+                                className={`min-h-11 justify-center rounded-control px-4 border ${on ? "bg-selected border-border-strong" : "bg-surface border-border"}`}
                                 accessibilityRole="radio"
                                 accessibilityState={{ selected: on }}
                               >
-                                <Text className={`text-sm ${on ? "text-white font-semibold" : "text-gray-700"}`}>
+                                <Text className={`text-body ${on ? "font-semibold text-ink" : "font-medium text-ink-secondary"}`}>
                                   {k.name}
                                 </Text>
                               </TouchableOpacity>
@@ -222,17 +230,17 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                 <TouchableOpacity
                   onPress={() => requestPackage(p, studentId)}
                   disabled={requestingId !== null || blocked}
-                  className="bg-sky-500 rounded-xl py-2.5 items-center"
+                  className="min-h-11 px-4 rounded-control items-center justify-center bg-surface border border-border-strong"
                   style={requestingId !== null || blocked ? { opacity: 0.6 } : undefined}
                 >
-                  <Text className="text-sm font-semibold text-white">
+                  <Text className="text-body font-semibold text-ink">
                     {requestingId === p.id ? "Requesting…" : "Request & pay"}
                   </Text>
                 </TouchableOpacity>
-              </Card>
+              </Surface>
               );
             })}
-            <Text className="text-xs text-gray-400 px-1">
+            <Text className="text-body-secondary text-ink-secondary px-1">
               You pay by PayNow; the package becomes active once your
               coach confirms the money arrived. Lessons then use the
               package automatically, and anything it doesn&apos;t cover
