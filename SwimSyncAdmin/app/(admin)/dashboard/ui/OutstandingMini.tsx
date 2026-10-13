@@ -10,12 +10,12 @@ export function OutstandingMini({ invoices, loading }: Props) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-bold text-gray-900">
+        <h2 className="text-headline font-semibold text-ink">
           Outstanding Invoices
         </h2>
         <Link
           href="/invoices"
-          className="text-sm text-sky-500 hover:text-sky-600 font-medium"
+          className="text-body font-medium text-primary hover:underline underline-offset-2"
         >
           View all →
         </Link>
@@ -30,13 +30,13 @@ export function OutstandingMini({ invoices, loading }: Props) {
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-6" colSpan={4}>
+              <Td className="text-center text-ink-muted py-6" colSpan={4}>
                 Loading…
               </Td>
             </Tr>
           ) : invoices.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-6" colSpan={4}>
+              <Td className="text-center text-ink-muted py-6" colSpan={4}>
                 No outstanding invoices
               </Td>
             </Tr>
@@ -44,10 +44,10 @@ export function OutstandingMini({ invoices, loading }: Props) {
             invoices.map((inv) => (
               <Tr key={inv.id}>
                 <Td className="font-medium">{inv.parent_name}</Td>
-                <Td className="text-gray-500">
+                <Td className="text-ink-muted">
                   {formatBillingMonth(inv.billing_month)}
                 </Td>
-                <Td className="font-semibold text-red-600">
+                <Td className="text-right font-semibold tabular-nums text-ink">
                   S${inv.net_amount.toFixed(2)}
                 </Td>
                 <Td>

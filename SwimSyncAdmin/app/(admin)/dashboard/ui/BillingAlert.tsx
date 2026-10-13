@@ -12,11 +12,11 @@ export function BillingAlert({ summary }: { summary: string | null }) {
     <Link
       href="/invoices"
       data-testid="billing-alert"
-      className="mb-5 flex items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100"
+      className="mb-5 flex items-center gap-2 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-3 text-body text-status-warning-text hover:border-status-warning-text"
     >
       <AlertTriangle className="h-4 w-4 shrink-0" />
       <span className="flex-1">{summary}</span>
-      <span className="text-xs font-semibold">Invoices →</span>
+      <span className="text-label font-semibold">Invoices →</span>
     </Link>
   );
 }

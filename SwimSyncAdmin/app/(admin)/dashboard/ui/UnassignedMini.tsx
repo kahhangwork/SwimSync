@@ -14,12 +14,12 @@ export function UnassignedMini({ unassigned, covMap, loading }: Props) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-bold text-gray-900">
+        <h2 className="text-headline font-semibold text-ink">
           Unassigned Children
         </h2>
         <Link
           href="/unassigned"
-          className="text-sm text-sky-500 hover:text-sky-600 font-medium"
+          className="text-body font-medium text-primary hover:underline underline-offset-2"
         >
           View all →
         </Link>
@@ -32,13 +32,13 @@ export function UnassignedMini({ unassigned, covMap, loading }: Props) {
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-6" colSpan={2}>
+              <Td className="text-center text-ink-muted py-6" colSpan={2}>
                 Loading…
               </Td>
             </Tr>
           ) : unassigned.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-6" colSpan={2}>
+              <Td className="text-center text-ink-muted py-6" colSpan={2}>
                 No unassigned children
               </Td>
             </Tr>
@@ -46,7 +46,7 @@ export function UnassignedMini({ unassigned, covMap, loading }: Props) {
             unassigned.map((s) => (
               <Tr key={s.id}>
                 <Td className="font-medium">{s.full_name}</Td>
-                <Td className="text-gray-500">
+                <Td className="text-ink-muted">
                   {s.parent_name}
                   <span className="ml-1.5">
                     <PackageChip coverage={covMap.get(s.id)} />
