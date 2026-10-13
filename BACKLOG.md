@@ -1687,6 +1687,38 @@ handler did not change, but it is now in the thumb's path.
 `Button variant="destructive"` with a `confirm`. `verify-app-money` D presses this Cancel; `launch()` accepts
 `window.confirm`, so the driver keeps passing — prove it with `--only app-money`. Not visual-only.
 
+### Admin tables still carrying several inline row actions — **S** — _filed 2026-10-14_
+UI restyle Phase 5 moved row actions into the shared "…" menu (`components/ui/RowMenu.tsx`, DESIGN.md → Tables: at
+most one inline action per row) on Credit notes, Classes, Parents, Coaches, Locations, Admins and Roles. Four screens
+were left with their inline actions, on purpose:
+- **Packages** (Held + Pending tables) — 2–4 per row (Extend, Cancel, Check marked lessons, Change child; Payment
+  received, Decline, Change child; Record refund / Reverse). Not on the audit's Tables fold-in list; ~15 driver presses
+  in `verify-packages-admin` (several `count()` checks) would move to `rowAction` / `rowActionCount`.
+- **Invoices** — Mark Paid + WhatsApp + Link. DESIGN.md's own example is this table (Due → *Mark paid*, Claimed →
+  *Confirm payment*). Drivers press WhatsApp / Link (`payment-collection`).
+- **Levels** — Edit + Remove inline; `verify-grading-admin` presses Edit directly.
+- **Platform** (`/platform` Businesses table) — Suspend/Unsuspend, Set owner / Change owner, Resend sit as inline links.
+  Left alone because plan 5.29 ⚠ RISK 4 forbids moving the cross-tenant suspend handlers; moving them into a menu is a
+  handler move, so it needs its own step with `--only platform-admin`, `platform-admin-scope`, `platform-controls`,
+  `tenant-suspension` before and after.
+
+**Why:** DESIGN.md's one-inline-action rule is unmet on these four; the restyle chose not to churn drivers or touch
+cross-tenant handlers inside a visual change.
+
+**Fix:** per screen, keep the row's STATE action inline and move the rest into `RowMenu` (destructive ones as
+`RowMenuItem destructive`); route each driver press through `lib.mjs` `rowAction` and each "no button any more" check
+through `rowActionCount` (so it counts inside the menu, never vacuously). Not visual-only.
+
+### Deleting a role has no confirmation step — **S** — _filed 2026-10-14_
+Admin → Roles → a role nobody holds → **Delete** calls `useRoles().remove(role)` at once: no confirmation, no undo.
+Found in UI restyle 5.25, which moved Delete from an inline red button into the card's "…" menu — the handler did not
+change.
+
+**Why:** DESIGN.md puts every destructive action behind a confirmation; a mis-click deletes a custom role an owner set up.
+
+**Fix:** a `Modal` confirm ("Delete the role <name>?") before `remove`, as Locations and Admins do. `verify-roles`
+does not delete a role today — add the press + confirm to it and prove it bites. Not visual-only.
+
 ### A credit note's amount has no positivity check — **S** — _filed 2026-10-13_
 `credit_notes.amount` is `NUMERIC(10,2) NOT NULL` with **no `CHECK (amount > 0)`** (`20260309000100_initial_schema.sql`).
 Its writers are the correction triggers, which copy a billed lesson's amount, so a negative row should not occur — but
