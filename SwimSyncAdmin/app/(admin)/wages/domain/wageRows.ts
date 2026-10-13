@@ -1,4 +1,4 @@
-import { todayInSg } from "@/lib/lessonDates";
+import { formatSgStamp, todayInSg } from "@/lib/lessonDates";
 import type { LessonLine, PayoutItem } from "./payoutItems";
 import type { CoachRow } from "../types";
 import type { CoachSelectRow, PayoutSelectRow } from "../dao/wages.repo";
@@ -17,6 +17,18 @@ export function currentMonth(): string {
  * what toFixed() gives you — puts the sign where nobody looks; the minus goes
  * in front of the currency, as on a bank statement.
  */
+/**
+ * DISPLAY ONLY (BACKLOG S9, UI restyle 5.4): a rate's "In effect from" as
+ * "6 Oct 2026". A rate dated on or before 2000-01-01 is a backfill that means
+ * "since the start" — shown as such, never as a real date. The raw
+ * `effective_from` stays what the sort and "the rate in effect" compare.
+ */
+export function rateFromLabel(effectiveFrom: string | null | undefined): string {
+  if (!effectiveFrom) return "—";
+  if (effectiveFrom <= "2000-01-01") return "From the start";
+  return formatSgStamp(effectiveFrom, { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function money(amount: number): string {
   return `${amount < 0 ? "−" : ""}S$${Math.abs(amount).toFixed(2)}`;
 }

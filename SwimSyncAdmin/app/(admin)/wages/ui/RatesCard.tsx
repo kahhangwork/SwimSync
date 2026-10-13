@@ -1,5 +1,6 @@
 import { Table, Thead, Th, Tbody, Tr, Td, type TableSort } from "@/components/Table";
 import type { CoachRow } from "../types";
+import { rateFromLabel } from "../domain/wageRows";
 
 export function RatesCard({
   rateSort,
@@ -33,9 +34,9 @@ export function RatesCard({
   handleSaveRate: (coachId: string) => void;
 }) {
   return (
-    <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4">
-      <h2 className="mb-1 text-sm font-semibold text-gray-900">Rates</h2>
-      <p className="mb-3 text-xs text-gray-500">
+    <div className="mb-6 rounded-card border border-border bg-surface p-4">
+      <h2 className="mb-1 text-headline font-semibold text-ink">Rates</h2>
+      <p className="mb-3 text-label text-ink-muted">
         A coach with no rate isn&rsquo;t on payroll — which is right for a
         private coach, whose income is their parents&rsquo; invoices. Saving a
         rate adds a new dated rate rather than editing the old one, so past
@@ -58,15 +59,15 @@ export function RatesCard({
                   ? `S$${c.rate.amount.toFixed(2)} per ${c.rate.unit_minutes} min`
                   : "Not on payroll"}
               </Td>
-              <Td>{c.rate?.effective_from ?? "—"}</Td>
+              <Td>{rateFromLabel(c.rate?.effective_from)}</Td>
               <Td>
                 {c.shadowRate ? (
-                  <span className="text-gray-900">
+                  <span className="text-ink">
                     S${c.shadowRate.amount.toFixed(2)} per{" "}
                     {c.shadowRate.unit_minutes} min
                   </span>
                 ) : (
-                  <span className="text-sm text-gray-400">—</span>
+                  <span className="text-body text-ink-muted">—</span>
                 )}
               </Td>
               <Td>
@@ -87,7 +88,7 @@ export function RatesCard({
                         setRateAmount(r ? String(r.amount) : "");
                         setRateUnit(String(r?.unit_minutes ?? 60));
                       }}
-                      className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                      className="rounded-control border border-border-strong px-2 py-1 text-body"
                     >
                       <option value="main">Teaching rate</option>
                       <option value="shadow">Shadow rate</option>
@@ -98,32 +99,32 @@ export function RatesCard({
                       placeholder="30.00"
                       value={rateAmount}
                       onChange={(e) => setRateAmount(e.target.value)}
-                      className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                      className="w-24 rounded-control border border-border-strong px-2 py-1 text-body"
                     />
-                    <span className="text-xs text-gray-500">per</span>
+                    <span className="text-label text-ink-muted">per</span>
                     <input
                       type="number"
                       value={rateUnit}
                       onChange={(e) => setRateUnit(e.target.value)}
-                      className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                      className="w-16 rounded-control border border-border-strong px-2 py-1 text-body"
                     />
-                    <span className="text-xs text-gray-500">min, from</span>
+                    <span className="text-label text-ink-muted">min, from</span>
                     <input
                       type="date"
                       value={rateFrom}
                       onChange={(e) => setRateFrom(e.target.value)}
-                      className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                      className="rounded-control border border-border-strong px-2 py-1 text-body"
                     />
                     <button
                       onClick={() => handleSaveRate(c.id)}
                       disabled={busy}
-                      className="rounded-lg bg-sky-500 px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
+                      className="rounded-control bg-primary px-3 py-1 text-body font-medium text-white disabled:opacity-50"
                     >
                       Save
                     </button>
                     <button
                       onClick={() => setRateFor(null)}
-                      className="text-sm text-gray-500"
+                      className="text-body text-ink-muted"
                     >
                       Cancel
                     </button>
@@ -137,7 +138,7 @@ export function RatesCard({
                       setRateUnit(String(c.rate?.unit_minutes ?? 60));
                       setRateFrom("");
                     }}
-                    className="text-sm font-medium text-sky-600 underline"
+                    className="text-body font-medium text-primary underline"
                   >
                     {c.rate ? "Change rate" : "Set a rate"}
                   </button>

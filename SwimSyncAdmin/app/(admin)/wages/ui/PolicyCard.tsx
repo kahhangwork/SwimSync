@@ -12,10 +12,10 @@ export function PolicyCard({
   updateTenant: (patch: Record<string, unknown>) => Promise<void>;
 }) {
   return (
-    <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4">
-      <h2 className="mb-3 text-sm font-semibold text-gray-900">Policy</h2>
+    <div className="mb-6 rounded-card border border-border bg-surface p-4">
+      <h2 className="mb-3 text-headline font-semibold text-ink">Policy</h2>
       <div className="flex flex-wrap items-center gap-6">
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+        <label className="flex items-center gap-2 text-body text-ink-secondary">
           <input
             type="checkbox"
             checked={rainPays}
@@ -26,7 +26,7 @@ export function PolicyCard({
           />
           Pay coaches for lessons cancelled by rain
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+        <label className="flex items-center gap-2 text-body text-ink-secondary">
           Pay coaches on day
           <input
             type="number"
@@ -39,12 +39,12 @@ export function PolicyCard({
               setRunDay(v);
               await updateTenant({ wage_run_day: v });
             }}
-            className="w-16 rounded-lg border border-gray-200 px-2 py-1"
+            className="w-16 rounded-control border border-border-strong px-2 py-1"
           />
           of the month
         </label>
       </div>
-      <p className="mt-3 text-xs text-gray-500">
+      <p className="mt-3 text-label text-ink-muted">
         A lesson pays when at least one student attended. Everyone absent
         doesn&rsquo;t pay; a lesson the coach cancelled never does. Rain
         follows the setting above, and any single session can be overridden.

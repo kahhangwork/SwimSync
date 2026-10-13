@@ -3,7 +3,7 @@
 // wages/page.tsx. They pin existing behaviour, so §7.25's prove-it-red rule does
 // not apply (playbook §0).
 import { describe, it, expect } from "vitest";
-import { lineDetail, money, toCoachRow, toPayoutItems } from "./wageRows";
+import { lineDetail, money, toCoachRow, toPayoutItems, rateFromLabel } from "./wageRows";
 import type { LessonLine } from "./payoutItems";
 
 describe("money", () => {
@@ -66,5 +66,17 @@ describe("lineDetail", () => {
   it("joins minutes and corrected periods with a middle dot", () => {
     expect(lineDetail(line([{ basis: "per_minute", minutes: 30 }], ["2026-06", "2026-07"])))
       .toBe("30 min · correcting 2026-06, 2026-07");
+  });
+});
+
+describe("rateFromLabel (display only — S9)", () => {
+  it("a backfilled 2000-01-01 rate reads 'From the start', never as a date", () => {
+    expect(rateFromLabel("2000-01-01")).toBe("From the start");
+  });
+  it("a real date reads in the One Date Style", () => {
+    expect(rateFromLabel("2026-09-22")).toBe("22 Sept 2026");
+  });
+  it("no rate is a dash", () => {
+    expect(rateFromLabel(undefined)).toBe("—");
   });
 });

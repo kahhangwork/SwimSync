@@ -53,7 +53,7 @@ export default function WagesPage() {
     return (
       <div>
         <PageHeader title="Wages" subtitle="Pay your coaches from attendance" />
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
+        <div className="rounded-card border border-border bg-surface p-6 text-ink-secondary">
           Wages are run per business, and your account is not attached to one.
         </div>
       </div>
@@ -67,13 +67,21 @@ export default function WagesPage() {
         subtitle="Calculated from the lessons your coaches actually taught"
       />
 
-      {/* Policy */}
-      <PolicyCard
-        rainPays={w.rainPays}
-        setRainPays={w.setRainPays}
-        runDay={w.runDay}
-        setRunDay={w.setRunDay}
-        updateTenant={w.updateTenant}
+      {/* Payroll run */}
+      <PayrollCard
+        period={pay.period}
+        setPeriod={pay.setPeriod}
+        handleRun={pay.handleRun}
+        busy={w.busy}
+        message={w.message}
+        loadError={pay.loadError}
+        loadingPayouts={pay.loadingPayouts}
+        payouts={pay.payouts}
+        payoutSort={pay.payoutSort}
+        visiblePayouts={pay.visiblePayouts}
+        expanded={pay.expanded}
+        setExpanded={pay.setExpanded}
+        handleMarkPaid={pay.handleMarkPaid}
       />
 
       {/* Rates */}
@@ -94,22 +102,15 @@ export default function WagesPage() {
         handleSaveRate={rate.handleSaveRate}
       />
 
-      {/* Payroll run */}
-      <PayrollCard
-        period={pay.period}
-        setPeriod={pay.setPeriod}
-        handleRun={pay.handleRun}
-        busy={w.busy}
-        message={w.message}
-        loadError={pay.loadError}
-        loadingPayouts={pay.loadingPayouts}
-        payouts={pay.payouts}
-        payoutSort={pay.payoutSort}
-        visiblePayouts={pay.visiblePayouts}
-        expanded={pay.expanded}
-        setExpanded={pay.setExpanded}
-        handleMarkPaid={pay.handleMarkPaid}
+      {/* Policy — settings, below the work (BACKLOG S10; UI restyle 5.4) */}
+      <PolicyCard
+        rainPays={w.rainPays}
+        setRainPays={w.setRainPays}
+        runDay={w.runDay}
+        setRunDay={w.setRunDay}
+        updateTenant={w.updateTenant}
       />
+
     </div>
   );
 }
