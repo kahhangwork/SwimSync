@@ -238,6 +238,19 @@ try {
   // No package in the fixture: the not-found state is the rendered screen.
   await visit(page, "/package/00000000000000000000000000000000", "Package not found",
     { authed: false, expectedFailure: /^404 \/functions\/v1\/public-package\?token=0000/ });
+  // A bad link is no longer a dead end (UI restyle 4.5/4.6): it offers Sign in.
+  // A Playwright click, not pressByText — the link is an <a> whose text is its
+  // own, so pressByText would dispatch on the wrapper and miss.
+  {
+    const way = page.getByText("Sign in to SwimSync", { exact: true });
+    const offered = (await way.count()) === 1;
+    check(offered, "/package (bad token) offers \"Sign in to SwimSync\"");
+    if (offered) {
+      await way.click();
+      await page.waitForURL(/\/login$/, { timeout: 15000 }).catch(() => {});
+    }
+    check(/\/login$/.test(new URL(page.url()).pathname), "…and it opens /login", page.url());
+  }
 
   console.log(`\n${pass}/${pass + fail} checks passed`);
   if (fail) process.exitCode = 1;

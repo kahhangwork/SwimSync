@@ -135,7 +135,7 @@ try {
     await page.goto(`${EXPO}/package/${token}`, { waitUntil: "domcontentloaded" });
     await page.getByText(/Reference: PKG-/).first().waitFor({ timeout: 30000 }).catch(() => {});
     const inText = await page.evaluate(() => document.body.innerText);
-    check("C (logged in): price + PKG reference render", /\$\d+\.\d\d/.test(inText) && /Reference: PKG-/.test(inText));
+    check("C (logged in): price (written S$, UI restyle 4.6) + PKG reference render", /S\$\d+\.\d\d/.test(inText) && /Reference: PKG-/.test(inText));
     check("C (logged in): a data:image QR renders", (await page.locator('img[src^="data:image"]').count()) > 0);
     check("C (logged in): I've paid is offered", /I've paid/.test(inText));
     await page.screenshot({ path: shot("C-in") });
