@@ -1685,6 +1685,20 @@ handler did not change, but it is now in the thumb's path.
 `Button variant="destructive"` with a `confirm`. `verify-app-money` D presses this Cancel; `launch()` accepts
 `window.confirm`, so the driver keeps passing — prove it with `--only app-money`. Not visual-only.
 
+### A credit note's amount has no positivity check — **S** — _filed 2026-10-13_
+`credit_notes.amount` is `NUMERIC(10,2) NOT NULL` with **no `CHECK (amount > 0)`** (`20260309000100_initial_schema.sql`).
+Its writers are the correction triggers, which copy a billed lesson's amount, so a negative row should not occur — but
+nothing enforces it. Since UI restyle 3.2 / 3.9 the parent app prints a credit as a reduction, `−S${amount}`, so a
+negative row would read `−S$-5.00`; the engine's FIFO draw (`apply_credit_to_invoice`) would treat it as a debit.
+
+**Why:** a credit note is money the business owes the family; a negative one would silently ADD to an invoice while
+every screen calls it a credit. Cheap to rule out now, expensive to unpick after a billing run.
+
+**Notes:** first `SELECT count(*) FROM credit_notes WHERE amount <= 0` on prod (`scripts/prod-query-ro.sh`, run by the
+RELATIVE path — an absolute path misses the allow rule). If 0: a migration adding `CHECK (amount > 0)` (expand-only,
+pgTAP a refused insert; `credit_applications.amount` already has the same check — `20260711000100`). If not 0: stop
+and ask — those rows are real money. Do NOT "fix" it in the UI with `Math.abs`; that would hide the bad row.
+
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
 
