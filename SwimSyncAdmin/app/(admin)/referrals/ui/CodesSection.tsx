@@ -14,12 +14,12 @@ export function CodesSection({
 }) {
   return (
     <section className="mb-8">
-      <h2 className="text-base font-bold text-gray-900 mb-2">Family referral codes</h2>
-      <p className="text-sm text-gray-500 mb-2">
+      <h2 className="text-headline font-semibold text-ink mb-2">Family referral codes</h2>
+      <p className="text-body text-ink-muted mb-2">
         A leaked code cannot be rotated — disable it to shut it off.
       </p>
       {memberships.length === 0 ? (
-        <p className="text-sm text-gray-500">No families yet.</p>
+        <p className="text-body text-ink-muted">No families yet.</p>
       ) : (
         <Table>
           <Thead>
@@ -34,7 +34,7 @@ export function CodesSection({
                   ? <StatusBadge status="Disabled" />
                   : <StatusBadge status="Active" />}</Td>
                 <Td>
-                  <Button variant="ghost" onClick={() => onToggle(m)} disabled={busy}>
+                  <Button variant="outline" size="sm" onClick={() => onToggle(m)} disabled={busy}>
                     {m.disabled_at ? "Enable" : "Disable"}
                   </Button>
                 </Td>

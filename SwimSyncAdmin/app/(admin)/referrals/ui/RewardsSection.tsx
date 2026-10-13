@@ -17,9 +17,9 @@ export function RewardsSection({
 }) {
   return (
     <section className="mb-8">
-      <h2 className="text-base font-bold text-gray-900 mb-2">Rewards</h2>
+      <h2 className="text-headline font-semibold text-ink mb-2">Rewards</h2>
       {rewards.length === 0 ? (
-        <p className="text-sm text-gray-500">No rewards yet.</p>
+        <p className="text-body text-ink-muted">No rewards yet.</p>
       ) : (
         <Table>
           <Thead>
@@ -38,7 +38,7 @@ export function RewardsSection({
                   <Td>{r.expires_at ? formatSgStamp(r.expires_at, DMY) : "never"}</Td>
                   <Td>
                     {(r.status === "available" || r.status === "reserved") && (
-                      <Button variant="ghost" onClick={() => onVoid(r.id)} disabled={busy}>
+                      <Button variant="danger" size="sm" onClick={() => onVoid(r.id)} disabled={busy}>
                         Void
                       </Button>
                     )}

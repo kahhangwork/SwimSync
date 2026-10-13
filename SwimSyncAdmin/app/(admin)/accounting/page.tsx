@@ -50,12 +50,12 @@ export default function AccountingPage() {
     return error ? (
       <div>
         <PageHeader title="Accounting" />
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
           {error}
         </p>
       </div>
     ) : (
-      <p className="text-sm text-gray-500">Loading…</p>
+      <p className="text-body text-ink-muted">Loading…</p>
     );
   }
   if (isOwner === false) {
@@ -63,10 +63,10 @@ export default function AccountingPage() {
       <div>
         <PageHeader title="Accounting" />
         <div
-          className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600"
+          className="rounded-card border border-border bg-ground p-6 text-body text-ink-secondary"
           data-testid="owner-only-notice"
         >
-          <strong className="text-gray-800">Not in your role.</strong> The
+          <strong className="text-ink">Not in your role.</strong> The
           accounting figures — revenue, wages and net — are visible to the
           business owner and to roles that include Accounting.
         </div>
@@ -88,26 +88,26 @@ export default function AccountingPage() {
       />
 
       {error && (
-        <p className="mb-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <p className="mb-5 rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
           {error}
         </p>
       )}
 
       {!monthsLoaded ? (
-        <p className="text-sm text-gray-500">Loading figures…</p>
+        <p className="text-body text-ink-muted">Loading figures…</p>
       ) : months.length === 0 ? (
         // Suppressed on error: an errored month-load also leaves months empty,
         // and claiming "no closed months" then would be a false empty state.
         error ? null : (
           <div
-            className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600"
+            className="rounded-card border border-border bg-ground p-6 text-body text-ink-secondary"
             data-testid="no-months"
           >
             No closed months yet — figures appear after your first billing run.
           </div>
         )
       ) : loadingSummary || !summary ? (
-        <p className="text-sm text-gray-500">Loading figures…</p>
+        <p className="text-body text-ink-muted">Loading figures…</p>
       ) : (
         <Figures summary={summary} />
       )}

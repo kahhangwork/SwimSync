@@ -14,27 +14,27 @@ export function SettingsSection({
   onSave: () => void;
 }) {
   return (
-    <section className="mb-8 rounded-xl border border-gray-200 bg-white p-5">
-      <h2 className="text-base font-bold text-gray-900 mb-3">Programme settings</h2>
+    <section className="mb-8 rounded-card border border-border bg-surface p-5">
+      <h2 className="text-headline font-semibold text-ink mb-3">Programme settings</h2>
       <div className="flex flex-wrap items-end gap-4">
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-body">
           <input
             type="checkbox"
             checked={settings.referral_enabled}
             onChange={(e) => setSettings({ ...settings, referral_enabled: e.target.checked })}
           />
-          <span className="font-medium text-gray-700">Referrals enabled</span>
+          <span className="font-medium text-ink-secondary">Referrals enabled</span>
         </label>
 
         <div>
-          <div className="text-xs font-semibold text-gray-500 mb-1">Discount type</div>
+          <div className="text-label font-semibold text-ink-muted mb-1">Discount type</div>
           <select
             value={settings.referral_discount_type ?? ""}
             onChange={(e) => setSettings({
               ...settings,
               referral_discount_type: (e.target.value || null) as DiscountType | null,
             })}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="rounded-control border border-border-strong px-3 py-2 text-body"
           >
             <option value="">—</option>
             <option value="percent">Percent (%)</option>
@@ -43,7 +43,7 @@ export function SettingsSection({
         </div>
 
         <div>
-          <div className="text-xs font-semibold text-gray-500 mb-1">Value</div>
+          <div className="text-label font-semibold text-ink-muted mb-1">Value</div>
           <input
             type="number"
             min={0}
@@ -52,12 +52,12 @@ export function SettingsSection({
               ...settings,
               referral_discount_value: e.target.value === "" ? null : Number(e.target.value),
             })}
-            className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-24 rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </div>
 
         <div>
-          <div className="text-xs font-semibold text-gray-500 mb-1">
+          <div className="text-label font-semibold text-ink-muted mb-1">
             Referrer reward expires (days)
           </div>
           <input
@@ -69,7 +69,7 @@ export function SettingsSection({
               ...settings,
               referral_reward_expiry_days: e.target.value === "" ? null : Number(e.target.value),
             })}
-            className="w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-28 rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </div>
 
@@ -77,7 +77,7 @@ export function SettingsSection({
           {saving ? "Saving…" : "Save"}
         </Button>
       </div>
-      <p className="mt-3 text-xs text-gray-500">
+      <p className="mt-3 text-label text-ink-muted">
         The referrer&rsquo;s reward can expire; a friend&rsquo;s first-package
         discount never does. A per-product override lives on each product
         (Packages page).

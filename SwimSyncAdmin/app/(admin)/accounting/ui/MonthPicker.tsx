@@ -16,7 +16,7 @@ export function MonthPicker({
       value={selected ?? ""}
       onChange={(e) => onSelect(e.target.value)}
       data-testid="month-picker"
-      className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+      className="h-9 rounded-control border border-border-strong bg-surface px-3 text-body text-ink focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary"
     >
       {months.map((m) => (
         <option key={m} value={m}>

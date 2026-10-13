@@ -7,9 +7,9 @@ import type { Referral } from "../types";
 export function ReferralsSection({ referrals }: { referrals: Referral[] }) {
   return (
     <section className="mb-8">
-      <h2 className="text-base font-bold text-gray-900 mb-2">Referrals</h2>
+      <h2 className="text-headline font-semibold text-ink mb-2">Referrals</h2>
       {referrals.length === 0 ? (
-        <p className="text-sm text-gray-500">No referrals yet.</p>
+        <p className="text-body text-ink-muted">No referrals yet.</p>
       ) : (
         <Table>
           <Thead>

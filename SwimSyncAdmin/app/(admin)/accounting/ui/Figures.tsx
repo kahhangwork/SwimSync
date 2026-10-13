@@ -47,11 +47,11 @@ export function Figures({ summary }: { summary: Summary }) {
       {/* Revenue breakdown — so a surprising figure is auditable without SQL.
           balance_adjustment is a prior month's debit folded onto this
           month's invoices; it is subtracted OUT of revenue. */}
-      <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5">
-        <p className="text-sm font-semibold text-gray-700">
+      <div className="mt-6 rounded-card border border-border bg-surface p-4">
+        <p className="text-headline font-semibold text-ink">
           Revenue breakdown
         </p>
-        <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm sm:max-w-md">
+        <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-1.5 text-body sm:max-w-md">
           <Line label="Gross billed" v={moneyOrDash(summary.revenue_gross)} />
           <Line
             label="− Packages applied"
@@ -68,7 +68,7 @@ export function Figures({ summary }: { summary: Summary }) {
         </dl>
         {/* Two bases on one page (PACKAGE_REVENUE_REFUNDS_PLAN.md U1) — say so,
             or a surprising Revenue is unexplainable. */}
-        <p className="mt-3 text-xs text-gray-500" data-testid="revenue-basis-note">
+        <p className="mt-3 text-label text-ink-muted" data-testid="revenue-basis-note">
           Invoices count the month they bill; packages count the month they were paid.
           A package paid this month appears once the month closes.
         </p>
@@ -80,10 +80,10 @@ export function Figures({ summary }: { summary: Summary }) {
 function Line({ label, v, strong, title }: { label: string; v: string; strong?: boolean; title?: string }) {
   return (
     <>
-      <dt title={title} className={`text-gray-500 ${strong ? "font-semibold text-gray-700" : ""}`}>
+      <dt title={title} className={`text-ink-muted ${strong ? "font-semibold text-ink-secondary" : ""}`}>
         {label}
       </dt>
-      <dd className={`text-right tabular-nums ${strong ? "font-semibold text-gray-900" : "text-gray-700"}`}>
+      <dd className={`text-right tabular-nums ${strong ? "font-semibold text-ink" : "text-ink-secondary"}`}>
         {v}
       </dd>
     </>

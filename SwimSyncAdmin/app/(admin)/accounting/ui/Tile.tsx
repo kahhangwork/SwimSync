@@ -13,18 +13,18 @@ export function Tile({
 }) {
   const valueColor =
     tone === "warn"
-      ? "text-amber-600"
+      ? "text-status-warning-text"
       : tone === "muted"
-        ? "text-gray-400"
-        : "text-gray-900";
+        ? "text-ink-muted"
+        : "text-ink";
   return (
     <div
-      className="rounded-2xl border border-gray-200 bg-white p-5"
+      className="rounded-card border border-border bg-surface p-4"
       data-testid={testid}
     >
-      <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className={`mt-1 text-2xl font-bold ${valueColor}`}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
+      <p className="text-body font-medium text-ink-muted">{label}</p>
+      <p className={`mt-1 text-2xl font-semibold tabular-nums ${valueColor}`}>{value}</p>
+      {sub && <p className="mt-1 text-label text-ink-muted">{sub}</p>}
     </div>
   );
 }

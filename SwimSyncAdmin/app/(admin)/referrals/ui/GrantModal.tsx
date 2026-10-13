@@ -25,16 +25,16 @@ export function GrantModal({
 }) {
   return (
     <Modal title="Grant a referral reward" open={open} onClose={onClose}>
-      <p className="text-sm text-gray-600 mb-3">
+      <p className="text-body text-ink-secondary mb-3">
         A goodwill discount for a family — e.g. a friend who forgot to enter the
         code. It joins the queue like any earned reward.
       </p>
       <div className="mb-3">
-        <div className="text-xs font-semibold text-gray-500 mb-1">Family</div>
+        <div className="text-label font-semibold text-ink-muted mb-1">Family</div>
         <select
           value={grantParent}
           onChange={(e) => setGrantParent(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
         >
           <option value="">Choose a family…</option>
           {memberships.map((m) => (
@@ -43,12 +43,12 @@ export function GrantModal({
         </select>
       </div>
       <div className="mb-4">
-        <div className="text-xs font-semibold text-gray-500 mb-1">Reason</div>
+        <div className="text-label font-semibold text-ink-muted mb-1">Reason</div>
         <input
           value={grantReason}
           onChange={(e) => setGrantReason(e.target.value)}
           placeholder="Goodwill"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
         />
       </div>
       <div className="flex justify-end gap-2">

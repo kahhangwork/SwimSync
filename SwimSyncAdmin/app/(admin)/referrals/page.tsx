@@ -27,30 +27,20 @@ import { GrantModal } from "./ui/GrantModal";
 export default function ReferralsPage() {
   const r = useReferrals();
 
-  if (r.loading) return <div className="p-6 text-gray-500">Loading…</div>;
+  if (r.loading) return <div className="text-body text-ink-muted">Loading…</div>;
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
         title="Referrals"
         subtitle="A double-sided package discount: a friend saves on their first package, and the family who referred them saves on their next."
-        action={<Button onClick={() => r.setGrantModal(true)}>Grant a reward</Button>}
+        action={<Button variant="outline" onClick={() => r.setGrantModal(true)}>Grant a reward</Button>}
       />
 
       {r.error && (
-        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="mb-4 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           {r.error}
         </div>
-      )}
-
-      {/* ── Settings ─────────────────────────────────────────────────── */}
-      {r.settings && (
-        <SettingsSection
-          settings={r.settings}
-          setSettings={r.setSettings}
-          saving={r.saving}
-          onSave={r.saveSettings}
-        />
       )}
 
       {/* ── Referrals ────────────────────────────────────────────────── */}
@@ -61,6 +51,16 @@ export default function ReferralsPage() {
 
       {/* ── Family codes ─────────────────────────────────────────────── */}
       <CodesSection memberships={r.memberships} busy={r.busy} onToggle={r.toggleCode} />
+
+      {/* ── Settings — below the work (BACKLOG S10; UI restyle 5.5) ──── */}
+      {r.settings && (
+        <SettingsSection
+          settings={r.settings}
+          setSettings={r.setSettings}
+          saving={r.saving}
+          onSave={r.saveSettings}
+        />
+      )}
 
       <GrantModal
         open={r.grantModal}
