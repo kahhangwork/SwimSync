@@ -1,7 +1,12 @@
 import { View, Text, ScrollView } from "react-native";
 import { router } from "expo-router";
-import PrimaryButton from "@/components/PrimaryButton";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import Logo from "@/components/Logo";
+
+// UI restyle step 4.1 (DESIGN.md): Ground, one flat card, square neutral step
+// numbers (the 3.3 PayNow shape), one Lane Blue primary — "I already have an
+// account" is the secondary beside it. Words and both routes are unchanged.
 
 const STEPS: { title: string; body: string }[] = [
   {
@@ -24,13 +29,13 @@ const STEPS: { title: string; body: string }[] = [
 
 function Step({ n, title, body }: { n: number; title: string; body: string }) {
   return (
-    <View className="flex-row gap-4">
-      <View className="w-8 h-8 rounded-full bg-sky-500 items-center justify-center">
-        <Text className="text-white font-bold">{n}</Text>
+    <View className="flex-row gap-3">
+      <View className="w-6 h-6 rounded-tag border border-border bg-ground items-center justify-center">
+        <Text className="text-label font-semibold text-ink-secondary">{n}</Text>
       </View>
       <View className="flex-1">
-        <Text className="text-base font-semibold text-gray-900">{title}</Text>
-        <Text className="text-sm text-gray-500 mt-0.5 leading-5">{body}</Text>
+        <Text className="text-headline font-semibold text-ink">{title}</Text>
+        <Text className="text-body-secondary text-ink-secondary mt-0.5">{body}</Text>
       </View>
     </View>
   );
@@ -39,40 +44,40 @@ function Step({ n, title, body }: { n: number; title: string; body: string }) {
 export default function Welcome() {
   return (
     <ScrollView
-      className="flex-1 bg-sky-50"
-      contentContainerClassName="flex-grow px-6 py-12 max-w-xl w-full mx-auto"
+      className="flex-1 bg-ground"
+      contentContainerClassName="flex-grow px-5 py-12 max-w-xl w-full mx-auto"
     >
       {/* Header */}
       <View className="items-center mb-8">
         <Logo size="lg" className="mb-4" />
-        <Text className="text-3xl font-bold text-gray-900">Welcome to SwimSync</Text>
-        <Text className="text-gray-500 mt-2 text-base text-center leading-6">
+        <Text className="text-display font-semibold text-ink text-center">Welcome to SwimSync</Text>
+        <Text className="text-body text-ink-secondary mt-2 text-center">
           Swim class attendance & billing, all in one place. Set up your account
           in a couple of minutes.
         </Text>
       </View>
 
       {/* Steps card */}
-      <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 gap-6 mb-8">
+      <Surface className="gap-5 mb-8">
         {STEPS.map((s, i) => (
           <Step key={s.title} n={i + 1} title={s.title} body={s.body} />
         ))}
-      </View>
+      </Surface>
 
       {/* Actions */}
       <View className="gap-3">
-        <PrimaryButton
+        <Button
           label="Get Started"
           onPress={() => router.push("/(auth)/register")}
         />
-        <PrimaryButton
+        <Button
           label="I already have an account"
-          variant="outline"
+          variant="secondary"
           onPress={() => router.push("/(auth)/login")}
         />
       </View>
 
-      <Text className="text-center text-xs text-gray-400 mt-8">
+      <Text className="text-center text-label text-ink-muted mt-8">
         SwimSync · Swim attendance & billing
       </Text>
     </ScrollView>
