@@ -1694,7 +1694,9 @@ negative row would read `−S$-5.00`; the engine's FIFO draw (`apply_credit_to_i
 **Why:** a credit note is money the business owes the family; a negative one would silently ADD to an invoice while
 every screen calls it a credit. Cheap to rule out now, expensive to unpick after a billing run.
 
-**Notes:** first `SELECT count(*) FROM credit_notes WHERE amount <= 0` on prod (`scripts/prod-query-ro.sh`, run by the
+**Checked 2026-10-13:** prod holds **0 credit notes** (0 non-positive) — the check cannot conflict with existing data.
+
+**Notes:** re-run `SELECT count(*) FROM credit_notes WHERE amount <= 0` on prod just before the migration (`scripts/prod-query-ro.sh`, run by the
 RELATIVE path — an absolute path misses the allow rule). If 0: a migration adding `CHECK (amount > 0)` (expand-only,
 pgTAP a refused insert; `credit_applications.amount` already has the same check — `20260711000100`). If not 0: stop
 and ask — those rows are real money. Do NOT "fix" it in the UI with `Math.abs`; that would hide the bad row.
