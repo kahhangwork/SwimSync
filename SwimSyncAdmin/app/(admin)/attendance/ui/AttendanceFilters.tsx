@@ -3,7 +3,7 @@ import { Button } from "@/components/Button";
 import { STATUS_FILTERS, STATUS_LABELS } from "../constants";
 
 const inputClass =
-  "rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400";
+  "rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary";
 
 type Props = {
   search: string;
@@ -34,7 +34,7 @@ export function AttendanceFilters(p: Props) {
         placeholder="Search by student..."
         value={p.search}
         onChange={(e) => p.onSearch(e.target.value)}
-        className={`${inputClass} w-52 placeholder-gray-400 px-4`}
+        className={`${inputClass} w-52 placeholder:text-ink-muted px-4`}
       />
       <select value={p.coachFilter} onChange={(e) => p.onCoach(e.target.value)} className={inputClass}>
         <option value="All">All Coaches</option>
@@ -60,7 +60,7 @@ export function AttendanceFilters(p: Props) {
         ))}
       </select>
 
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-500">
+      <label className="flex flex-col gap-1 text-label font-medium text-ink-muted">
         From
         <input
           type="date"
@@ -70,7 +70,7 @@ export function AttendanceFilters(p: Props) {
           className={inputClass}
         />
       </label>
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-500">
+      <label className="flex flex-col gap-1 text-label font-medium text-ink-muted">
         To
         <input
           type="date"
@@ -85,7 +85,7 @@ export function AttendanceFilters(p: Props) {
         <button
           type="button"
           onClick={p.onClear}
-          className="px-3 py-2.5 text-sm font-medium text-sky-600 hover:text-sky-700 hover:underline"
+          className="px-3 py-2.5 text-body font-medium text-primary hover:text-primary-hover hover:underline"
         >
           Clear filters
         </button>

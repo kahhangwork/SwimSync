@@ -45,36 +45,36 @@ export default function AttendancePage() {
       />
 
       {a.exportNotice && (
-        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mb-3 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-3 text-body text-status-warning-text">
           {a.exportNotice}
         </div>
       )}
 
       {a.mkSuccess && (
-        <div className="mb-3 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        <div className="mb-3 flex items-start gap-3 rounded-card border border-status-success-border bg-status-success-bg px-4 py-3 text-body text-status-success-text">
           <span className="flex-1">{a.mkSuccess}</span>
-          <button onClick={() => a.setMkSuccess(null)} className="font-semibold text-green-700 hover:underline">
+          <button onClick={() => a.setMkSuccess(null)} className="font-semibold text-status-success-text hover:underline">
             Dismiss
           </button>
         </div>
       )}
 
       {a.loadError && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-3 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           Could not load the attendance records: {a.loadError}. The table below is
           incomplete — do not read it as the full trail.
         </div>
       )}
 
       {a.attribError && !a.loadError && (
-        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-3 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-3 text-body text-status-warning-text">
           {a.attribError} The records below are complete, but the Coach column is
           shown as &ldquo;—&rdquo; rather than risk naming the wrong coach.
         </div>
       )}
 
       {!a.loading && !a.loadError && a.rows.length === ROW_LIMIT && (
-        <p className="mb-3 text-sm text-amber-700">
+        <p className="mb-3 text-body text-status-warning-text">
           Showing the {ROW_LIMIT} most recent records. Narrow the date range to
           see earlier ones.
         </p>

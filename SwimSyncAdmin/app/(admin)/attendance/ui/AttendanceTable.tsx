@@ -1,3 +1,6 @@
+import { Tag } from "@/components/ui/Tag";
+import { Button } from "@/components/Button";
+import { formatSgDate } from "@/lib/lessonDates";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, type useTableSort } from "@/components/Table";
 import { PackageChip } from "@/components/PackageChip";
@@ -41,13 +44,13 @@ export function AttendanceTable({
       <Tbody>
         {loading ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={6}>
+            <Td className="text-center text-ink-muted py-8" colSpan={6}>
               Loading…
             </Td>
           </Tr>
         ) : visible.length === 0 ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={6}>
+            <Td className="text-center text-ink-muted py-8" colSpan={6}>
               {loadError
                 ? "Could not load the records — see the error above."
                 : anyFilter
@@ -58,24 +61,24 @@ export function AttendanceTable({
         ) : (
           visible.map((a) => (
             <Tr key={a.id}>
-              <Td className="font-medium text-gray-900">
+              <Td className="font-medium text-ink">
                 {a.student_name}
                 <span className="ml-1.5">
                   <PackageChip coverage={covMap.get(a.student_id)} />
                 </span>
               </Td>
-              <Td className="text-gray-600">{a.class_title}</Td>
-              <Td className="text-gray-500">
+              <Td className="text-ink-secondary">{a.class_title}</Td>
+              <Td className="text-ink-muted">
                 {a.main_coach_id ? (
                   <>
                     {coachNameById.get(a.main_coach_id) ?? "Unknown coach"}
                     {a.is_cover && (
-                      <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      <Tag tone="info" className="ml-1.5">
                         Cover
-                      </span>
+                      </Tag>
                     )}
                     {a.shadow_coach_ids.length > 0 && (
-                      <div className="mt-0.5 text-xs text-gray-400">
+                      <div className="mt-0.5 text-label text-ink-muted">
                         {a.shadow_coach_ids
                           .map((id) => `+ ${coachNameById.get(id) ?? "Unknown coach"} (shadow)`)
                           .join(", ")}
@@ -86,18 +89,18 @@ export function AttendanceTable({
                   "—"
                 )}
               </Td>
-              <Td className="text-gray-500">{a.session_date}</Td>
+              {/* DISPLAY only (S9): session_date stays the YYYY-MM-DD the sort reads. */}
+              <Td className="text-ink-muted">
+                {formatSgDate(a.session_date, { day: "numeric", month: "short", year: "numeric" })}
+              </Td>
               <Td>
                 <StatusBadge status={STATUS_LABELS[a.status] ?? a.status} />
               </Td>
               <Td>
                 {canBookMakeup(a) && (
-                  <button
-                    onClick={() => openMakeup(a)}
-                    className="rounded-lg border border-sky-300 bg-white px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50"
-                  >
+                  <Button size="sm" variant="outline" onClick={() => openMakeup(a)}>
                     Book make-up
-                  </button>
+                  </Button>
                 )}
               </Td>
             </Tr>
