@@ -35,11 +35,11 @@ export function InvoiceToolbar({
       <div className="flex flex-wrap gap-3 mb-4">
         {/* Scoped search — the dropdown picks the column the term is pushed into,
             so it reaches every invoice in the DB, not the first 1000 (⚠ RISK 3). */}
-        <div className="flex overflow-hidden rounded-card border border-border bg-surface focus-within:ring-2 focus-within:ring-primary">
+        <div className="flex overflow-hidden rounded-control border border-border-strong bg-surface focus-within:ring-2 focus-within:ring-primary">
           <select
             value={searchField}
             onChange={(e) => setSearchField(e.target.value as SearchField)}
-            className="border-r border-border bg-ground px-2 py-2.5 text-body text-ink-secondary focus:outline-none"
+            className="border-r border-border-strong bg-ground px-2 py-2.5 text-body text-ink-secondary focus:outline-none"
             aria-label="Search by"
           >
             <option value="parent">Parent</option>
@@ -58,9 +58,9 @@ export function InvoiceToolbar({
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
-              className={`rounded-card px-3 py-2 text-label font-semibold transition-colors ${
+              className={`rounded-control px-3 py-2 text-label font-semibold transition-colors ${
                 statusFilter === f
-                  ? "bg-primary text-white"
+                  ? "bg-selected text-ink border border-border-strong"
                   : "bg-surface border border-border text-ink-secondary hover:bg-ground"
               }`}
             >

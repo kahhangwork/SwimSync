@@ -32,7 +32,7 @@ export default function CreditNotesPage() {
       />
 
       {loadError && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           {loadError}
         </div>
       )}
@@ -48,13 +48,13 @@ export default function CreditNotesPage() {
         onExport={list.handleExportCsv}
       />
       {exportNotice && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+        <div className="mb-4 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-2.5 text-body text-status-warning-text">
           {exportNotice}
         </div>
       )}
 
       {!loading && capped && (
-        <p className="mb-3 text-sm text-amber-700">
+        <p className="mb-3 text-body text-status-warning-text">
           Showing the first {ROW_LIMIT}{" "}
           {search.trim() ? "matches" : "credit notes"}.{" "}
           {search.trim()

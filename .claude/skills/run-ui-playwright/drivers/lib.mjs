@@ -612,3 +612,34 @@ export async function settleForMeasurement(page, ms = 300) {
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(ms);
 }
+
+// ── Admin row actions behind a "…" menu ─────────────────────────────────────
+// DESIGN.md → Tables: one inline action per row, everything else in a row "…"
+// menu (UI restyle Phase 5, `components/ui/RowMenu.tsx`). The menu's items are
+// plain buttons rendered INSIDE the row once it is open, so a driver presses
+// them through this — never by reaching for the button and timing out on a
+// closed menu. An action that is INLINE (the row's one) is pressed directly.
+//
+// `rowAction` resolves to the button's locator, opening the menu first when the
+// button is not already on the row. `rowActionCount` answers "does this row
+// offer it at all", opening the menu to look and closing it again — so a
+// "no Void button any more" check counts inside the menu, not just inline.
+export async function rowAction(row, name, opts = { exact: true }) {
+  const btn = row.getByRole("button", { name, ...opts });
+  if ((await btn.count()) > 0) return btn.first();
+  const more = row.getByRole("button", { name: "More actions" });
+  if ((await more.count()) > 0) await more.first().click();
+  return btn.first();
+}
+
+export async function rowActionCount(row, name, opts = { exact: true }) {
+  const btn = row.getByRole("button", { name, ...opts });
+  const inline = await btn.count();
+  if (inline > 0) return inline;
+  const more = row.getByRole("button", { name: "More actions" });
+  if ((await more.count()) === 0) return 0;
+  await more.first().click();
+  const n = await btn.count();
+  await row.page().keyboard.press("Escape");
+  return n;
+}

@@ -198,7 +198,8 @@ try {
 
   const drawnRow = page.locator("tr", { hasText: "CN-MA-0001" });
   const panel = page.locator("tr", { has: page.getByPlaceholder(/Reason for voiding/) });
-  await drawnRow.getByRole("button", { name: "Void", exact: true }).click();
+  // Void sits in the row "…" menu since UI restyle 5.2 — rowAction opens it.
+  await (await rowAction(drawnRow, "Void")).click();
   const warn = await panel.innerText({ timeout: 8000 }).catch(() => "(no panel)");
   check("Void on a DRAWN note warns the invoice goes OUTSTANDING again",
     /Void CN-MA-0001\?/.test(warn) && /OUTSTANDING again/.test(warn), warn.replace(/\n/g, " | ").slice(0, 200));
@@ -209,7 +210,7 @@ try {
   check("Cancel closes the confirm and voids nothing (DB unchanged)", closed && untouched(),
     `closed ${closed} · ${sql(noteQ)} · ${sql(invQ)}`);
 
-  await drawnRow.getByRole("button", { name: "Void", exact: true }).click();
+  await (await rowAction(drawnRow, "Void")).click();
   await panel.getByRole("button", { name: "Confirm void" }).click();
   const refused = await panel.getByText("A reason is required.").waitFor({ timeout: 5000 })
     .then(() => true).catch(() => false);
@@ -229,7 +230,7 @@ try {
            AND actor_id='${OWNER}' AND new_value->>'reason'='MoneyAdm driver void'`) === "1");
   const rowAfter = await drawnRow.innerText().catch(() => "");
   check("the row now reads Reversed with no Void button",
-    /Reversed/.test(rowAfter) && (await drawnRow.getByRole("button", { name: "Void", exact: true }).count()) === 0,
+    /Reversed/.test(rowAfter) && (await rowActionCount(drawnRow, "Void")) === 0,
     rowAfter.replace(/\s+/g, " ").slice(0, 160));
   check("the OTHER note and its family's balance are untouched",
     sql(`SELECT status FROM credit_notes WHERE id='${NOTE_AVAIL}'`) === "available" &&
