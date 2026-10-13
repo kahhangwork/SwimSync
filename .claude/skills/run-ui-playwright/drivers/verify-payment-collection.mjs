@@ -101,8 +101,10 @@ try {
   await anonPage.goto(`${EXPO}/invoice/${TOKEN}`, { waitUntil: "networkidle" });
   await anonPage.waitForTimeout(6000);
   const pubText = await anonPage.locator("body").innerText();
-  check("public page: renders the amount with no session",
-    pubText.includes("$88.00"));
+  // "S$", not a bare "$" (UI restyle 4.5 — "$88.00" alone also matched "S$88.00",
+  // so it could not tell the two apart).
+  check("public page: renders the amount, written S$, with no session",
+    pubText.includes("S$88.00"));
   check("public page: shows the reference as text",
     pubText.includes("INV-2026-9901"));
   check("public page: a computed QR image is present",
@@ -110,6 +112,18 @@ try {
   check("public page: Save QR control present",
     pubText.includes("Save QR image"));
   await anonPage.screenshot({ path: `${SHOT}/payment-public-page.png` });
+
+  // A bad token is not a dead end (UI restyle 4.5): "Invoice not found" offers
+  // Sign in. Read in a SEPARATE page so the claim below runs on the real one.
+  {
+    const bad = await anon.newPage();
+    await bad.goto(`${EXPO}/invoice/00000000000000000000000000000000`, { waitUntil: "networkidle" });
+    await bad.getByText("Invoice not found").first().waitFor({ timeout: 30000 }).catch(() => {});
+    const badText = await bad.locator("body").innerText();
+    check("public page: a bad token reads 'Invoice not found' and offers Sign in",
+      badText.includes("Invoice not found") && badText.includes("Sign in to SwimSync"));
+    await bad.close();
+  }
 
   // ══ 3. The claim, sessionless ═════════════════════════════════════════════
   anonPage.on("dialog", (d) => d.accept());

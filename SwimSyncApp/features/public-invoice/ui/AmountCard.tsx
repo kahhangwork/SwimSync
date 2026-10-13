@@ -2,30 +2,38 @@
 // Moved VERBATIM from app/invoice/[token].tsx (docs/refactor/BATCH_FGH_PLAN.md,
 // App L-G); props destructured on the first line so the JSX is byte-identical
 // (whitespace aside).
+//
+// UI restyle step 4.5 (DESIGN.md): a flat card; the amount written S$88.00 in
+// tabular figures (it was a bare "$88.00" — Aligned Money); Pay-First — "Save QR
+// image" is the one primary and "I've paid" a text link beneath it, never an
+// equal button; after a claim the line is Info, and Paid is Success. No figure is
+// recomputed and no condition changed — paid / claimed / qrDataUrl are the page's.
 import React from "react";
 import { Image, Text, View } from "react-native";
-import PrimaryButton from "@/components/PrimaryButton";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import type { PublicInvoice } from "../types";
 
 export function AmountCard(p: { invoice: PublicInvoice; paid: boolean; qrDataUrl: string | null; saveQr: () => void; claimed: boolean; claiming: boolean; claimPaid: () => void }) {
   const { invoice, paid, qrDataUrl, saveQr, claimed, claiming, claimPaid } = p;
   return (
     <>
-      <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 items-center mb-6">
-        <Text className="text-sm text-gray-500">Amount due</Text>
+      <Surface className="items-center mb-6">
+        <Text className="text-body-secondary text-ink-secondary">Amount due</Text>
         <Text
           selectable
-          className="text-4xl font-bold text-gray-900 mt-1 mb-2"
+          className="text-display font-semibold text-ink mt-1 mb-2"
+          style={{ fontVariant: ["tabular-nums"] }}
         >
-          ${invoice.amount.toFixed(2)}
+          S${invoice.amount.toFixed(2)}
         </Text>
-        <Text selectable className="text-sm text-gray-500">
+        <Text selectable className="text-body-secondary text-ink-secondary">
           Reference: {invoice.reference}
         </Text>
 
         {paid ? (
-          <View className="mt-6 bg-emerald-50 rounded-xl px-6 py-4 items-center">
-            <Text className="text-emerald-700 font-semibold text-lg">
+          <View className="mt-5 w-full bg-status-success-bg border border-status-success-border rounded-card px-4 py-3 items-center">
+            <Text className="text-headline font-semibold text-status-success-text">
               Paid — thank you!
             </Text>
           </View>
@@ -33,21 +41,21 @@ export function AmountCard(p: { invoice: PublicInvoice; paid: boolean; qrDataUrl
           <>
             <Image
               source={{ uri: qrDataUrl }}
-              className="w-56 h-56 mt-6"
+              className="w-56 h-56 mt-5"
               resizeMode="contain"
             />
-            <Text className="text-xs text-gray-400 mb-4">
+            <Text className="text-label text-ink-muted mb-4">
               PayNow · amount and reference are locked in
             </Text>
-            <PrimaryButton label="Save QR image" onPress={saveQr} />
-            <Text className="text-sm text-gray-500 text-center mt-3 leading-5">
+            <Button label="Save QR image" onPress={saveQr} className="w-full" />
+            <Text className="text-body-secondary text-ink-secondary text-center mt-3">
               On your phone? Save the QR, then open your banking app and scan
               it from your photo gallery.
             </Text>
           </>
         ) : (
-          <View className="mt-6 bg-amber-50 rounded-xl px-6 py-4">
-            <Text className="text-amber-800 text-center leading-5">
+          <View className="mt-5 w-full bg-ground border border-border rounded-card px-4 py-3">
+            <Text className="text-body text-ink text-center">
               Pay by PayNow using the amount and reference above, or contact
               your coach for payment details.
             </Text>
@@ -56,19 +64,20 @@ export function AmountCard(p: { invoice: PublicInvoice; paid: boolean; qrDataUrl
 
         {!paid &&
           (claimed ? (
-            <Text className="text-sm text-sky-700 mt-4">
-              You've told us this is paid — your coach will confirm it.
-            </Text>
-          ) : (
-            <View className="mt-4 w-full">
-              <PrimaryButton
-                label={claiming ? "Saving…" : "I've paid"}
-                variant="outline"
-                onPress={claimPaid}
-              />
+            <View className="mt-4 w-full bg-status-info-bg border border-status-info-border rounded-card px-4 py-3">
+              <Text className="text-body text-status-info-text text-center">
+                You've told us this is paid — your coach will confirm it.
+              </Text>
             </View>
+          ) : (
+            <Button
+              label={claiming ? "Saving…" : "I've paid"}
+              variant="link"
+              onPress={claimPaid}
+              className="mt-2 items-center w-full"
+            />
           ))}
-      </View>
+      </Surface>
     </>
   );
 }

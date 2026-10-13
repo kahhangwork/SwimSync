@@ -38,8 +38,8 @@ export default function PublicInvoicePage() {
 
   return (
     <ScrollView
-      className="flex-1 bg-sky-50"
-      contentContainerClassName="flex-grow px-6 py-10 max-w-xl w-full mx-auto"
+      className="flex-1 bg-ground"
+      contentContainerClassName="flex-grow px-5 py-10 max-w-xl w-full mx-auto"
     >
       <PageHeader invoice={invoice} />
 
