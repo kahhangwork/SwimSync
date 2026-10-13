@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.147** | 2026-10-11 → 12 | UI restyle: logo 2a, tokens, the plan, coach Schedule (2.1) — all live | plan UI_RESTYLE §3 · §7.363–§7.367 · DEPLOYMENT #83–#85 |
 | **8.146** | 2026-10-10 → 11 | Single-child packages built and deployed (D11: one kind per family) | PRD §7.16 · plan SINGLE_CHILD_PACKAGES · §7.362 · DEPLOYMENT #82 |
 | **8.145** | 2026-10-10 | Fixture hygiene ×3 shipped; Wave 9 filed, ranked; single-child packages planned | §7.63, §7.272, §7.304, §7.361 · BACKLOG Wave 9 |
 | **8.144** | 2026-10-09 → 10 | Pin the clock for UI drivers (`--now`); engine v35 on prod, dormant | TESTING §5 · ARCHITECTURE §6af · §7.355–§7.360 · DEPLOYMENT #80, #81 |

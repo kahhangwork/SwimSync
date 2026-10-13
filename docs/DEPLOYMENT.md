@@ -1227,3 +1227,11 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `fontSize:12,lineHeight:16,fontWeight` (absent from the Geist bundle). **GitHub's Vercel commit status read
     `pending` for 12+ min after the new bundle was already served** — grep the bundle, never wait on the status.
 
+87. **Deploy record (2026-10-13): UI restyle 1.3 → 2.8 — nine app/admin landings in one day.** 1.3 primitives
+    (`84f7ea5`) and 1.4 status scale (`11f2cf3`) before the 03:17 nightly, verified green by `38331575542`; then 1.6
+    admin shell (`a5ef3e2`, gate kept); then **on the user's waivers** 2.2 Mark attendance (`d0669dd`), 2.3 Classes
+    (`fb096ef`) and 2.4–2.8 Roster / Grade / Pay / Settings / Change password (`2b73815`…`f53d55d`, one push). The user
+    raised the three-landing cap "up to the completion of phase 2" and dispatched nightly `38360405197` on `f53d55d`
+    to verify 1.6 + 2.2–2.8. Every push: CI repo invariants locally first, `--only` drivers before = after, CI green
+    after. Proof per landing is the plan §3 ledger's "Bundle string grepped" cell. **A shell pipe of a 2 MB bundle into
+    `grep -c` read empty in a polling loop** — download the bundle to a file and grep the file.

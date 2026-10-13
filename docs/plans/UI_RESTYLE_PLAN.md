@@ -84,6 +84,7 @@ Decisions this plan makes (the user may overrule; none changes the look):
 _As of 2026-10-12 (evening): Phase 0 and all of 2.1 (`64ab076`, wording `7445547`) are on `main`. Steps 1.1 (Geist) and 1.2 (tab bars) landed the same evening on the user's waiver of the nightly cap. **Next: read the first nightly after them and fill the five empty "Nightly verdict" cells; then step 1.3.**_
 _2026-10-13: nightly `38269313790` (dispatched by the user on `3d0672a`) read **green** — all five landings verified. 1.3 lands now, 1.4 after it, both before the 03:17 scheduled nightly. Admin type tokens become **rem** in 1.6 (user, 2026-10-12 — answers RISK 11)._
 _2026-10-13 (late morning): the scheduled nightly `38331575542` (on `552ee75`) read **green** — 1.3 and 1.4 verified, zero unverified landings. 1.6 lands now under the HANDOVER §9 GATE (the user chose the gate over the full sweep); its first nightly verifies it. 2.2 then landed on the user's waiver of the gate, once CI on `a5ef3e2` passed — the next nightly verifies both; a red one is attributed across the 1.6 and 2.2 rows._
+_2026-10-13 (afternoon): **Phases 1 and 2 are complete and live.** 2.2–2.8 landed on the user's waivers (cap raised through Phase 2). The user dispatched nightly `38360405197` on `f53d55d` to verify 1.6 and 2.2–2.8 — read it, fill those eight verdict cells, and land nothing more until it is green. Next: Phase 3 (parent app), step 3.1._
 
 | Branch | Commit | What | Landed? |
 |---|---|---|---|
@@ -445,6 +446,12 @@ are case-insensitive or read `textContent` (§7.362).
      (`red-*`, `amber-*`, `blue-*`, …) — use `status-*` / `ink-*` / `border-*` tokens. **Do NOT interpolate a class
      name.** **Do NOT place a class string in `SwimSyncApp/lib/`.**
    - ⚠ RISK 9 MITIGATION — **Do NOT edit `SwimSyncAdmin/lib/classColours.ts`.**
+   - (learned in 2.2) **A tag must never repeat a button's word on the same card.** `pressByText(page, "Present", 1)`
+     is index-based: a "Present" tag on card 1 is pressed in place of card 2's button. Tag what still needs doing
+     ("Not marked"), and let the chosen button carry the chosen word.
+   - (learned in 2.2) **A driver count of a status word must be scoped to the screen's own container** (a `testID`),
+     never the page: the screen mounted underneath (§7.98) carries the same words — Schedule's "Not marked" chip vs
+     Mark attendance's tag (`lib.mjs` `unmarkedOnMarking`).
 4. **Words**: change them to `DESIGN.md` where the audit says so (D4), and update each driver from step 2 in the same
    commit.
    - ⚠ RISK 5 MITIGATION — a driver's new string is the **exact new literal**. A heading styled `uppercase` is matched
