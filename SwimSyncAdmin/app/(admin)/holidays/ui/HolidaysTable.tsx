@@ -28,13 +28,13 @@ export function HolidaysTable({ holidays, voidCounts, loading, busy, onVoid, onU
       <Tbody>
         {loading ? (
           <Tr>
-            <Td className="py-8 text-center text-gray-400" colSpan={4}>
+            <Td className="py-8 text-center text-ink-muted" colSpan={4}>
               Loading…
             </Td>
           </Tr>
         ) : visible.length === 0 ? (
           <Tr>
-            <Td className="py-8 text-center text-gray-400" colSpan={4}>
+            <Td className="py-8 text-center text-ink-muted" colSpan={4}>
               No holidays yet. Import a CSV or add one.
             </Td>
           </Tr>
@@ -43,16 +43,16 @@ export function HolidaysTable({ holidays, voidCounts, loading, busy, onVoid, onU
             const voided = voidCounts[h.holiday_date] ?? 0;
             return (
               <Tr key={h.id}>
-                <Td className="font-medium text-gray-900">{h.holiday_date}</Td>
-                <Td className="text-gray-600">{h.name}</Td>
+                <Td className="font-medium text-ink">{h.holiday_date}</Td>
+                <Td className="text-ink-secondary">{h.name}</Td>
                 <Td>
                   {voided > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+                    <span className="inline-flex items-center gap-1 text-label font-medium text-status-success-text">
                       <Check className="h-3.5 w-3.5" />
                       Voided · {voided} lesson{voided === 1 ? "" : "s"}
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-400">Not voided</span>
+                    <span className="text-label text-ink-muted">Not voided</span>
                   )}
                 </Td>
                 <Td>
@@ -69,7 +69,7 @@ export function HolidaysTable({ holidays, voidCounts, loading, busy, onVoid, onU
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-600 hover:bg-red-50"
+                      className="text-status-danger-text hover:bg-status-danger-bg"
                       onClick={() => onRemove(h)}
                       disabled={busy}
                     >

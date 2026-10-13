@@ -37,16 +37,16 @@ export default function HolidaysPage() {
         }
       />
 
-      <p className="mb-4 text-sm text-gray-500">
+      <p className="mb-4 text-body text-ink-muted">
         Import Singapore&rsquo;s public holidays as a CSV from{" "}
-        <a href={DATA_GOV_SG_URL} target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+        <a href={DATA_GOV_SG_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline">
           data.gov.sg
         </a>{" "}
-        (columns <span className="font-mono text-xs">date, day, holiday</span>),
+        (columns <span className="font-mono text-label">date, day, holiday</span>),
         or add dates by hand — including your own closures.
       </p>
 
-      <div className="mb-4 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+      <div className="mb-4 flex items-center gap-2 rounded-control bg-ground px-3 py-2 text-body text-ink-secondary">
         <label htmlFor="ext-days">A voided holiday extends each affected package by</label>
         <input
           id="ext-days"
@@ -56,26 +56,26 @@ export default function HolidaysPage() {
           value={h.extDays}
           onChange={(e) => h.setExtDays(Number(e.target.value))}
           onBlur={(e) => h.saveExtDays(Number(e.target.value))}
-          className="w-16 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+          className="w-16 rounded-control border border-border-strong px-2 py-1 text-body"
         />
         <span>day{h.extDays === 1 ? "" : "s"}.</span>
       </div>
 
       {h.voidMsg && (
-        <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{h.voidMsg}</p>
+        <p className="mb-4 rounded-card bg-status-success-bg px-3 py-2 text-body text-status-success-text">{h.voidMsg}</p>
       )}
 
       {h.error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{h.error}</p>
+        <p className="mb-4 rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">{h.error}</p>
       )}
 
       {h.importResult && (
-        <div className="mb-4 rounded-lg bg-gray-50 px-3 py-2 text-sm">
-          <p className="font-medium text-gray-800">
+        <div className="mb-4 rounded-control bg-ground px-3 py-2 text-body">
+          <p className="font-medium text-ink">
             Imported {h.importResult.added} holiday{h.importResult.added === 1 ? "" : "s"}.
           </p>
           {h.importResult.errors.length > 0 && (
-            <ul className="mt-1 list-disc pl-5 text-amber-700">
+            <ul className="mt-1 list-disc pl-5 text-status-warning-text">
               {h.importResult.errors.slice(0, 8).map((msg, i) => (
                 <li key={i}>{msg}</li>
               ))}
