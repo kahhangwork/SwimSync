@@ -14,9 +14,9 @@ export function RoleGrid({ grid, onChange }: { grid: Grid; onChange?: (g: Grid) 
   const gridId = useId();
   return (
     <div>
-      <table className="w-full text-sm">
+      <table className="w-full text-body">
         <thead>
-          <tr className="text-left text-xs uppercase tracking-wide text-gray-400">
+          <tr className="text-left text-label uppercase tracking-wide text-ink-muted">
             <th className="py-2 font-medium">Area</th>
             {ADMIN_LEVELS.map((l) => (
               <th key={l} className="w-16 py-2 text-center font-medium">{LEVEL_LABEL[l]}</th>
@@ -25,10 +25,10 @@ export function RoleGrid({ grid, onChange }: { grid: Grid; onChange?: (g: Grid) 
         </thead>
         <tbody>
           {ADMIN_AREAS.map((area) => (
-            <tr key={area} className="border-t border-gray-100">
+            <tr key={area} className="border-t border-border">
               <td className="py-2 pr-3">
-                <div className="font-medium text-gray-900">{AREA_LABELS[area]}</div>
-                <div className="text-xs text-gray-500">{AREA_HINTS[area]}</div>
+                <div className="font-medium text-ink">{AREA_LABELS[area]}</div>
+                <div className="text-label text-ink-muted">{AREA_HINTS[area]}</div>
               </td>
               {ADMIN_LEVELS.map((level) => (
                 <td key={level} className="text-center">
@@ -46,7 +46,7 @@ export function RoleGrid({ grid, onChange }: { grid: Grid; onChange?: (g: Grid) 
           ))}
         </tbody>
       </table>
-      {problem && <p className="mt-2 text-sm text-amber-700">{problem}</p>}
+      {problem && <p className="mt-2 text-body text-status-warning-text">{problem}</p>}
     </div>
   );
 }

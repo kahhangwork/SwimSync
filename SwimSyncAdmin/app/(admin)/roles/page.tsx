@@ -3,6 +3,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { useRoles } from "./domain/useRoles";
 import { STANDARD_BLURB } from "./domain/rolesRows";
 import { RoleGrid } from "./ui/RoleGrid";
@@ -27,38 +28,43 @@ export default function RolesPage() {
       />
 
       {p.pageError && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{p.pageError}</p>
+        <p className="mb-4 rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">{p.pageError}</p>
       )}
       {!p.canEdit && !p.loading && (
-        <p className="mb-4 text-sm text-gray-500">Only the business owner can change roles.</p>
+        <p className="mb-4 text-body text-ink-muted">Only the business owner can change roles.</p>
       )}
 
       {p.loading ? (
-        <p className="text-gray-500">Loading…</p>
+        <p className="text-ink-muted">Loading…</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {p.roles.map((role) => (
-            <div key={role.id} className="rounded-2xl border border-gray-200 bg-white p-5">
+            <div key={role.id} className="rounded-card border border-border bg-surface p-4">
               <div className="mb-1 flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-semibold text-gray-900">{role.name}</h2>
-                  <p className="text-xs text-gray-500">
+                  <h2 className="text-headline font-semibold text-ink">{role.name}</h2>
+                  <p className="text-label text-ink-muted">
                     {role.holders === 0 ? "Nobody holds this role" : `${role.holders} admin${role.holders === 1 ? "" : "s"}`}
                   </p>
                 </div>
                 {p.canEdit && (
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => p.openEdit(role)}>Edit</Button>
-                    {role.holders === 0 && (
-                      <Button size="sm" variant="ghost" className="text-red-600" onClick={() => p.remove(role)}>
-                        Delete
-                      </Button>
-                    )}
+                  // Edit inline; Delete (only offered while nobody holds the
+                  // role) in the "…" menu — no inline destructive button
+                  // (DESIGN.md; UI restyle 5.25). Same handlers.
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="outline" onClick={() => p.openEdit(role)}>Edit</Button>
+                    <RowMenu>
+                      {role.holders === 0 && (
+                        <RowMenuItem destructive onClick={() => p.remove(role)}>
+                          Delete
+                        </RowMenuItem>
+                      )}
+                    </RowMenu>
                   </div>
                 )}
               </div>
               {role.standardKey && STANDARD_BLURB[role.standardKey] && (
-                <p className="mb-3 text-sm text-gray-600">{STANDARD_BLURB[role.standardKey]}</p>
+                <p className="mb-3 text-body text-ink-secondary">{STANDARD_BLURB[role.standardKey]}</p>
               )}
               <RoleGrid grid={role.grid} />
             </div>
@@ -72,17 +78,17 @@ export default function RolesPage() {
         onClose={() => p.setEditing(null)}
       >
         <div className="space-y-4">
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium text-gray-700">Name</span>
+          <label className="block text-body">
+            <span className="mb-1 block font-medium text-ink-secondary">Name</span>
             <input
               aria-label="Role name"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
               value={p.draftName}
               onChange={(e) => p.setDraftName(e.target.value)}
             />
           </label>
           <RoleGrid grid={p.draftGrid} onChange={p.setDraftGrid} />
-          {p.saveError && <p className="text-sm text-red-600">{p.saveError}</p>}
+          {p.saveError && <p className="text-body text-status-danger-text">{p.saveError}</p>}
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => p.setEditing(null)}>Cancel</Button>
             <Button className="flex-1" disabled={p.saving} onClick={p.save}>
