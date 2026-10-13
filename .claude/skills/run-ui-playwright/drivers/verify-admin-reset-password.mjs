@@ -176,7 +176,10 @@ try {
 
   const pw = rp.locator('input[type="password"]');
   const submit = rp.getByRole("button", { name: "Update Password" });
-  const errorText = rp.locator("p.text-red-600");
+  // By role, not by colour class: the colour is styling and UI restyle 4.7
+  // changed it (p.text-red-600 found nothing → two false FAILs). Next's own
+  // route announcer is also role=alert, hence the p.
+  const errorText = rp.locator('p[role="alert"]');
 
   // Mismatch → refused, password untouched.
   await pw.nth(0).fill(NEW_PASSWORD);

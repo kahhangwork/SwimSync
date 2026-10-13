@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
               </div>
 
               {error && (
-                <p className="text-body text-status-danger-text">
+                <p role="alert" className="text-body text-status-danger-text">
                   {error}
                 </p>
               )}
