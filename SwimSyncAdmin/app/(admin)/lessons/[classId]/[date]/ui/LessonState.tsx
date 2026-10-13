@@ -10,7 +10,7 @@ export function LessonLoading() {
   return (
     <div>
       <PageHeader title="Lesson" />
-      <p className="text-sm text-gray-400">Loading…</p>
+      <p className="text-body text-ink-muted">Loading…</p>
     </div>
   );
 }
@@ -19,8 +19,8 @@ export function LessonLoadError({ loadError }: { loadError: string | null }) {
   return (
     <div>
       <PageHeader title="Lesson" />
-      <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{loadError ?? "Not found."}</div>
-      <Link href="/calendar" className="mt-3 inline-flex items-center gap-1 text-sm text-sky-700 hover:underline">
+      <div className="rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">{loadError ?? "Not found."}</div>
+      <Link href="/calendar" className="mt-3 inline-flex items-center gap-1 text-body text-primary hover:underline">
         <ArrowLeft className="h-4 w-4" /> Back to Calendar
       </Link>
     </div>

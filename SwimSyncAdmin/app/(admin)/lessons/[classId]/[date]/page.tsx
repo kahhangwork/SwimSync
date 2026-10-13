@@ -108,7 +108,7 @@ function LessonBody({ classId, date }: { classId: string; date: string }) {
       <BookGuestModal date={date} cls={cls} ld={ld} gb={gb} />
       <LeaveConfirmModal nav={nav} />
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-label text-ink-muted">
         Saving writes attendance exactly as the coach app does; the marking window, weekday rule, capacity and credit-note lock are enforced by the database and cannot be overridden here. Substitutes and shadows follow the Lesson Coaches rules.
       </p>    </div>
   );

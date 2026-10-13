@@ -19,7 +19,7 @@ export function LessonNavStrip({ nav: n }: { nav: LessonNavState }) {
   if (status === "loading") return <div aria-hidden className={`mb-4 ${STRIP_HEIGHT}`} />;
   if (status === "unavailable") {
     return (
-      <p data-testid="lesson-nav-unavailable" className="mb-4 text-xs text-gray-400">
+      <p data-testid="lesson-nav-unavailable" className="mb-4 text-label text-ink-muted">
         Lesson navigation unavailable
       </p>
     );
@@ -39,7 +39,7 @@ export function LessonNavStrip({ nav: n }: { nav: LessonNavState }) {
         >
           <ChevronLeft className="h-3.5 w-3.5" /> Prev lesson
         </Button>
-        <span data-testid="nav-lesson-counter" className="min-w-[7rem] text-center text-sm text-gray-600">
+        <span data-testid="nav-lesson-counter" className="min-w-[7rem] text-center text-body text-ink-secondary">
           Lesson {nav.lesson.position} of {nav.lesson.total}
         </span>
         <Button
@@ -64,7 +64,7 @@ export function LessonNavStrip({ nav: n }: { nav: LessonNavState }) {
         >
           <ChevronsLeft className="h-3.5 w-3.5" /> Prev coach
         </Button>
-        <span data-testid="nav-coach-counter" className="min-w-[7rem] text-center text-sm font-medium text-gray-800">
+        <span data-testid="nav-coach-counter" className="min-w-[7rem] text-center text-body font-medium text-ink">
           {nav.coach.name} ({nav.coach.position} of {nav.coach.total})
         </span>
         <Button

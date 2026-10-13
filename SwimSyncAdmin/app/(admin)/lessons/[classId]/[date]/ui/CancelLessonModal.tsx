@@ -15,24 +15,24 @@ export function CancelLessonModal({ date, cls, cx }: { date: string; cls: ClassI
     <>
       {/* ── Cancel this lesson (reason required) ───────────────────────── */}
       <Modal title={`Cancel ${cls.title} on ${formatSgDate(date)}?`} open={cancelOpen} onClose={() => setCancelOpen(false)}>
-        <div className="space-y-3 text-sm">
-          <p className="text-gray-600">
+        <div className="space-y-3 text-body">
+          <p className="text-ink-secondary">
             The whole lesson is called off — rain, the coach away. Every parent sees it struck out under Upcoming with your reason,
             the coach has nothing to mark, and the billing month does not wait for it. A single child not coming is an absence, not this.
           </p>
           <label className="block">
-            <span className="text-xs font-medium text-gray-600">Reason (the parents and the coach see this)</span>
+            <span className="text-label font-medium text-ink-secondary">Reason (the parents and the coach see this)</span>
             <input
               aria-label="Cancellation reason"
               data-testid="cancel-reason"
-              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm"
+              className="mt-1 w-full rounded-control border border-border-strong bg-surface px-2 py-1.5 text-body"
               placeholder="e.g. Heavy rain forecast — pool closed"
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               disabled={cancelBusy}
             />
           </label>
-          {cancelError && <p data-testid="cancel-error" className="rounded-lg bg-red-50 px-3 py-2 text-red-700">{cancelError}</p>}
+          {cancelError && <p data-testid="cancel-error" className="rounded-card bg-status-danger-bg px-3 py-2 text-status-danger-text">{cancelError}</p>}
           <div className="flex gap-2 pt-1">
             <Button variant="outline" className="flex-1" onClick={() => setCancelOpen(false)} disabled={cancelBusy}>
               Keep the lesson

@@ -22,7 +22,7 @@ export function LessonHeader({ date, cls, ld, cx }: { date: string; cls: ClassIn
 
   return (
     <>
-      <Link href={backHref} className="mb-2 inline-flex items-center gap-1 text-sm text-sky-700 hover:underline">
+      <Link href={backHref} className="mb-2 inline-flex items-center gap-1 text-body text-primary hover:underline">
         <ArrowLeft className="h-4 w-4" /> Calendar · {formatSgDate(date, { weekday: "short", day: "numeric", month: "short" })}
       </Link>
       <PageHeader
@@ -50,7 +50,7 @@ export function LessonHeader({ date, cls, ld, cx }: { date: string; cls: ClassIn
                 </Button>
               )
             )}
-            <Link href="/classes" className="text-sm text-sky-700 hover:underline">
+            <Link href="/classes" className="text-body text-primary hover:underline">
               Classes page →
             </Link>
           </div>

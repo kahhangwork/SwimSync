@@ -11,24 +11,24 @@ export function CoachesPanel({ ld, sub }: { ld: LessonDetail; sub: SubstituteSta
   const { coachPick, setCoachPick, coachBusy, coachMsg, classCoachName, substituteOptions, assignCoach, removeCover } = sub;
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
-      <h2 className="mb-2 font-semibold text-gray-900">Coaches</h2>
-      <p className="text-sm">
+    <section className="rounded-card border border-border bg-surface p-4">
+      <h2 className="mb-2 font-semibold text-ink">Coaches</h2>
+      <p className="text-body">
         Teaching: <span className="font-medium">{mainName}</span>
-        {attr?.isCover && <span className="ml-1 font-semibold text-red-600">(Sub)</span>}
+        {attr?.isCover && <span className="ml-1 font-semibold text-status-danger-text">(Sub)</span>}
       </p>
       {attr && attr.shadowIds.length > 0 && (
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-label text-ink-muted">
           Shadow: {attr.shadowIds.map((id) => coaches.find((c) => c.id === id)?.name ?? "Unknown").join(", ")} (read-only; managed on the Classes page)
         </p>
       )}
       <div className="mt-3">
-        <p className="text-xs font-medium text-gray-600">Assign a substitute for this lesson</p>
-        <p className="mt-0.5 text-xs text-gray-400">
+        <p className="text-label font-medium text-ink-secondary">Assign a substitute for this lesson</p>
+        <p className="mt-0.5 text-label text-ink-muted">
           Covers this one lesson only — it does not change {classCoachName}, the class&apos;s regular coach.
         </p>
         <div className="mt-2 flex items-center gap-2">
-          <select aria-label="Substitute coach" className="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm" value={coachPick} onChange={(e) => setCoachPick(e.target.value)} disabled={coachBusy}>
+          <select aria-label="Substitute coach" className="flex-1 rounded-control border border-border-strong bg-surface px-2 py-1.5 text-body" value={coachPick} onChange={(e) => setCoachPick(e.target.value)} disabled={coachBusy}>
             <option value="">Choose a substitute…</option>
             {substituteOptions.map((c) => (
               <option key={c.id} value={c.id}>
@@ -46,7 +46,7 @@ export function CoachesPanel({ ld, sub }: { ld: LessonDetail; sub: SubstituteSta
           Remove substitute (back to {classCoachName})
         </Button>
       )}
-      {coachMsg && <p className="mt-2 text-xs text-red-700">{coachMsg}</p>}
+      {coachMsg && <p className="mt-2 text-label text-status-danger-text">{coachMsg}</p>}
     </section>
   );
 }

@@ -4,7 +4,7 @@
 
 export function CancelledBanner({ cancelled }: { cancelled: { reason: string | null } }) {
   return (
-    <div data-testid="lesson-cancelled" className="mb-4 rounded-xl border border-gray-300 bg-gray-50 p-4 text-sm text-gray-800">
+    <div data-testid="lesson-cancelled" className="mb-4 rounded-card border border-border-strong bg-ground p-4 text-body text-ink">
       <p className="font-semibold">This lesson is cancelled.</p>
       <p className="mt-1">
         {cancelled.reason ? <>Reason: <span className="italic">{cancelled.reason}</span>. </> : null}

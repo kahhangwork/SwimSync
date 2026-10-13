@@ -15,7 +15,7 @@ export function LeaveConfirmModal({ nav }: { nav: LessonNavState }) {
 
   return (
     <Modal title="Leave without saving?" open={leaveOpen} onClose={stay}>
-      <p className="text-sm text-gray-700">
+      <p className="text-body text-ink-secondary">
         You have unsaved marks on this lesson. If you leave now they are discarded.
       </p>
       <div className="mt-4 flex gap-2">

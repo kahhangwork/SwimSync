@@ -3,6 +3,7 @@
 // unmounts everything below its loading switch on every reload).
 
 import { cn } from "@/lib/utils";
+import { Tag } from "@/components/ui/Tag";
 import { optionsForKind, type DbStatus, type RosterKind } from "../domain/lessonMarking";
 
 // ── Status buttons — the coach app's shape (top status + a reason), not a dropdown ──
@@ -14,12 +15,16 @@ function topOf(s: DbStatus | null): Top | null {
   return s;
 }
 const TOP_LABEL: Record<Top, string> = { present: "Present", absent: "Absent", cancelled: "Cancelled", trial: "Trial", holiday: "Holiday" };
+// The CHOSEN status reads as a tag, as on the coach app (UI restyle 2.2 / 5.27):
+// its tone's tint, a border in the tone's text colour, the word in that colour.
+// Tones follow lib/statusTone.ts (Present success, Trial info, the rest neutral);
+// whole literals so Tailwind keeps them (§7.191).
 const TOP_ACTIVE: Record<Top, string> = {
-  present: "bg-emerald-600 text-white border-emerald-600",
-  absent: "bg-red-600 text-white border-red-600",
-  cancelled: "bg-sky-600 text-white border-sky-600",
-  trial: "bg-violet-600 text-white border-violet-600",
-  holiday: "bg-gray-700 text-white border-gray-700",
+  present: "bg-status-success-bg text-status-success-text border-status-success-text font-semibold",
+  absent: "bg-status-neutral-bg text-status-neutral-text border-status-neutral-text font-semibold",
+  cancelled: "bg-status-neutral-bg text-status-neutral-text border-status-neutral-text font-semibold",
+  trial: "bg-status-info-bg text-status-info-text border-status-info-text font-semibold",
+  holiday: "bg-status-neutral-bg text-status-neutral-text border-status-neutral-text font-semibold",
 };
 
 export function StatusButtons({
@@ -56,34 +61,34 @@ export function StatusButtons({
           disabled={disabled}
           onClick={() => pick(t)}
           className={cn(
-            "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
-            top === t ? TOP_ACTIVE[t] : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+            "rounded-control border px-2.5 py-1 text-label font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+            top === t ? TOP_ACTIVE[t] : "border-border-strong bg-surface text-ink-secondary hover:bg-ground"
           )}
         >
           {TOP_LABEL[t]}
         </button>
       ))}
       {top === "cancelled" && (
-        <span className="ml-1 inline-flex overflow-hidden rounded-lg border border-sky-300 text-xs" role="group" aria-label={`Cancellation reason for ${name}`}>
+        <span className="ml-1 inline-flex overflow-hidden rounded-control border border-border-strong text-label" role="group" aria-label={`Cancellation reason for ${name}`}>
           {(["cancelled_rain", "cancelled_coach"] as const).map((s) => (
             <button key={s} type="button" data-status={s} aria-pressed={value === s} disabled={disabled} onClick={() => onChange(s)}
-              className={cn("px-2 py-1", value === s ? "bg-sky-100 font-semibold text-sky-900" : "bg-white text-gray-600 hover:bg-gray-50")}>
+              className={cn("px-2 py-1", value === s ? "bg-selected font-semibold text-ink" : "bg-surface text-ink-secondary hover:bg-ground")}>
               {s === "cancelled_rain" ? "Rain" : "Coach"}
             </button>
           ))}
         </span>
       )}
       {top === "trial" && (
-        <span className="ml-1 inline-flex overflow-hidden rounded-lg border border-violet-300 text-xs" role="group" aria-label={`Trial type for ${name}`}>
+        <span className="ml-1 inline-flex overflow-hidden rounded-control border border-border-strong text-label" role="group" aria-label={`Trial type for ${name}`}>
           {(["trial_paid", "trial_free"] as const).map((s) => (
             <button key={s} type="button" data-status={s} aria-pressed={value === s} disabled={disabled} onClick={() => onChange(s)}
-              className={cn("px-2 py-1", value === s ? "bg-violet-100 font-semibold text-violet-900" : "bg-white text-gray-600 hover:bg-gray-50")}>
+              className={cn("px-2 py-1", value === s ? "bg-selected font-semibold text-ink" : "bg-surface text-ink-secondary hover:bg-ground")}>
               {s === "trial_paid" ? "Paid" : "Free"}
             </button>
           ))}
         </span>
       )}
-      {top === null && <span className="text-xs text-gray-400">Not marked</span>}
+      {top === null && <Tag tone="warning" className="ml-1">Not marked</Tag>}
     </div>
   );
 }
