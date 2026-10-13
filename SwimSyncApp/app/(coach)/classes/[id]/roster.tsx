@@ -41,14 +41,14 @@ export default function ClassRosterScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-sky-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#0ea5e9" />
+      <SafeAreaView className="flex-1 bg-ground items-center justify-center">
+        <ActivityIndicator size="large" color="#2563eb" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <RosterHeader classInfo={classInfo} />
       <ScrollView
         contentContainerClassName="px-5 pb-10"
@@ -57,7 +57,7 @@ export default function ClassRosterScreen() {
         <MarkTargetPanel id={id} markTarget={markTarget} todayDate={todayDate} windowStart={windowStart} students={students} />
         <UpcomingGuests upcomingTrials={upcomingTrials} upcomingMakeups={upcomingMakeups} upcomingExtras={upcomingExtras} />
         <StudentList id={id} students={students} duplicateNames={duplicateNames} removingId={removingId} handleRemove={handleRemove} openLevelFor={openLevelFor} setOpenLevelFor={setOpenLevelFor} />
-        <PastSessions id={id} sessions={sessions} />
+        <PastSessions id={id} sessions={sessions} nothingToMark={!markTarget} />
       </ScrollView>
     </SafeAreaView>
   );

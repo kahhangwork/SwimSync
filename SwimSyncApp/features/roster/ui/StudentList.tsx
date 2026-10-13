@@ -1,11 +1,11 @@
 // StudentList — the roster screen's enrolled students (COACH_ROSTER_REFACTOR_PLAN.md, Stage 5).
-// Markup moved VERBATIM from app/(coach)/classes/[id]/roster.tsx: the props are
-// destructured on the first line so the JSX below is byte-identical to the
-// route's (playbook §2). Nothing here may import dao/ (fence check 1).
+// Restyled in UI restyle step 2.4: Skills is a plain secondary control, Remove a
+// destructive one (Danger text, behind its existing confirmAction — useRemoveStudent),
+// and an empty class has ONE empty state. Nothing here may import dao/ (fence check 1).
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { router } from "expo-router";
-import Card from "@/components/Card";
+import { Surface } from "@/components/ui/Surface";
 import { formatSgDate, ageFromDob } from "@/lib/lessonDates";
 import type { Student } from "@/features/roster/types";
 
@@ -23,27 +23,25 @@ export function StudentList(p: {
     <>
         {/* Enrolled Students */}
         <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-base font-bold text-gray-900">
+          <Text className="text-headline font-semibold text-ink">
             Students ({students.length})
           </Text>
         </View>
 
         <View className="gap-2 mb-6">
           {students.length === 0 ? (
-            <Card className="items-center py-6">
-              <Text className="text-gray-400 text-sm">No students enrolled</Text>
-            </Card>
+            <Surface className="items-center py-6">
+              <Text className="text-body font-semibold text-ink">No students enrolled</Text>
+              <Text className="text-body-secondary text-ink-secondary mt-1 text-center">
+                Assign students to this class first.
+              </Text>
+            </Surface>
           ) : (
             students.map((student) => (
-              <Card key={student.id}>
+              <Surface key={student.id}>
                <View className="flex-row items-center gap-3">
-                <View className="w-9 h-9 rounded-full bg-sky-100 items-center justify-center">
-                  <Text className="text-sky-600 font-bold text-sm">
-                    {student.full_name.charAt(0)}
-                  </Text>
-                </View>
                 <View className="flex-1">
-                  <Text className="text-sm font-semibold text-gray-800">
+                  <Text className="text-body font-semibold text-ink">
                     {student.full_name}
                   </Text>
                   {/* Age is the everyday useful fact. The BIRTHDAY only appears
@@ -58,7 +56,7 @@ export function StudentList(p: {
                     );
                     if (age === null && !ambiguous && !student.level_label) return null;
                     return (
-                      <Text className="text-xs text-gray-500 mt-0.5">
+                      <Text className="text-body-secondary text-ink-secondary mt-0.5">
                         {student.level_label ? `${student.level_label} · ` : ""}
                         {age !== null ? `Age ${age}` : "Age unknown"}
                         {/* WITH THE YEAR — formatSgDate's default omits it,
@@ -88,9 +86,9 @@ export function StudentList(p: {
                       `/(coach)/classes/${id}/grade?studentId=${student.id}`
                     )
                   }
-                  className="px-2.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200"
+                  className="min-h-11 px-3 justify-center rounded-control border border-border-strong bg-surface"
                 >
-                  <Text className="text-xs font-semibold text-sky-600">Skills</Text>
+                  <Text className="text-body-secondary font-semibold text-ink">Skills</Text>
                 </Pressable>
                 {/* A child who has stopped coming keeps this class permanently
                     "incomplete" — every lesson expects a mark for them — and
@@ -99,9 +97,9 @@ export function StudentList(p: {
                 <Pressable
                   onPress={() => handleRemove(student)}
                   disabled={removingId === student.id}
-                  className="px-2.5 py-1.5 rounded-lg border border-gray-200"
+                  className="min-h-11 px-3 justify-center rounded-control border border-border-strong bg-surface"
                 >
-                  <Text className="text-xs font-semibold text-gray-500">
+                  <Text className="text-body-secondary font-semibold text-status-danger-text">
                     {removingId === student.id ? "Removing…" : "Remove"}
                   </Text>
                 </Pressable>
@@ -119,9 +117,9 @@ export function StudentList(p: {
                         openLevelFor === student.id ? null : student.id
                       )
                     }
-                    className="mt-2 pt-2 border-t border-gray-100"
+                    className="mt-2 pt-2 min-h-11 justify-center border-t border-divider"
                   >
-                    <Text className="text-xs font-medium text-sky-600">
+                    <Text className="text-body-secondary font-medium text-primary">
                       {openLevelFor === student.id ? "Hide" : "What"}{" "}
                       {student.level_label} {openLevelFor === student.id ? "" : "covers"}
                     </Text>
@@ -131,21 +129,21 @@ export function StudentList(p: {
                 {openLevelFor === student.id ? (
                   <View className="mt-2 gap-1.5">
                     {student.level_note ? (
-                      <Text className="text-xs italic text-gray-500 mb-1">
+                      <Text className="text-body-secondary italic text-ink-secondary mb-1">
                         {student.level_note}
                       </Text>
                     ) : null}
                     {student.level_skills.map((skill, i) => (
                       <View key={`${skill}-${i}`} className="flex-row gap-2">
-                        <Text className="text-xs text-sky-500 font-semibold w-3.5">
+                        <Text className="text-body-secondary text-ink-muted font-semibold w-4">
                           {i + 1}
                         </Text>
-                        <Text className="text-xs text-gray-700 flex-1">{skill}</Text>
+                        <Text className="text-body-secondary text-ink flex-1">{skill}</Text>
                       </View>
                     ))}
                   </View>
                 ) : null}
-              </Card>
+              </Surface>
             ))
           )}
         </View>
