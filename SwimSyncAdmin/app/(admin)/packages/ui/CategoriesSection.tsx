@@ -125,7 +125,7 @@ export function CategoriesSection({
 
       {/* The all-classes fallback: proposed when neither the family's original
           nor a category default applies (Decision 5). */}
-      <div className="mt-3 flex w-[36rem] items-center gap-2 text-body">
+      <div className="mt-3 flex w-full max-w-[36rem] flex-wrap items-center gap-2 text-body">
         <label className="text-label text-ink-muted">
           All-classes default (fallback):
         </label>
