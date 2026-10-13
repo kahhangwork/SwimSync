@@ -171,9 +171,12 @@ try {
     body.includes("told your coach"),
     ""
   );
+  // Since UI restyle 3.1 a claimed invoice's tag reads "Claimed" (Info — waiting
+  // on the coach, DESIGN.md), not "Outstanding". Still unpaid: no "Paid" tag, and
+  // Pay via PayNow is still offered.
   check(
-    "the invoice is still OUTSTANDING — claiming never changes status (PRD §7.21)",
-    body.includes("Outstanding"),
+    "the invoice is still UNPAID — claiming never changes status (PRD §7.21)",
+    /\bClaimed\b/.test(body) && !/^Paid$/m.test(body) && body.includes("Pay via PayNow"),
     ""
   );
 } catch (e) {

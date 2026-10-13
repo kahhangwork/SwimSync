@@ -1,7 +1,7 @@
 // The Invoices / Packages / Credit Notes switcher.
-// Moved VERBATIM from app/(parent)/billing/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-G); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/billing/index.tsx (docs/refactor/BATCH_FGH_PLAN.md, App L-G).
+// UI restyle step 3.1: a segmented control — the chosen segment is the Selected
+// fill with Ink 600 text (DESIGN.md), never a shadow; each segment is 44px.
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import type { Tab } from "../types";
@@ -12,27 +12,29 @@ type Billing = ReturnType<typeof useBilling>;
 export function Tabs(p: Pick<Billing, "activeTab" | "setActiveTab">) {
   const { activeTab, setActiveTab } = p;
   return (
-    <>
-      {/* Tabs */}
-      <View className="flex-row mx-5 mb-4 bg-gray-100 rounded-xl p-1">
-        {(["Invoices", "Packages", "Credit Notes"] as Tab[]).map((tab) => (
+    <View className="flex-row mx-5 mb-4 bg-surface border border-border rounded-card p-1 gap-1">
+      {(["Invoices", "Packages", "Credit Notes"] as Tab[]).map((tab) => {
+        const active = activeTab === tab;
+        return (
           <TouchableOpacity
             key={tab}
             onPress={() => setActiveTab(tab)}
-            className={`flex-1 py-2 rounded-lg items-center ${
-              activeTab === tab ? "bg-white shadow-sm" : ""
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            className={`flex-1 min-h-11 rounded-control items-center justify-center ${
+              active ? "bg-selected" : "bg-surface"
             }`}
           >
             <Text
-              className={`text-sm font-semibold ${
-                activeTab === tab ? "text-gray-900" : "text-gray-500"
+              className={`text-body ${
+                active ? "font-semibold text-ink" : "font-medium text-ink-secondary"
               }`}
             >
               {tab}
             </Text>
           </TouchableOpacity>
-        ))}
-      </View>
-    </>
+        );
+      })}
+    </View>
   );
 }

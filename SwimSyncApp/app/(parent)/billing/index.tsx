@@ -39,14 +39,14 @@ export default function BillingScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <Header />
 
       <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#0ea5e9" />
+          <ActivityIndicator size="large" color="#2563eb" />
         </View>
       ) : (
         <ScrollView
