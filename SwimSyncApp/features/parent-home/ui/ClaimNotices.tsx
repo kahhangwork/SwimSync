@@ -1,12 +1,12 @@
 // Claims awaiting the coach, and ones they turned down.
-// Moved VERBATIM from app/(parent)/home/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-F); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/home/index.tsx (docs/refactor/BATCH_FGH_PLAN.md, App L-F).
+// UI restyle step 3.4: a pending claim is Info (waiting on someone else); a
+// declined one is a plain card with its way forward as a Lane Blue link.
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import Card from "@/components/Card";
+import { Surface } from "@/components/ui/Surface";
 import { waitingSince } from "@/lib/claimCandidates";
 import type { useParentHome } from "../domain/useParentHome";
 
@@ -22,71 +22,74 @@ export function ClaimNotices(p: Pick<Home, "claims" | "dismissClaim">) {
           about it. A declined claim explains itself and offers the way
           forward, because "nothing happened" is what makes a parent call the
           coach. */}
-      {claims.map((c) => (
-        <Card key={c.id} className="mb-3">
-          {c.status === "pending" ? (
-            <>
-              <View className="flex-row items-center gap-2">
-                <Ionicons name="time-outline" size={18} color="#f59e0b" />
-                <Text className="font-semibold text-gray-900">
-                  Waiting for your coach
+      {claims.map((c) =>
+        c.status === "pending" ? (
+          <View
+            key={c.id}
+            className="mb-3 rounded-card border p-4 bg-status-info-bg border-status-info-border"
+          >
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="time-outline" size={18} color="#1e40af" />
+              <Text className="text-body font-semibold text-status-info-text">
+                Waiting for your coach
+              </Text>
+            </View>
+            <Text className="mt-1 text-body text-ink">
+              You asked about <Text className="font-semibold">{c.claimed_name}</Text>.
+              Your coach is checking whether they&rsquo;re already on their
+              roster — we&rsquo;ll add them to your account once it&rsquo;s
+              confirmed.
+            </Text>
+            <Text className="mt-1 text-body-secondary text-ink-secondary">
+              {waitingSince(c.created_at)} · Still waiting? Ask your coach to
+              check their SwimSync admin.
+            </Text>
+          </View>
+        ) : (
+          <Surface key={c.id} className="mb-3">
+            {/* ⚠ THE CLAIM WAS ABOUT A RECORD ALREADY ON THE ROSTER, NOT
+                ABOUT THE NAME THEY TYPED. The old copy said
+                "<typed name> wasn't on your coach's roster", which
+                conflated the two: the typed name was never on the roster —
+                it is what they want to CREATE. What the coach actually
+                decided is that the existing record they pointed at is not
+                their child. Reported from production 2026-07-26. */}
+            <View className="flex-row items-start justify-between gap-2">
+              <View className="flex-row items-center gap-2 flex-1">
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color="#525252"
+                />
+                <Text className="text-body font-semibold text-ink flex-1">
+                  Your coach checked — that wasn&rsquo;t {c.claimed_name}
                 </Text>
               </View>
-              <Text className="mt-1 text-sm text-gray-600">
-                You asked about <Text className="font-medium">{c.claimed_name}</Text>.
-                Your coach is checking whether they&rsquo;re already on their
-                roster — we&rsquo;ll add them to your account once it&rsquo;s
-                confirmed.
-              </Text>
-              <Text className="mt-1 text-xs text-gray-400">
-                {waitingSince(c.created_at)} · Still waiting? Ask your coach to
-                check their SwimSync admin.
-              </Text>
-            </>
-          ) : (
-            <>
-              {/* ⚠ THE CLAIM WAS ABOUT A RECORD ALREADY ON THE ROSTER, NOT
-                  ABOUT THE NAME THEY TYPED. The old copy said
-                  "<typed name> wasn't on your coach's roster", which
-                  conflated the two: the typed name was never on the roster —
-                  it is what they want to CREATE. What the coach actually
-                  decided is that the existing record they pointed at is not
-                  their child. Reported from production 2026-07-26. */}
-              <View className="flex-row items-start justify-between gap-2">
-                <View className="flex-row items-center gap-2 flex-1">
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={18}
-                    color="#64748b"
-                  />
-                  <Text className="font-semibold text-gray-900 flex-1">
-                    Your coach checked — that wasn&rsquo;t {c.claimed_name}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => dismissClaim(c.id)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="close" size={18} color="#9ca3af" />
-                </TouchableOpacity>
-              </View>
-              <Text className="mt-1 text-sm text-gray-600">
-                The child already on their roster turned out to be someone
-                else. If you think that&rsquo;s wrong, check with your coach —
-                otherwise you can add {c.claimed_name} yourself now.
-              </Text>
               <TouchableOpacity
-                onPress={() => router.push("/(parent)/home/add-child")}
-                className="mt-2"
+                onPress={() => dismissClaim(c.id)}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text className="text-sky-500 font-semibold text-sm">
-                  Add {c.claimed_name}
-                </Text>
+                <Ionicons name="close" size={18} color="#525252" />
               </TouchableOpacity>
-            </>
-          )}
-        </Card>
-      ))}
+            </View>
+            <Text className="mt-1 text-body text-ink-secondary">
+              The child already on their roster turned out to be someone
+              else. If you think that&rsquo;s wrong, check with your coach —
+              otherwise you can add {c.claimed_name} yourself now.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/(parent)/home/add-child")}
+              className="min-h-11 justify-center self-start"
+            >
+              <Text className="text-body font-semibold text-primary">
+                Add {c.claimed_name}
+              </Text>
+            </TouchableOpacity>
+          </Surface>
+        )
+      )}
     </>
   );
 }

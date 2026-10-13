@@ -41,7 +41,7 @@ export default function ParentHomeScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <ScrollView
         contentContainerClassName="px-5 py-6 pb-10"
         showsVerticalScrollIndicator={false}
