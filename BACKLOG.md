@@ -1638,7 +1638,7 @@ visible text, so keep words unless the item changes them on purpose):**
     and its two day-7 sentences contradict); then Wages, Referrals, Packages.
 
 **Fold-ins — fix whenever the screen is touched (not their own items):**
-- Plurals: "1 students" (coach Classes), "1 coaches", "1 families".
+- Plurals: "1 coaches", "1 families". ("1 students" on coach Classes — fixed in UI restyle 2.3.)
 - Credit amounts in link-blue with no minus (admin Credit Notes, parent invoice + credit notes) → Ink, `−S$40.00`.
 - Tables with 2+ inline actions or an inline destructive one (Classes, Locations, Platform, Parents, Coaches, Roles,
   Credit Notes) → one inline action + a "…" menu.
