@@ -2,10 +2,17 @@
 // Moved VERBATIM from app/(auth)/register.tsx (docs/refactor/BATCH_FGH_PLAN.md,
 // App L-H); props destructured on the first line so the JSX is byte-identical
 // (whitespace aside).
+//
+// UI restyle step 4.3 (DESIGN.md): a flat card, DESIGN.md inputs (white, Border
+// Strong, 6px, 44px, label above), "(optional)" in Ink Muted, the error in
+// Danger text, the shared Button. Every placeholder stays as written — the
+// drivers find the fields by them (Sarah Tan, you@email.com, 9123 4567, Blk 123,
+// 120123, SWIM-1234). What Create Account does is useRegister's, unchanged.
 import React from "react";
 import { View, Text, TextInput } from "react-native";
 import { router } from "expo-router";
-import PrimaryButton from "@/components/PrimaryButton";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import type { useRegister } from "../domain/useRegister";
 
 type Register = ReturnType<typeof useRegister>;
@@ -15,17 +22,17 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
   return (
     <>
       {/* Form card */}
-      <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 gap-4">
+      <Surface className="gap-4">
         {emailSent ? (
           <View>
-            <Text className="text-base font-semibold text-gray-900 mb-2">
+            <Text className="text-headline font-semibold text-ink mb-2">
               Check your email
             </Text>
-            <Text className="text-sm text-gray-500 mb-6">
+            <Text className="text-body text-ink-secondary mb-5">
               We've sent a confirmation link to {email.trim()}. Please verify
               your email, then sign in.
             </Text>
-            <PrimaryButton
+            <Button
               label="Back to Sign In"
               onPress={() => router.replace("/(auth)/login")}
             />
@@ -33,31 +40,31 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
         ) : (
         <>
         <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">Full Name</Text>
+          <Text className="text-body font-medium text-ink mb-1.5">Full Name</Text>
           <TextInput
             value={name}
             onChangeText={setName}
             placeholder="Sarah Tan"
-            className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-            placeholderTextColor="#9ca3af"
+            className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+            placeholderTextColor="#6b6b6b"
           />
         </View>
 
         <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">Email</Text>
+          <Text className="text-body font-medium text-ink mb-1.5">Email</Text>
           <TextInput
             value={email}
             onChangeText={setEmail}
             placeholder="you@email.com"
             keyboardType="email-address"
             autoCapitalize="none"
-            className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-            placeholderTextColor="#9ca3af"
+            className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+            placeholderTextColor="#6b6b6b"
           />
         </View>
 
         <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">
+          <Text className="text-body font-medium text-ink mb-1.5">
             Phone Number
           </Text>
           <TextInput
@@ -65,8 +72,8 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
             onChangeText={setPhone}
             placeholder="+65 9123 4567"
             keyboardType="phone-pad"
-            className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-            placeholderTextColor="#9ca3af"
+            className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+            placeholderTextColor="#6b6b6b"
           />
         </View>
 
@@ -76,21 +83,21 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
             onboarding it exists to help. Parents can add it later from their
             profile. */}
         <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">
-            Address <Text className="text-gray-400">(optional)</Text>
+          <Text className="text-body font-medium text-ink mb-1.5">
+            Address <Text className="text-ink-muted">(optional)</Text>
           </Text>
           <TextInput
             value={address}
             onChangeText={setAddress}
             placeholder="Blk 123 Clementi Ave 3, #04-56"
-            className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-            placeholderTextColor="#9ca3af"
+            className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+            placeholderTextColor="#6b6b6b"
           />
         </View>
 
         <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">
-            Postal Code <Text className="text-gray-400">(optional)</Text>
+          <Text className="text-body font-medium text-ink mb-1.5">
+            Postal Code <Text className="text-ink-muted">(optional)</Text>
           </Text>
           <TextInput
             value={postal}
@@ -98,14 +105,14 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
             placeholder="120123"
             keyboardType="number-pad"
             maxLength={6}
-            className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-            placeholderTextColor="#9ca3af"
+            className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+            placeholderTextColor="#6b6b6b"
           />
         </View>
 
         <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">
-            Join or referral code <Text className="text-gray-400">(optional)</Text>
+          <Text className="text-body font-medium text-ink mb-1.5">
+            Join or referral code <Text className="text-ink-muted">(optional)</Text>
           </Text>
           <TextInput
             value={joinCode}
@@ -113,29 +120,29 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
             placeholder="SWIM-1234 or REF-ABCDE"
             autoCapitalize="characters"
             autoCorrect={false}
-            className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50 tracking-widest"
-            placeholderTextColor="#9ca3af"
+            className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface tracking-widest"
+            placeholderTextColor="#6b6b6b"
           />
-          <Text className="mt-1.5 text-xs text-gray-500">
+          <Text className="mt-1.5 text-body-secondary text-ink-secondary">
             Have a code from your coach or a friend? Add it and we&rsquo;ll
             connect you when you sign in.
           </Text>
         </View>
 
         <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">Password</Text>
+          <Text className="text-body font-medium text-ink mb-1.5">Password</Text>
           <TextInput
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
             secureTextEntry
-            className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-            placeholderTextColor="#9ca3af"
+            className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+            placeholderTextColor="#6b6b6b"
           />
         </View>
 
         <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">
+          <Text className="text-body font-medium text-ink mb-1.5">
             Confirm Password
           </Text>
           <TextInput
@@ -143,25 +150,25 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
             onChangeText={setConfirm}
             placeholder="••••••••"
             secureTextEntry
-            className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
-            placeholderTextColor="#9ca3af"
+            className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
+            placeholderTextColor="#6b6b6b"
           />
         </View>
 
         {error && (
-          <Text className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <Text className="text-body text-status-danger-text">
             {error}
           </Text>
         )}
 
-        <PrimaryButton
+        <Button
           label={loading ? "Creating account..." : "Create Account"}
           onPress={handleRegister}
-          className="mt-2"
+          className="mt-1"
         />
         </>
         )}
-      </View>
+      </Surface>
     </>
   );
 }

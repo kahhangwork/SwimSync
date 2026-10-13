@@ -36,10 +36,10 @@ export default function RegisterScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-sky-50"
+      className="flex-1 bg-ground"
     >
       <ScrollView
-        contentContainerClassName="flex-grow px-6 py-12"
+        contentContainerClassName="flex-grow px-5 py-12 max-w-xl w-full mx-auto"
         keyboardShouldPersistTaps="handled"
       >
         <BackLink />
