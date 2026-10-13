@@ -1,10 +1,9 @@
 // Open admin panel — shown only to the business's admin.
-// Moved VERBATIM from app/(coach)/settings/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-H); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(coach)/settings/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-H); restyled in UI restyle step 2.7.
 import React from "react";
 import { Text } from "react-native";
-import Card from "@/components/Card";
+import { Surface } from "@/components/ui/Surface";
 import { MenuItem } from "./MenuItem";
 import type { useCoachSettings } from "../domain/useCoachSettings";
 
@@ -21,18 +20,18 @@ export function AdminPanelCard(p: Pick<Settings, "isAdmin" | "openAdminPanel">) 
           entry gate if this is ever reported as "broken"; that gate is
           deliberate. */}
       {isAdmin && (
-        <Card className="mb-4">
+        <Surface className="mb-4">
           <MenuItem
             icon="desktop-outline"
             label="Open admin panel"
             onPress={openAdminPanel}
             last
           />
-          <Text className="text-xs text-gray-500 mt-2">
+          <Text className="text-body-secondary text-ink-secondary mt-2">
             Classes, students, invoices and your PayNow ID are managed at
             admin.swimsync.sg.
           </Text>
-        </Card>
+        </Surface>
       )}
     </>
   );

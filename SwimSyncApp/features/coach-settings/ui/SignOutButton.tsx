@@ -1,9 +1,8 @@
 // Sign Out (confirmed first).
-// Moved VERBATIM from app/(coach)/settings/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-H); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(coach)/settings/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-H); restyled in UI restyle step 2.7.
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { useCoachSettings } from "../domain/useCoachSettings";
 
@@ -14,15 +13,18 @@ export function SignOutButton(p: Pick<Settings, "confirmLogout">) {
   return (
     <>
       {/* Logout */}
+      {/* DESIGN.md's destructive button: secondary shape, Danger text, behind a
+          confirmation (confirmLogout → confirmAction, never Alert.alert). Not
+          the shared Button's destructive variant: that would add a SECOND
+          confirm on top of confirmLogout's. The word is the pressable's direct
+          child (pressByText dispatches on the leaf's parent). */}
       <TouchableOpacity
         onPress={confirmLogout}
-        className="bg-red-50 border border-red-100 rounded-2xl py-4 items-center"
+        className="min-h-11 flex-row items-center justify-center gap-2 rounded-control border border-border-strong bg-surface"
         activeOpacity={0.8}
       >
-        <View className="flex-row items-center gap-2">
-          <Ionicons name="log-out-outline" size={20} color="#dc2626" />
-          <Text className="text-red-600 font-semibold">Sign Out</Text>
-        </View>
+        <Ionicons name="log-out-outline" size={18} color="#b91c1c" />
+        <Text className="text-body font-semibold text-status-danger-text">Sign Out</Text>
       </TouchableOpacity>
     </>
   );
