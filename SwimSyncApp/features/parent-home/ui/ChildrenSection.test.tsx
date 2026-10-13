@@ -9,7 +9,7 @@
 //   2. `const routine = child.is_active && …` → `const routine = child.is_active`
 //      → RED: "an unassigned child is tagged Unassigned"
 import React from "react";
-import { render, screen } from "@testing-library/react-native";
+import { render, screen, within } from "@testing-library/react-native";
 import { ChildrenSection } from "./ChildrenSection";
 
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
@@ -46,6 +46,22 @@ it("an active, assigned child carries no tag", () => {
 it("an unassigned child is tagged Unassigned", () => {
   setup(child({ assignment_status: "unassigned", classes: [] }));
   expect(screen.getByText("Unassigned")).toBeTruthy();
+});
+
+it("the payment line sits directly under the name", () => {
+  render(
+    <ChildrenSection
+      loading={false}
+      children={[child({})]}
+      covMap={new Map([["k1", { parentId: "p", tenantId: "t", coverage: "package", lessonsRemaining: 9, packageId: "pk" }]])}
+    />
+  );
+  // Name and line share one column (the name's host parent), name first.
+  let col = screen.getByText("Ava Tan").parent!;
+  while (typeof col.type !== "string") col = col.parent!;
+  expect(within(col).getByText("Package · 9 left")).toBeTruthy();
+  const flat = JSON.stringify(screen.toJSON());
+  expect(flat.indexOf("Ava Tan")).toBeLessThan(flat.indexOf("\"Package\""));
 });
 
 it("an inactive child is tagged Inactive", () => {

@@ -146,10 +146,12 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                     </Text>
                   </TouchableOpacity>
                   {/* Cancelling a request is the second decision, not an equal
-                      one (Pay-First); it asks before it acts (cancelRequest). */}
+                      one (Pay-First). ⚠ cancelRequest acts at once — it has no
+                      confirmation (BACKLOG: *Cancelling a package request has no
+                      confirmation*), so this link keeps a clear gap below Pay. */}
                   <TouchableOpacity
                     onPress={() => cancelRequest(pkg)}
-                    className="min-h-11 items-center justify-center"
+                    className="mt-3 min-h-11 items-center justify-center"
                   >
                     <Text className="text-body font-semibold text-status-danger-text">
                       Cancel

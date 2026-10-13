@@ -67,7 +67,9 @@ export function ClaimNotices(p: Pick<Home, "claims" | "dismissClaim">) {
               </View>
               <TouchableOpacity
                 onPress={() => dismissClaim(c.id)}
-                accessibilityRole="button"
+                // No accessibilityRole="button": on RN-web it renders a real
+                // <button>, which has no tabindex — verify-app-home-writes
+                // finds this ✕ as the header row's [tabindex="0"].
                 accessibilityLabel="Dismiss"
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >

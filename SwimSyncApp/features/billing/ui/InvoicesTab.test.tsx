@@ -11,8 +11,10 @@
 //      → RED: "a claimed invoice is tagged Claimed and still offers Pay"
 //   3. `label={outstanding ? "To pay" : "Total"}` → `label="Net Amount"`
 //      → RED: "each money line is its own field, in the parent's words"
+//   4. Package row ↔ Credit row amounts swapped (package_applied ↔ credit_applied)
+//      → RED: "each money line is its own field, in the parent's words"
 import React from "react";
-import { render, screen } from "@testing-library/react-native";
+import { render, screen, within } from "@testing-library/react-native";
 import { InvoicesTab } from "./InvoicesTab";
 import type { Invoice } from "../types";
 
@@ -43,14 +45,13 @@ function setup(invoice: Invoice) {
 
 it("each money line is its own field, in the parent's words", () => {
   setup(inv());
-  expect(screen.getByText("Lessons")).toBeTruthy();
-  expect(screen.getByText("S$120.00")).toBeTruthy();
-  expect(screen.getByText("Package")).toBeTruthy();
-  expect(screen.getByText("−S$20.00")).toBeTruthy();
-  expect(screen.getByText("Credit")).toBeTruthy();
-  expect(screen.getByText("−S$10.00")).toBeTruthy();
-  expect(screen.getByText("To pay")).toBeTruthy();
-  expect(screen.getByText("S$90.00")).toBeTruthy();
+  // Each label read with its OWN amount (the row is the label's parent), so a
+  // swapped pair of fields cannot pass.
+  const row = (label: string) => within(screen.getByText(label).parent!.parent!);
+  expect(row("Lessons").getByText("S$120.00")).toBeTruthy();
+  expect(row("Package").getByText("−S$20.00")).toBeTruthy();
+  expect(row("Credit").getByText("−S$10.00")).toBeTruthy();
+  expect(row("To pay").getByText("S$90.00")).toBeTruthy();
   expect(screen.queryByText(/Gross|Net/)).toBeNull();
 });
 
