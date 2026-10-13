@@ -20,14 +20,14 @@ export function ReactivateCoachModal(p: Props) {
       onClose={p.onClose}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-700">
+        <p className="text-body text-ink-secondary">
           Their login and coach access return immediately. Classes handed
           over when they were disabled are <strong>not</strong> handed back —
           reassign any class deliberately from the Classes page.
         </p>
 
         {p.actionError && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <p className="text-body text-status-danger-text bg-status-danger-bg rounded-card px-3 py-2">
             {p.actionError}
           </p>
         )}

@@ -28,7 +28,7 @@ export function DisableCoachModal(p: Props) {
       onClose={p.onClose}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-700">
+        <p className="text-body text-ink-secondary">
           Their coach access ends immediately and their login is blocked.
           Their taught lessons and past pay are untouched — disabling is
           forward-looking.
@@ -36,7 +36,7 @@ export function DisableCoachModal(p: Props) {
 
         {disableModal && disableModal.class_titles.length > 0 && (
           <div>
-            <p className="text-sm text-gray-700 mb-2">
+            <p className="text-body text-ink-secondary mb-2">
               They still teach{" "}
               <span className="font-medium">
                 {disableModal.class_titles.join(", ")}
@@ -47,7 +47,7 @@ export function DisableCoachModal(p: Props) {
             <select
               value={p.replacementId}
               onChange={(e) => p.setReplacementId(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+              className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
             >
               <option value="">Choose the replacement coach…</option>
               {p.replacementOptions.map((c) => (
@@ -57,7 +57,7 @@ export function DisableCoachModal(p: Props) {
               ))}
             </select>
             {p.replacementOptions.length === 0 && (
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-body text-ink-muted">
                 No other active coach to hand these classes to — hire or
                 reactivate one first.
               </p>
@@ -69,17 +69,17 @@ export function DisableCoachModal(p: Props) {
             coach. After the disable only an admin can mark them, and an
             unmarked lesson blocks billing with no override. */}
         {p.impactError ? (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <p className="text-body text-status-danger-text bg-status-danger-bg rounded-card px-3 py-2">
             Could not check their unmarked lessons: {p.impactError}
           </p>
         ) : p.impact === null ? (
-          <p className="text-sm text-gray-400">Checking unmarked lessons…</p>
+          <p className="text-body text-ink-muted">Checking unmarked lessons…</p>
         ) : p.impact.length > 0 ? (
-          <div className="rounded-xl bg-amber-50 p-3">
-            <p className="text-sm font-medium text-amber-800 mb-1">
+          <div className="rounded-card bg-status-warning-bg p-3">
+            <p className="text-body font-medium text-status-warning-text mb-1">
               Marking these falls to you (admin) after disabling:
             </p>
-            <ul className="text-sm text-amber-700 space-y-0.5">
+            <ul className="text-body text-status-warning-text space-y-0.5">
               {p.impact.map((l) => (
                 <li key={l.sessionId}>
                   {l.sessionDate} — {l.title} ({l.unmarkedCount} unmarked)
@@ -90,7 +90,7 @@ export function DisableCoachModal(p: Props) {
         ) : null}
 
         {p.actionError && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <p className="text-body text-status-danger-text bg-status-danger-bg rounded-card px-3 py-2">
             {p.actionError}
           </p>
         )}
@@ -100,7 +100,8 @@ export function DisableCoachModal(p: Props) {
             Cancel
           </Button>
           <Button
-            className="flex-1 bg-red-600 hover:bg-red-700"
+            variant="danger"
+            className="flex-1"
             disabled={
               p.actionBusy ||
               ((disableModal?.class_titles.length ?? 0) > 0 && !p.replacementId)

@@ -15,7 +15,7 @@ export default function CoachesPage() {
     <div>
       <PageHeader
         title="Coaches"
-        subtitle={`${p.coaches.length} coaches`}
+        subtitle={`${p.coaches.length} ${p.coaches.length === 1 ? "coach" : "coaches"}`}
         action={<NewCoachButton onOpen={p.openCreate} />}
       />
 

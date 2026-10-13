@@ -42,7 +42,7 @@ export function CreateCoachModal(p: Props) {
         />
 
         {p.createError && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <p className="text-body text-status-danger-text bg-status-danger-bg rounded-card px-3 py-2">
             {p.createError}
           </p>
         )}

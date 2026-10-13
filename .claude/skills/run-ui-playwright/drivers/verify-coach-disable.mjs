@@ -19,7 +19,7 @@
 //   dc-replace@swimsync.test   pure coach who inherits the class
 
 import os from "node:os";
-import { launch, loginAdmin, loginExpo, appLoginDies as appLoginDiesOn, loginVerdictDetail, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, appLoginDies as appLoginDiesOn, loginVerdictDetail, ADMIN, rowAction, rowActionCount } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => `${SHOT}/coach-disable-${n}`;
@@ -53,12 +53,13 @@ check("both fixture coaches are listed with the target teaching their class",
   body.includes("DisableCov Target") && body.includes("DisableCov Replacement") &&
   (await row("DisableCov Target").innerText()).includes("DisableCov Lane"),
   body.slice(0, 300));
+// Disable sits in the row "…" menu since UI restyle 5.17 — counted inside it.
 check("an active coach's row offers Disable",
-  (await row("DisableCov Target").innerText()).includes("Disable"));
+  (await rowActionCount(row("DisableCov Target"), "Disable")) === 1);
 await page.screenshot({ path: shot("01-before.png"), fullPage: true });
 
 // ── 2. The dialog: replacement demanded, ⚠ RISK 8 list shown ────────────────
-await row("DisableCov Target").getByText("Disable", { exact: true }).click();
+await (await rowAction(row("DisableCov Target"), "Disable")).click();
 await page.waitForTimeout(2500); // the marking-backlog check loads async
 body = await page.evaluate(() => document.body.innerText);
 
@@ -84,7 +85,8 @@ check("the target's row now says Disabled",
 check("the class moved to the replacement's row",
   (await row("DisableCov Replacement").innerText()).includes("DisableCov Lane"));
 check("a disabled row offers Reactivate, not Disable",
-  (await row("DisableCov Target").innerText()).includes("Reactivate"));
+  (await row("DisableCov Target").innerText()).includes("Reactivate") &&
+    (await rowActionCount(row("DisableCov Target"), "Disable")) === 0);
 await page.screenshot({ path: shot("03-disabled.png"), fullPage: true });
 
 // ── 4. The ban half, in the real app ────────────────────────────────────────

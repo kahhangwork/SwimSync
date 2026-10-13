@@ -1,6 +1,8 @@
 // Coaches page — the roster table. Owns its own useTableSort.
 
-import { UserX, UserCheck } from "lucide-react";
+import { Tag } from "@/components/ui/Tag";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
+import { UserCheck } from "lucide-react";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import type { CoachRow } from "../types";
@@ -33,13 +35,13 @@ export function CoachesTable(p: Props) {
       <Tbody>
         {p.loading ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={5}>
+            <Td className="text-center text-ink-muted py-8" colSpan={5}>
               Loading…
             </Td>
           </Tr>
         ) : visible.length === 0 ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={5}>
+            <Td className="text-center text-ink-muted py-8" colSpan={5}>
               No coaches yet.
             </Td>
           </Tr>
@@ -49,41 +51,39 @@ export function CoachesTable(p: Props) {
               <Td>
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-body font-semibold ${
                       coach.disabled_at
-                        ? "bg-gray-100 text-gray-400"
-                        : "bg-sky-100 text-sky-700"
+                        ? "bg-status-neutral-bg text-ink-muted"
+                        : "bg-status-info-bg text-primary"
                     }`}
                   >
                     {coach.full_name.charAt(0)}
                   </div>
                   <span
                     className={`font-medium ${
-                      coach.disabled_at ? "text-gray-400" : "text-gray-900"
+                      coach.disabled_at ? "text-ink-muted" : "text-ink"
                     }`}
                   >
                     {coach.full_name}
                   </span>
                   {coach.disabled_at && (
-                    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500">
-                      Disabled
-                    </span>
+                    <Tag tone="neutral">Disabled</Tag>
                   )}
                 </div>
               </Td>
-              <Td className="text-gray-500">{coach.email}</Td>
-              <Td className="text-gray-500">{coach.phone ?? "—"}</Td>
+              <Td className="text-ink-muted">{coach.email}</Td>
+              <Td className="text-ink-muted">{coach.phone ?? "—"}</Td>
               <Td>
                 {coach.class_titles.length > 0 ? (
                   <div className="flex flex-col gap-0.5">
                     {coach.class_titles.map((t) => (
-                      <span key={t} className="text-xs text-gray-600">
+                      <span key={t} className="text-label text-ink-secondary">
                         {t}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <span className="text-xs text-gray-400">No classes</span>
+                  <span className="text-label text-ink-muted">No classes</span>
                 )}
               </Td>
               <Td>
@@ -91,22 +91,21 @@ export function CoachesTable(p: Props) {
                   {coach.disabled_at ? (
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       onClick={() => p.openReactivate(coach)}
                     >
                       <UserCheck className="h-3.5 w-3.5" />
                       Reactivate
                     </Button>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-red-600 hover:bg-red-50"
-                      onClick={() => p.openDisable(coach)}
-                    >
-                      <UserX className="h-3.5 w-3.5" />
-                      Disable
-                    </Button>
+                    // Disable is destructive (it hands the classes over and
+                    // bans the login) — the row menu, never an inline red
+                    // button (DESIGN.md → Tables; UI restyle 5.17).
+                    <RowMenu>
+                      <RowMenuItem destructive onClick={() => p.openDisable(coach)}>
+                        Disable
+                      </RowMenuItem>
+                    </RowMenu>
                   )}
                 </div>
               </Td>
