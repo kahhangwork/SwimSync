@@ -1244,3 +1244,10 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     in one transaction (UP → DOWN → 8 bodies + ACLs byte-identical). Prod after: 0 pending; column gone; backfill +
     D9 guard functions gone; 6 rewritten bodies md5 = local; ACLs = local, no anon; `package_live_balances()` 1 row,
     live = stored. CI `38373848395` green; both sites 200 (no bundle string — types compile to identical JS). No Generate.
+
+89. **Deploy record (2026-10-13): UI restyle Phase 3 — the ten parent screens, one push.** App-only (no migration, no
+    function; `migration list --linked` 0 pending), so no backend gate: `ui/parent-phase3` → `main` as `9f67aee` (3.1–3.10
+    + a review fix + docs). The user raised the cap through Phase 3 and waived the gate for 3.6 / 3.10. Before the push:
+    CI repo invariants locally; 24 parent drivers `--only` before (`fc2252d`) = after. Live bundle on swimsync.sg carried
+    `No lessons are listed on this invoice` and `type:"date"` ~60 s after the push. Nightly `38397974946` (dispatched on
+    the user's word) green, 74/74.

@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-13 — **Legacy package matcher removed** (Wave 9 item 9; follow-up *Simplify the admin's live-balance display* filed). **UI restyle Phases 1–2 shipped** (primitives, status scale — S7 Overdue still open —, admin shell S5, all eight coach screens); 1.5 capture fold-ins filed. 2026-10-12 — **Legacy matcher un-gated** (Little Orcas sealed September). **UI restyle under way** (Wave 9 item 8): logo, tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* shipped (Geist open question removed — answered); the work follows `docs/plans/UI_RESTYLE_PLAN.md`. 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-13 — **UI restyle Phase 3 shipped** (S3, S6 and the parent fold-ins; follow-up *Cancelling a package request has no confirmation* filed). **Legacy package matcher removed** (Wave 9 item 9; follow-up *Simplify the admin's live-balance display* filed). **UI restyle Phases 1–2 shipped** (primitives, status scale — S7 Overdue still open —, admin shell S5, all eight coach screens); 1.5 capture fold-ins filed. 2026-10-12 — **Legacy matcher un-gated** (Little Orcas sealed September). **UI restyle under way** (Wave 9 item 8): logo, tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* shipped (Geist open question removed — answered); the work follows `docs/plans/UI_RESTYLE_PLAN.md`. 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -297,7 +297,8 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
    user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
 8. **UI/UX improvements** (M, *Platform and reach*) — **IN PROGRESS: follow `docs/plans/UI_RESTYLE_PLAN.md`.** Logo,
-   tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* are live (2026-10-12); next is the plan's step 1.3 (primitives).
+   Phases 0–3 are live and verified (2026-10-13: logo, tokens, primitives, status scale, admin shell, all coach and
+   parent screens); next is the plan's Phase 4 (auth + public). The plan's §3 is the state.
 9. ~~*Remove the legacy package matcher*~~ — **shipped 2026-10-13** (engine v36 + `20261013000100`; the D9 guard went
    with it). Follow-up filed: *Simplify the admin's live-balance display* (S).
 

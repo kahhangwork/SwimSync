@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.149** | 2026-10-12 → 13 | UI restyle 1.3–1.6 and 2.2–2.8 live | plan UI_RESTYLE §3 · §7.372–§7.374 · DEPLOYMENT #87 |
 | **8.148** | 2026-10-12 | UI restyle 1.1 Geist + 1.2 tab bars live | plan UI_RESTYLE §3 · §7.368–§7.371 · DEPLOYMENT #86 |
 | **8.147** | 2026-10-11 → 12 | UI restyle: logo 2a, tokens, the plan, coach Schedule (2.1) — all live | plan UI_RESTYLE §3 · §7.363–§7.367 · DEPLOYMENT #83–#85 |
 | **8.146** | 2026-10-10 → 11 | Single-child packages built and deployed (D11: one kind per family) | PRD §7.16 · plan SINGLE_CHILD_PACKAGES · §7.362 · DEPLOYMENT #82 |

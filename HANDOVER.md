@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-13 (evening) — **Legacy package matcher removed and live** (engine v36 + `20261013000100`;
-DEPLOYMENT #88). Nightly `38360405197` read green (74/74) — every restyle landing verified. Next: restyle Phase 3._
+_Last updated: 2026-10-13 (night) — **UI restyle Phase 3 live** (all ten parent screens, DEPLOYMENT #89); nightly
+`38397974946` green (74/74), zero unverified landings. Next: restyle Phase 4 (auth + public, stricter gate)._
 
-_Previously (§8.149, 2026-10-12 late → 13) — UI restyle Phases 1 and 2 live (DEPLOYMENT #87)._
+_Previously (§8.150, 2026-10-13 evening) — legacy package matcher removed, live (DEPLOYMENT #88)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -351,6 +351,18 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.151 (2026-10-13, night) — UI restyle Phase 3: the ten parent screens, live and nightly-green
+
+**All of Phase 3 (3.1–3.10) shipped in one push** (`9f67aee`, DEPLOYMENT #89); nightly `38397974946` green, 74/74.
+The plan's §3 ledger is the per-step record; the parent-visible changes are in PRD §14.1.
+
+- **Decided by the user:** no `/plan-with-confidence` (the plan existed); cap raised through Phase 3; gate waived for
+  3.6 (DOB picker) and 3.10 (Join / auth); nightly dispatched after the deploy on their word.
+- **Found:** §7.367 hit again (`accessibilityRole="button"` → a `<button>` with no `tabindex`) — promoted to the plan's
+  §5 recipe. Review found Cancel on a pending package has no confirmation — filed in BACKLOG, not fixed in a restyle.
+- **Not done:** the plan's prod spot-check for 3.2 (refused: called by ABSOLUTE path, which the allow rule's prefix misses);
+  whether a credit note can be negative (now printed `−S$…`) is unverified; no `/commit-review` per step (one review pass).
+
 ## 8.150 (2026-10-13, evening) — legacy package matcher removed (Wave 9 item 9), live
 
 **Packages pay ONE way now: drawn at marking.** Engine v36 matches no package; `20261013000100` dropped
@@ -362,20 +374,7 @@ inside a file read at the start of every session.
 - **Also:** nightly `38360405197` green → the plan's eight §3 verdict cells filled.
 - **Not done:** the admin's dead "pending draws" display (BACKLOG *Simplify the admin's live-balance display*).
 
-## 8.149 (2026-10-12 late → 13) — UI restyle 1.3–1.6 and 2.2–2.8, all live
-
-**Phase 1 finished, then all of Phase 2** (`docs/plans/UI_RESTYLE_PLAN.md` §3 = the per-step record). Live: DEPLOYMENT #87.
-
-- **Shipped:** primitives (1.3), one status scale (1.4), the six-screen capture (1.5, BACKLOG), admin drawer + rem type
-  (1.6), then coach Mark attendance, Classes, Roster, Grade, Pay, Settings, Change password (2.2–2.8).
-- **Decided by the user:** 1.3+1.4 before the 03:17 nightly; 1.6 under the gate; then waived the nightly for 2.2–2.3
-  and **raised the cap through Phase 2**; dispatched nightly `38360405197` on `f53d55d` after it. Admin type is rem.
-- **Found:** §7.372–§7.374; two driver rules now in the plan's §5 recipe (a tag never repeats a button word; counts
-  scoped to the screen's `testID`). Fixed on the way: Settings read "Coach Coach Marcus".
-- **Not done:** public pages still show `$` not `S$` (BACKLOG, plan 4.5/4.6); Coach Pay has no thousands separator
-  (BACKLOG fold-in); Overdue waits on a due-date decision (BACKLOG S7).
-
-_(§8.148 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.149 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -417,9 +416,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-13:** `38360405197` (dispatched by the user, `f53d55d`) GREEN, 74/74 — 1.6 and 2.2–2.8 verified,
-zero unverified restyle landings. `706934f` (legacy matcher removal) is not yet under a nightly; the package drivers
-passed `--only` on it.
+**State on 2026-10-13 (night):** `38397974946` (dispatched by the user, `9f67aee`) GREEN, 74/74 — Phase 3 (3.1–3.10)
+and `706934f` (legacy matcher removal) verified; zero unverified restyle landings.
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -437,9 +435,9 @@ which mutate shared seed state — are in the same section.
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
-   **Phases 0–2 are live and verified** (2026-10-13). **Next: Phase 3 (parent app), step 3.1** — its head note: money
-   screens, RISK 2. The
-   public `$`→`S$` bug is plan 4.5/4.6 (Phase 4, stricter gate). Keep the lid open during any local batch (§7.370).
+   **Phases 0–3 are live and verified** (2026-10-13). **Next: Phase 4 (auth + public), step 4.1** — a stricter gate:
+   never visual-only (§6, P4), so propose the full sweep or land under the HANDOVER §9 GATE. The public `$`→`S$` bug
+   is 4.5/4.6. Small, separate: BACKLOG *Cancelling a package request has no confirmation* (S, not visual-only). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 

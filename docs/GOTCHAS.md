@@ -3030,6 +3030,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     disabled `TouchableOpacity` renders a `div`: the press reaches it and correctly does nothing. Fix taken
     (`WeekSelector.tsx`): keep the `accessibilityLabel`, drop the role on controls a driver presses at their bound. Before adding a
     role to an existing control, grep the drivers for its `testID`.
+    - **Hit again (2026-10-13, §8.151) — without `disabled`.** The role alone renders a `<button>`, and a `<button>` has no
+      `tabindex` attribute. Parent Home's declined-claim ✕ gained the role in UI restyle 3.4; `verify-app-home-writes`
+      finds that ✕ as its header row's `[tabindex="0"]` and timed out (1/2 vs 10/10). One `--only` run and one revert of
+      the role. **Promoted:** a rule in `docs/plans/UI_RESTYLE_PLAN.md` §5 step 3 — before giving an existing control
+      `accessibilityRole="button"`, grep the drivers for a `tabindex` / `getByRole` locator near it, not only its `testID`.
 
 368. **RN-web's class names differ between dev and production — never select one by name.** A classic class is
     `css-text-<hash>` under `expo start` but a bare `css-<hash>` in an `expo export` build (`createIdentifier`,
