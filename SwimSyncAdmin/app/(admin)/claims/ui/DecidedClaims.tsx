@@ -18,7 +18,7 @@ export function DecidedClaims(p: Props) {
     <div className="mt-8">
       <button
         onClick={() => p.setShowDecided((s) => !s)}
-        className="text-sm font-medium text-sky-600 hover:text-sky-700"
+        className="text-body font-medium text-primary hover:text-primary-hover"
       >
         {p.showDecided ? "Hide" : "Show"} decided requests ({p.decided.length})
       </button>
@@ -28,15 +28,15 @@ export function DecidedClaims(p: Props) {
           {p.decided.map((c) => (
             <div
               key={c.id}
-              className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3"
+              className="flex items-center justify-between rounded-control border border-border bg-surface px-4 py-3"
             >
               <div>
-                <p className="text-sm text-gray-900">
+                <p className="text-body text-ink">
                   <span className="font-medium">{c.student_name}</span>{" "}
                   {c.status === "approved" ? "linked to" : "not linked to"}{" "}
                   <span className="font-medium">{c.parent_name}</span>
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-label text-ink-muted">
                   {c.status}
                   {c.decided_at
                     ? ` · ${claimDayLabel(c.decided_at)}`

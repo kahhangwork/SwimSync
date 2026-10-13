@@ -31,7 +31,7 @@ import { ApproveClaimModal } from "./ui/ApproveClaimModal";
 export default function ClaimsPage() {
   const p = useClaims();
 
-  if (p.loading) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (p.loading) return <p className="text-body text-ink-muted">Loading…</p>;
 
   return (
     <div>
@@ -41,15 +41,15 @@ export default function ClaimsPage() {
       />
 
       {p.error && (
-        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm text-amber-800">{p.error}</p>
+        <div className="mb-5 rounded-card border border-status-warning-border bg-status-warning-bg px-4 py-3">
+          <p className="text-body text-status-warning-text">{p.error}</p>
         </div>
       )}
 
       {p.pending.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
-          <p className="text-sm text-gray-500">Nothing waiting.</p>
-          <p className="mt-1 text-xs text-gray-400">
+        <div className="rounded-card border border-border bg-surface p-8 text-center">
+          <p className="text-body text-ink-muted">Nothing waiting.</p>
+          <p className="mt-1 text-label text-ink-muted">
             When a parent adds a child who looks like one already on your
             roster, their request appears here.
           </p>

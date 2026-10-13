@@ -23,7 +23,7 @@ export function ApproveClaimModal(p: Props) {
     >
       {confirming && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-body text-ink-secondary">
             Attach{" "}
             <span className="font-semibold">{confirming.student_name}</span>
             {confirming.lessons > 0 && (
@@ -34,7 +34,7 @@ export function ApproveClaimModal(p: Props) {
             <span className="font-semibold">{confirming.parent_name}</span>
             &apos;s account?
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-body text-ink-muted">
             They will be able to see this child&apos;s attendance and billing
             history, and future lessons will be invoiced to them. You can undo
             this from the decided list, until the child has been invoiced.
@@ -43,15 +43,15 @@ export function ApproveClaimModal(p: Props) {
           {/* ⚠ RISK 1: the name picker. Default is parent-name for a
               confirmed claim, current name for an unsure one (see the nameChoice
               useEffect in useClaims). Applied via rename_student() after the link. */}
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <p className="text-xs font-semibold text-gray-600">
+          <div className="rounded-card border border-border bg-ground p-3">
+            <p className="text-label font-semibold text-ink-secondary">
               Name on your roster after linking
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => p.setNameChoice(confirming.student_name)}
-                className="rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                className="rounded-control border border-border-strong bg-surface px-2.5 py-1 text-label font-medium text-ink hover:bg-ground"
               >
                 Keep &ldquo;{confirming.student_name}&rdquo;
               </button>
@@ -60,7 +60,7 @@ export function ApproveClaimModal(p: Props) {
                   <button
                     type="button"
                     onClick={() => p.setNameChoice(confirming.claimed_name)}
-                    className="rounded-full border border-sky-300 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100"
+                    className="rounded-control border border-border-strong bg-surface px-2.5 py-1 text-label font-medium text-ink hover:bg-ground"
                   >
                     Use &ldquo;{confirming.claimed_name}&rdquo; (parent&apos;s)
                   </button>
@@ -69,10 +69,10 @@ export function ApproveClaimModal(p: Props) {
             <input
               value={p.nameChoice}
               onChange={(e) => p.setNameChoice(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-2 w-full rounded-control border border-border-strong px-3 py-2 text-body"
             />
             {confirming.certainty === "unsure" && (
-              <p className="mt-1 text-[11px] text-amber-700">
+              <p className="mt-1 text-label text-status-warning-text">
                 This parent said they weren&apos;t sure, so the current name is
                 kept unless you change it.
               </p>
