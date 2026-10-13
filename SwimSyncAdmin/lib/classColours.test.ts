@@ -52,3 +52,22 @@ describe("colourFor", () => {
     expect(isKnownColourKey("#ff0000")).toBe(false);
   });
 });
+
+// UI restyle 5.11 (plan ⚠ RISK 9): the calendar changed how a class colour is
+// APPLIED (a 1px border + tint, no `border-l-4` side tab) — never the palette.
+// MUTATION PROOF (§7.25): giving "teal" sky's `card` string → RED on "every
+// swatch's card and dot are distinct".
+describe("CLASS_COLOURS after the UI restyle (RISK 9)", () => {
+  it("every swatch's card and dot are distinct — no two classes look alike", () => {
+    expect(new Set(CLASS_COLOURS.map((c) => c.card)).size).toBe(CLASS_COLOURS.length);
+    expect(new Set(CLASS_COLOURS.map((c) => c.dot)).size).toBe(CLASS_COLOURS.length);
+  });
+
+  it("every key stored on production resolves to a real (non-neutral) swatch", () => {
+    // `select distinct colour from classes` via scripts/prod-query-ro.sh, 2026-10-14:
+    // lime, sky, violet (and NULL, which is "no colour" by design).
+    for (const key of ["lime", "sky", "violet"]) {
+      expect(colourFor(key)).not.toBe(NEUTRAL_COLOUR);
+    }
+  });
+});

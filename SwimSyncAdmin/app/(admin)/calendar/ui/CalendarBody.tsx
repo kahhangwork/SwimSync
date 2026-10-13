@@ -32,7 +32,7 @@ export function CalendarBody(c: CalendarState) {
       />
 
       {c.error && (
-        <div className="mb-3 flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="mb-3 flex items-center justify-between rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
           <span>Could not load the calendar: {c.error}</span>
           <button type="button" className="font-medium underline" onClick={c.reload}>
             Retry
@@ -41,13 +41,13 @@ export function CalendarBody(c: CalendarState) {
       )}
 
       {!c.loading && !c.error && c.data && c.data.classes.length === 0 && (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+        <div className="rounded-card border border-dashed border-border-strong bg-surface p-8 text-center text-body text-ink-muted">
           No classes yet — create one on the Classes page and it will appear here on its weekday.
         </div>
       )}
 
       {!c.loading && !c.error && c.data && c.data.classes.length > 0 && c.lessons.length === 0 && c.allLessons.length > 0 && (
-        <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div className="mb-3 rounded-card bg-status-warning-bg px-3 py-2 text-body text-status-warning-text">
           No lessons {location ? `at ${location}` : ""} {coach ? "for that coach" : ""} in this {view === "month" ? "month" : view === "day" ? "day" : "week"}.
           {" "}
           <button type="button" className="font-medium underline" onClick={() => setParams({ location: "", coach: "" })}>
@@ -61,8 +61,10 @@ export function CalendarBody(c: CalendarState) {
           days={c.days}
           lessons={c.lessons}
           today={c.today}
-          laneMinPx={view === "day" ? 220 : 150}
-          dayMinPx={view === "day" ? 320 : 150}
+          // Week lanes 128px (were 150): seven days fit a 1440px screen beside
+          // the sidebar unless a day double-books (BACKLOG: Week hid Sunday).
+          laneMinPx={view === "day" ? 220 : 128}
+          dayMinPx={view === "day" ? 320 : 128}
           selectedKey={c.pinned?.lesson.key ?? null}
           onOpen={c.onOpen}
           onHover={c.onHover}
@@ -104,10 +106,10 @@ export function CalendarBody(c: CalendarState) {
         />
       )}
 
-      <p className="mt-2 text-xs text-gray-400">
-        Legend: <span className="font-semibold">4+1/6</span> = enrolled + guests / max ·{" "}
-        <span className="text-red-600 font-semibold">(Sub)</span> = substitute coach · dashed border = attendance not
-        fully marked · <span className="text-emerald-700">✓</span> = fully marked · faded = public-holiday void.
+      <p className="mt-2 text-label font-normal text-ink-muted">
+        Legend: <span className="font-semibold">4+1/6</span> = enrolled + guests / max (no max when the class has no
+        limit) · <span className="font-semibold">(Sub)</span> = substitute coach · dashed border = attendance not
+        fully marked · <span className="font-semibold">✓</span> = fully marked · faded = public-holiday void.
       </p>
     </>
   );

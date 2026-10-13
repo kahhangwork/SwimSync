@@ -37,7 +37,7 @@ export function CalendarToolbar(p: Props) {
             type="button"
             aria-label="Previous"
             onClick={p.onPrev}
-            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 hover:bg-gray-50"
+            className="rounded-control border border-border bg-surface p-1.5 text-ink-secondary hover:bg-ground"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -45,22 +45,22 @@ export function CalendarToolbar(p: Props) {
             type="button"
             aria-label="Next"
             onClick={p.onNext}
-            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 hover:bg-gray-50"
+            className="rounded-control border border-border bg-surface p-1.5 text-ink-secondary hover:bg-ground"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
           <button
             type="button"
             onClick={p.onToday}
-            className="ml-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="ml-1 rounded-control border border-border bg-surface px-3 py-1.5 text-body font-medium text-ink-secondary hover:bg-ground"
           >
             Today
           </button>
         </div>
-        <div data-testid="calendar-label" className="text-base font-semibold text-gray-900">
+        <div data-testid="calendar-label" className="text-headline font-semibold text-ink">
           {p.label}
         </div>
-        <div className="ml-auto flex rounded-lg border border-gray-200 bg-white p-0.5 text-sm">
+        <div className="ml-auto flex rounded-control border border-border-strong bg-surface p-0.5 text-body">
           {CALENDAR_VIEWS.map((v) => (
             <button
               key={v}
@@ -68,8 +68,8 @@ export function CalendarToolbar(p: Props) {
               aria-pressed={p.view === v}
               onClick={() => p.onView(v)}
               className={cn(
-                "rounded-md px-3 py-1 font-medium",
-                p.view === v ? "bg-sky-500 text-white" : "text-gray-600 hover:bg-gray-100"
+                "rounded-tag px-3 py-1 font-medium",
+                p.view === v ? "bg-selected text-ink" : "text-ink-secondary hover:bg-ground"
               )}
             >
               {VIEW_LABEL[v]}
@@ -77,14 +77,14 @@ export function CalendarToolbar(p: Props) {
           ))}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label className="flex items-center gap-1.5 text-gray-600">
+      <div className="flex flex-wrap items-center gap-2 text-body">
+        <label className="flex items-center gap-1.5 text-ink-secondary">
           Location
           <select
             aria-label="Location"
             value={p.location}
             onChange={(e) => p.onLocation(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm"
+            className="rounded-control border border-border-strong bg-surface px-2 py-1.5 text-body"
           >
             <option value="">All locations</option>
             {p.locations.map((l) => (
@@ -94,13 +94,13 @@ export function CalendarToolbar(p: Props) {
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-1.5 text-gray-600">
+        <label className="flex items-center gap-1.5 text-ink-secondary">
           Coach
           <select
             aria-label="Coach"
             value={p.coach}
             onChange={(e) => p.onCoach(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm"
+            className="rounded-control border border-border-strong bg-surface px-2 py-1.5 text-body"
           >
             <option value="">All coaches</option>
             {p.coaches.map((c) => (
@@ -110,7 +110,7 @@ export function CalendarToolbar(p: Props) {
             ))}
           </select>
         </label>
-        {p.summary && <span className="ml-auto text-xs text-gray-500">{p.summary}</span>}
+        {p.summary && <span className="ml-auto text-label text-ink-muted">{p.summary}</span>}
       </div>
     </div>
   );

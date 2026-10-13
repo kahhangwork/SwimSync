@@ -24,7 +24,7 @@ import { CalendarBody } from "./ui/CalendarBody";
 
 export default function CalendarPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="text-body text-ink-muted">Loading…</div>}>
       <CalendarInner />
     </Suspense>
   );

@@ -44,9 +44,9 @@ describe("LessonCard", () => {
     expect(screen.getByText("Cancelled").getAttribute("title")).toBe("Cancelled: Pool closed");
   });
 
-  it("flags a full class in red with FULL, counting guests toward capacity", () => {
+  it("flags a full class in Warning with FULL, counting guests toward capacity (never red — Red Means Stuck)", () => {
     render(<LessonCard lesson={{ ...BASE, enrolled: 5, guests: 1 }} />);
-    expect(screen.getByTestId("lesson-count").className).toContain("text-red-600");
+    expect(screen.getByTestId("lesson-count").className).toContain("text-status-warning-text");
     expect(screen.getByText("FULL")).toBeTruthy();
   });
 

@@ -17,6 +17,10 @@ export type LessonCardProps = {
 };
 
 /**
+ * One lesson on the calendar. UI restyle 5.11: the class colour is a 1px
+ * border + tint all round (no `border-l-4` side tab — Impeccable's finding), text
+ * 12px at least, FULL in Warning and (Sub) uncoloured (Red Means Stuck).
+ *
  * One lesson on the calendar. Reads only — the card navigates (double-click /
  * Enter) and never writes. Time is NOT printed on the grid card: the grid's
  * axis already says it, and the room goes to coach + count (the user's call).
@@ -55,10 +59,10 @@ export function LessonCard({
         onMouseEnter={(e) => onHover?.(lesson, e)}
         onMouseLeave={(e) => onHover?.(null, e)}
         className={cn(
-          "flex w-full items-center gap-1 truncate rounded border-l-4 px-1 py-0.5 text-left text-[11px] leading-tight",
+          "flex w-full items-center gap-1 truncate rounded-tag border px-1 py-0.5 text-left text-label leading-tight",
           colour.card,
           dim && "opacity-50",
-          selected && "ring-2 ring-sky-400",
+          selected && "ring-2 ring-primary",
           className
         )}
         style={style}
@@ -84,11 +88,11 @@ export function LessonCard({
       onMouseEnter={(e) => onHover?.(lesson, e)}
       onMouseLeave={(e) => onHover?.(null, e)}
       className={cn(
-        "group overflow-hidden rounded-md border-l-4 px-2 py-1 text-xs leading-snug shadow-sm cursor-pointer select-none",
+        "group overflow-hidden rounded-control border px-2 py-1 text-label leading-snug cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         colour.card,
         dim && "opacity-50",
         needsMark && "border-dashed",
-        selected && "ring-2 ring-sky-400",
+        selected && "ring-2 ring-primary",
         layout === "full" && "py-2",
         className
       )}
@@ -97,16 +101,16 @@ export function LessonCard({
       <div className="flex items-start gap-1">
         <span className="truncate font-semibold">{lesson.title}</span>
         {lesson.offPattern && (
-          <span className="ml-auto shrink-0 rounded bg-white/70 px-1 text-[10px] font-medium" title="Extra (off-schedule) lesson">
+          <span className="ml-auto shrink-0 rounded-tag bg-surface/70 px-1 text-label font-medium" title="Extra (off-schedule) lesson">
             extra
           </span>
         )}
         {lesson.progress === "holiday" && (
-          <span className="ml-auto shrink-0 rounded bg-white/70 px-1 text-[10px] font-medium">Holiday</span>
+          <span className="ml-auto shrink-0 rounded-tag bg-surface/70 px-1 text-label font-medium">Holiday</span>
         )}
         {lesson.progress === "cancelled" && (
           <span
-            className="ml-auto shrink-0 rounded bg-white/70 px-1 text-[10px] font-medium"
+            className="ml-auto shrink-0 rounded-tag bg-surface/70 px-1 text-label font-medium"
             title={lesson.cancellationReason ? `Cancelled: ${lesson.cancellationReason}` : "Cancelled"}
           >
             Cancelled
@@ -114,14 +118,15 @@ export function LessonCard({
         )}
       </div>
       {layout === "full" && (
-        <div className="text-[11px] opacity-80">
+        <div className="text-label opacity-80">
           {lesson.start}–{lesson.end} · {lesson.location}
         </div>
       )}
       <div className="truncate">
         <span className={cn(lesson.mainCoach.isCover && "font-medium")}>{lesson.mainCoach.name}</span>
         {lesson.mainCoach.isCover && (
-          <span className="ml-1 text-red-600 font-semibold">(Sub)</span>
+          // A cover is a fact, not a fault — no red (Red Means Stuck, UI restyle 5.11).
+          <span className="ml-1 font-semibold">(Sub)</span>
         )}
         {lesson.shadowNames.length > 0 && (
           <span className="ml-1 opacity-70" title={`Shadow: ${lesson.shadowNames.join(", ")}`}>
@@ -132,7 +137,7 @@ export function LessonCard({
       <div className="flex items-center gap-1">
         <span
           data-testid="lesson-count"
-          className={cn("font-bold tabular-nums", full && "text-red-600")}
+          className={cn("font-semibold tabular-nums", full && "text-status-warning-text")}
           title={
             lesson.capacity == null
               ? `${lesson.enrolled} enrolled${lesson.guests ? `, ${lesson.guests} guest(s)` : ""} — no limit set`
@@ -141,14 +146,15 @@ export function LessonCard({
         >
           {count}
         </span>
-        {full && <span className="text-[10px] font-semibold text-red-600">FULL</span>}
+        {/* FULL is Warning: a full class is not stuck (Red Means Stuck). */}
+        {full && <span className="font-semibold text-status-warning-text">FULL</span>}
         {needsMark && (
-          <span className="ml-auto text-[10px] font-medium text-amber-700" title="Attendance not fully marked">
+          <span className="ml-auto font-semibold" title="Attendance not fully marked">
             {lesson.progress === "partial" ? `${lesson.marked}/${lesson.enrolled + lesson.guests} marked` : "unmarked"}
           </span>
         )}
         {lesson.progress === "complete" && (
-          <span className="ml-auto text-[10px] text-emerald-700" title="Fully marked">✓</span>
+          <span className="ml-auto font-semibold" title="Fully marked">✓</span>
         )}
       </div>
     </div>

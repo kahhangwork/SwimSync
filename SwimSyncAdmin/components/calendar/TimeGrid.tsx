@@ -80,14 +80,14 @@ export function TimeGrid({
     <div
       ref={scrollRef}
       data-testid="time-grid-scroll"
-      className="relative max-h-[calc(100vh-240px)] overflow-auto rounded-xl border border-gray-200 bg-white"
+      className="relative max-h-[calc(100vh-240px)] overflow-auto rounded-card border border-border bg-surface"
     >
       <div style={{ width: totalWidth, minWidth: "100%" }}>
         {/* Header row */}
-        <div className="sticky top-0 z-20 flex border-b border-gray-200 bg-white">
+        <div className="sticky top-0 z-20 flex border-b border-border bg-surface">
           <div
             data-testid="time-gutter-corner"
-            className="sticky left-0 z-30 shrink-0 border-r border-gray-200 bg-white"
+            className="sticky left-0 z-30 shrink-0 border-r border-border bg-surface"
             style={{ width: GUTTER_PX }}
           />
           {columns.map((c) => {
@@ -96,8 +96,8 @@ export function TimeGrid({
               <div
                 key={c.date}
                 className={cn(
-                  "shrink-0 border-r border-gray-100 px-2 py-2 text-xs",
-                  isToday && "bg-sky-50"
+                  "shrink-0 border-r border-border px-2 py-2 text-label",
+                  isToday && "bg-status-info-bg"
                 )}
                 style={{ width: c.width }}
               >
@@ -106,12 +106,12 @@ export function TimeGrid({
                   onClick={() => onDayClick?.(c.date)}
                   className={cn(
                     "font-semibold hover:underline",
-                    isToday ? "text-sky-700" : "text-gray-700"
+                    isToday ? "text-primary" : "text-ink-secondary"
                   )}
                 >
                   {formatSgDate(c.date, { weekday: "short", day: "numeric", month: "short" })}
                 </button>
-                <span className="ml-2 text-gray-400">
+                <span className="ml-2 text-ink-muted">
                   {c.dayLessons.length} lesson{c.dayLessons.length === 1 ? "" : "s"}
                 </span>
               </div>
@@ -124,7 +124,7 @@ export function TimeGrid({
           {/* Time gutter */}
           <div
             data-testid="time-gutter"
-            className="sticky left-0 z-10 shrink-0 border-r border-gray-200 bg-white"
+            className="sticky left-0 z-10 shrink-0 border-r border-border bg-surface"
             style={{ width: GUTTER_PX }}
           >
             {Array.from({ length: rows }, (_, i) => {
@@ -134,8 +134,8 @@ export function TimeGrid({
                 <div
                   key={min}
                   className={cn(
-                    "pr-2 text-right text-[11px] leading-none",
-                    hour ? "font-semibold text-gray-700" : "text-gray-400"
+                    "pr-2 text-right text-label leading-none",
+                    hour ? "font-semibold text-ink-secondary" : "text-ink-muted"
                   )}
                   style={{ height: ROW_PX, paddingTop: 2 }}
                 >
@@ -151,7 +151,7 @@ export function TimeGrid({
               key={c.date}
               data-testid="day-column"
               data-date={c.date}
-              className={cn("relative shrink-0 border-r border-gray-100", c.date === today && "bg-sky-50/40")}
+              className={cn("relative shrink-0 border-r border-border", c.date === today && "bg-status-info-bg")}
               style={{ width: c.width }}
             >
               {/* Row lines */}
@@ -160,7 +160,7 @@ export function TimeGrid({
                   key={i}
                   className={cn(
                     "absolute left-0 right-0 border-t",
-                    (axis.startMin + i * 30) % 60 === 0 ? "border-gray-200" : "border-gray-100"
+                    (axis.startMin + i * 30) % 60 === 0 ? "border-border" : "border-border"
                   )}
                   style={{ top: i * ROW_PX }}
                 />

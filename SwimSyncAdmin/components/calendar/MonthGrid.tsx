@@ -34,9 +34,9 @@ export function MonthGrid({ anchor, lessons, today, selectedKey, onOpen, onHover
   }, [lessons]);
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-x-auto rounded-card border border-border bg-surface">
       <div className="min-w-[840px]">
-        <div className="grid grid-cols-7 border-b border-gray-200 text-xs font-semibold text-gray-500">
+        <div className="grid grid-cols-7 border-b border-border text-label font-semibold text-ink-muted">
           {DOW.map((d) => (
             <div key={d} className="px-2 py-2">
               {d}
@@ -54,16 +54,16 @@ export function MonthGrid({ anchor, lessons, today, selectedKey, onOpen, onHover
                 data-testid="month-cell"
                 data-date={date}
                 className={cn(
-                  "min-h-[104px] border-b border-r border-gray-100 p-1",
-                  !inMonth && "bg-gray-50 text-gray-400"
+                  "min-h-[104px] border-b border-r border-border p-1",
+                  !inMonth && "bg-ground text-ink-muted"
                 )}
               >
                 <button
                   type="button"
                   onClick={() => onDayOpen(date)}
                   className={cn(
-                    "mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-semibold hover:bg-gray-100",
-                    date === today && "bg-sky-600 text-white hover:bg-sky-700"
+                    "mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-label font-semibold hover:bg-selected",
+                    date === today && "bg-primary text-white hover:bg-primary-hover"
                   )}
                   title="Open this day"
                 >
@@ -85,7 +85,7 @@ export function MonthGrid({ anchor, lessons, today, selectedKey, onOpen, onHover
                     <button
                       type="button"
                       onClick={() => onDayOpen(date)}
-                      className="px-1 text-[11px] font-medium text-sky-700 hover:underline"
+                      className="px-1 text-label font-medium text-primary hover:underline"
                     >
                       +{extra} more
                     </button>
