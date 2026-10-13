@@ -49,7 +49,7 @@ export default function AttendanceScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <Header />
 
       <ChildSelector loadingChildren={loadingChildren} children={children} selectedChildId={selectedChildId} setSelectedChildId={setSelectedChildId} />

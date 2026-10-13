@@ -1,7 +1,7 @@
 // One chip per child (first name), or a spinner while children load.
-// Moved VERBATIM from app/(parent)/attendance/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-H); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/attendance/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-H). UI restyle step 3.7: 44px chips, 6px corners, the chosen child the
+// Selected fill (DESIGN.md — not a second blue).
 import React from "react";
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import type { useParentAttendance } from "../domain/useParentAttendance";
@@ -15,7 +15,7 @@ export function ChildSelector(p: Pick<Att, "loadingChildren" | "children" | "sel
       {/* Child selector */}
       {loadingChildren ? (
         <View className="px-5 mb-3">
-          <ActivityIndicator size="small" color="#0ea5e9" />
+          <ActivityIndicator size="small" color="#2563eb" />
         </View>
       ) : (
         <ScrollView
@@ -33,15 +33,17 @@ export function ChildSelector(p: Pick<Att, "loadingChildren" | "children" | "sel
             <TouchableOpacity
               key={child.id}
               onPress={() => setSelectedChildId(child.id)}
-              className={`px-4 py-2 rounded-full border ${
+              accessibilityRole="button"
+              accessibilityState={{ selected: selectedChildId === child.id }}
+              className={`min-h-11 px-4 justify-center rounded-control border ${
                 selectedChildId === child.id
-                  ? "bg-sky-500 border-sky-500"
-                  : "bg-white border-gray-200"
+                  ? "bg-selected border-border-strong"
+                  : "bg-surface border-border"
               }`}
             >
               <Text
-                className={`text-sm font-semibold ${
-                  selectedChildId === child.id ? "text-white" : "text-gray-600"
+                className={`text-body ${
+                  selectedChildId === child.id ? "font-semibold text-ink" : "font-medium text-ink-secondary"
                 }`}
               >
                 {child.full_name.split(" ")[0]}

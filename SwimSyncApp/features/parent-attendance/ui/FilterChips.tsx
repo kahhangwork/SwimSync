@@ -1,7 +1,8 @@
 // The status filter chips.
-// Moved VERBATIM from app/(parent)/attendance/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-H); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/attendance/index.tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-H). UI restyle step 3.7: 44px touch targets (were ~28px), 6px corners,
+// the chosen filter the Selected fill. verify-parent-attendance holds a chip
+// under 60px tall and wider than tall.
 import React from "react";
 import { Text, ScrollView, TouchableOpacity } from "react-native";
 import { FILTER_OPTIONS } from "../constants";
@@ -24,15 +25,17 @@ export function FilterChips(p: Pick<Att, "filter" | "setFilter">) {
           <TouchableOpacity
             key={opt}
             onPress={() => setFilter(opt)}
-            className={`px-3 py-1.5 rounded-full border ${
+            accessibilityRole="button"
+            accessibilityState={{ selected: filter === opt }}
+            className={`min-h-11 px-4 justify-center rounded-control border ${
               filter === opt
-                ? "bg-gray-900 border-gray-900"
-                : "bg-white border-gray-200"
+                ? "bg-selected border-border-strong"
+                : "bg-surface border-border"
             }`}
           >
             <Text
-              className={`text-xs font-semibold ${
-                filter === opt ? "text-white" : "text-gray-500"
+              className={`text-body ${
+                filter === opt ? "font-semibold text-ink" : "font-medium text-ink-secondary"
               }`}
             >
               {opt}
