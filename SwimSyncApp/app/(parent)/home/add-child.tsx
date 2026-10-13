@@ -37,7 +37,7 @@ export default function AddChildScreen() {
   } = useAddChild();
 
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <Header />
 
       <ScrollView

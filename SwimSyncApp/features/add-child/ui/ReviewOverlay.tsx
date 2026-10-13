@@ -1,10 +1,12 @@
 // One last look before the record exists.
-// Moved VERBATIM from app/(parent)/home/add-child.tsx (docs/refactor/BATCH_FGH_PLAN.md,
-// App L-F); props destructured on the first line so the JSX is byte-identical
-// (whitespace aside).
+// Moved from app/(parent)/home/add-child.tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-F). UI restyle step 3.6: a floating card (the one shadow DESIGN.md allows),
+// the date of birth in the One Date Style ("1 Jan 2019") so the parent checks a
+// date, not a code. The value saved is still `dob` itself.
 import React from "react";
 import { View, Text } from "react-native";
-import PrimaryButton from "@/components/PrimaryButton";
+import { Button } from "@/components/ui/Button";
+import { formatSgStamp } from "@/lib/lessonDates";
 import type { useAddChild } from "../domain/useAddChild";
 
 type AddChild = ReturnType<typeof useAddChild>;
@@ -16,37 +18,38 @@ export function ReviewOverlay(p: Pick<AddChild, "reviewing" | "candidates" | "na
       {/* ── One last look before the record exists ──────────────────────── */}
       {reviewing && candidates === null && (
         <View className="absolute inset-0 bg-black/40 items-center justify-center px-5">
-          <View className="bg-white rounded-2xl p-5 w-full max-w-md">
-            <Text className="text-lg font-bold text-gray-900">
+          <View className="bg-surface border border-border rounded-card shadow-float p-5 w-full max-w-md">
+            <Text className="text-headline font-semibold text-ink">
               Is this right?
             </Text>
-            <Text className="mt-1 text-sm text-gray-600">
+            <Text className="mt-1 text-body text-ink-secondary">
               Check the spelling and the date of birth. A child&rsquo;s profile
               can&rsquo;t be deleted afterwards — if it&rsquo;s wrong,
               you&rsquo;ll need to ask your coach to sort it out.
             </Text>
 
-            <View className="mt-4 bg-gray-50 rounded-xl p-4 gap-1">
-              <Text className="text-base font-semibold text-gray-900">
+            <View className="mt-4 bg-ground border border-border rounded-control p-3 gap-1">
+              <Text className="text-headline font-semibold text-ink">
                 {name.trim()}
               </Text>
-              <Text className="text-sm text-gray-600">
-                Born {dob.trim()} · {gender}
+              <Text className="text-body text-ink-secondary">
+                Born {formatSgStamp(dob.trim(), { day: "numeric", month: "short", year: "numeric" })} · {gender}
               </Text>
               {notes.trim() !== "" && (
-                <Text className="mt-1 text-sm text-gray-500">{notes.trim()}</Text>
+                <Text className="mt-1 text-body-secondary text-ink-secondary">{notes.trim()}</Text>
               )}
             </View>
 
-            <View className="mt-5 gap-2">
-              <PrimaryButton
+            <View className="mt-5 gap-1">
+              <Button
                 label={loading ? "Saving..." : "Yes, add this child"}
                 onPress={() => submit("check")}
               />
-              <PrimaryButton
+              <Button
+                variant="link"
                 label="Go back and edit"
-                variant="ghost"
                 onPress={() => setReviewing(false)}
+                className="items-center"
               />
             </View>
           </View>
