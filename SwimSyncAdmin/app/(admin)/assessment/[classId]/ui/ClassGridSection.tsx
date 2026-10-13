@@ -6,7 +6,7 @@ export function ClassGridSection(p: { s: AssessClassState }) {
   return (
     <>
       {p.s.error ? (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-6 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           Could not load this class: {p.s.error}. Reload before assessing — an empty
           grid here is a failed query, not an empty roster.
         </div>
@@ -16,7 +16,7 @@ export function ClassGridSection(p: { s: AssessClassState }) {
           and "could not save … reloaded" messages survive the re-read. Only a
           first load (or another class's) shows Loading. */}
       {!gridVisibleWhileLoading(p.s.loading, p.s.loadedFor, p.s.classId) ? (
-        <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
+        <p className="rounded-card border border-border bg-surface p-6 text-center text-body text-ink-muted">
           Loading…
         </p>
       ) : p.s.info ? (

@@ -282,17 +282,17 @@ export function AssessmentGrid({
   return (
     <div>
       {!compact && scale.length > 0 ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-3">
-          <span className="text-xs font-semibold text-gray-600">Paint:</span>
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface p-3">
+          <span className="text-label font-semibold text-ink-secondary">Paint:</span>
           {scale.map((g) => (
             <button
               key={g.id}
               onClick={() => setArmed(armed?.id === g.id ? null : g)}
               className={
-                "rounded-full px-3 py-1.5 text-xs font-semibold transition " +
+                "rounded-control border px-3 py-1.5 text-label font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary " +
                 (armed?.id === g.id
-                  ? "bg-sky-600 text-white ring-2 ring-sky-300"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200")
+                  ? "border-ink bg-selected text-ink"
+                  : "border-border-strong bg-surface text-ink-secondary hover:bg-ground")
               }
             >
               {g.label}
@@ -301,12 +301,12 @@ export function AssessmentGrid({
           {armed ? (
             <button
               onClick={() => setArmed(null)}
-              className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+              className="rounded-control border border-border-strong bg-surface px-3 py-1.5 text-label font-semibold text-ink-secondary hover:bg-ground"
             >
               Done painting (Esc)
             </button>
           ) : null}
-          <span className="ml-auto text-xs text-gray-500">
+          <span className="ml-auto text-label text-ink-muted">
             {armed
               ? `Click a cell to mark it ${armed.label}.`
               : "Click a cell to cycle its grade, or pick a grade to paint."}
@@ -317,29 +317,29 @@ export function AssessmentGrid({
       {armed ? (
         // Loud on purpose. An armed grade the assessor has forgotten about is
         // how a wrong record gets written with a confident click.
-        <div className="mb-3 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-800">
-          Painting <span className="font-bold">{armed.label}</span> — every cell
+        <div className="mb-3 rounded-card border border-status-info-border bg-status-info-bg px-3 py-2 text-body text-status-info-text">
+          Painting <span className="font-semibold">{armed.label}</span> — every cell
           you click is marked {armed.label}. Press Esc to stop.
         </div>
       ) : null}
 
       {error ? (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="mb-3 rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
           {error}
         </div>
       ) : null}
 
       {flash ? (
-        <div className="mb-3 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+        <div className="mb-3 flex items-center justify-between rounded-card border border-status-success-border bg-status-success-bg px-3 py-2 text-body text-status-success-text">
           <span>{flash}</span>
-          <button onClick={() => setFlash(null)} className="text-xs font-semibold">
+          <button onClick={() => setFlash(null)} className="text-label font-semibold">
             Dismiss
           </button>
         </div>
       ) : null}
 
       {groups.length === 0 ? (
-        <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+        <p className="rounded-card border border-border bg-surface p-6 text-center text-body text-ink-muted">
           No children on this roster.
         </p>
       ) : null}
@@ -350,13 +350,13 @@ export function AssessmentGrid({
           return (
             <div
               key={group.level?.id ?? "no-level"}
-              className="overflow-hidden rounded-xl border border-gray-200 bg-white"
+              className="overflow-hidden rounded-card border border-border bg-surface"
             >
-              <div className="border-b border-gray-200 bg-gray-50 px-4 py-2.5">
-                <h3 className="text-sm font-bold text-gray-900">
+              <div className="border-b border-border bg-ground px-4 py-2.5">
+                <h3 className="text-body font-semibold text-ink">
                   {group.level ? group.level.label : "No level set"}
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className="text-label text-ink-muted">
                   {group.rows.length}{" "}
                   {group.rows.length === 1 ? "child" : "children"}
                   {group.level ? ` · ${group.level.skills.length} skills` : ""}
@@ -366,11 +366,11 @@ export function AssessmentGrid({
               {/* ⚠ The grid scrolls INSIDE this container. A level with many
                   skills must never make the page itself scroll sideways. */}
               <div className="overflow-x-auto">
-                <table className="w-full min-w-max text-sm">
+                <table className="w-full min-w-max text-body">
                   <thead>
-                    <tr className="border-b border-gray-100 text-left">
+                    <tr className="border-b border-border text-left">
                       {/* ⚠ STICKY ONLY FROM sm: UP — see the <td> below. */}
-                      <th className="bg-white px-4 py-2 text-xs font-semibold text-gray-500 sm:sticky sm:left-0 sm:z-10">
+                      <th className="bg-surface px-4 py-2 text-label font-semibold text-ink-muted sm:sticky sm:left-0 sm:z-10">
                         Child
                       </th>
                       {(group.level?.skills ?? [])
@@ -383,19 +383,19 @@ export function AssessmentGrid({
                         .map((s) => (
                           <th
                             key={s.id}
-                            className="px-2 py-2 text-xs font-semibold text-gray-500"
+                            className="px-2 py-2 text-label font-semibold text-ink-muted"
                           >
                             {s.label}
                           </th>
                         ))}
-                      <th className="px-4 py-2 text-xs font-semibold text-gray-500">
+                      <th className="px-4 py-2 text-label font-semibold text-ink-muted">
                         This round
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {group.rows.map((row) => (
-                      <tr key={row.student.id} className="border-b border-gray-50">
+                      <tr key={row.student.id} className="border-b border-border">
                         {/* ⚠ STICKY ONLY FROM sm: UP, AND THAT IS A BUG FIX,
                             NOT A PREFERENCE. verify-assessment.mjs caught this
                             at 390px on its first run: a sticky name column
@@ -414,13 +414,13 @@ export function AssessmentGrid({
                             pinned name is worth having. */}
                         <td
                           title={row.student.full_name}
-                          className="max-w-[8rem] truncate bg-white px-4 py-2 font-medium text-gray-900 sm:max-w-none sm:sticky sm:left-0 sm:z-10"
+                          className="max-w-[8rem] truncate bg-surface px-4 py-2 font-medium text-ink sm:max-w-none sm:sticky sm:left-0 sm:z-10"
                         >
                           {row.student.full_name}
                         </td>
 
                         {row.noSkills ? (
-                          <td className="px-2 py-2 text-xs text-gray-500" colSpan={1}>
+                          <td className="px-2 py-2 text-label text-ink-muted" colSpan={1}>
                             {group.level
                               ? "This level has no skills yet — add them on the Levels page."
                               : "Set a level on the Students page before assessing."}
@@ -446,17 +446,17 @@ export function AssessmentGrid({
                                     : "Not yet graded"
                                 }
                                 className={
-                                  "min-w-[5.5rem] rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 " +
+                                  "min-w-[5.5rem] rounded-control px-3 py-1.5 text-label font-semibold transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary " +
                                   (!cell.grade
-                                    ? "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                                    ? "bg-status-neutral-bg text-ink-muted hover:bg-selected"
                                     : !cell.fresh
                                     ? // STALE: a previous round's grade. Greyed
                                       // and dated, so a full row of old grades
                                       // can never be mistaken for today's work.
-                                      "bg-gray-50 text-gray-400 ring-1 ring-inset ring-gray-200 hover:bg-gray-100"
+                                      "bg-ground text-ink-muted ring-1 ring-inset ring-border hover:bg-selected"
                                     : cell.done
-                                    ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                    : "bg-sky-100 text-sky-800 hover:bg-sky-200")
+                                    ? "bg-status-success-bg text-status-success-text ring-1 ring-inset ring-status-success-border"
+                                    : "bg-status-info-bg text-status-info-text ring-1 ring-inset ring-status-info-border")
                                 }
                               >
                                 {cell.grade ? cell.grade.label : "—"}
@@ -476,15 +476,15 @@ export function AssessmentGrid({
 
                         <td className="whitespace-nowrap px-4 py-2">
                           {row.noSkills ? (
-                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                            <span className="rounded-tag border border-status-neutral-border bg-status-neutral-bg px-1.5 py-0.5 text-label font-medium text-status-neutral-text">
                               Needs a level
                             </span>
                           ) : row.assessedThisRound ? (
-                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                            <span className="rounded-tag border border-status-success-border bg-status-success-bg px-1.5 py-0.5 text-label font-medium text-status-success-text">
                               {row.freshCount}/{row.total} ✓
                             </span>
                           ) : (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                            <span className="rounded-tag border border-status-warning-border bg-status-warning-bg px-1.5 py-0.5 text-label font-medium text-status-warning-text">
                               {row.freshCount}/{row.total}
                             </span>
                           )}
@@ -493,7 +493,7 @@ export function AssessmentGrid({
                               lands here with no fresh grades. Without this they
                               read as untouched on the day they were assessed. */}
                           {row.promotedThisRound && row.freshCount === 0 ? (
-                            <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-700">
+                            <span className="ml-2 rounded-tag border border-status-info-border bg-status-info-bg px-1.5 py-0.5 text-label font-medium text-status-info-text">
                               Promoted this round
                             </span>
                           ) : null}
@@ -502,7 +502,7 @@ export function AssessmentGrid({
                             <button
                               onClick={() => onPaintRow(row)}
                               disabled={busy}
-                              className="ml-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+                              className="ml-2 rounded-card border border-status-info-border bg-status-info-bg px-2 py-0.5 text-label font-semibold text-primary hover:bg-status-info-bg disabled:opacity-50"
                             >
                               All {armed.label}
                             </button>
@@ -515,7 +515,7 @@ export function AssessmentGrid({
                             <button
                               onClick={() => void onPromote(row, up)}
                               disabled={promoting === row.student.id}
-                              className="ml-2 rounded-lg border border-green-300 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700 hover:bg-green-100 disabled:opacity-50"
+                              className="ml-2 rounded-card border border-status-success-border bg-status-success-bg px-2 py-0.5 text-label font-semibold text-status-success-text hover:bg-status-success-bg disabled:opacity-50"
                             >
                               {promoting === row.student.id
                                 ? "Moving…"

@@ -41,14 +41,14 @@ export default function AssessmentIndexPage() {
       <SinceControl since={a.since} setSince={a.setSince} />
 
       {a.error ? (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-6 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           Could not load the class list: {a.error}. Nothing here is a count you can
           trust until this succeeds — reload before assessing.
         </div>
       ) : null}
 
       {!a.loading && !a.error ? (
-        <p className="mb-4 text-sm text-gray-600">
+        <p className="mb-4 text-body text-ink-secondary">
           {a.outstanding === 0
             ? `Every active class is fully assessed for this round.`
             : `${a.outstanding} of ${a.rows.length} ${

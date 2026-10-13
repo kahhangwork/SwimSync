@@ -22,13 +22,13 @@ export function ClassChecklist(p: {
       <Tbody>
         {p.loading ? (
           <Tr>
-            <Td className="py-8 text-center text-gray-400" colSpan={5}>
+            <Td className="py-8 text-center text-ink-muted" colSpan={5}>
               Loading…
             </Td>
           </Tr>
         ) : p.rows.length === 0 ? (
           <Tr>
-            <Td className="py-8 text-center text-gray-400" colSpan={5}>
+            <Td className="py-8 text-center text-ink-muted" colSpan={5}>
               No active classes.
             </Td>
           </Tr>
@@ -37,33 +37,33 @@ export function ClassChecklist(p: {
             const done = r.total > 0 && r.assessed === r.total;
             return (
               <Tr key={r.id}>
-                <Td className="font-medium text-gray-900">
+                <Td className="font-medium text-ink">
                   <Link
                     href={`/assessment/${r.id}?since=${p.since}`}
-                    className="text-sky-700 hover:underline"
+                    className="text-primary hover:underline"
                   >
                     {r.title}
                   </Link>
                 </Td>
-                <Td className="whitespace-nowrap text-gray-500">
+                <Td className="whitespace-nowrap text-ink-muted">
                   {DAY_LABEL[r.day_of_week] ?? r.day_of_week}
                   {r.day_of_week === p.today ? (
-                    <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-700">
+                    <span className="ml-2 rounded-tag border border-status-info-border bg-status-info-bg px-1.5 py-0.5 text-label font-medium text-status-info-text">
                       Today
                     </span>
                   ) : null}
                 </Td>
-                <Td className="text-gray-500">{r.coach ?? "—"}</Td>
-                <Td className="text-gray-500">{r.location ?? "—"}</Td>
+                <Td className="text-ink-muted">{r.coach ?? "—"}</Td>
+                <Td className="text-ink-muted">{r.location ?? "—"}</Td>
                 <Td>
                   <span
                     className={
-                      "rounded-full px-2 py-0.5 text-xs font-semibold " +
+                      "rounded-tag border px-1.5 py-0.5 text-label font-medium " +
                       (r.total === 0
-                        ? "bg-gray-100 text-gray-500"
+                        ? "bg-status-neutral-bg text-status-neutral-text border-status-neutral-border"
                         : done
-                        ? "bg-green-100 text-green-700"
-                        : "bg-amber-100 text-amber-700")
+                        ? "bg-status-success-bg text-status-success-text border-status-success-border"
+                        : "bg-status-warning-bg text-status-warning-text border-status-warning-border")
                     }
                   >
                     {r.total === 0
@@ -74,7 +74,7 @@ export function ClassChecklist(p: {
                       child with no level is not work the assessor can do, and
                       folding them into either bucket is how they get missed. */}
                   {r.blocked > 0 ? (
-                    <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                    <span className="ml-2 rounded-tag border border-status-neutral-border bg-status-neutral-bg px-1.5 py-0.5 text-label font-medium text-status-neutral-text">
                       {r.blocked} {r.blocked === 1 ? "child needs" : "children need"} a level
                     </span>
                   ) : null}

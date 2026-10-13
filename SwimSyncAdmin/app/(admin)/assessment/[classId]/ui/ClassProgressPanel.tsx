@@ -10,22 +10,22 @@ export function ClassProgressPanel(p: {
   pct: number;
 }) {
   return (
-    <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+    <div className="mb-6 rounded-card border border-border bg-surface p-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <label className="block">
-          <span className="text-xs font-semibold text-gray-600">
+          <span className="text-label font-semibold text-ink-secondary">
             Assessing since
           </span>
           <input
             type="date"
             value={p.since}
             onChange={(e) => p.setSince(e.target.value || todayInSg())}
-            className="mt-1 block rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 block rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </label>
 
         <div className="min-w-[16rem] flex-1">
-          <p className="text-sm text-gray-700">
+          <p className="text-body text-ink-secondary">
             <span className="font-semibold">
               {p.progress.gradedSkills} of {p.progress.totalSkills}
             </span>{" "}
@@ -41,7 +41,7 @@ export function ClassProgressPanel(p: {
             {p.progress.blockedStudents > 0 ? (
               <>
                 {" · "}
-                <span className="font-semibold text-gray-600">
+                <span className="font-semibold text-ink-secondary">
                   {p.progress.blockedStudents}{" "}
                   {p.progress.blockedStudents === 1 ? "child needs" : "children need"}{" "}
                   a level
@@ -49,9 +49,9 @@ export function ClassProgressPanel(p: {
               </>
             ) : null}
           </p>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-status-neutral-bg">
             <div
-              className="h-full rounded-full bg-sky-500 transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${p.pct}%` }}
             />
           </div>
