@@ -8,6 +8,7 @@
 
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
+import { Tag } from "@/components/ui/Tag";
 import { formatSgStamp } from "@/lib/lessonDates";
 import { DMY, money } from "../constants";
 import type { Purchase } from "../types";
@@ -42,21 +43,21 @@ export function PendingPanel({
   if (pending.length === 0 && superseded.length === 0) return null;
 
   return (
-    <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-4">
+    <div className="mb-8 rounded-card border border-status-info-border bg-status-info-bg p-4">
       <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-amber-900">
+        <h2 className="text-headline font-semibold text-status-info-text">
           Awaiting confirmation ({pending.length})
         </h2>
         {superseded.length > 0 && (
           <button
             onClick={() => setShowSuperseded((v) => !v)}
-            className="text-xs font-semibold text-amber-700 underline"
+            className="text-label font-semibold text-status-info-text underline underline-offset-2"
           >
             {showSuperseded ? "Hide" : "Show"} superseded ({superseded.length})
           </button>
         )}
       </div>
-      <p className="mb-3 text-xs text-amber-800">
+      <p className="mb-3 text-body-secondary text-status-info-text">
         Confirm once the parent&rsquo;s PayNow transfer has landed in your
         account. Confirming starts the validity period.
       </p>
@@ -65,34 +66,35 @@ export function PendingPanel({
           <Th sort={pendingSort} sortKey="parent_name">Parent</Th>
           <Th sort={pendingSort} sortKey="name">Package</Th>
           <Th sort={pendingSort} sortKey="reference_number">Reference</Th>
-          <Th sort={pendingSort} sortKey="total_value" firstDir="desc">Price</Th>
+          <Th sort={pendingSort} sortKey="total_value" firstDir="desc" className="text-right">Price</Th>
           <Th sort={pendingSort} sortKey="requested_at">Requested</Th>
           <Th>&nbsp;</Th>
         </Thead>
         <Tbody>
           {visiblePending.map((p) => (
             <Tr key={p.id}>
-              <Td className="font-medium text-gray-900">
+              <Td className="font-medium text-ink">
                 {p.parent_name}
                 {p.offered_by && (
-                  <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                  <Tag tone="neutral" className="ml-2">
                     Offer
-                  </span>
+                  </Tag>
                 )}
                 {p.paid_claimed_at && (
-                  <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  // Claimed is its own state, Info (DESIGN.md) — never green.
+                  <Tag tone="info" className="ml-1">
                     Claimed
-                  </span>
+                  </Tag>
                 )}
               </Td>
-              <Td className="text-gray-600">
+              <Td className="text-ink-secondary">
                 {p.name}
-                <span className="text-gray-400">
+                <span className="text-ink-muted">
                   {" "}
                   · {p.lesson_count} × {money(p.rate_per_lesson)}
                 </span>
                 {p.student_id && (
-                  <span className="block text-xs text-sky-700" data-testid="one-child-label">
+                  <span className="block text-label text-ink-secondary" data-testid="one-child-label">
                     {p.student_name ?? "One child"} only
                   </span>
                 )}
@@ -100,27 +102,30 @@ export function PendingPanel({
               {/* The whole point of the column: this string is what
                   appears on the bank statement, so it must be readable
                   and copyable, not summarised. */}
-              <Td className="font-mono text-xs text-gray-600">
+              <Td className="font-mono text-label text-ink-secondary">
                 {p.reference_number ?? "—"}
               </Td>
-              <Td className="text-gray-900">
+              <Td className="text-right tabular-nums text-ink">
                 {money(p.amount_payable)}
                 {p.discount_amount > 0 && (
-                  <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <span className="ml-1 text-label text-ink-muted">
                     −{money(p.discount_amount)}
                   </span>
                 )}
               </Td>
-              <Td className="text-gray-500">
+              <Td className="text-ink-muted">
                 {formatSgStamp(p.requested_at, DMY)}
               </Td>
               <Td>
                 <div className="flex gap-2">
-                  <Button onClick={() => setConfirming(p)} disabled={busy}>
+                  {/* Per-row buttons are secondary — a primary per ROW would
+                      be many per section (DESIGN.md: one per section). */}
+                  <Button variant="outline" size="sm" onClick={() => setConfirming(p)} disabled={busy}>
                     Payment received
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="danger"
+                    size="sm"
                     onClick={() => setCancelling(p)}
                     disabled={busy}
                   >
@@ -138,27 +143,27 @@ export function PendingPanel({
           {showSuperseded &&
             superseded.map((p) => (
               <Tr key={p.id} className="opacity-60">
-                <Td className="font-medium text-gray-500">
+                <Td className="font-medium text-ink-muted">
                   {p.parent_name}
-                  <span className="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
+                  <Tag tone="neutral" className="ml-2">
                     Superseded
-                  </span>
+                  </Tag>
                 </Td>
-                <Td className="text-gray-500">
+                <Td className="text-ink-muted">
                   {p.name}
-                  <span className="text-gray-400">
+                  <span className="text-ink-muted">
                     {" "}
                     · {p.lesson_count} × {money(p.rate_per_lesson)}
                   </span>
                 </Td>
-                <Td className="font-mono text-xs text-gray-500">
+                <Td className="font-mono text-label text-ink-muted">
                   {p.reference_number ?? "—"}
                 </Td>
-                <Td className="text-gray-500">{money(p.total_value)}</Td>
-                <Td className="text-gray-400">
+                <Td className="text-right tabular-nums text-ink-muted">{money(p.total_value)}</Td>
+                <Td className="text-ink-muted">
                   {formatSgStamp(p.requested_at, DMY)}
                 </Td>
-                <Td className="text-xs text-gray-400">
+                <Td className="text-label text-ink-muted">
                   cancelled — a newer request replaced it
                 </Td>
               </Tr>

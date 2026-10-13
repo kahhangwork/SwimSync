@@ -32,10 +32,10 @@ export function CategoriesSection({
 }) {
   return (
     <div className="mb-8">
-      <h2 className="mb-1 text-sm font-bold text-gray-900">
+      <h2 className="mb-1 text-headline font-semibold text-ink">
         Class categories
       </h2>
-      <p className="mb-3 text-xs text-gray-500">
+      <p className="mb-3 text-label text-ink-muted">
         Your own grouping of classes — &ldquo;Group&rdquo;,
         &ldquo;Private&rdquo;, whatever you price together. A package sold
         against a category is spendable at every class in it, including ones
@@ -49,7 +49,7 @@ export function CategoriesSection({
             if (e.key === "Enter") addCategory();
           }}
           placeholder="Group"
-          className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+          className="w-64 rounded-control border border-border-strong px-3 py-1.5 text-body"
         />
         <Button onClick={addCategory} disabled={busy || !newCategory.trim()}>
           Add category
@@ -65,16 +65,16 @@ export function CategoriesSection({
             return (
               <li
                 key={c.id}
-                className="flex w-[36rem] items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                className="flex w-[36rem] items-center justify-between gap-3 rounded-control border border-border bg-surface px-3 py-2 text-body"
               >
-                <span className="font-medium text-gray-900">{c.name}</span>
+                <span className="font-medium text-ink">{c.name}</span>
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-400">Default:</label>
+                  <label className="text-label text-ink-muted">Default:</label>
                   <select
                     value={c.default_product_id ?? ""}
                     onChange={(e) => setCategoryDefault(c.id, e.target.value)}
                     disabled={busy}
-                    className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                    className="rounded-control border border-border-strong px-2 py-1 text-label"
                   >
                     <option value="">None</option>
                     {eligible.map((p) => (
@@ -83,7 +83,7 @@ export function CategoriesSection({
                       </option>
                     ))}
                   </select>
-                  <label className="text-xs text-gray-400" htmlFor={`cap-${c.id}`}>
+                  <label className="text-label text-ink-muted" htmlFor={`cap-${c.id}`}>
                     Max:
                   </label>
                   <input
@@ -103,15 +103,15 @@ export function CategoriesSection({
                       if (next !== cur) setCategoryCapacity(c.id, next);
                     }}
                     title="Default max students per class in this category (blank = no limit). Each class can override it."
-                    className="w-14 rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                    className="w-14 rounded-control border border-border-strong px-2 py-1 text-label"
                   />
-                  <span className="text-xs text-gray-500">
+                  <span className="text-label text-ink-muted">
                     {c.class_count} class{c.class_count === 1 ? "" : "es"}
                   </span>
                   <button
                     onClick={() => removeCategory(c)}
                     disabled={busy}
-                    className="text-gray-400 hover:text-red-600"
+                    className="text-ink-muted hover:text-status-danger-text"
                     aria-label={`Remove ${c.name}`}
                   >
                     &times;
@@ -125,15 +125,15 @@ export function CategoriesSection({
 
       {/* The all-classes fallback: proposed when neither the family's original
           nor a category default applies (Decision 5). */}
-      <div className="mt-3 flex w-[36rem] items-center gap-2 text-sm">
-        <label className="text-xs text-gray-500">
+      <div className="mt-3 flex w-[36rem] items-center gap-2 text-body">
+        <label className="text-label text-ink-muted">
           All-classes default (fallback):
         </label>
         <select
           value={tenantDefaultProduct ?? ""}
           onChange={(e) => setAllClassesDefault(e.target.value)}
           disabled={busy}
-          className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+          className="rounded-control border border-border-strong px-2 py-1 text-label"
         >
           <option value="">None</option>
           {activeProducts

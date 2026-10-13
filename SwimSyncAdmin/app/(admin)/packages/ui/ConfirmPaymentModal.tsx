@@ -27,13 +27,13 @@ export function ConfirmPaymentModal({
       onClose={() => setConfirming(null)}
       title="Confirm payment received?"
     >
-      <p className="text-sm text-gray-600">
+      <p className="text-body text-ink-secondary">
         {confirming && (
           <>
             <strong>{confirming.parent_name}</strong> — {confirming.name} for{" "}
             <strong>{money(confirming.amount_payable)}</strong>
             {confirming.discount_amount > 0 && (
-              <span className="text-emerald-700">
+              <span className="text-status-success-text">
                 {" "}(after a {money(confirming.discount_amount)} referral discount
                 off {money(confirming.total_value)})
               </span>
@@ -44,13 +44,13 @@ export function ConfirmPaymentModal({
         )}
       </p>
       <div className="mt-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-body font-medium text-ink-secondary">
           Start date
         </label>
         {/* ⚠ RISK 3 — for an OFFER the parent already paid against this date;
             show it so the admin does not silently move the validity window. */}
         {confirming?.offered_by && confirming?.start_date && (
-          <p className="mb-1 text-xs font-medium text-sky-700">
+          <p className="mb-1 text-label font-medium text-primary">
             Offered start: {confirming.start_date}
           </p>
         )}
@@ -58,9 +58,9 @@ export function ConfirmPaymentModal({
           type="date"
           value={confirmStart}
           onChange={(e) => setConfirmStart(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
         />
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="mt-1 text-label text-ink-muted">
           {confirming?.offered_by
             ? "Defaults to the offered start above — change only if needed."
             : "Suggested from when this parent’s current coverage ends — adjust it freely."}

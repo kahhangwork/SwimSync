@@ -11,12 +11,12 @@ const blurOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
 
 export function LowSettingsCard({ low }: { low: LowSettingsState }) {
   return (
-    <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-gray-900">When is a package running low?</h2>
-      <p className="mt-1 text-xs text-gray-500">
+    <div className="mb-6 rounded-card border border-border bg-surface p-4">
+      <h2 className="text-headline font-semibold text-ink">When is a package running low?</h2>
+      <p className="mt-1 text-label text-ink-muted">
         A family is due a renewal offer — and flagged on the Students page — when its package has
       </p>
-      <label className="mt-3 flex flex-wrap items-center gap-1.5 text-sm text-gray-700">
+      <label className="mt-3 flex flex-wrap items-center gap-1.5 text-body text-ink-secondary">
         <input
           value={low.threshold}
           onChange={(e) => low.setThreshold(e.target.value)}
@@ -24,7 +24,7 @@ export function LowSettingsCard({ low }: { low: LowSettingsState }) {
           onKeyDown={blurOnEnter}
           inputMode="numeric"
           disabled={!low.loaded}
-          className="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-sm"
+          className="w-14 rounded-control border border-border-strong px-2 py-1.5 text-center text-body"
           aria-label="Low-package threshold in lessons"
         />
         lessons or fewer left, or expires within
@@ -35,12 +35,12 @@ export function LowSettingsCard({ low }: { low: LowSettingsState }) {
           onKeyDown={blurOnEnter}
           inputMode="numeric"
           disabled={!low.loaded}
-          className="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-sm"
+          className="w-14 rounded-control border border-border-strong px-2 py-1.5 text-center text-body"
           aria-label="Expiry warning window in days"
         />
         days.
       </label>
-      {low.saveError ? <p className="mt-2 text-xs text-red-600">{low.saveError}</p> : null}
+      {low.saveError ? <p className="mt-2 text-label text-status-danger-text">{low.saveError}</p> : null}
     </div>
   );
 }

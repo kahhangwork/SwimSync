@@ -4,8 +4,14 @@
 export function ListNotices({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    // role="alert" is how a driver finds it — never its colour classes, which a
+    // restyle changes (UI restyle 5.3; §7.375). A <p>, because Next's own route
+    // announcer is a role=alert DIV.
+    <p
+      role="alert"
+      className="mb-4 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text"
+    >
       {error}
-    </div>
+    </p>
   );
 }

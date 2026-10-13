@@ -32,7 +32,7 @@ export function BacklogDrawModal({ form }: { form: BacklogDraw }) {
     >
       {backlog && empty && (
         <>
-          <p className="text-sm text-gray-600" data-testid="backlog-empty">
+          <p className="text-body text-ink-secondary" data-testid="backlog-empty">
             Nothing to draw. No lesson marked since{" "}
             <strong>{backlog.packageName}</strong>&rsquo;s start date is waiting
             — each one is already drawn from a package, billed, or outside what
@@ -46,35 +46,35 @@ export function BacklogDrawModal({ form }: { form: BacklogDraw }) {
       {backlog && s && !empty && (
         <>
           {backlog.source === "check" ? (
-            <p className="text-sm text-gray-600">
+            <p className="text-body text-ink-secondary">
               {lessonCount(s.total)} marked since{" "}
               <strong>{backlog.packageName}</strong>&rsquo;s start date{" "}
               {s.total === 1 ? "hasn't" : "haven't"} been drawn from a package
               or billed yet.
             </p>
           ) : (
-            <p className="text-sm text-gray-600">
+            <p className="text-body text-ink-secondary">
               <strong>{backlog.packageName}</strong> is active.{" "}
               {lessonCount(s.total)} since its start date{" "}
               {s.total === 1 ? "was" : "were"} marked before it was, and{" "}
               {s.total === 1 ? "hasn't" : "haven't"} been billed yet.
             </p>
           )}
-          <ul className="mt-2 space-y-0.5 text-xs text-gray-600" data-testid="backlog-summary">
+          <ul className="mt-2 space-y-0.5 text-label text-ink-secondary" data-testid="backlog-summary">
             {s.thisPackage > 0 && <li>{lessonCount(s.thisPackage)} from this package</li>}
             {s.otherPackage > 0 && <li>{lessonCount(s.otherPackage)} from another package of the family</li>}
             {s.adhoc > 0 && <li>{lessonCount(s.adhoc)} no package can cover — these stay ad-hoc</li>}
           </ul>
 
-          <div className="mt-3 max-h-48 overflow-y-auto rounded border border-gray-100">
-            <table className="w-full text-xs">
+          <div className="mt-3 max-h-48 overflow-y-auto rounded border border-border">
+            <table className="w-full text-label">
               <tbody>
                 {backlog.rows.map((r) => (
-                  <tr key={`${r.session_date}:${r.student_id}`} className="border-b border-gray-50 last:border-0">
-                    <td className="px-2 py-1 text-gray-700">{formatSgStamp(r.session_date, DM)}</td>
-                    <td className="px-2 py-1 text-gray-700">{r.student_name}</td>
-                    <td className="px-2 py-1 text-gray-500">{r.class_title}</td>
-                    <td className="px-2 py-1 text-right text-gray-500">{backlogRowFunding(r)}</td>
+                  <tr key={`${r.session_date}:${r.student_id}`} className="border-b border-border last:border-0">
+                    <td className="px-2 py-1 text-ink-secondary">{formatSgStamp(r.session_date, DM)}</td>
+                    <td className="px-2 py-1 text-ink-secondary">{r.student_name}</td>
+                    <td className="px-2 py-1 text-ink-muted">{r.class_title}</td>
+                    <td className="px-2 py-1 text-right text-ink-muted">{backlogRowFunding(r)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -82,10 +82,10 @@ export function BacklogDrawModal({ form }: { form: BacklogDraw }) {
           </div>
 
           {backlog.error && (
-            <p className="mt-3 text-sm text-red-600" role="alert">{backlog.error}</p>
+            <p className="mt-3 text-body text-status-danger-text" role="alert">{backlog.error}</p>
           )}
           {done && (
-            <p className="mt-3 text-sm font-medium text-emerald-700" data-testid="backlog-drawn">
+            <p className="mt-3 text-body font-medium text-status-success-text" data-testid="backlog-drawn">
               {drawResultText(backlog.drawn!)}
             </p>
           )}
@@ -105,7 +105,7 @@ export function BacklogDrawModal({ form }: { form: BacklogDraw }) {
             )}
           </div>
           {!done && (
-            <p className="mt-2 text-[11px] text-gray-400">
+            <p className="mt-2 text-label text-ink-muted">
               Keep as ad-hoc bills them at the next run. Lessons already invoiced
               are never listed — the family pays that invoice.
             </p>

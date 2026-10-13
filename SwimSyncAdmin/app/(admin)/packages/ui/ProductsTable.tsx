@@ -43,15 +43,15 @@ export function ProductsTable({
   return (
     <div className="mb-8">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-gray-900">What you sell</h2>
+        <h2 className="text-headline font-semibold text-ink">What you sell</h2>
         <Button onClick={openProductModal}>Add package</Button>
       </div>
       {loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-body text-ink-muted">Loading…</p>
       ) : products.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
-          <p className="font-medium text-gray-900">No packages defined</p>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-control border border-border bg-surface p-8 text-center">
+          <p className="font-medium text-ink">No packages defined</p>
+          <p className="mt-1 text-body text-ink-muted">
             A package is N lessons at a locked rate — e.g. 10 lessons at
             S$40, valid 12 weeks. Parents request one from the app and pay
             by PayNow; families without one simply stay on monthly invoices.
@@ -73,41 +73,42 @@ export function ProductsTable({
           <Tbody>
             {visibleProducts.map((p) => (
               <Tr key={p.id} className={p.is_active ? "" : "opacity-50"}>
-                <Td className="font-medium text-gray-900">
+                <Td className="font-medium text-ink">
                   {p.name}
                   {!p.is_active && (
-                    <span className="ml-2 text-xs font-normal text-gray-400">
+                    <span className="ml-2 text-label font-normal text-ink-muted">
                       retired
                     </span>
                   )}
                 </Td>
-                <Td className="text-gray-500">
+                <Td className="text-ink-muted">
                   {p.category_name ?? "All classes"}
                 </Td>
-                <Td className="text-gray-500">
+                <Td className="text-ink-muted">
                   {p.single_child ? "One child only" : "Shared across siblings"}
                   {setProductSingleChild && (
                     <button
                       onClick={() => setFlipping(p)}
                       disabled={busy}
-                      className="ml-2 text-xs font-semibold text-sky-700 underline disabled:opacity-50"
+                      className="ml-2 text-label font-semibold text-primary underline disabled:opacity-50"
                     >
                       Change
                     </button>
                   )}
                 </Td>
-                <Td className="text-gray-500">{p.lesson_count}</Td>
-                <Td className="text-gray-500">{money(p.rate_per_lesson)}</Td>
-                <Td className="text-gray-900">
+                <Td className="text-ink-muted">{p.lesson_count}</Td>
+                <Td className="text-ink-muted">{money(p.rate_per_lesson)}</Td>
+                <Td className="text-ink">
                   {money(p.lesson_count * p.rate_per_lesson)}
                 </Td>
-                <Td className="text-gray-500">
+                <Td className="text-ink-muted">
                   {p.validity_weeks} week{p.validity_weeks === 1 ? "" : "s"}
                 </Td>
-                <Td className="text-gray-500">{p.holder_count}</Td>
+                <Td className="text-ink-muted">{p.holder_count}</Td>
                 <Td>
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => setProductActive(p, !p.is_active)}
                     disabled={busy}
                   >
@@ -126,11 +127,11 @@ export function ProductsTable({
       >
         {flipping && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">
+            <p className="text-body text-ink-secondary">
               {flipping.name} becomes{" "}
               <strong>{flipping.single_child ? "shared across siblings" : "one child only"}</strong>.
             </p>
-            <p className="text-sm text-gray-600">
+            <p className="text-body text-ink-secondary">
               Applies to new sales only — packages already sold keep their terms.
             </p>
             <div className="flex justify-end gap-2">
@@ -150,7 +151,7 @@ export function ProductsTable({
           </div>
         )}
       </Modal>
-      <p className="mt-2 text-xs text-gray-500">
+      <p className="mt-2 text-label text-ink-muted">
         A package&rsquo;s lessons, rate and validity can&rsquo;t be edited —
         families already hold them at those terms. To change the price,
         retire the package and create a new one; renewals then buy the new

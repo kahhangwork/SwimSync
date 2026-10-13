@@ -42,19 +42,19 @@ export function SaleModal({
       onClose={() => setSaleModal(false)}
       title="Record a sale"
     >
-      <p className="mb-4 text-sm text-gray-600">
+      <p className="mb-4 text-body text-ink-secondary">
         For a purchase arranged outside the app. The package becomes active
         immediately — record it only once the money has arrived.
       </p>
       <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
             Parent
           </label>
           <select
             value={saleParent}
             onChange={(e) => setSaleParent(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           >
             <option value="">Choose…</option>
             {parents.map((p) => (
@@ -65,13 +65,13 @@ export function SaleModal({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
             Package
           </label>
           <select
             value={saleProduct}
             onChange={(e) => setSaleProduct(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           >
             <option value="">Choose…</option>
             {activeProducts.map((p) => (
@@ -87,22 +87,22 @@ export function SaleModal({
         {needsChild && saleParent && (
           <div>
             {saleChildren.length === 0 ? (
-              <p className="text-sm text-amber-700">
+              <p className="text-body text-status-warning-text">
                 This family has no active child at your business yet.
               </p>
             ) : saleChildren.length === 1 ? (
-              <p className="text-sm text-gray-700" data-testid="sale-child-auto">
+              <p className="text-body text-ink-secondary" data-testid="sale-child-auto">
                 For <strong>{saleChildren[0].name}</strong>
               </p>
             ) : (
               <>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-body font-medium text-ink-secondary">
                   Which child is this for?
                 </label>
                 <select
                   value={saleChild}
                   onChange={(e) => setSaleChild(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
                 >
                   <option value="">Choose…</option>
                   {saleChildren.map((c) => (
@@ -116,16 +116,16 @@ export function SaleModal({
           </div>
         )}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
             Start date
           </label>
           <input
             type="date"
             value={saleStart}
             onChange={(e) => setSaleStart(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-label text-ink-muted">
             Suggested from when this parent&rsquo;s current coverage ends —
             adjust it freely.
           </p>
@@ -133,24 +133,24 @@ export function SaleModal({
         {/* ⚠ RISK 7 — the price the family pays, from preview_package_price,
             so a referral discount is visible before recording the sale. */}
         {salePreview && (
-          <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
+          <div className="rounded-control bg-ground px-3 py-2 text-body">
             {salePreview.discount > 0 ? (
-              <span className="text-gray-700">
+              <span className="text-ink-secondary">
                 Pays <strong>{money(salePreview.payable)}</strong>{" "}
-                <span className="text-emerald-700">
+                <span className="text-status-success-text">
                   (−{money(salePreview.discount)} referral discount off{" "}
                   {money(salePreview.total)})
                 </span>
               </span>
             ) : (
-              <span className="text-gray-700">
+              <span className="text-ink-secondary">
                 Pays <strong>{money(salePreview.payable)}</strong>
               </span>
             )}
           </div>
         )}
         {saleError && (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="text-body text-status-danger-text" role="alert">
             {saleError}
           </p>
         )}

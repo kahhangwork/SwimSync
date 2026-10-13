@@ -157,7 +157,7 @@ export default function PackagesPage() {
       />
 
       <div className="mb-6 flex justify-end">
-        <Button onClick={openGenerateAll} disabled={genBusy || loading}>
+        <Button variant="outline" onClick={openGenerateAll} disabled={genBusy || loading}>
           {genBusy ? "Loading…" : "Generate renewal offers"}
         </Button>
       </div>

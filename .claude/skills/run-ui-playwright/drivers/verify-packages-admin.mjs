@@ -52,7 +52,7 @@
 // literal, so proof 2's arrival was grepped as `status: "pending"` in the served chunk instead.)
 
 import { execFileSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, EXPO, sgLabel } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API = "http://127.0.0.1:54321";
@@ -139,7 +139,8 @@ async function refsUntil(loc, want, ms = 8000) {
   return v;
 }
 const sorted = (...r) => [...r].sort().join(",");
-const errorBanner = page.locator("div.border-red-200.bg-red-50");
+// By role, not colour class (UI restyle 5.3 — the class is styling, §7.375).
+const errorBanner = page.locator('p[role="alert"]');
 
 try {
   await loginAdmin(page, "packages-admin-owner@swimsync.test");
@@ -256,7 +257,10 @@ try {
   const manualNote = await alderRow.getByText("+14 days · manual").waitFor({ timeout: 8000 })
     .then(() => true).catch(() => false);
   check("the held row shows the new expiry and \"+14 days · manual\"",
-    manualNote && (await alderRow.innerText()).includes(sql(`SELECT expires_on FROM parent_packages WHERE id='${PKG_ALDER}'`)),
+    // The expiry is DISPLAYED "6 Oct 2026" since UI restyle 5.3 (S9) — built from
+    // the DB's date with lib.mjs's formatter, never typed.
+    manualNote && (await alderRow.innerText()).includes(
+      sgLabel(sql(`SELECT expires_on FROM parent_packages WHERE id='${PKG_ALDER}'`), { day: "numeric", month: "short", year: "numeric" })),
     flat(await alderRow.innerText().catch(() => "")).slice(0, 200));
 
   // ══ 5. Cancel an ACTIVE package (Alder) ════════════════════════════════════

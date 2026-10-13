@@ -12,22 +12,22 @@ export function ChangeChildModal({ form, busy }: { form: ChangeChildForm; busy: 
     <Modal open={target !== null} onClose={closeChangeChild} title="Change child">
       {target && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-body text-ink-secondary">
             {target.name} ({target.reference_number ?? "no reference"}) is for{" "}
             <strong>{target.student_name ?? "one child"}</strong>. Move it to another of{" "}
             {target.parent_name}&rsquo;s children — only while no lesson has drawn from it.
           </p>
           {options.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-body text-ink-muted">
               This family has no other active child at your business.
             </p>
           ) : (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">New child</label>
+              <label className="mb-1 block text-body font-medium text-ink-secondary">New child</label>
               <select
                 value={childId}
                 onChange={(e) => setChildId(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
               >
                 <option value="">Choose…</option>
                 {options.map((c) => (
@@ -39,7 +39,7 @@ export function ChangeChildModal({ form, busy }: { form: ChangeChildForm; busy: 
             </div>
           )}
           {changeError && (
-            <p className="text-sm text-red-600" role="alert">
+            <p className="text-body text-status-danger-text" role="alert">
               {changeError}
             </p>
           )}

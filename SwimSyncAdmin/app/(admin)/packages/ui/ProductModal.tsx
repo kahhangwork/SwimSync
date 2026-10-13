@@ -53,24 +53,24 @@ export function ProductModal({
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
             Name
           </label>
           <input
             value={pName}
             onChange={(e) => setPName(e.target.value)}
             placeholder="10 Group Lessons"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-body font-medium text-ink-secondary">
             Valid for
           </label>
           <select
             value={pCategory}
             onChange={(e) => setPCategory(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           >
             <option value="">All classes</option>
             {categories.map((c) => (
@@ -82,7 +82,7 @@ export function ProductModal({
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-body font-medium text-ink-secondary">
               Lessons
             </label>
             <input
@@ -90,11 +90,11 @@ export function ProductModal({
               onChange={(e) => setPLessons(e.target.value)}
               inputMode="numeric"
               placeholder="10"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-body font-medium text-ink-secondary">
               Rate (S$)
             </label>
             <input
@@ -102,23 +102,23 @@ export function ProductModal({
               onChange={(e) => setPRate(e.target.value)}
               inputMode="decimal"
               placeholder="40"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-body font-medium text-ink-secondary">
               Weeks valid
             </label>
             <input
               value={pWeeks}
               onChange={(e) => setPWeeks(e.target.value)}
               inputMode="numeric"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
             />
           </div>
         </div>
         {pLessons && pRate && Number(pLessons) > 0 && Number(pRate) > 0 && (
-          <p className="text-sm text-gray-600">
+          <p className="text-body text-ink-secondary">
             Sells for{" "}
             <strong>{money(Number(pLessons) * Number(pRate))}</strong> —{" "}
             {pLessons} lessons at {money(Number(pRate))} each.
@@ -127,10 +127,10 @@ export function ProductModal({
 
         {/* Single-child packages (D1): shared across siblings, or one child only. */}
         <fieldset>
-          <legend className="mb-1 block text-sm font-medium text-gray-700">
+          <legend className="mb-1 block text-body font-medium text-ink-secondary">
             Who can use it
           </legend>
-          <div className="flex flex-col gap-1 text-sm text-gray-700">
+          <div className="flex flex-col gap-1 text-body text-ink-secondary">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
@@ -150,7 +150,7 @@ export function ProductModal({
               One child only
             </label>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-label text-ink-muted">
             {pSingleChild
               ? "Bought for one named child — a sibling's lessons are billed ad-hoc."
               : "Any of the family's children can use its lessons."}
@@ -158,8 +158,8 @@ export function ProductModal({
         </fieldset>
 
         {/* Referral discount override (D4). Off = inherit the tenant default. */}
-        <div className="rounded-lg border border-gray-200 p-3">
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <div className="rounded-card border border-border p-3">
+          <label className="flex items-center gap-2 text-body font-medium text-ink-secondary">
             <input
               type="checkbox"
               checked={pRefOverride}
@@ -168,7 +168,7 @@ export function ProductModal({
             Override referral discount
           </label>
           {!pRefOverride ? (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-label text-ink-muted">
               {tenantReferral.enabled && tenantReferral.type
                 ? `Inherits the tenant default (${discountLabel(tenantReferral.type, tenantReferral.value ?? 0)}).`
                 : "Referrals are off, or no tenant default is set — no discount applies."}
@@ -178,7 +178,7 @@ export function ProductModal({
               <select
                 value={pRefType}
                 onChange={(e) => setPRefType(e.target.value as "percent" | "amount")}
-                className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                className="rounded-control border border-border-strong px-2 py-1 text-body"
               >
                 <option value="percent">Percent (%)</option>
                 <option value="amount">Fixed (S$)</option>
@@ -188,16 +188,16 @@ export function ProductModal({
                 onChange={(e) => setPRefValue(e.target.value)}
                 inputMode="numeric"
                 placeholder="0"
-                className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                className="w-24 rounded-control border border-border-strong px-2 py-1 text-body"
               />
-              <span className="text-xs text-gray-500">
+              <span className="text-label text-ink-muted">
                 0 = no referral discount on this product.
               </span>
             </div>
           )}
         </div>
 
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
+        {formError && <p className="text-body text-status-danger-text">{formError}</p>}
         <div className="flex justify-end gap-2">
           <Button
             variant="outline"

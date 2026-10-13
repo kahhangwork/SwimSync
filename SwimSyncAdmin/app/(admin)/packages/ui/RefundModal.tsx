@@ -31,14 +31,14 @@ export function RefundModal({ form, busy }: { form: RefundForm; busy: boolean })
       title="Record a refund"
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-body text-ink-secondary">
           Record money you have <strong>already sent</strong> to{" "}
           <strong>{refunding?.parent_name}</strong> for{" "}
           <strong>{refunding?.name}</strong>. It comes off Revenue in the month
           of the date below.
         </p>
         <div>
-          <label htmlFor="refund-amount" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="refund-amount" className="mb-1 block text-body font-medium text-ink-secondary">
             Amount refunded (S$)
           </label>
           {/* No figure in the placeholder — nothing is suggested (decided 2026-09-27). */}
@@ -47,14 +47,14 @@ export function RefundModal({ form, busy }: { form: RefundForm; busy: boolean })
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             inputMode="decimal"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
-          <p className="mt-1 text-xs text-gray-500" data-testid="refund-ceiling">
+          <p className="mt-1 text-label text-ink-muted" data-testid="refund-ceiling">
             Up to {money(refunding?.amount_payable ?? 0)} — what the family paid.
           </p>
         </div>
         <div>
-          <label htmlFor="refund-date" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="refund-date" className="mb-1 block text-body font-medium text-ink-secondary">
             Date paid out
           </label>
           <input
@@ -64,23 +64,23 @@ export function RefundModal({ form, busy }: { form: RefundForm; busy: boolean })
             max={todayInSg()}
             min={refunding?.confirmed_at ? toSgDate(refunding.confirmed_at) : undefined}
             onChange={(e) => setRefundedOn(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </div>
         <div>
-          <label htmlFor="refund-note" className="mb-1 block text-sm font-medium text-gray-700">
-            Note <span className="text-gray-400">(optional)</span>
+          <label htmlFor="refund-note" className="mb-1 block text-body font-medium text-ink-secondary">
+            Note <span className="text-ink-muted">(optional)</span>
           </label>
           <input
             id="refund-note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Family moved away"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </div>
         {refundError && (
-          <p className="text-sm text-red-600" role="alert" data-testid="refund-error">
+          <p className="text-body text-status-danger-text" role="alert" data-testid="refund-error">
             {refundError}
           </p>
         )}
@@ -105,14 +105,14 @@ export function ReverseRefundModal({ form, busy }: { form: RefundForm; busy: boo
       onClose={() => setReversing(null)}
       title="Reverse this refund?"
     >
-      <p className="text-sm text-gray-600">
+      <p className="text-body text-ink-secondary">
         The refund of <strong>{money(reversing?.refund.amount ?? 0)}</strong> on{" "}
         {reversing ? formatSgStamp(reversing.refund.refunded_on, DMY) : ""} is kept
         on record as reversed, and no longer counts on Accounting. You can then
         record the correct one.
       </p>
       {reverseError && (
-        <p className="mt-3 text-sm text-red-600" role="alert" data-testid="reverse-error">
+        <p className="mt-3 text-body text-status-danger-text" role="alert" data-testid="reverse-error">
           {reverseError}
         </p>
       )}

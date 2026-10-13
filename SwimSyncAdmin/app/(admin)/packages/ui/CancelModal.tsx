@@ -27,7 +27,7 @@ export function CancelModal({
           : "Cancel this package?"
       }
     >
-      <p className="text-sm text-gray-600">
+      <p className="text-body text-ink-secondary">
         {cancelling?.status === "pending" ? (
           "The request is withdrawn. Nothing was charged."
         ) : (

@@ -75,7 +75,7 @@ export function HeldTable({
   return (
     <div className="mb-8">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold text-gray-900">Who holds one</h2>
+        <h2 className="text-headline font-semibold text-ink">Who holds one</h2>
         <div className="flex items-center gap-2">
           {held.length > 0 && (
             <input
@@ -83,7 +83,7 @@ export function HeldTable({
               placeholder="Search parent, package or ref…"
               value={heldSearch}
               onChange={(e) => setHeldSearch(e.target.value)}
-              className="w-56 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-56 rounded-control border border-border-strong bg-surface px-3 py-2 text-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary"
             />
           )}
           <Button variant="outline" onClick={() => setSaleModal(true)}>
@@ -92,19 +92,19 @@ export function HeldTable({
         </div>
       </div>
       {!loading && capped && (
-        <p className="mb-3 text-sm text-amber-700">
+        <p className="mb-3 text-body text-status-warning-text">
           Showing the first {ROW_LIMIT} packages — the list is truncated. This
           is not expected; contact support if you see it.
         </p>
       )}
       {loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-body text-ink-muted">Loading…</p>
       ) : held.length === 0 ? (
-        <p className="text-sm text-gray-400">
+        <p className="text-body text-ink-muted">
           Nobody holds a package yet.
         </p>
       ) : heldMatches.length === 0 ? (
-        <p className="text-sm text-gray-400">
+        <p className="text-body text-ink-muted">
           No held package matches &ldquo;{heldSearch}&rdquo;.
         </p>
       ) : (
@@ -129,47 +129,47 @@ export function HeldTable({
                 p.expires_on < todayInSg();
               return (
                 <Tr key={p.id}>
-                  <Td className="font-medium text-gray-900">
+                  <Td className="font-medium text-ink">
                     {p.parent_name}
                     {p.children && (
-                      <span className="block text-xs font-normal text-gray-400">
+                      <span className="block text-label font-normal text-ink-muted">
                         {p.children}
                       </span>
                     )}
                   </Td>
-                  <Td className="text-gray-600">
+                  <Td className="text-ink-secondary">
                     {p.name}
-                    <span className="text-gray-400">
+                    <span className="text-ink-muted">
                       {" "}
                       · {p.category_name ?? "all classes"}
                     </span>
                     {p.student_id && (
-                      <span className="block text-xs text-sky-700" data-testid="one-child-label">
+                      <span className="block text-label text-primary" data-testid="one-child-label">
                         {p.student_name ?? "One child"} only
                       </span>
                     )}
                   </Td>
                   {/* Kept here too so a payment can still be reconciled
                       after the request has been confirmed. */}
-                  <Td className="font-mono text-xs text-gray-600">
+                  <Td className="font-mono text-label text-ink-secondary">
                     {p.reference_number ?? "—"}
                   </Td>
                   <Td>
                     {p.status === "active" &&
                     p.live_lessons_remaining !== null ? (
                       <span
-                        className="font-medium text-gray-900"
+                        className="font-medium text-ink"
                         data-testid="live-remaining"
                       >
                         {p.live_lessons_remaining} lesson
                         {p.live_lessons_remaining === 1 ? "" : "s"}
-                        <span className="font-normal text-gray-400">
+                        <span className="font-normal text-ink-muted">
                           {" "}
                           · {money(p.live_value_remaining ?? 0)}
                         </span>
                         {liveDiffers(p) && (
                           <span
-                            className="ml-1 font-normal text-gray-400"
+                            className="ml-1 font-normal text-ink-muted"
                             title="Includes lessons attended but not yet invoiced"
                           >
                             *
@@ -177,33 +177,34 @@ export function HeldTable({
                         )}
                       </span>
                     ) : (
-                      <span className="text-gray-500">
+                      <span className="text-ink-muted">
                         {money(p.value_remaining)}
                       </span>
                     )}
                   </Td>
-                  <Td className="text-gray-500">{p.start_date ?? "—"}</Td>
-                  <Td className="text-gray-500">
-                    {p.expires_on ?? "—"}
+                  {/* DISPLAY only (S9): the raw dates stay what `expired` and the sort read. */}
+                  <Td className="text-ink-muted">{p.start_date ? formatSgStamp(p.start_date, DMY) : "—"}</Td>
+                  <Td className="text-ink-muted">
+                    {p.expires_on ? formatSgStamp(p.expires_on, DMY) : "—"}
                     {expired && (
-                      <span className="ml-1 text-xs text-red-600">
+                      <span className="ml-1 text-label text-status-danger-text">
                         expired
                       </span>
                     )}
                     {p.holiday_extension_days > 0 && (
-                      <div className="mt-0.5 text-xs text-gray-400">
+                      <div className="mt-0.5 text-label text-ink-muted">
                         +{p.holiday_extension_days} day
                         {p.holiday_extension_days === 1 ? "" : "s"} · public holidays
                       </div>
                     )}
                     {p.cancel_extension_days > 0 && (
-                      <div className="mt-0.5 text-xs text-gray-400">
+                      <div className="mt-0.5 text-label text-ink-muted">
                         +{p.cancel_extension_days} day
                         {p.cancel_extension_days === 1 ? "" : "s"} · cancelled lessons
                       </div>
                     )}
                     {p.manual_extension_days > 0 && (
-                      <div className="mt-0.5 text-xs text-gray-400">
+                      <div className="mt-0.5 text-label text-ink-muted">
                         +{p.manual_extension_days} day
                         {p.manual_extension_days === 1 ? "" : "s"} · manual
                       </div>
@@ -248,7 +249,8 @@ export function HeldTable({
                           Extend
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="danger"
+                          size="sm"
                           onClick={() => setCancelling(p)}
                           disabled={busy}
                         >
@@ -277,14 +279,14 @@ export function HeldTable({
         </Table>
       )}
       {visibleHeld.some(liveDiffers) && (
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-label text-ink-muted">
           * Remaining balances are live: lessons attended but not yet invoiced
           are already subtracted. The money itself moves when the month is
           billed.
         </p>
       )}
       {refunds === null && (
-        <p className="mt-1 text-xs text-amber-700" data-testid="refunds-unavailable">
+        <p className="mt-1 text-label text-status-warning-text" data-testid="refunds-unavailable">
           Refund details couldn&rsquo;t load — reload the page before recording a refund.
         </p>
       )}
@@ -321,7 +323,7 @@ function RefundCell({
   const r = refunds!.get(p.id)!;
   return (
     <div className="flex items-center gap-1" data-testid="refund-recorded">
-      <span className="text-xs text-gray-600" title={r.note ?? undefined}>
+      <span className="text-label text-ink-secondary" title={r.note ?? undefined}>
         Refunded {money(r.amount)} on {formatSgStamp(r.refunded_on, DMY)}
       </span>
       {state === "recorded" && (
