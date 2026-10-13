@@ -8,48 +8,46 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import Card from "@/components/Card";
+import { Surface } from "@/components/ui/Surface";
 import { useParentProfile } from "@/features/profile/domain/useParentProfile";
 
 // The parent Profile tab (docs/refactor/BATCH_FGH_PLAN.md, app fence): the markup
 // stays here; the session read and Sign Out live in
 // features/profile/domain/useParentProfile.
+//
+// UI restyle step 3.10 — the same shape as the coach's Settings (step 2.7): no
+// avatar circle, flat cards, 44px menu rows, Sign Out a destructive control behind
+// confirmLogout's confirmation.
 
 export default function ParentProfileScreen() {
   const { session, confirmLogout } = useParentProfile();
 
-  const initials = session?.fullName?.charAt(0) ?? "?";
-
   return (
-    <SafeAreaView className="flex-1 bg-sky-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <ScrollView
         contentContainerClassName="px-5 py-6 pb-10"
         showsVerticalScrollIndicator={false}
       >
-        {/* Avatar */}
-        <View className="items-center mb-8">
-          <View className="w-20 h-20 rounded-full bg-sky-500 items-center justify-center mb-3">
-            <Text className="text-white text-3xl font-bold">{initials}</Text>
-          </View>
-          <Text className="text-xl font-bold text-gray-900">
+        <View className="mb-5">
+          <Text className="text-display font-semibold text-ink">
             {session?.fullName ?? "—"}
           </Text>
-          <Text className="text-sm text-gray-500">{session?.email ?? "—"}</Text>
+          <Text className="text-body-secondary text-ink-secondary mt-0.5">{session?.email ?? "—"}</Text>
         </View>
 
         {/* Account info */}
-        <Card className="mb-4">
-          <Text className="text-base font-bold text-gray-900 mb-3">
+        <Surface className="mb-3">
+          <Text className="text-headline font-semibold text-ink mb-2">
             Account Details
           </Text>
-          <View className="gap-2">
+          <View>
             <Row label="Name"  value={session?.fullName ?? "—"} icon="person-outline" />
             <Row label="Email" value={session?.email ?? "—"}    icon="mail-outline" />
           </View>
-        </Card>
+        </Surface>
 
         {/* Menu items */}
-        <Card className="mb-4">
+        <Surface className="mb-4 py-1">
           <MenuItem
             icon="person-add-outline"
             label="Add Child Profile"
@@ -66,18 +64,19 @@ export default function ParentProfileScreen() {
             onPress={() => router.push("/(parent)/profile/change-password")}
             last
           />
-        </Card>
+        </Surface>
 
-        {/* Logout */}
+        {/* Logout — DESIGN.md's destructive control: secondary shape, Danger
+            text, behind confirmLogout's confirmation. The word is the
+            pressable's direct child (pressByText dispatches on the leaf's
+            parent). */}
         <TouchableOpacity
           onPress={confirmLogout}
-          className="bg-red-50 border border-red-100 rounded-2xl py-4 items-center"
+          className="min-h-11 flex-row items-center justify-center gap-2 rounded-control border border-border-strong bg-surface"
           activeOpacity={0.8}
         >
-          <View className="flex-row items-center gap-2">
-            <Ionicons name="log-out-outline" size={20} color="#dc2626" />
-            <Text className="text-red-600 font-semibold">Sign Out</Text>
-          </View>
+          <Ionicons name="log-out-outline" size={18} color="#b91c1c" />
+          <Text className="text-body font-semibold text-status-danger-text">Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -94,10 +93,10 @@ function Row({
   icon: string;
 }) {
   return (
-    <View className="flex-row items-center gap-3 py-1.5">
-      <Ionicons name={icon as any /* db-any-ok: icon */} size={16} color="#9ca3af" />
-      <Text className="text-sm text-gray-500 w-14">{label}</Text>
-      <Text className="text-sm font-medium text-gray-800 flex-1">{value}</Text>
+    <View className="flex-row items-center gap-3 py-2">
+      <Ionicons name={icon as any /* db-any-ok: icon */} size={16} color="#6b6b6b" />
+      <Text className="text-body text-ink-secondary w-14">{label}</Text>
+      <Text className="text-body font-medium text-ink flex-1">{value}</Text>
     </View>
   );
 }
@@ -117,13 +116,15 @@ function MenuItem({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      className={`flex-row items-center gap-3 py-3.5 ${
-        !last ? "border-b border-gray-100" : ""
-      }`}
+      className={
+        last
+          ? "min-h-11 flex-row items-center gap-3 py-3"
+          : "min-h-11 flex-row items-center gap-3 py-3 border-b border-divider"
+      }
     >
-      <Ionicons name={icon as any /* db-any-ok: icon */} size={20} color="#6b7280" />
-      <Text className="flex-1 text-sm text-gray-700">{label}</Text>
-      <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+      <Ionicons name={icon as any /* db-any-ok: icon */} size={20} color="#525252" />
+      <Text className="flex-1 text-body text-ink">{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color="#6b6b6b" />
     </TouchableOpacity>
   );
 }

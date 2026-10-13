@@ -9,7 +9,8 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import PrimaryButton from "@/components/PrimaryButton";
+import { Surface } from "@/components/ui/Surface";
+import { Button } from "@/components/ui/Button";
 import { useJoinTenant } from "@/features/join-tenant/domain/useJoinTenant";
 
 /**
@@ -26,6 +27,10 @@ import { useJoinTenant } from "@/features/join-tenant/domain/useJoinTenant";
  *
  * The markup stays here (docs/refactor/BATCH_FGH_PLAN.md, app fence); the code and
  * the redeem live in features/join-tenant/domain/useJoinTenant.
+ *
+ * UI restyle step 3.10: Ground and Ink in place of slate, a sentence-case field
+ * label, DESIGN.md's input and button. The code field, the Join press and its
+ * loading state are unchanged.
  */
 export default function JoinTenantScreen() {
   const {
@@ -36,61 +41,61 @@ export default function JoinTenantScreen() {
   } = useJoinTenant();
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
+    <SafeAreaView className="flex-1 bg-ground">
       <ScrollView contentContainerClassName="p-5">
         <TouchableOpacity
           onPress={() => router.back()}
-          className="mb-4 flex-row items-center"
+          className="mb-4 -ml-1 min-h-11 flex-row items-center self-start"
         >
-          <Ionicons name="chevron-back" size={22} color="#0f172a" />
-          <Text className="ml-1 text-base text-slate-900">Back</Text>
+          <Ionicons name="chevron-back" size={22} color="#2563eb" />
+          <Text className="ml-1 text-body font-semibold text-primary">Back</Text>
         </TouchableOpacity>
 
-        <Text className="text-2xl font-bold text-slate-900">
+        <Text className="text-display font-semibold text-ink">
           Join your coach
         </Text>
-        <Text className="mt-2 text-base text-slate-600">
+        <Text className="mt-2 text-body text-ink-secondary">
           Your coach or swim school will give you a join code. Enter it here to
           add your children to their classes.
         </Text>
 
         <View className="mt-6">
-          <Text className="mb-1 text-xs font-semibold text-slate-500">
-            JOIN CODE
+          <Text className="mb-1.5 text-body font-medium text-ink">
+            Join code
           </Text>
           <TextInput
             value={code}
             onChangeText={setCode}
             placeholder="SWIM-1234 or REF-ABCDE"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor="#6b6b6b"
             autoCapitalize="characters"
             autoCorrect={false}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-lg tracking-widest text-slate-900"
+            className="min-h-11 rounded-control border border-border-strong bg-surface px-3 text-headline tracking-widest text-ink"
           />
-          <Text className="mt-2 text-xs text-slate-500">
+          <Text className="mt-1.5 text-body-secondary text-ink-secondary">
             A join code (SWIM-1234) or a friend&rsquo;s referral code (REF-ABCDE).
             Capitals and spaces don&rsquo;t matter.
           </Text>
         </View>
 
         <View className="mt-6">
-          <PrimaryButton
+          <Button
             label={loading ? "Joining…" : "Join"}
             onPress={handleJoin}
             disabled={loading}
           />
         </View>
 
-        <View className="mt-8 rounded-2xl border border-slate-200 bg-white p-4">
-          <Text className="text-sm font-semibold text-slate-900">
+        <Surface className="mt-8">
+          <Text className="text-body font-semibold text-ink">
             Don&rsquo;t have a code?
           </Text>
-          <Text className="mt-1 text-sm text-slate-600">
+          <Text className="mt-1 text-body text-ink-secondary">
             Ask your coach or swim school for it. Joining doesn&rsquo;t enrol
             your child in a class on its own — they&rsquo;ll assign the class
             once you&rsquo;ve added your child&rsquo;s details.
           </Text>
-        </View>
+        </Surface>
       </ScrollView>
     </SafeAreaView>
   );
