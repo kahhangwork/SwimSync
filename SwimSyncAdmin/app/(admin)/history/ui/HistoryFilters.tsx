@@ -12,7 +12,7 @@ type Props = {
 };
 
 const inputClass =
-  "rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400";
+  "rounded-control border border-border-strong bg-surface px-3 py-2.5 text-body focus:outline-none focus:ring-2 focus:ring-primary";
 
 export function HistoryFilters({
   entityFilter,
@@ -26,7 +26,7 @@ export function HistoryFilters({
 }: Props) {
   return (
     <div className="mb-4 flex flex-wrap items-end gap-3">
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-500">
+      <label className="flex flex-col gap-1 text-label font-medium text-ink-muted">
         Type
         <select
           value={entityFilter}
@@ -41,7 +41,7 @@ export function HistoryFilters({
           ))}
         </select>
       </label>
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-500">
+      <label className="flex flex-col gap-1 text-label font-medium text-ink-muted">
         From
         <input
           type="date"
@@ -51,7 +51,7 @@ export function HistoryFilters({
           className={inputClass}
         />
       </label>
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-500">
+      <label className="flex flex-col gap-1 text-label font-medium text-ink-muted">
         To
         <input
           type="date"
@@ -65,7 +65,7 @@ export function HistoryFilters({
         <button
           type="button"
           onClick={clearFilters}
-          className="px-3 py-2.5 text-sm font-medium text-sky-600 hover:text-sky-700 hover:underline"
+          className="px-3 py-2.5 text-body font-medium text-primary hover:text-primary-hover hover:underline"
         >
           Clear filters
         </button>

@@ -28,7 +28,7 @@ export default function HistoryPage() {
         subtitle="Who changed what, and when — for resolving a dispute"
       />
 
-      <p className="mb-4 max-w-2xl text-xs text-gray-500">
+      <p className="mb-4 max-w-2xl text-label text-ink-muted">
         A record of edits across your business — attendance, students, classes and
         more. Not a complete legal audit: some actions (a removed admin&apos;s
         history, a system data-fix) are not shown, so a gap here does not prove
@@ -47,14 +47,14 @@ export default function HistoryPage() {
       />
 
       {h.loadError && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-3 rounded-card border border-status-danger-border bg-status-danger-bg px-4 py-3 text-body text-status-danger-text">
           Could not load the history: {h.loadError}. The list below is incomplete —
           do not read it as the full trail.
         </div>
       )}
 
       {!h.loading && !h.loadError && h.rows.length === ROW_LIMIT && (
-        <p className="mb-3 text-sm text-amber-700">
+        <p className="mb-3 text-body text-status-warning-text">
           Showing the {ROW_LIMIT} most recent changes. Narrow the date range or
           type to see earlier ones.
         </p>
