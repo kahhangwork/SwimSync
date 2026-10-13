@@ -69,11 +69,11 @@ export function StudentMoveSection({
   const visibleStudents = studentSort.apply(students);
 
   return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-gray-900">
+      <div data-platform-card className="rounded-card border border-border bg-surface p-4">
+        <h2 className="text-body font-semibold text-ink">
           Move a student to another business
         </h2>
-        <p className="mt-1 mb-3 text-sm text-gray-600">
+        <p className="mt-1 mb-3 text-body text-ink-secondary">
           For when a parent entered the wrong join code. Moving closes any active
           class enrolment — attendance and billing history stay with the business
           that recorded them.
@@ -85,18 +85,18 @@ export function StudentMoveSection({
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSearch()}
             placeholder="Search a child's name"
-            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            className="flex-1 rounded-control border border-border-strong px-3 py-2 text-body"
           />
           <button
             onClick={onSearch}
-            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+            className="rounded-control bg-primary px-4 py-2 text-body font-medium text-white hover:bg-primary-hover"
           >
             Search
           </button>
         </div>
 
         {message && (
-          <div className="mb-3 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          <div className="mb-3 rounded-card bg-status-info-bg px-3 py-2 text-body text-status-info-text">
             {message}
           </div>
         )}
@@ -131,7 +131,7 @@ export function StudentMoveSection({
                       onChange={(e) =>
                         e.target.value && onMove(s.id, e.target.value)
                       }
-                      className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                      className="rounded-control border border-border-strong px-2 py-1 text-body"
                     >
                       <option value="">
                         {moving === s.id ? "Moving…" : "Choose…"}

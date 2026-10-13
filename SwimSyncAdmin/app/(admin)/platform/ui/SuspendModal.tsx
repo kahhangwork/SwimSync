@@ -42,7 +42,7 @@ export function SuspendModal({
           onClose={onClose}
         >
           {suspendModal?.suspended ? (
-            <p className="mb-4 text-sm text-gray-700">
+            <p className="mb-4 text-body text-ink-secondary">
               Staff logins come back and the app lights up again for this
               business&apos;s families. Staff who were individually disabled
               before the suspension stay disabled.
@@ -51,7 +51,7 @@ export function SuspendModal({
             /* Accepted consequence 1's exact shape (WAVE_5_PLAN.md): the
                outstanding-receivables position is the owner's problem BEFORE
                suspension, and the dialog says so out loud. */
-            <p className="mb-4 text-sm text-gray-700">
+            <p className="mb-4 text-body text-ink-secondary">
               The app goes dark for this business&apos;s staff and families:
               staff logins are blocked, parents stop seeing this
               business&apos;s data (a family with another business keeps that
@@ -64,7 +64,7 @@ export function SuspendModal({
             </p>
           )}
           {suspendError && (
-            <p className="mb-3 text-sm font-medium text-red-600">
+            <p className="mb-3 text-body font-medium text-status-danger-text">
               {suspendError}
             </p>
           )}
@@ -72,10 +72,13 @@ export function SuspendModal({
             <button
               onClick={onConfirm}
               disabled={suspendBusy}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${
+              // Suspend draws as destructive (Danger text on a secondary
+              // button); Unsuspend is the primary. Only classes changed — the
+              // handler is untouched (plan 5.29 RISK 4).
+              className={`h-9 rounded-control border px-4 text-body font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
                 suspendModal?.suspended
-                  ? "bg-sky-500 hover:bg-sky-600"
-                  : "bg-red-600 hover:bg-red-700"
+                  ? "border-transparent bg-primary text-white hover:bg-primary-hover"
+                  : "border-border-strong bg-surface text-status-danger-text hover:bg-status-danger-bg"
               }`}
             >
               {suspendBusy
@@ -88,7 +91,7 @@ export function SuspendModal({
             </button>
             <button
               onClick={onClose}
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+              className="rounded-control border border-border bg-surface px-4 py-2 text-body font-medium text-ink-secondary"
             >
               Cancel
             </button>

@@ -39,12 +39,12 @@ export function NewBusinessForm({
   return (
                   <form
             onSubmit={onSubmit}
-            className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4"
+            className="mb-4 rounded-card border border-border bg-ground p-4"
           >
-            <h3 className="text-sm font-semibold text-gray-900">
+            <h3 className="text-body font-semibold text-ink">
               Create a business
             </h3>
-            <p className="mt-1 text-xs text-gray-600">
+            <p className="mt-1 text-label text-ink-secondary">
               This creates the business and emails its admin a link to set their
               password. The business is live — and its join code works — as soon
               as it is created.
@@ -52,7 +52,7 @@ export function NewBusinessForm({
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-label font-medium text-ink-secondary mb-1">
                   Business name
                 </label>
                 <input
@@ -61,11 +61,11 @@ export function NewBusinessForm({
                     setNewBiz({ ...newBiz, businessName: e.target.value })
                   }
                   placeholder="Dolphin Swim Academy"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-body"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-label font-medium text-ink-secondary mb-1">
                   Admin&apos;s name
                 </label>
                 <input
@@ -74,7 +74,7 @@ export function NewBusinessForm({
                     setNewBiz({ ...newBiz, adminName: e.target.value })
                   }
                   placeholder="Marcus Tan"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-body"
                 />
               </div>
               {/* THERE IS NO "TYPE" FIELD, and that is deliberate (2026-08-01).
@@ -89,7 +89,7 @@ export function NewBusinessForm({
                   a rate is a choice, a STAFF coach without one is the mistake.
                   See PRD §7.13 — the distinction is data, not a rule. */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-label font-medium text-ink-secondary mb-1">
                   Admin&apos;s email
                 </label>
                 <input
@@ -99,11 +99,11 @@ export function NewBusinessForm({
                     setNewBiz({ ...newBiz, adminEmail: e.target.value })
                   }
                   placeholder="marcus@example.com"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-body"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-label font-medium text-ink-secondary mb-1">
                   Confirm email
                 </label>
                 <input
@@ -116,7 +116,7 @@ export function NewBusinessForm({
                     })
                   }
                   placeholder="marcus@example.com"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-body"
                 />
               </div>
             </div>
@@ -128,20 +128,20 @@ export function NewBusinessForm({
                 question with a real consequence, unlike the "Type" field that
                 used to sit above it (removed 2026-08-01: nothing branched on it
                 and no query could derive it). */}
-            <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+            <label className="mt-3 flex items-center gap-2 text-body text-ink-secondary">
               <input
                 type="checkbox"
                 checked={newBiz.isCoach}
                 onChange={(e) =>
                   setNewBiz({ ...newBiz, isCoach: e.target.checked })
                 }
-                className="rounded border-gray-300"
+                className="rounded-control border-border-strong"
               />
               This person also teaches (give them a coach account too)
             </label>
 
             {newBizError && (
-              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              <p className="mt-3 rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">
                 {newBizError}
               </p>
             )}
@@ -150,14 +150,14 @@ export function NewBusinessForm({
               <button
                 type="submit"
                 disabled={creating}
-                className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-60"
+                className="rounded-control bg-primary px-4 py-2 text-body font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
               >
                 {creating ? "Creating…" : "Create & invite"}
               </button>
               <button
                 type="button"
                 onClick={onCancel}
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+                className="rounded-control border border-border bg-surface px-4 py-2 text-body font-medium text-ink-secondary"
               >
                 Cancel
               </button>

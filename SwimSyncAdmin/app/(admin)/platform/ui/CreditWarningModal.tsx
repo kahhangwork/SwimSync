@@ -44,7 +44,7 @@ export function CreditWarningModal({
       >
         {pendingMove && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">
+            <p className="text-body text-ink-secondary">
               {pendingMove.checkFailed ? (
                 <>
                   Couldn&apos;t check whether{" "}
@@ -67,13 +67,13 @@ export function CreditWarningModal({
             <div className="flex gap-3">
               <button
                 onClick={() => onConfirm(pendingMove.studentId, pendingMove.tenantId)}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                className="h-9 rounded-control border border-border-strong bg-surface px-4 text-body font-semibold text-status-danger-text hover:bg-status-danger-bg"
               >
                 Move anyway
               </button>
               <button
                 onClick={onCancel}
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+                className="rounded-control border border-border bg-surface px-4 py-2 text-body font-medium text-ink-secondary"
               >
                 Cancel
               </button>

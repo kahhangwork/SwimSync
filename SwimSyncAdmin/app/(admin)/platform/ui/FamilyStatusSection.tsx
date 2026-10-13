@@ -48,9 +48,9 @@ export function FamilyStatusSection({
   const visibleFamilies = familySort.apply(families);
 
   return (
-      <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-5">
-        <h2 className="mb-1 text-lg font-semibold text-gray-900">Family status</h2>
-        <p className="mb-4 text-sm text-gray-500">
+      <div data-platform-card className="mt-8 rounded-card border border-border bg-surface p-4">
+        <h2 className="mb-1 text-lg font-semibold text-ink">Family status</h2>
+        <p className="mb-4 text-body text-ink-muted">
           Where a family stands at each business they deal with. Read-only —
           activity is the business&apos;s decision, not the platform&apos;s.
         </p>
@@ -61,18 +61,18 @@ export function FamilyStatusSection({
             onChange={(e) => setFamSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSearch()}
             placeholder="Search a parent's name or email"
-            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            className="flex-1 rounded-control border border-border-strong px-3 py-2 text-body"
           />
           <button
             onClick={onSearch}
-            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+            className="rounded-control bg-primary px-4 py-2 text-body font-medium text-white hover:bg-primary-hover"
           >
             Search
           </button>
         </div>
 
         {famMessage && (
-          <div className="mb-3 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          <div className="mb-3 rounded-card bg-status-info-bg px-3 py-2 text-body text-status-info-text">
             {famMessage}
           </div>
         )}
@@ -89,23 +89,23 @@ export function FamilyStatusSection({
               {visibleFamilies.map((f, i) => (
                 <Tr key={`${f.email}:${f.tenant_name}:${i}`}>
                   <Td>
-                    <div className="font-medium text-gray-900">{f.parent_name}</div>
-                    <div className="text-xs text-gray-500">{f.email}</div>
+                    <div className="font-medium text-ink">{f.parent_name}</div>
+                    <div className="text-label text-ink-muted">{f.email}</div>
                   </Td>
                   <Td>{f.tenant_name}</Td>
                   <Td>{f.family_active ? "Active" : "Inactive"}</Td>
                   <Td>
                     {f.children.length === 0 ? (
-                      <span className="text-gray-400">none</span>
+                      <span className="text-ink-muted">none</span>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {f.children.map((c) => (
                           <span
                             key={c.full_name}
-                            className={`rounded px-1.5 py-0.5 text-xs ${
+                            className={`rounded px-1.5 py-0.5 text-label ${
                               c.is_active
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-gray-100 text-gray-500 line-through"
+                                ? "bg-status-success-bg text-status-success-text"
+                                : "bg-status-neutral-bg text-ink-muted line-through"
                             }`}
                           >
                             {c.full_name}

@@ -120,7 +120,8 @@ page.on("pageerror", (e) => pageErrors.push(e.message));
 
 // ── Page handles (each card scoped by its own heading) ──────────────────────
 const card = (heading) =>
-  page.locator("div.rounded-2xl", { has: page.getByRole("heading", { name: heading }) });
+  // A data marker, not a radius class — UI restyle 5.29 changed rounded-2xl (§7.375).
+  page.locator("[data-platform-card]", { has: page.getByRole("heading", { name: heading }) });
 const bizCard = card(/^Businesses$/);
 const strandedCard = card(/^Signed up but not in any business/);
 const moveCard = card(/^Move a student to another business$/);

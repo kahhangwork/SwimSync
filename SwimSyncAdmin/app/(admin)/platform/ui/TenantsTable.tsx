@@ -13,6 +13,7 @@
 // parents but operable by nobody, which is the fault this page exists to
 // surface — so it sorts to the top, not into alphabetical order.
 
+import { Tag } from "@/components/ui/Tag";
 import {
   Table,
   Thead,
@@ -84,9 +85,7 @@ export function TenantsTable({
                     <div className="flex items-center gap-2">
                       <span>{t.display_name}</span>
                       {t.suspended_at && (
-                        <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">
-                          suspended
-                        </span>
+                        <Tag tone="danger">suspended</Tag>
                       )}
                       <button
                         onClick={() =>
@@ -96,7 +95,11 @@ export function TenantsTable({
                             suspended: t.suspended_at !== null,
                           })
                         }
-                        className="text-xs font-medium text-sky-600 hover:text-sky-700"
+                        className={
+                          t.suspended_at
+                            ? "text-label font-medium text-primary underline-offset-2 hover:underline"
+                            : "text-label font-medium text-status-danger-text underline-offset-2 hover:underline"
+                        }
                       >
                         {t.suspended_at ? "Unsuspend" : "Suspend"}
                       </button>
@@ -110,45 +113,39 @@ export function TenantsTable({
                         backstop for any orphan that escapes that. */}
                     {t.admin_status === "none" ? (
                       <div className="flex items-center gap-2">
-                        <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">
-                          no admin
-                        </span>
+                        <Tag tone="danger">no admin</Tag>
                         {/* The LOST-OWNER case: "no admin" means no OWNER — the
                             business may still hold live co-admins to promote,
                             and this button is the only remedy that isn't SQL. */}
                         <button
                           onClick={() => onChangeOwner(t)}
-                          className="text-xs font-medium text-sky-600 hover:text-sky-700"
+                          className="text-label font-medium text-primary underline-offset-2 hover:underline"
                         >
                           Set owner
                         </button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-700">
+                        <span className="text-label text-ink-secondary">
                           {t.admin_email}
                         </span>
                         {t.admin_status === "invited" ? (
                           <>
-                            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
-                              invited
-                            </span>
+                            <Tag tone="info">invited</Tag>
                             <button
                               onClick={() => onResend(t.tenant_id)}
                               disabled={resending === t.tenant_id}
-                              className="text-xs font-medium text-sky-600 hover:text-sky-700 disabled:opacity-50"
+                              className="text-label font-medium text-primary underline-offset-2 hover:underline disabled:text-ink-muted"
                             >
                               {resending === t.tenant_id ? "Sending…" : "Resend"}
                             </button>
                           </>
                         ) : (
-                          <span className="rounded bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700">
-                            active
-                          </span>
+                          <Tag tone="success">active</Tag>
                         )}
                         <button
                           onClick={() => onChangeOwner(t)}
-                          className="text-xs font-medium text-sky-600 hover:text-sky-700"
+                          className="text-label font-medium text-primary underline-offset-2 hover:underline"
                         >
                           Change owner
                         </button>
@@ -173,7 +170,7 @@ export function TenantsTable({
                         the browser scan that briefly replaced this column was
                         based on a backwards reading of the RPC. */}
                     {t.staff_without_rate > 0 && (
-                      <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                      <span className="ml-2 rounded bg-status-warning-bg px-1.5 py-0.5 text-label font-medium text-status-warning-text">
                         {t.staff_without_rate} unpaid
                       </span>
                     )}
@@ -185,7 +182,7 @@ export function TenantsTable({
                     {t.last_attendance_date ? (
                       formatSgDate(t.last_attendance_date)
                     ) : (
-                      <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">
+                      <span className="rounded bg-status-danger-bg px-1.5 py-0.5 text-label font-semibold text-status-danger-text">
                         never
                       </span>
                     )}
@@ -197,12 +194,12 @@ export function TenantsTable({
                         row at all (PRD §7.5), and the rule that derives those
                         lives in lessonDates.ts. See the migration header. */}
                     {t.sessions_this_month === 0 ? (
-                      <span className="text-gray-400">none recorded</span>
+                      <span className="text-ink-muted">none recorded</span>
                     ) : (
                       <span
                         className={
                           t.sessions_fully_marked < t.sessions_this_month
-                            ? "font-medium text-amber-700"
+                            ? "font-medium text-status-warning-text"
                             : ""
                         }
                       >
@@ -214,13 +211,13 @@ export function TenantsTable({
                     {/* "never run" and "open" mean different things to an
                         operator and must not collapse into one word. */}
                     {t.last_month_billing === "sealed" && (
-                      <span className="text-emerald-700">sealed</span>
+                      <span className="text-status-success-text">sealed</span>
                     )}
                     {t.last_month_billing === "open" && (
-                      <span className="text-amber-700">open</span>
+                      <span className="text-status-warning-text">open</span>
                     )}
                     {t.last_month_billing === "never run" && (
-                      <span className="text-gray-400">never run</span>
+                      <span className="text-ink-muted">never run</span>
                     )}
                   </Td>
                 </Tr>

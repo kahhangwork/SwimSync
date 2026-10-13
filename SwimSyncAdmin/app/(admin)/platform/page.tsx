@@ -116,7 +116,7 @@ export default function PlatformPage() {
   // `allowed === null` is a THIRD state, not a falsy boolean. Collapsing these
   // two returns into one `if (!allowed)` flashes the refusal card at the platform
   // admin on every load, while the gate is still deciding.
-  if (allowed === null) return <div className="p-6 text-gray-500">Loading…</div>;
+  if (allowed === null) return <div className="p-6 text-ink-muted">Loading…</div>;
 
   if (!allowed) return <NotPlatformAdmin />;
 
@@ -128,7 +128,7 @@ export default function PlatformPage() {
       />
 
       {loadError && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="mb-6 rounded-card border border-status-danger-border bg-status-danger-bg p-3 text-body text-status-danger-text">
           Could not load the overview: {loadError}
         </div>
       )}
@@ -143,11 +143,11 @@ export default function PlatformPage() {
         />
       )}
 
-      <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-4">
+      <div data-platform-card className="mb-8 rounded-card border border-border bg-surface p-4">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">Businesses</h2>
-            <p className="mt-1 mb-3 text-sm text-gray-600">
+            <h2 className="text-body font-semibold text-ink">Businesses</h2>
+            <p className="mt-1 mb-3 text-body text-ink-secondary">
               Counts are computed per business in the database, so they never mix
               across tenants and never truncate.
             </p>
@@ -157,7 +157,7 @@ export default function PlatformPage() {
               setShowNew(true);
               setNewBizError(null);
             }}
-            className="shrink-0 rounded-xl bg-sky-500 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-600"
+            className="shrink-0 rounded-control bg-primary px-3 py-2 text-body font-semibold text-white hover:bg-primary-hover"
           >
             New business
           </button>

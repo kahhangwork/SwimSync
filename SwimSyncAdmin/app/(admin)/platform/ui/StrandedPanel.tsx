@@ -27,11 +27,11 @@ export function StrandedPanel({ stranded }: { stranded: StrandedParent[] }) {
   const visibleStranded = strandedSort.apply(stranded);
 
   return (
-              <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <h2 className="text-sm font-semibold text-gray-900">
+              <div data-platform-card className="mb-8 rounded-card border border-status-warning-border bg-status-warning-bg p-4">
+          <h2 className="text-body font-semibold text-ink">
             Signed up but not in any business ({stranded.length})
           </h2>
-          <p className="mt-1 mb-3 text-sm text-gray-700">
+          <p className="mt-1 mb-3 text-body text-ink-secondary">
             These parents registered but never entered a join code, so no
             business can see them. They are stuck until someone gives them one.
           </p>

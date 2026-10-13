@@ -43,7 +43,7 @@ export function OwnerModal({
           open={ownerModal !== null}
           onClose={onClose}
         >
-          <p className="mb-3 text-sm text-gray-700">
+          <p className="mb-3 text-body text-ink-secondary">
             The owner is the one account that can manage this business&apos;s
             admins. Ownership moves immediately;{" "}
             {ownerModal?.currentEmail ? (
@@ -56,9 +56,9 @@ export function OwnerModal({
             )}
           </p>
           {ownerLoading ? (
-            <p className="mb-4 text-sm text-gray-400">Loading admins…</p>
+            <p className="mb-4 text-body text-ink-muted">Loading admins…</p>
           ) : ownerAdmins.length === 0 && !ownerError ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-body text-ink-muted">
               No admin accounts to choose from — this business has no
               co-admins. Invite one first.
             </p>
@@ -66,7 +66,7 @@ export function OwnerModal({
             <select
               value={ownerChoice}
               onChange={(e) => onChoose(e.target.value)}
-              className="mb-4 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+              className="mb-4 w-full rounded-control border border-border-strong px-3 py-2 text-body"
             >
               <option value="">Choose the new owner…</option>
               {ownerAdmins.map((a) => (
@@ -83,13 +83,13 @@ export function OwnerModal({
             </select>
           )}
           {ownerError && (
-            <p className="mb-3 text-sm font-medium text-red-600">{ownerError}</p>
+            <p className="mb-3 text-body font-medium text-status-danger-text">{ownerError}</p>
           )}
           <div className="flex gap-3">
             <button
               onClick={onConfirm}
               disabled={!ownerChoice || ownerSaving}
-              className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-60"
+              className="rounded-control bg-primary px-4 py-2 text-body font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
             >
               {ownerSaving
                 ? "Transferring…"
@@ -100,7 +100,7 @@ export function OwnerModal({
             </button>
             <button
               onClick={onClose}
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+              className="rounded-control border border-border bg-surface px-4 py-2 text-body font-medium text-ink-secondary"
             >
               Cancel
             </button>

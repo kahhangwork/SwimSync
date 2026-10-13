@@ -16,7 +16,7 @@ export function NotPlatformAdmin() {
   return (
     <div>
       <PageHeader title="Platform" subtitle="Cross-tenant operations" />
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
+      <div className="rounded-card border border-border bg-surface p-6 text-ink-secondary">
         This page is for the SwimSync platform admin. Your account
         administers a single business, which is what every other page shows.
       </div>

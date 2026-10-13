@@ -31,11 +31,11 @@ export function ProvisionedBanner({
   onDismiss: () => void;
 }) {
   return (
-              <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
-          <h3 className="text-sm font-semibold text-green-900">
+              <div className="mb-6 rounded-card border border-status-success-border bg-status-success-bg p-4">
+          <h3 className="text-body font-semibold text-status-success-text">
             {provisioned.businessName} is set up
           </h3>
-          <p className="mt-1 text-sm text-green-800">
+          <p className="mt-1 text-body text-status-success-text">
             Join code:{" "}
             <span className="font-mono font-semibold">
               {provisioned.joinCode}
@@ -43,7 +43,7 @@ export function ProvisionedBanner({
             — parents enter this in the app to join.
           </p>
           {provisioned.emailSent ? (
-            <p className="mt-1 text-sm text-green-800">
+            <p className="mt-1 text-body text-status-success-text">
               An invite to set a password was sent to{" "}
               <strong>{provisioned.adminEmail}</strong>.
             </p>
@@ -51,22 +51,22 @@ export function ProvisionedBanner({
             /* The email IS the deliverable here — unlike an invoice email, a
                missing invite means the owner has no way in at all. So this must
                never read as a plain success. */
-            <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
-              <p className="text-sm font-semibold text-amber-900">
+            <div className="mt-2 rounded-card border border-status-warning-border bg-status-warning-bg p-3">
+              <p className="text-body font-semibold text-status-warning-text">
                 No invite email was sent.
               </p>
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="mt-1 text-body text-status-warning-text">
                 Send this one-time link to <strong>{provisioned.adminEmail}</strong>{" "}
                 yourself — they cannot sign in until they use it:
               </p>
-              <code className="mt-2 block break-all rounded bg-white p-2 text-xs text-gray-800">
+              <code className="mt-2 block break-all rounded bg-surface p-2 text-label text-ink">
                 {provisioned.inviteLink}
               </code>
             </div>
           )}
           <button
             onClick={onDismiss}
-            className="mt-3 text-xs font-medium text-green-800 hover:text-green-900"
+            className="mt-3 text-label font-medium text-status-success-text hover:text-status-success-text"
           >
             Dismiss
           </button>
