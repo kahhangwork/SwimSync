@@ -1727,8 +1727,9 @@ screen reader announces "button". Found in UI restyle 5.0 (shared chrome), left 
 (`getByRole("button", { name: "Close" })` — a case-insensitive SUBSTRING match) find two buttons — the modal's own
 Close and the X — and strict mode fails. `verify-class-admin.mjs` presses a "Close" button the same way.
 
-**Fix:** pass `exact: true` on those two drivers' "Close" lookups first, then `aria-label="Close"` on the X (a name like
-"Close dialog" still substring-matches). Run `--only package-draw-at-marking` and `--only class-admin`. Not visual-only.
+**Fix:** give the X a name that does not contain "close" — `aria-label="Dismiss"` — so both drivers still resolve one
+button (any name containing "Close", exact or not, collides with a footer Close). Run `--only package-draw-at-marking`
+and `--only class-admin`. Not visual-only.
 
 ### A credit note's amount has no positivity check — **S** — _filed 2026-10-13_
 `credit_notes.amount` is `NUMERIC(10,2) NOT NULL` with **no `CHECK (amount > 0)`** (`20260309000100_initial_schema.sql`).
