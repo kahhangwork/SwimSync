@@ -228,3 +228,43 @@ Deno.test("sgDateOfStamp: from 08:00 SGT on, the UTC and SGT dates agree; junk i
   assertEquals(sgDateOfStamp("2026-11-15T00:00:00+00:00"), "2026-11-15");
   assertEquals(sgDateOfStamp("not a date"), null);
 });
+
+// ── Email-safe rendering (UI restyle Phase 6, ⚠ RISK 7) ────────────────────
+// Every variant carries the amount, a link and the tenant's name, in inline CSS
+// only, with a Geist family that falls back to a system font (mail clients never
+// load Geist). The header is the tenant's: SwimSync appears only in the footer.
+
+const BANNED_IN_EMAIL = ["var(", "display:flex", "display:grid", "<link", "@font-face", "@import", "<style"];
+
+function assertEmailSafe(html: string, mustContain: string[]) {
+  for (const s of mustContain) assertStringIncludes(html, s);
+  for (const b of BANNED_IN_EMAIL) assert(!html.includes(b), `email must not contain ${b}`);
+  const families = [...html.matchAll(/font-family:([^;"]+)/g)].map((m) => m[1]);
+  assert(families.length > 0, "no font-family in the email");
+  for (const f of families) {
+    assert(f.startsWith("Geist,"), `font-family must start with Geist: ${f}`);
+    assert(/sans-serif\s*$/.test(f), `font-family must end in a system fallback: ${f}`);
+  }
+  const header = html.slice(0, html.indexOf("<h1"));
+  assert(!header.includes("SwimSync"), "SwimSync must not head a tenant's email");
+}
+
+Deno.test("package emails: every variant is email-safe and complete", () => {
+  const payUrl = "https://swimsync.sg/package/deadbeefdeadbeefdeadbeefdeadbeef";
+  const discounted: PackageEmailData = { ...base, discountAmount: 40, amountPayable: 360 };
+  const withLogo: PackageEmailData = { ...base, logoUrl: "https://x.test/logo.png" };
+  const cases: [string, string[]][] = [
+    [buildRequestedHtml(base), ["S$400.00"]],
+    [buildRequestedHtml(discounted), ["S$360.00", "S$40.00"]],
+    [buildRequestedHtml(withLogo), ["S$400.00"]],
+    [buildConfirmedHtml(base), ["S$400.00"]],
+    [buildConfirmedHtml(discounted), ["S$360.00", "−S$40.00"]],
+    [buildOfferedHtml({ ...base, startDate: "2026-09-01", payUrl }), ["S$400.00", `href="${payUrl}"`]],
+    [buildOfferedHtml({ ...withLogo, payUrl }), ["S$400.00", `href="${payUrl}"`]],
+    [buildReferralRewardHtml({ businessName: "Coastal Swim School", discountType: "amount", discountValue: 20 }), ["S$20.00"]],
+    [buildReferralRewardHtml({ businessName: "Coastal Swim School", discountType: null, discountValue: null }), []],
+  ];
+  for (const [html, amounts] of cases) {
+    assertEmailSafe(html, [...amounts, 'href="https://swimsync.sg"', "Coastal Swim School"]);
+  }
+});

@@ -36,7 +36,7 @@ export function payable(d: PackageEmailData): number {
 /** A "was S$X · Y off" line, or empty when there is no discount. */
 function discountLine(d: PackageEmailData): string {
   if (!d.discountAmount || d.discountAmount <= 0) return "";
-  return `<p style="margin:0 0 16px;font-size:13px;color:#16a34a;">
+  return `<p style="margin:0 0 16px;font-size:13px;color:#525252;">
        Referral discount applied: ${escapeHtml(money(d.discountAmount))} off ${escapeHtml(money(d.totalValue))}.
      </p>`;
 }
@@ -135,16 +135,16 @@ export function formatDate(dateStr: string): string {
 }
 
 function shell(businessName: string, logoUrl: string | null | undefined, body: string): string {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;padding:32px 0;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <tr>
     <td align="center">
-      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e5e5e5;border-radius:8px;">
         <tr>
-          <td style="background:#0ea5e9;padding:24px 32px;">
+          <td style="padding:24px 32px;border-bottom:1px solid #f0f0f0;">
             ${
               logoUrl
                 ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(businessName)}" height="28" style="height:28px;vertical-align:middle;border:0;" />`
-                : `<span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">${escapeHtml(businessName)}</span>`
+                : `<span style="color:#0a0a0a;font-size:16px;font-weight:600;">${escapeHtml(businessName)}</span>`
             }
           </td>
         </tr>
@@ -152,8 +152,8 @@ function shell(businessName: string, logoUrl: string | null | undefined, body: s
           <td style="padding:32px;">${body}</td>
         </tr>
         <tr>
-          <td style="padding:16px 32px;border-top:1px solid #f1f5f9;">
-            <p style="margin:0;font-size:12px;color:#94a3b8;">Sent via SwimSync · <a href="${DEFAULT_APP_URL}" style="color:#94a3b8;">swimsync.sg</a></p>
+          <td style="padding:16px 32px;border-top:1px solid #f0f0f0;">
+            <p style="margin:0;font-size:12px;color:#6b6b6b;">Sent via SwimSync · <a href="${DEFAULT_APP_URL}" style="color:#6b6b6b;">swimsync.sg</a></p>
           </td>
         </tr>
       </table>
@@ -170,16 +170,16 @@ export function buildRequestedHtml(d: PackageEmailData): string {
   return shell(
     d.businessName,
     d.logoUrl,
-    `<h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Almost there — pay by PayNow</h1>
-     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+    `<h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Almost there — pay by PayNow</h1>
+     <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Hi ${escapeHtml(d.parentName)}, you've requested
        <strong>${escapeHtml(d.packageName)}</strong> from
        ${escapeHtml(d.businessName)} — ${d.lessonCount} lessons at
        ${escapeHtml(money(d.ratePerLesson))} each.
      </p>
-     <p style="margin:0 0 16px;font-size:24px;font-weight:700;color:#0f172a;">${escapeHtml(money(payable(d)))}</p>
+     <p style="margin:0 0 16px;font-size:24px;font-weight:600;color:#0a0a0a;font-variant-numeric:tabular-nums;">${escapeHtml(money(payable(d)))}</p>
      ${discountLine(d)}
-     <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#475569;">
+     <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#525252;">
        Transfer the amount using the PayNow QR code shown in the SwimSync app
        (Billing &rarr; Packages). Your package activates once
        ${escapeHtml(d.businessName)} confirms the money has arrived — you'll
@@ -196,43 +196,43 @@ export function buildConfirmedHtml(d: PackageEmailData): string {
   return shell(
     d.businessName,
     d.logoUrl,
-    `<h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Your package is active</h1>
-     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+    `<h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Your package is active</h1>
+     <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Hi ${escapeHtml(d.parentName)}, ${escapeHtml(d.businessName)} has
        confirmed your payment. <strong>${escapeHtml(d.packageName)}</strong>
        is now active:
      </p>
      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
        <tr>
-         <td style="padding:6px 0;font-size:13px;color:#475569;">Lessons</td>
-         <td style="padding:6px 0;font-size:13px;color:#0f172a;text-align:right;">${d.lessonCount} × ${escapeHtml(money(d.ratePerLesson))}</td>
+         <td style="padding:6px 0;font-size:13px;color:#525252;">Lessons</td>
+         <td style="padding:6px 0;font-size:13px;color:#0a0a0a;text-align:right;font-variant-numeric:tabular-nums;">${d.lessonCount} × ${escapeHtml(money(d.ratePerLesson))}</td>
        </tr>
        <tr>
-         <td style="padding:6px 0;font-size:13px;color:#475569;">Value</td>
-         <td style="padding:6px 0;font-size:13px;color:#0f172a;text-align:right;">${escapeHtml(money(d.totalValue))}</td>
+         <td style="padding:6px 0;font-size:13px;color:#525252;">Value</td>
+         <td style="padding:6px 0;font-size:13px;color:#0a0a0a;text-align:right;font-variant-numeric:tabular-nums;">${escapeHtml(money(d.totalValue))}</td>
        </tr>
        ${
          d.discountAmount && d.discountAmount > 0
            ? `<tr>
-         <td style="padding:6px 0;font-size:13px;color:#16a34a;">Referral discount</td>
-         <td style="padding:6px 0;font-size:13px;color:#16a34a;text-align:right;">− ${escapeHtml(money(d.discountAmount))}</td>
+         <td style="padding:6px 0;font-size:13px;color:#525252;">Referral discount</td>
+         <td style="padding:6px 0;font-size:13px;color:#0a0a0a;text-align:right;font-variant-numeric:tabular-nums;">−${escapeHtml(money(d.discountAmount))}</td>
        </tr>
        <tr>
-         <td style="padding:6px 0;font-size:13px;color:#475569;font-weight:600;">You paid</td>
-         <td style="padding:6px 0;font-size:13px;color:#0f172a;text-align:right;font-weight:600;">${escapeHtml(money(payable(d)))}</td>
+         <td style="padding:6px 0;font-size:13px;color:#525252;font-weight:600;">You paid</td>
+         <td style="padding:6px 0;font-size:13px;color:#0a0a0a;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">${escapeHtml(money(payable(d)))}</td>
        </tr>`
            : ""
        }
        ${
          d.expiresOn
            ? `<tr>
-         <td style="padding:6px 0;font-size:13px;color:#475569;">Valid until</td>
-         <td style="padding:6px 0;font-size:13px;color:#0f172a;text-align:right;">${escapeHtml(formatDate(d.expiresOn))}</td>
+         <td style="padding:6px 0;font-size:13px;color:#525252;">Valid until</td>
+         <td style="padding:6px 0;font-size:13px;color:#0a0a0a;text-align:right;">${escapeHtml(formatDate(d.expiresOn))}</td>
        </tr>`
            : ""
        }
      </table>
-     <p style="margin:0;font-size:15px;line-height:1.6;color:#475569;">
+     <p style="margin:0;font-size:14px;line-height:1.5;color:#525252;">
        Lessons now come out of your package automatically. You can watch the
        balance any time in the app under Billing &rarr; Packages.
      </p>`
@@ -248,25 +248,25 @@ export function buildOfferedHtml(d: PackageEmailData): string {
   return shell(
     d.businessName,
     d.logoUrl,
-    `<h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Your next package is ready</h1>
-     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+    `<h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Your next package is ready</h1>
+     <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Hi ${escapeHtml(d.parentName)}, ${escapeHtml(d.businessName)} has
        prepared your next package — <strong>${escapeHtml(d.packageName)}</strong>,
        ${d.lessonCount} lessons at ${escapeHtml(money(d.ratePerLesson))} each.
      </p>
-     <p style="margin:0 0 16px;font-size:24px;font-weight:700;color:#0f172a;">${escapeHtml(money(payable(d)))}</p>
+     <p style="margin:0 0 16px;font-size:24px;font-weight:600;color:#0a0a0a;font-variant-numeric:tabular-nums;">${escapeHtml(money(payable(d)))}</p>
      ${discountLine(d)}
      ${
        d.startDate
-         ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+         ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Starts <strong>${escapeHtml(formatDate(d.startDate))}</strong>.
      </p>`
          : ""
      }
      <p style="margin:0 0 20px;">
-       <a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#0ea5e9;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:8px;">Pay by PayNow</a>
+       <a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:14px;font-weight:600;line-height:20px;text-decoration:none;padding:12px 16px;border-radius:6px;">Pay by PayNow</a>
      </p>
-     <p style="margin:0;font-size:13px;line-height:1.6;color:#94a3b8;">
+     <p style="margin:0;font-size:13px;line-height:1.5;color:#6b6b6b;">
        The page shows a PayNow QR with the amount and reference filled in. Your
        package activates once ${escapeHtml(d.businessName)} confirms the payment.
      </p>`
@@ -293,20 +293,20 @@ export function buildReferralRewardHtml(d: ReferralRewardEmailData): string {
   return shell(
     d.businessName,
     d.logoUrl,
-    `<h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Thanks for the referral 🎉</h1>
-     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+    `<h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Thanks for the referral 🎉</h1>
+     <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Good news — a family you referred to ${escapeHtml(d.businessName)} has
        started their first package. As a thank-you, you've earned
        <strong>${escapeHtml(phrase)}</strong> your next package.
      </p>
      ${
        d.expiresOn
-         ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+         ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Use it by <strong>${escapeHtml(formatDate(d.expiresOn))}</strong>.
      </p>`
          : ""
      }
-     <p style="margin:0;font-size:15px;line-height:1.6;color:#475569;">
+     <p style="margin:0;font-size:14px;line-height:1.5;color:#525252;">
        The discount is applied automatically to your next package —
        ${escapeHtml(d.businessName)} will sort it out when you renew.
      </p>`
