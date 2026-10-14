@@ -3692,6 +3692,19 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Credit Notes** | All credit notes; filter by parent, status, date | Read-only; linked to invoices and lessons |
 | **Coaches** | Coach list; create/edit accounts; view assigned classes | Shows the **business's** PayNow QR *(implemented — read-only here; it is set by the business's admin, §7.10)* |
 
+
+*(implemented 2026-10-14, UI restyle Phase 5 — every admin screen on the DESIGN.md tokens. What an admin can see
+differently: **a table row carries at most one inline action** (the one its state calls for); the rest sit in a row
+**"…" menu** on Credit notes, Classes, Parents, Coaches, Locations, Admins and Roles — destructive items in red, still
+behind their confirmations (Packages, Invoices, Levels and Platform keep several inline actions for now, and deleting a
+role has no confirmation — both in BACKLOG). **Lessons:** a past lesson still unmarked is tagged **Blocks billing**
+(red; today's reads *Not marked* / *Partly marked*, amber), and the week tab's count is the same number as the sidebar badge (both read
+`tenant_unmarked_lesson_count`). **Invoices:** billing settings moved to their own card at the foot of the page, and
+when the last Generate was refused the page says why beside the button — the button itself is disabled only while a
+run is in progress. **Wages:** a rate dated 2000-01-01 reads "From the start". **Students:** a business with no levels
+shows a dash, not an empty dropdown. Nothing an admin can do changed — every handler and `disabled=` expression is the
+same.)*
+
 ### 14.4 Key Navigation Patterns
 
 #### Parent App (Mobile)

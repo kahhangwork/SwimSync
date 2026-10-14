@@ -1257,4 +1257,12 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `ui/auth-phase4` → `main` as `1dd228c` (4.1–4.7 + the `role="alert"` fix + docs). Every Phase 4 step keeps the gate
     (P4); the user chose to build all seven and run one nightly. Before the push: CI repo invariants locally; 18 drivers
     `--only` before (`c5453ec`) = after. Live: swimsync.sg's bundle carried `Sign in to SwimSync` within ~3 min;
-    admin.swimsync.sg's `/login` served `bg-ground` once its Vercel build finished (~12 min). Nightly `38430764913` dispatched on the user's word.
+    admin.swimsync.sg's `/login` served `bg-ground` once its Vercel build finished (~12 min). Nightly `38430764913` dispatched on the user's word. Read green, 74/74.
+
+91. **Deploy record (2026-10-14): UI restyle Phase 5 — the admin panel, one push.** App-only (the range touches nothing
+    under `supabase/`; its one new `.rpc(` is the existing `tenant_unmarked_lesson_count`, already granted and already
+    read by the Sidebar), so no backend gate: `ui/admin-phase5` → `main` as `bfa971d` (5.0–5.29 + close-out + review
+    fixes + docs). The user dropped the planned three pushes and the local sweep: land it all, let the next nightly verify.
+    Before the push: CI repo invariants locally; 19 billing drivers `--only` = nightly `38430764913`; admin vitest + both
+    typechecks. Live: admin.swimsync.sg's bundle carried `Blocks billing`. User's prod hand-check passed; scheduled
+    nightly `38483193929` (on `ffba544`) green, 74/74.

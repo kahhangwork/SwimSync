@@ -434,6 +434,12 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 > `lib.mjs` — labels come from `sgLabel()` / `sgMonthLabel()`, the apps' own en-SG formatter ("Sept", not "Sep").
 > The coach Schedule's day labels drop the comma (`Sat 26 Sept`, scheduleFormat.ts `dayHeading`); match them with
 > `sgDayLabel()`, and ONLY on Schedule text — every other screen still reads `sgLabel()`'s `Sat, 26 Sept` (2026-10-12).
+>
+> **An admin row action may live in the row's "…" menu** (UI restyle Phase 5, 2026-10-14). Reach it with
+> `(await rowAction(row, "Void")).click()` from `lib.mjs` — it returns the inline button if there is one, else opens
+> the menu and returns the item (items are plain `<button>`s inside the row, so `row.getByRole("button")` still sees them once open).
+> Count with `rowActionCount(row, name)`, which opens the menu first — a bare `count()` on a closed menu is 0, and an
+> "absent" check written that way passes vacuously.
 > A non-label line opts out with `// date-label-ok: <why>` (§7.302).
 >
 > **No pgTAP test or fixture holds an expiring literal date** (2026-10-01). `scripts/check-test-dates.sh` (CI,

@@ -978,7 +978,10 @@ refuses an invoice line for a drawn lesson (PK002). The ledger (`package_applica
 wrongful refusal blocks a whole class's save with no override (§7.324). The engine **fails CLOSED**
 (`package_mode_unreadable`: no invoice, no seal): billing a lesson a package paid is the worse error. Both count
 "expected" through `class_unmarked_lesson_pairs`, the core of `class_unmarked_lesson_dates` — do not write a third
-copy — Billing months' per-month unmarked count (`package_month_funding.unmarked_lessons`) is the same pairs function, server-side, never a client derivation. Plan + deploy record: `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md`.
+copy — Billing months' per-month unmarked count (`package_month_funding.unmarked_lessons`) is the same pairs function, server-side, never a client derivation. Plan + deploy record: `docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md`. The admin's
+**tenant-wide** unmarked count likewise has one reader, `SwimSyncAdmin/lib/unmarkedLessonCount.ts`
+(`tenant_unmarked_lesson_count`): the Sidebar badge and the Lessons week tab both use it (UI restyle 5.7 — the tab
+had counted only the visible week: badge 20, tab 2) — never count unmarked lessons in a component.
 
 **Addendum — single-child packages (2026-10-11, `20261010000100`, plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`).**
 `parent_packages.student_id` (NULL = shared) ties a package to one child; the matcher filters on it and returns

@@ -3,7 +3,7 @@
 _Last updated: 2026-10-14 — **UI restyle Phase 5 live and verified** (admin panel, `bfa971d`); scheduled nightly
 `38483193929` on `ffba544` **green, 74/74**, the user's prod hand-check passed. Next: Phase 6 (emails)._
 
-_Previously (§8.151, 2026-10-13 night) — UI restyle Phase 3 live (ten parent screens, DEPLOYMENT #89)._
+_Previously (§8.152, 2026-10-14) — UI restyle Phase 4 live (auth + public screens, DEPLOYMENT #90)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -351,6 +351,17 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.153 (2026-10-14) — UI restyle Phase 5: the admin panel, live and nightly-green
+
+**5.0–5.29 + close-out shipped in one push** (`bfa971d`, DEPLOYMENT #91); scheduled nightly `38483193929` green, 74/74;
+the user's prod hand-check passed. Per-step record: the plan's §3 ledger; admin-visible changes: PRD §14.3.
+
+- **Decided by the user:** no `/plan-with-confidence`; the three-push plan and the local sweep dropped (stopped after
+  one driver) — land it all, let the nightly verify. Packages / Invoices / Levels / Platform keep several inline row
+  actions, and role delete has no confirm: both filed in BACKLOG, not fixed in a restyle.
+- **Found:** §7.376 (a popup that closes on scroll), §7.377 (a codemod rewrote a frozen-file test). Driver row-menu
+  helpers: TESTING §5. Modal X has no accessible name — BACKLOG (naming it "Close" breaks two drivers).
+
 ## 8.152 (2026-10-14) — UI restyle Phase 4: auth + public screens, live
 
 **4.1–4.7 shipped in one push** (`1dd228c`, DEPLOYMENT #90), on the user's call: build all of Phase 4, then ONE nightly
@@ -360,20 +371,6 @@ inside a file read at the start of every session.
   drivers before = after, NOT FOUND 0 → 0; every new driver check proven red on the old build.
 - **Found:** a driver selecting by colour class went blind (§7.375, fixed by `role="alert"`). **Not done:** package
   page's contact link and the admin reset page naming its account (both need data; BACKLOG fold-ins).
-
-## 8.151 (2026-10-13, night) — UI restyle Phase 3: the ten parent screens, live and nightly-green
-
-**All of Phase 3 (3.1–3.10) shipped in one push** (`9f67aee`, DEPLOYMENT #89); nightly `38397974946` green, 74/74.
-The plan's §3 ledger is the per-step record; the parent-visible changes are in PRD §14.1.
-
-- **Decided by the user:** no `/plan-with-confidence` (the plan existed); cap raised through Phase 3; gate waived for
-  3.6 (DOB picker) and 3.10 (Join / auth); nightly dispatched after the deploy on their word.
-- **Found:** §7.367 hit again (`accessibilityRole="button"` → a `<button>` with no `tabindex`) — promoted to the plan's
-  §5 recipe. Review found Cancel on a pending package has no confirmation — filed in BACKLOG, not fixed in a restyle.
-- **Prod-checked after:** 25 invoices, 1–8 lines each, parent-readable (3.2 RISK 13 closed); 0 credit notes on prod
-  (BACKLOG *A credit note's amount has no positivity check*). **Not done:** no `/commit-review` per step (one review pass).
-
-_(§8.150 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
