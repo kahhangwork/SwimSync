@@ -1719,6 +1719,17 @@ change.
 **Fix:** a `Modal` confirm ("Delete the role <name>?") before `remove`, as Locations and Admins do. `verify-roles`
 does not delete a role today — add the press + confirm to it and prove it bites. Not visual-only.
 
+### The admin Modal's close (X) button has no accessible name — **S** — _filed 2026-10-14_
+`SwimSyncAdmin/components/Modal.tsx` renders the title-bar close as an icon-only `<button>` with no `aria-label`, so a
+screen reader announces "button". Found in UI restyle 5.0 (shared chrome), left as it was on purpose.
+
+**Why not fixed in 5.0:** naming it "Close" makes `verify-package-draw-at-marking.mjs:199`
+(`getByRole("button", { name: "Close" })` — a case-insensitive SUBSTRING match) find two buttons — the modal's own
+Close and the X — and strict mode fails. `verify-class-admin.mjs` presses a "Close" button the same way.
+
+**Fix:** pass `exact: true` on those two drivers' "Close" lookups first, then `aria-label="Close"` on the X (a name like
+"Close dialog" still substring-matches). Run `--only package-draw-at-marking` and `--only class-admin`. Not visual-only.
+
 ### A credit note's amount has no positivity check — **S** — _filed 2026-10-13_
 `credit_notes.amount` is `NUMERIC(10,2) NOT NULL` with **no `CHECK (amount > 0)`** (`20260309000100_initial_schema.sql`).
 Its writers are the correction triggers, which copy a billed lesson's amount, so a negative row should not occur — but
