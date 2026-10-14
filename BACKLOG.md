@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-14 — **UI restyle Phase 6 shipped** (every email; nothing filed). **UI restyle Phase 5 shipped** (admin panel: S4 — reason shown, Generate not disabled —, S8, S9, most of S10 and the admin fold-ins closed; *Admin tables still carrying several inline row actions*, *Deleting a role has no confirmation step* and *The admin Modal's close (X) button has no accessible name* filed). **UI restyle Phase 4 shipped** (auth + public screens; public `S$` and bad-token fold-ins closed; *Superadmin access only* copy filed). 2026-10-13 — **UI restyle Phase 3 shipped** (S3, S6 and the parent fold-ins; follow-up *Cancelling a package request has no confirmation* filed). **Legacy package matcher removed** (Wave 9 item 9; follow-up *Simplify the admin's live-balance display* filed). **UI restyle Phases 1–2 shipped** (primitives, status scale — S7 Overdue still open —, admin shell S5, all eight coach screens); 1.5 capture fold-ins filed. 2026-10-12 — **Legacy matcher un-gated** (Little Orcas sealed September). **UI restyle under way** (Wave 9 item 8): logo, tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* shipped (Geist open question removed — answered); the work follows `docs/plans/UI_RESTYLE_PLAN.md`. 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-14 — **UI restyle COMPLETE (Phase 7)** — *UI/UX improvements* replaced by *UI restyle leftovers* (two 7.2 audit findings + the verified-open fold-ins). **UI restyle Phase 6 shipped** (every email; nothing filed). **UI restyle Phase 5 shipped** (admin panel: S4 — reason shown, Generate not disabled —, S8, S9, most of S10 and the admin fold-ins closed; *Admin tables still carrying several inline row actions*, *Deleting a role has no confirmation step* and *The admin Modal's close (X) button has no accessible name* filed). **UI restyle Phase 4 shipped** (auth + public screens; public `S$` and bad-token fold-ins closed; *Superadmin access only* copy filed). 2026-10-13 — **UI restyle Phase 3 shipped** (S3, S6 and the parent fold-ins; follow-up *Cancelling a package request has no confirmation* filed). **Legacy package matcher removed** (Wave 9 item 9; follow-up *Simplify the admin's live-balance display* filed). **UI restyle Phases 1–2 shipped** (primitives, status scale — S7 Overdue still open —, admin shell S5, all eight coach screens); 1.5 capture fold-ins filed. 2026-10-12 — **Legacy matcher un-gated** (Little Orcas sealed September). **UI restyle under way** (Wave 9 item 8): logo, tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* shipped (Geist open question removed — answered); the work follows `docs/plans/UI_RESTYLE_PLAN.md`. 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -296,10 +296,8 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 
 7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
    user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
-8. **UI/UX improvements** (M, *Platform and reach*) — **IN PROGRESS: follow `docs/plans/UI_RESTYLE_PLAN.md`.** Logo,
-   Phases 0–3 are live and verified (2026-10-13: logo, tokens, primitives, status scale, admin shell, all coach and
-   parent screens); Phases 4 (auth + public), 5 (admin panel) and 6 (emails) live and verified 2026-10-14; next is Phase 7 (retire the legacy).
-   The plan's §3 is the state.
+8. ~~*UI/UX improvements*~~ — **shipped 2026-10-14** (UI restyle Phases 0–7; DESIGN.md adopted). What it left open:
+   *UI restyle leftovers* (S each).
 9. ~~*Remove the legacy package matcher*~~ — **shipped 2026-10-13** (engine v36 + `20261013000100`; the D9 guard went
    with it). Follow-up filed: *Simplify the admin's live-balance display* (S).
 
@@ -1584,104 +1582,38 @@ roles. Do it before the co-admin hire if the owner builds such a role.
 
 ## Platform and reach
 
-### UI/UX improvements across the admin panel, parent app and coach app — **M** — _filed 2026-10-10, audited 2026-10-11_
-A restyle of all three surfaces to root **`DESIGN.md`** — direction A (neutral greys, one blue `#2563eb`, Geist, flat
-bordered cards), the five-step status scale, the new logo, and the Blocked-Action / Pay-First / Blocker-Outranks-Routine
-rules. **Those look decisions are final** (user, 2026-10-11): don't reopen look, colour, font or logo.
+### UI restyle leftovers — **S each** — _filed 2026-10-14 (UI restyle 7.3)_
+What the restyle (Wave 9 item 8, `docs/plans/UI_RESTYLE_PLAN.md`, DESIGN.md now *adopted*) left open. Each is one screen
+or one shared component; fix whenever the screen is touched, or as its own S. The full audit history (81 screens,
+2026-10-11; ranked S1–S10 and fold-ins) is `git show 0cf4c11:BACKLOG.md`.
 
-**Why:** the user wants it.
+**Why:** DESIGN.md is adopted, so each of these is now a defect against it, not a taste question.
 
-**The user's order (2026-10-11):** 1) ship logo 2a · 2) DESIGN.md tokens in both Tailwind configs, no screen changes ·
-3) audit every screen (`run-ui-playwright` + Impeccable audit), file ranked S items · 4) one screen per change, starting
-with coach Schedule. **Stop and ask before adding any new package.** Steps 1–3 done 2026-10-11 (logo `9edfee4`, tokens
-`f805461` — classes listed in `DESIGN.md` → *Tokens as Tailwind classes*).
+**Found by the 7.2 audit (2026-10-14):**
+- **Admin text falls under the 12px floor below 1152px wide** (P1, a11y). `globals.css` steps the root font to 13px at
+  ≤1152px and admin type tokens are rem (RISK 11, the user's call 2026-10-12), so Body 14px renders 11.375px and Label
+  12px renders 9.75px. **A decision for the user, not a fix:** keep the scaling (and accept the floor breach on small
+  laptops), floor the root at 16px for text only, or stop scaling below 1280px.
+- **Toast is off-token, and its success colour fails contrast** (P1). `SwimSyncApp/components/Toast.tsx:9–11` —
+  `#16a34a` / `#dc2626` / `#334155`; white on `#16a34a` is 3.3:1 (AA needs 4.5:1). Move to the status scale's text
+  colours (`#166534` success, `#b91c1c` danger, Ink info). Shared chrome: P4, not visual-only.
 
-**The audit (2026-10-11):** 81 live screens at 1440px / 390px against `DESIGN.md`, four parallel reviewers + Impeccable's
-detector (its 3 findings — `border-l-4` side-tabs in `LessonCard.tsx`, grey-on-amber in `ConfirmGenerateModal.tsx`
-— were fixed in UI restyle 5.11 / 5.1). The global gap — sky theme, shadows, pills, system font — is every screen and is what each
-S item below removes from its own screen.
+**Verified open 2026-10-14:**
+- Coach Pay: `toFixed(2)` → `S$1260.00`, no thousands separator (`PayoutCards.tsx:42,57`) — wants ONE shared money
+  formatter, not a per-screen one.
+- Add / Edit child: gender state defaults to `"Male"` (`useAddChild.ts:27`, `useEditChild.ts:18`) — Edit pre-selects
+  Male where the profile shows "—".
+- Join screen (Profile → Add Child) highlights **Home**: the route lives under `home/join-tenant.tsx`.
+- Public package page: "Prefer a different package? Tell your coach." is a dead end → link to the business's contact
+  (needs the contact on the page's data).
+- Admin reset-password page does not say which account it is for (needs data the page does not load).
+- Settings out of working pages (old S10): still open on **Packages**.
+- **Overdue** (old S7): every unpaid invoice is *Outstanding* = Due (amber). Showing Overdue (red) needs a product
+  decision first — when is an invoice overdue — then a stored due date. Never derive it in a client.
 
-**S items, in the order the user accepted 2026-10-11 (each ≤ ~2 h, one screen or one shared component; UI drivers assert on
-visible text, so keep words unless the item changes them on purpose):**
-
-1. ~~**Coach Schedule restyle**~~ — **shipped 2026-10-12** (`64ab076` restyle, `7445547` wording; PRD §7.5). Kept as a
-   line so the plan's S-numbers still resolve.
-2. ~~**Mobile tab bar to spec**~~ — **shipped 2026-10-12** (UI restyle step 1.2, `components/TabBar.tsx`). Kept as a
-   line so the plan's S-numbers still resolve.
-3. ~~**Parent invoice card**~~ — **shipped 2026-10-13** (UI restyle step 3.1). Kept as a line so the plan's S-numbers
-   still resolve. (Billing → Invoices) — Pay-First (PayNow full-width primary, "Already paid?" text link
-   beneath, Info "Claimed · awaiting confirmation" after a claim); "Gross / Net Amount" → "N lessons / Credit / To pay";
-   unpaid is amber, money in Ink, true minus.
-4. ~~**Admin Invoices: Generate disabled with the reason**~~ — **shipped 2026-10-14 with a deliberate change** (UI
-   restyle 5.1, PRD §14.3): the reason shows beside Generate, read from the last run's refusal, but Generate is NOT
-   disabled — a client-side guess must never block billing; the engine stays the authority. Kept as a line so the plan's
-   S-numbers still resolve. Was: today a live primary while the seed month has 20 unmarked
-   lessons; the month shows amber "Not billed yet". → disabled + "20 lessons unmarked → Review", the month a Danger tag.
-   (The critique's "month picker" is already done: it is a native month input.)
-5. ~~**Admin sidebar stacks below 800px**~~ — **shipped 2026-10-13** (UI restyle step 1.6: top bar + drawer below 800px,
-   Ground sidebar, Selected fill, status-coloured badges; PRD *Sidebar navigation*). Kept as a line so the plan's
-   S-numbers still resolve. (S8's badge half is done; its Lessons-page half is not.)
-6. ~~**Parent invoice detail**~~ — **shipped 2026-10-13** (UI restyle step 3.2; the empty breakdown was empty data — the
-   card now says so). Kept as a line so the plan's S-numbers still resolve. Was: the same Pay-First / Plain Words fix, and the **Lesson Breakdown card renders empty**
-   (no rows, no empty text), so a parent cannot see what they are paying for.
-7. ~~**One status scale across every tag**~~ — **shipped 2026-10-13** (UI restyle step 1.4: twin `lib/statusTone.ts`,
-   both `StatusBadge`s through `components/ui/Tag`, admin Claimed tag, billing-month tones; PRD §7.7, §7.21). Kept as a
-   line so the plan's S-numbers still resolve. **Still open — Overdue:** there is no due-date source (no `due_date`
-   column, none in the PRD), so every unpaid invoice is *Outstanding* = Due (amber). Showing **Overdue** (red) needs a
-   product decision first — when is an invoice overdue (a fixed day of the month? N days after issue? per business?) —
-   and then a stored due date. Never derive it in a client from the month or the invoice's age.
-8. ~~**Admin Lessons + the sidebar badge**~~ — **shipped 2026-10-14** (UI restyle 5.7; PRD §14.3, ARCHITECTURE: one
-   unmarked-count reader). Kept as a line so the plan's S-numbers still resolve. Was: past unmarked lessons show amber "Needs marking" (→ Danger "Blocks billing");
-   the sidebar badge says 20 while the page tab says 2 — one count definition, Danger colour.
-9. ~~**One date style in admin tables**~~ — **shipped 2026-10-14** (UI restyle Phase 5: Credit Notes, Packages, Wages
-   — "From the start" for 2000-01-01 —, Attendance, Students and Referrals through `formatSgStamp`; display only, the
-   sorts and checks read raw dates). Kept as a line so the plan's S-numbers still resolve. Was: ISO (`2026-10-11`) or numeric (`11/10/2026`) on Credit Notes, Referrals,
-   Packages, Wages, Attendance, Assessment; Wages shows the placeholder `2000-01-01` as a real date. Display through
-   `formatSgStamp`.
-10. **Settings out of working pages** — **mostly shipped 2026-10-14** (UI restyle 5.1 / 5.4 / 5.5: Invoices'
-    *Billing settings* card at the foot, Wages and Referrals put the work first). **Still open: Packages.** Was: start
-    with Invoices (PayNow UEN/mobile + auto-generation share the Generate card,
-    and its two day-7 sentences contradict); then Wages, Referrals, Packages.
-
-**Fold-ins — fix whenever the screen is touched (not their own items):**
-- ~~Plurals~~ — fixed ("1 students" in 2.3; "1 coach", "1 family" in 5.16 / 5.17).
-- ~~Credit amounts in link-blue with no minus~~ — fixed (parent 3.2 / 3.9, admin 5.2).
-- ~~Tables with 2+ inline actions~~ — fixed in Phase 5 (row "…" menu) except Platform; what is left is its own item,
-  *Admin tables still carrying several inline row actions*.
-- Coloured money text (blue / green / red) → Ink, status in the tag; money right-aligned and tabular.
-- Helper text under 12px on ~12 admin screens; tab/section captions in `gray-400`.
-- More than one primary per section (Referrals, Packages ×3, Platform, parent Buy-a-package cards).
-- ~~Amber "Awaiting confirmation" on Packages~~ — Info since 5.3.
-- A green "Assigned" tag on every child card says nothing → tag only non-routine states; one tag per card.
-- Red S$0.00 "Outstanding" box on child profile; red "Outstanding Payment" banner for a plain unpaid bill (parent home).
-- ~~Students: green "Assigned"; greyed "No levels defined" dropdown~~ — fixed in 5.9.
-- Child form: Date of Birth is free text (`YYYY-MM-DD`); Edit Child pre-selects "Male" where the profile shows "—";
-  placeholders that look like values ("Emma Tan").
-- ~~Bad public-invoice token is a dead end~~ (4.5/4.6: it offers Sign in). ~~Calendar legend ~11px, red for "(Sub)"~~ (fixed in 5.11).
-- Mark Attendance: tab bar highlights Classes when arrived from Schedule. (*Set all* out of thumb reach — fixed in UI
-  restyle 2.2: it sits beside Save in a bottom action area.)
-
-**Captured 2026-10-13 (UI restyle step 1.5)** — the six screens the first audit could not reach, all reached with edge
-functions served and real tokens. Fold-ins from them:
-- ~~**Public invoice + package pages show `$88.00`, not `S$`**~~ (fixed in UI restyle 4.5/4.6, with Pay-First and the flat card) (`AmountCard.tsx:20`, `OfferCard.tsx:17,21,25` — a bare
-  `${…}` in JSX); "I've paid" is an equal outlined button → a text link under the primary (Pay-First); `bg-sky-50`, sky
-  button, shadowed `rounded-2xl` card → Ground, Lane Blue, flat 8px; caption/footer `text-xs text-gray-400`.
-- Public package: "Prefer a different package? Tell your coach." is a dead end → link to the business's contact.
-- **Admin Calendar Week hides Sunday at 1440px** (the grid scrolls inside its own box: 1264 vs 1138px); a full class is
-  drawn red with a red "FULL" (Red Means Stuck → neutral/warning); 10–11px text in `LessonCard` / `TimeGrid`; a class
-  with no capacity shows a bare "1" where the legend promises "enrolled + guests / max".
-- Coach Pay: `toFixed(2)` → `S$1,260.00` (no thousands separator yet — wants one shared money formatter, not a
-  per-screen one). (Green money, the green total box, grey Paid/Draft and the violet chip — fixed in UI restyle 2.6.)
-- Parent Contact: placeholders that look like values ("9123 4567", "Blk 123 Clementi Ave 3"); grey-filled `rounded-xl`
-  inputs; helper in `gray-400`; a sky Save plus a sky "Cancel" link.
-- Join screen (opened from Profile → Add Child) highlights **Home** — the route lives under `home/`; same shape as the
-  Mark Attendance tab fold-in. Its greys are `slate-*` and its field label an all-caps 12px "JOIN CODE".
-- Admin reset-password / accept-invite: ~~sky background and button, grey `rounded-xl` inputs, shadowed card~~ (4.7);
-  **still open:** the reset page does not say which account it is for (needs data the page does not load).
-- Admin login reads "Superadmin access only" — tenant admins and co-admins sign in there too (seen in 4.7; words kept, a copy decision).
-- Admins table: `rounded-full` "invited"/"Owner" pills and three inline actions including a red Delete → one action +
-  a "…" menu (add to the Tables fold-in above).
-Screenshots were local only (`capture15/`, not kept).
+**Not re-verified since 2026-10-11/13 (check before building):** Mark Attendance highlights Classes when arrived from
+Schedule; Admin Calendar Week hiding Sunday at 1440px; more than one primary per section (Referrals, Packages,
+Platform, parent Buy-a-package); Register's phone/address placeholders without "e.g.".
 
 ### Cancelling a package request has no confirmation — **S** — _filed 2026-10-13_
 Billing → Packages → a pending package's **Cancel** calls `cancelRequest` → `cancelPackageRequest` at once: no

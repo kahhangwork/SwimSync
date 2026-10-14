@@ -112,13 +112,12 @@ components:
 > `docs/design/`. The name `DESIGN.md` is a standard (Google's DESIGN.md format) that design tools such as
 > Impeccable load automatically, which is why it is not called anything else.
 >
-> **Status (2026-10-13): target, adoption begun.** The **logo is shipped** (below), **the tokens are in both
-> Tailwind configs** (classes below), the **primitives** are in each app's `components/ui/` (`Button`, `Surface`, `Tag`,
-> `SectionHeading`) and the **status scale is adopted** — every `StatusBadge` in both apps takes its tone from
-> `lib/statusTone.ts` (twin files) through `Tag`. Otherwise the apps today still use Tailwind sky
-> (`#0ea5e9`) and white cards with shadows. Screens move to this system one at a time under BACKLOG
-> *UI/UX improvements* — never in one sweep (the UI drivers assert on visible text). Until a screen is
-> migrated, its code is not evidence against this file. Chosen from three drawn directions; mock-ups:
+> **Status (2026-10-14): ADOPTED.** Every screen in the parent app, coach app, admin panel, platform panel, public
+> token pages, auth screens and every transactional email follows this file (UI restyle Phases 0–7,
+> `docs/plans/UI_RESTYLE_PLAN.md`). The legacy sky palette is gone, and each app's `lib/designTokens.drift.test.ts`
+> fails on any Tailwind default-palette colour class outside its allowlist (`SwimSyncAdmin/lib/classColours.ts`,
+> tenant data). Known gaps are BACKLOG *UI restyle leftovers*. Code that disagrees with this file is now a defect.
+> Chosen from three drawn directions; mock-ups:
 > https://claude.ai/artifact/2gSDdtZbKEb3pVnmDiVEKK · logo concepts: https://claude.ai/artifact/PxWBq9tXtsBYZEgnnvRYKT
 
 ## Tokens as Tailwind classes

@@ -1274,3 +1274,8 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     Then `ui/phase6-emails` → `main` as `ea0c253` (admin invite emails ride Vercel); CI `38519921286` green. Auth
     `recovery.html` by the user's DASHBOARD PASTE (no `config push`); `/auth/v1/settings` `mailer_autoconfirm: true`
     after it; the user completed a real prod reset. 13 rendered emails checked in Gmail; Outlook skipped (user).
+93. **Deploy record (2026-10-14): UI restyle 7.1 — legacy palette retired.** App-only (no `supabase/` path), so no
+    backend gate: `ui/phase7` → `main` as `d12210f`. Before: CI repo invariants locally; both typechecks; app 802/802,
+    admin 1281/1281; `--only` app-auth 29/29, smoke-app 73/73, payment-collection 20/20, smoke-admin 64/64. Both Vercel
+    builds green; swimsync.sg's entry bundle carries `bg-primary items-center justify-center` (the Logo tile). P4: the
+    next nightly (or a user-approved full sweep) is its verdict.

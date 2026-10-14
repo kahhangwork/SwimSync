@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-14 — **UI restyle Phase 6 live and verified** (every email; functions v37/v6/v7, admin `ea0c253`,
-auth template by dashboard paste + a real prod reset). Next: Phase 7 (retire the legacy), step 7.1._
+_Last updated: 2026-10-14 — **UI restyle COMPLETE** (Phase 7: legacy retired + palette guard `d12210f`, audit 16/20,
+DESIGN.md adopted). 7.1 is the one unverified landing (P4). Next: the user's call on admin text scaling; *UI restyle leftovers*._
 
-_Previously (§8.153, 2026-10-14) — UI restyle Phase 5 live (admin panel, nightly `38483193929` green 74/74)._
+_Previously (§8.154, 2026-10-14) — UI restyle Phase 6 live (every email; functions v37/v6/v7)._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -351,6 +351,16 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.155 (2026-10-14) — UI restyle Phase 7: the restyle is COMPLETE
+
+**7.1 live** (`d12210f`): dead `Card`/`PrimaryButton`/`SectionHeader` and the `primary-50…900` shades deleted; both
+drift tests now fail on ANY Tailwind default-palette colour class (allowlist `classColours.ts`), proven red. **7.2:**
+`/impeccable audit` **16/20**, detector 0 static findings. **7.3:** DESIGN.md *adopted*; plan COMPLETE.
+
+- **Kept, not deleted:** `StatusBadge` (18 importers, already a `Tag` adapter) — plan §10.
+- **Found (BACKLOG *UI restyle leftovers*):** admin text under 12px below 1152px (a user decision — RISK 11's rem
+  scaling); Toast off-token, success 3.3:1. **Not done:** the full sweep for 7.1 (P4) — proposed to the user.
+
 ## 8.154 (2026-10-14) — UI restyle Phase 6: every email, live
 
 **6.1–6.5 shipped** (`2203cfa`…`ea0c253`, DEPLOYMENT #92): invoice, blocked-billing, credit-note, package, admin-invite
@@ -360,17 +370,6 @@ on the old one. Deno 306 twice. The user checked 13 real sends in Gmail, pasted 
 - **Decided by the user:** Outlook check skipped (no client); `swimsync-edge` key used for the test sends.
 - **Found:** `functions download` now type-strips — §7.187 amended with the replacement check. White email header vs a
   white logo: plan §10, PRD `logo_url` row. Drift fixed: HANDOVER's `_Previously` budget grep matched nothing.
-
-## 8.153 (2026-10-14) — UI restyle Phase 5: the admin panel, live and nightly-green
-
-**5.0–5.29 + close-out shipped in one push** (`bfa971d`, DEPLOYMENT #91); scheduled nightly `38483193929` green, 74/74;
-the user's prod hand-check passed. Per-step record: the plan's §3 ledger; admin-visible changes: PRD §14.3.
-
-- **Decided by the user:** no `/plan-with-confidence`; the three-push plan and the local sweep dropped (stopped after
-  one driver) — land it all, let the nightly verify. Packages / Invoices / Levels / Platform keep several inline row
-  actions, and role delete has no confirm: both filed in BACKLOG, not fixed in a restyle.
-- **Found:** §7.376 (a popup that closes on scroll), §7.377 (a codemod rewrote a frozen-file test). Driver row-menu
-  helpers: TESTING §5. Modal X has no accessible name — BACKLOG (naming it "Close" breaks two drivers).
 
 ## 9. Next steps (pick with the user)
 
@@ -414,7 +413,7 @@ for one marked inactive.
 
 **State on 2026-10-14:** scheduled `38483193929` (on `ffba544`) read **GREEN, 74/74** — all of Phase 5 (admin panel,
 5.0–5.29, landed in one push on the user's word) verified; the 11 drivers edited for the row "…" menu and `money-admin`
-(44/44) all green. Zero unverified landings. Previous: `38430764913` GREEN 74/74 (Phase 4).
+(44/44) all green. **Unverified since: 7.1 (`d12210f`, P4)** — Phase 6 changed no screen (user: no nightly for it). Previous: `38430764913` GREEN 74/74 (Phase 4).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -431,10 +430,10 @@ which mutate shared seed state — are in the same section.
 2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
-3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
-   **Phases 0–6 verified and live** (Phase 6 = emails, 2026-10-14; Phase 5's nightly `38483193929` green). **Phase 6 (emails) live 2026-10-14. Next build: Phase 7, step 7.1** —
-   delete legacy `Card`/`PrimaryButton`/`StatusBadge` + the `primary-*` shades, add the banned-class CI guard. P4: NOT
-   visual-only; propose the full sweep to the user once as Phase 7 closes. Small, separate: BACKLOG *Cancelling a package
+3. **UI restyle (Wave 9 item 8) is COMPLETE** (2026-10-14; `docs/plans/UI_RESTYLE_PLAN.md` closed, DESIGN.md adopted).
+   **7.1 (`d12210f`) is P4 and unverified:** read the next scheduled nightly before the next APP unit merges (or run the
+   full sweep if the user says yes). What it left: BACKLOG *UI restyle leftovers* — first, **a user decision** on admin
+   text below 12px at ≤1152px (keep rem scaling / floor text / stop scaling). Small, separate: *Cancelling a package
    request has no confirmation* (S). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.

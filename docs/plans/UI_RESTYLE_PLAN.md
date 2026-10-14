@@ -1,6 +1,6 @@
 # UI restyle plan — all three apps to `DESIGN.md`
 
-_Status: **IN PROGRESS** — written 2026-10-11 with `/plan-with-confidence`, hardened by `/plan-review` the same day. Phases 0–1 partly built (see §3)._
+_Status: **COMPLETE 2026-10-14** — written 2026-10-11 with `/plan-with-confidence`, hardened by `/plan-review` the same day. All of Phases 0–7 built and live (§3). What it left open: BACKLOG *UI restyle leftovers*._
 _BACKLOG item: Wave 9 #8, **UI/UX improvements**. Visual authority: root **`DESIGN.md`**. This file is the HOW and
 the ORDER; `DESIGN.md` is the WHAT. Where they disagree, `DESIGN.md` wins and this file is fixed — **except where
 `DESIGN.md` collides with a CI guard or a DB-built string (Q1 below): that is a question for the user, never a
@@ -80,6 +80,7 @@ Decisions this plan makes (the user may overrule; none changes the look):
 ---
 
 ## 3. State (update in every commit that ticks a step)
+_2026-10-14 (late night): **THE RESTYLE IS COMPLETE.** 7.1 live (`d12210f`); 7.2 audit 16/20 (two P1s filed); 7.3: DESIGN.md *adopted*, BACKLOG *UI/UX improvements* → *UI restyle leftovers*, HANDOVER. 7.1 is P4 (not visual-only): the full sweep is PROPOSED to the user, not run; until it or the next scheduled nightly reads green, 7.1 is the one unverified landing._
 _2026-10-14 (night): **7.1 built** — `Card`/`PrimaryButton`/`SectionHeader` deleted (0 importers; `tsc` green), `primary-50…900` deleted from both configs (0 uses), app `Logo` tile `bg-blue-600` → `bg-primary` (same `#2563eb`; it was the last default-palette class outside `classColours.ts`). The drift tests' `primary-<shade>` ratchet is now the full RISK 10 guard (every default-palette colour class, allowlist `lib/classColours.ts`; >100 files scanned; a pattern self-check) — red in both apps on a scratch `bg-sky-500`. `--only` on the build: app-auth 29/29, smoke-app 73/73, payment-collection 20/20, smoke-admin 64/64. P4: lands under the HANDOVER §9 gate; the full sweep is proposed to the user as Phase 7 closes._
 _2026-10-14 (evening): **Phase 6 is COMPLETE.** The user pasted `recovery.html` into the dashboard (Reset Password; no `config push`); `/auth/v1/settings` still shows `mailer_autoconfirm: true`; the user requested a real prod reset, received the new template, set a password and signed in. `confirmation.html` rendered offline only, never sent (dormant). **Next: Phase 7 (retire the legacy), step 7.1.**_
 _2026-10-14 (afternoon): **Phase 6 code is live** (`2203cfa`…`ea0c253`, CI `38519921286` green): generate-invoices v37, credit-note-emails v6, package-emails v7 (deployed source greps `Geist,`, 0 `#0ea5e9`); admin invites via Vercel. Pre-deploy diff check: `git diff <last deploy sha> HEAD` per function = email file + test only (`functions download` now returns TYPE-STRIPPED source, so §7.187's clean-`git status` check is noise). Deno 306/306 twice; admin 1280/1280. All 13 rendered emails sent to the user's Gmail through Resend and checked there; **Outlook skipped on the user's word (no Outlook client)**. 6.1–6.4 ticked. **6.5 waits on the user's dashboard paste of `recovery.html`**, then the `mailer_autoconfirm` check and a real prod reset._
@@ -457,8 +458,21 @@ are case-insensitive or read `textContent` (§7.362).
     Include a vacuity check that the scanner saw >100 files.
   - ⚠ RISK 8 MITIGATION — **NOT visual-only (P4)** if any screen changes as a result. If the greps above are empty, the
     change is config + dead code; still propose the full sweep to the user once, as Phase 7 closes.
-- [ ] **7.2** Re-run the full audit (capture script + Impeccable detector + `/impeccable audit`) and record the score in this file.
-- [ ] **7.3** Update `DESIGN.md` status ("adopted"), PRD where screens changed behaviour, BACKLOG (delete the item), HANDOVER.
+- [x] **7.2** Re-run the full audit (capture script + Impeccable detector + `/impeccable audit`) and record the score in this file.
+  - **Score (2026-10-14, `/impeccable audit`): 16/20, Good.** Accessibility 3 · Performance 3 · Theming 3 · Responsive 3 ·
+    Implementation integrity 4.
+  - **Detector:** static scan of both apps' `app/ components/ features/` — **0 findings**, also with `--no-config
+    --no-inline-ignores` (the only project ignore is the user's Geist decision); proven live on a probe file
+    (`border-l-4`, purple gradient → 2 findings). On 2026-10-11 it found 3. Rendered scan of the five signed-out pages
+    at 1280 and 390: `icon-tile-stack` ×5 — the logo tile DESIGN.md specifies ("white on Lane Blue for the app-icon
+    tile"), **verified intentional, not drift** — and `tiny-text` on admin login at 390.
+  - **Findings, filed as BACKLOG *UI restyle leftovers*:** P1 admin text under the 12px floor below 1152px (root font
+    13px × rem tokens — RISK 11's trade-off, a user decision); P1 Toast off-token, success white-on-`#16a34a` 3.3:1.
+    Known and already filed: Modal X has no accessible name.
+  - **Not repeated:** the 81-screen manual capture. Its job is covered by the static detector over every screen's
+    source, the rendered scan above, and nightly `38483193929`'s screenshots (74/74 drivers, Phase 5 state; Phases 6–7
+    changed no screen's look). Performance is a code reading, not a measurement.
+- [x] **7.3** Update `DESIGN.md` status ("adopted"), PRD where screens changed behaviour, BACKLOG (delete the item), HANDOVER.
   - Fix DESIGN.md's One Date Style examples to match Q1's answer, so the doc and G-Sept stop disagreeing.
 
 ---

@@ -3,7 +3,7 @@
 // App L-G); props destructured on the first line so the JSX is byte-identical
 // (whitespace aside). Restyled in UI restyle step 4.6. "Tell your coach" stays
 // plain text: the public-package payload carries no contact for the business,
-// and a restyle adds no query (BACKLOG *UI/UX improvements* keeps the fold-in).
+// and a restyle adds no query (BACKLOG *UI restyle leftovers* keeps it).
 import React from "react";
 import { Text } from "react-native";
 
