@@ -1,9 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-14 — **UI restyle Phase 5 live and verified** (admin panel, `bfa971d`); scheduled nightly
-`38483193929` on `ffba544` **green, 74/74**, the user's prod hand-check passed. Next: Phase 6 (emails)._
+_Last updated: 2026-10-14 — **UI restyle Phase 6 live and verified** (every email; functions v37/v6/v7, admin `ea0c253`,
+auth template by dashboard paste + a real prod reset). Next: Phase 7 (retire the legacy), step 7.1._
 
-_Previously (§8.152, 2026-10-14) — UI restyle Phase 4 live (auth + public screens, DEPLOYMENT #90)._
+_Previously (§8.153, 2026-10-14) — UI restyle Phase 5 live (admin panel, nightly `38483193929` green 74/74)._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -351,6 +351,16 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.154 (2026-10-14) — UI restyle Phase 6: every email, live
+
+**6.1–6.5 shipped** (`2203cfa`…`ea0c253`, DEPLOYMENT #92): invoice, blocked-billing, credit-note, package, admin-invite
+and auth emails on DESIGN.md, wording unchanged; functions v37/v6/v7. Each template's new email-safe test was proven red
+on the old one. Deno 306 twice. The user checked 13 real sends in Gmail, pasted `recovery.html`, and completed a prod reset.
+
+- **Decided by the user:** Outlook check skipped (no client); `swimsync-edge` key used for the test sends.
+- **Found:** `functions download` now type-strips — §7.187 amended with the replacement check. White email header vs a
+  white logo: plan §10, PRD `logo_url` row. Drift fixed: HANDOVER's `_Previously` budget grep matched nothing.
+
 ## 8.153 (2026-10-14) — UI restyle Phase 5: the admin panel, live and nightly-green
 
 **5.0–5.29 + close-out shipped in one push** (`bfa971d`, DEPLOYMENT #91); scheduled nightly `38483193929` green, 74/74;
@@ -361,16 +371,6 @@ the user's prod hand-check passed. Per-step record: the plan's §3 ledger; admin
   actions, and role delete has no confirm: both filed in BACKLOG, not fixed in a restyle.
 - **Found:** §7.376 (a popup that closes on scroll), §7.377 (a codemod rewrote a frozen-file test). Driver row-menu
   helpers: TESTING §5. Modal X has no accessible name — BACKLOG (naming it "Close" breaks two drivers).
-
-## 8.152 (2026-10-14) — UI restyle Phase 4: auth + public screens, live
-
-**4.1–4.7 shipped in one push** (`1dd228c`, DEPLOYMENT #90), on the user's call: build all of Phase 4, then ONE nightly
-(dispatched, `38430764913`). Per-step record: the plan's §3 ledger; parent-visible changes: PRD §7.21 and §14.1.
-
-- **Held:** no changed line touches `router.`/`auth.`/`signUp`/`signIn`/`disabled=` (the Phase 4 assertion); 18
-  drivers before = after, NOT FOUND 0 → 0; every new driver check proven red on the old build.
-- **Found:** a driver selecting by colour class went blind (§7.375, fixed by `role="alert"`). **Not done:** package
-  page's contact link and the admin reset page naming its account (both need data; BACKLOG fold-ins).
 
 ## 9. Next steps (pick with the user)
 
@@ -432,9 +432,9 @@ which mutate shared seed state — are in the same section.
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
-   **Phases 0–5 verified and live** (Phase 5 = admin panel: nightly `38483193929` green + the user's prod hand-check,
-   2026-10-14). **Next build: Phase 6 (emails)** — RISK 7 governs all of it (plan §Phase 6: email-only function diff,
-   Deno suite twice, a real test email). Small, separate: BACKLOG *Cancelling a package
+   **Phases 0–6 verified and live** (Phase 6 = emails, 2026-10-14; Phase 5's nightly `38483193929` green). **Phase 6 (emails) live 2026-10-14. Next build: Phase 7, step 7.1** —
+   delete legacy `Card`/`PrimaryButton`/`StatusBadge` + the `primary-*` shades, add the banned-class CI guard. P4: NOT
+   visual-only; propose the full sweep to the user once as Phase 7 closes. Small, separate: BACKLOG *Cancelling a package
    request has no confirmation* (S). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.

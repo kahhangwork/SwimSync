@@ -1704,6 +1704,12 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     directory with the DEPLOYED source**, so clean = live matches branch, a diff = it does not. Pair with `supabase
     functions list` (`version` bumps). It mutates your tree — run on a clean tree, not mid-edit. (`generate-invoices`
     v24, `credit-note-emails` v2, 2026-08-18; §8.69)
+    - **⚠ The clean-`git status` check STOPPED WORKING (2026-10-14, CLI v2.119, §8.154):** `functions download` now
+      returns TYPE-STRIPPED, re-formatted source, so every `.ts` file diffs by hundreds of lines with no real change.
+      Use instead — BEFORE: `git diff --stat <last deploy sha> HEAD -- supabase/functions/<name>/` plus every
+      `../<other-fn>/` file it imports (the deploy sha is in `docs/DEPLOYMENT.md` §11); AFTER: `functions list`
+      (version bumped) + `grep` the downloaded file for a string only the new build has, then
+      `git checkout -- supabase/functions/` to restore the tree.
 
 188. **Transition tables are SINGLE-EVENT only — a trigger with `REFERENCING ... TABLE` and more than one event is
     rejected** (`ERROR: transition tables cannot be specified for triggers with more than one event`). Use **three

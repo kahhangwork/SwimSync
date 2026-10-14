@@ -3382,7 +3382,7 @@ from this: `available` until the note is fully drawn, then `applied`.*
 | **slug** | String | Yes | Unique, stable identifier |
 | **display_name** | String | Yes | The business's name. Appears on invoices and invoice emails |
 | **kind** | Enum | Yes | private \| school. **Onboarding copy and future pricing only — never appears in a permission rule** |
-| **logo_url** | String | No | Shown on invoice emails |
+| **logo_url** | String | No | Shown on invoice emails. *(2026-10-14, UI restyle Phase 6 — every business-branded email is headed on WHITE, not a coloured band, so a logo drawn white-on-colour does not show; no live business has a logo yet)* |
 | **paynow_qr_url** | String | No | The business's payee (§7.10) |
 | **join_code** | String | Yes | Unique. What a parent types to join (§5.1). Regenerable |
 | **auto_invoice_enabled** | Boolean | Yes | Per-business, was global |
@@ -3805,7 +3805,7 @@ same.)*
 
 ### Phase 2 — Enhancements
 
-- Email invoice and credit note notification *(implemented: invoice emails — see §7.7; credit-note emails still pending)*
+- Email invoice and credit note notification *(implemented: invoice emails — see §7.7; credit-note emails — see §7.8, 2026-08-17)* *(2026-10-14, UI restyle Phase 6 — every transactional and auth email follows DESIGN.md: neutral page, flat bordered card, money in black tabular figures, one blue button; wording unchanged)*
 - Optional WhatsApp payment reminder
 - Better filtering and search
 - More polished dashboards

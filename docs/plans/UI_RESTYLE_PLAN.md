@@ -597,8 +597,8 @@ not fix it inside a visual-only commit) · the BACKLOG items outside *UI/UX impr
 
 - **Phase 6 (2026-10-14): the tenant email header is white, not a sky band.** A tenant logo drawn for the old band
   (white on transparent) would vanish on it. Prod had **0 of 3 tenants with a logo** when this landed
-  (`scripts/prod-query-ro.sh`), so nothing live changes; the logo upload screen should say "on a white background"
-  the day a tenant uploads one.
+  (`scripts/prod-query-ro.sh`), so nothing live changes; there is no logo upload screen (`logo_url` is set by
+  hand), so whoever sets one uses a logo drawn for a white background. PRD's `logo_url` row says so.
 
 ---
 

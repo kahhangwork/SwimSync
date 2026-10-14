@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.152** | 2026-10-14 | UI restyle Phase 4: auth + public screens, live | plan UI_RESTYLE §3 · PRD §7.21, §14.1 · §7.375 · DEPLOYMENT #90 |
 | **8.151** | 2026-10-13 | UI restyle Phase 3: ten parent screens, live | plan UI_RESTYLE §3 · PRD §14.1 · DEPLOYMENT #89 |
 | **8.150** | 2026-10-13 | Legacy package matcher removed (Wave 9 item 9), live | `20261013000100` header · TESTING §5 · DEPLOYMENT #88 |
 | **8.149** | 2026-10-12 → 13 | UI restyle 1.3–1.6 and 2.2–2.8 live | plan UI_RESTYLE §3 · §7.372–§7.374 · DEPLOYMENT #87 |

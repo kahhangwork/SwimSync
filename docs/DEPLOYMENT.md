@@ -1266,3 +1266,11 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     Before the push: CI repo invariants locally; 19 billing drivers `--only` = nightly `38430764913`; admin vitest + both
     typechecks. Live: admin.swimsync.sg's bundle carried `Blocks billing`. User's prod hand-check passed; scheduled
     nightly `38483193929` (on `ffba544`) green, 74/74.
+92. **Deploy record (2026-10-14): UI restyle Phase 6 — every email.** No migration (0 pending). Pre-deploy: per function,
+    `git diff <last deploy sha> HEAD` = `email.ts` + its test only (generate-invoices since `6632202`, the two email
+    functions since `58b532c`; `package-emails`' import `generate-invoices/dates.ts` unchanged); last `billing_runs` row
+    2026-10-12, not the 1st–3rd. Functions one at a time: generate-invoices **v37**, credit-note-emails **v6**,
+    package-emails **v7**; downloaded source greps `Geist,`, 0 `#0ea5e9` (§7.187 amended — download is type-stripped now).
+    Then `ui/phase6-emails` → `main` as `ea0c253` (admin invite emails ride Vercel); CI `38519921286` green. Auth
+    `recovery.html` by the user's DASHBOARD PASTE (no `config push`); `/auth/v1/settings` `mailer_autoconfirm: true`
+    after it; the user completed a real prod reset. 13 rendered emails checked in Gmail; Outlook skipped (user).
