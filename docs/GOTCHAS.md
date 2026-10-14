@@ -1752,6 +1752,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       tokens they do NOT scale with the shell while every rem class around them does — at 1152px a 14px label sits in a
       13px-rem layout. Pick px-or-rem for admin `fontSize` tokens before the admin shell restyle (UI_RESTYLE_PLAN 1.6)
       and screenshot every admin restyle at 1440, 1280 and 1152px.
+    - **The 13px step is gone (2026-10-14, the user's call):** it put Body at 11.4px and Label at 9.75px. The root now
+      stops at 14px (≤1280px); `designTokens.drift.test.ts` fails on any root size under 14px. Scale everything
+      together — never floor text alone (the controls would no longer fit their text).
 
 194. **↪ Folded into §7.177 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 

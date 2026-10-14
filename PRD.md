@@ -3743,6 +3743,7 @@ same.)*
   collapsed header takes its loudest child's colour; the current page has a grey fill and `aria-current="page"`. The
   whole panel also **auto-scales down on narrower screens** (root font-size media queries) so it fits a
   smaller laptop without manual browser zoom — DESIGN.md's type sizes are rem in the admin so they scale with it.
+  It stops at 87.5% (≤1280px wide) so body text never drops below ~12px *(implemented 2026-10-14; a 13px step was removed)*.
   **Below 800px** the sidebar becomes a top bar with a **Menu** button that opens the same navigation as a drawer
   (closes on navigation or Esc), so the page gets the full width of a phone.
 - Persistent search bar and filter controls on all table views

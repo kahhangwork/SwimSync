@@ -42,7 +42,7 @@ async function toggleBox(page) {
       track: { w: t.width, h: t.height, l: t.left, r: t.right },
       knob: { w: k.width, h: k.height, l: k.left, r: k.right },
       // Tailwind sizes are rem-based and globals.css shrinks the root font-size
-      // below 1536px wide (16 -> 15 -> 14 -> 13px). Pixel pins moved with it
+      // below 1536px wide (16 -> 15 -> 14px). Pixel pins moved with it
       // (§7.73 family: 3 red nights, 2026-08-17..19); measure in rem instead.
       rem: parseFloat(getComputedStyle(document.documentElement).fontSize),
       pressed: btn.getAttribute("aria-pressed"),

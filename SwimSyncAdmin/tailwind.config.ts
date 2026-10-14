@@ -40,7 +40,7 @@ const config: Config = {
       // Line heights in px, not multipliers: React Native has no unitless
       // line-height, and the twin config must say the same thing.
       // REM here, unlike the app's px twin: the admin shrinks its root font
-      // 16→13px below 1536px so the whole panel scales together (globals.css),
+      // 16→14px below 1536px so the whole panel scales together (globals.css),
       // and the user chose (2026-10-12, UI restyle 1.6) that DESIGN.md's sizes
       // scale with it. Each value is DESIGN.md's px ÷ 16; the drift test converts.
       fontSize: {

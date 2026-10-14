@@ -432,8 +432,8 @@ which mutate shared seed state — are in the same section.
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **UI restyle (Wave 9 item 8) is COMPLETE** (2026-10-14; `docs/plans/UI_RESTYLE_PLAN.md` closed, DESIGN.md adopted).
    **7.1 (`d12210f`) is P4 and unverified:** read the next scheduled nightly before the next APP unit merges (or run the
-   full sweep if the user says yes). What it left: BACKLOG *UI restyle leftovers* — first, **a user decision** on admin
-   text below 12px at ≤1152px (keep rem scaling / floor text / stop scaling). Small, separate: *Cancelling a package
+   full sweep if the user says yes). What it left: BACKLOG *UI restyle leftovers* (the admin 12px-floor decision is done:
+   root font stops at 14px, 2026-10-14). Small, separate: *Cancelling a package
    request has no confirmation* (S). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.

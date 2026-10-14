@@ -1590,10 +1590,6 @@ or one shared component; fix whenever the screen is touched, or as its own S. Th
 **Why:** DESIGN.md is adopted, so each of these is now a defect against it, not a taste question.
 
 **Found by the 7.2 audit (2026-10-14):**
-- **Admin text falls under the 12px floor below 1152px wide** (P1, a11y). `globals.css` steps the root font to 13px at
-  ≤1152px and admin type tokens are rem (RISK 11, the user's call 2026-10-12), so Body 14px renders 11.375px and Label
-  12px renders 9.75px. **A decision for the user, not a fix:** keep the scaling (and accept the floor breach on small
-  laptops), floor the root at 16px for text only, or stop scaling below 1280px.
 - **Toast is off-token, and its success colour fails contrast** (P1). `SwimSyncApp/components/Toast.tsx:9–11` —
   `#16a34a` / `#dc2626` / `#334155`; white on `#16a34a` is 3.3:1 (AA needs 4.5:1). Move to the status scale's text
   colours (`#166534` success, `#b91c1c` danger, Ink info). Shared chrome: P4, not visual-only.

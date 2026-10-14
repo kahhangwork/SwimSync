@@ -13,11 +13,14 @@
  * We only ever scale DOWN, never up: a large monitor stays at the 16px design
  * size. Keyed on width (not height) because the pain is horizontal crowding of
  * the filter row / action buttons; density follows for free.
+ *
+ * 14px is the FLOOR (the user's call, 2026-10-14): a 13px step at <=1152px put
+ * Body at 11.4px and Label at 9.75px. lib/designTokens.drift.test.ts fails on
+ * any root size below 14px.
  */
 html { font-size: 16px; }
 @media (max-width: 1536px) { html { font-size: 15px; } }
 @media (max-width: 1280px) { html { font-size: 14px; } }
-@media (max-width: 1152px) { html { font-size: 13px; } }
 
 body {
   @apply bg-ground text-ink;

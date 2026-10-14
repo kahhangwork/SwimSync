@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 // TWIN FILE: SwimSyncApp/lib/designTokens.drift.test.ts is identical except that it
 // uses jest globals, loads that app's tailwind.config.js and scans that app's source
 // folders (SCAN) — and this admin copy reads its type sizes as REM (px ÷ 16, the
-// user's 1.6 decision: they scale with the admin's root font). Keep in sync.
+// user's 1.6 decision: they scale with the admin's root font) and adds an
+// admin-only root-font floor test at the end. Keep in sync.
 //
 // DESIGN.md's front matter is the source of the visual tokens; each app's Tailwind
 // config holds a hand copy (two deploy roots — neither can import from the repo
@@ -138,5 +139,23 @@ describe("no Tailwind default-palette colour classes outside the allowlist", () 
       .filter((f) => !ALLOW.has(relative(root, f).split(sep).join("/")))
       .flatMap((f) => (readFileSync(f, "utf8").match(BANNED) ?? []).map((c) => `${relative(root, f)}: ${c}`));
     expect(hits).toEqual([]);
+  });
+});
+
+// ADMIN ONLY (the app has no root-font scaling). globals.css shrinks the root
+// font on narrow screens and every token above is rem, so the smallest root sets
+// the smallest text. 14px keeps Body at 12.25px; the 13px step put it at 11.4px
+// and Label at 9.75px (7.2 audit; the user chose to stop scaling at 14px,
+// 2026-10-14). Scale everything together — never floor text alone.
+describe("admin root font never scales below 14px", () => {
+  const css = readFileSync(join(__dirname, "..", "app", "globals.css"), "utf8");
+  const sizes = [...css.matchAll(/html\s*\{\s*font-size:\s*(\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1]));
+
+  it("found the root font rules (guards a silent zero-row pass)", () => {
+    expect(sizes.length).toBeGreaterThan(1);
+  });
+
+  it("every root font-size is at least 14px", () => {
+    expect(sizes.filter((s) => s < 14)).toEqual([]);
   });
 });
