@@ -268,7 +268,7 @@ Run these three. They take ten seconds together and they are the whole of the di
 
 ```bash
 wc -c HANDOVER.md                                              # budget 45000
-grep -c '^_Previously,' HANDOVER.md                            # must be ≤ 1
+grep -c '^_Previously[ ,(]' HANDOVER.md                         # must be ≤ 1
 perl -CSD -nle 'print length, " ", $_ if /^\| \*\*8/ && length>200' HANDOVER.md | sort -rn | head   # §7.283: never awk
                                                                # must print NOTHING
 ```

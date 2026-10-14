@@ -5,7 +5,7 @@ _Last updated: 2026-10-14 — **UI restyle Phase 5 live and verified** (admin pa
 
 _Previously (§8.152, 2026-10-14) — UI restyle Phase 4 live (auth + public screens, DEPLOYMENT #90)._
 
-_**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
+_**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
 copy of a session that §8 already holds in full and `docs/SESSIONS.md` holds as a row; three
 copies are not read three times, they just disagree. Older state: §8, then `docs/SESSIONS.md`._
@@ -486,7 +486,7 @@ leave the file smaller. Three commands, ten seconds:
 
 ```bash
 wc -c HANDOVER.md                                              # budget 45000
-grep -c '^_Previously,' HANDOVER.md                            # must be ≤ 1
+grep -c '^_Previously[ ,(]' HANDOVER.md                         # must be ≤ 1
 perl -CSD -nle 'print length if /^\| \*\*8/ && length>200' HANDOVER.md   # must print NOTHING
 ```
 
