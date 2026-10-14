@@ -1,7 +1,7 @@
 # SwimSync — Session Handover
 
 _Last updated: 2026-10-14 — **UI restyle COMPLETE** (Phase 7: legacy retired + palette guard `d12210f`, audit 16/20,
-DESIGN.md adopted). 7.1 is the one unverified landing (P4). Next: the user's call on admin text scaling; *UI restyle leftovers*._
+DESIGN.md adopted). 7.1 verified (user-requested nightly 38548376173 green). Admin root font floored at 14px (`41e48e8`). Next: *UI restyle leftovers*._
 
 _Previously (§8.154, 2026-10-14) — UI restyle Phase 6 live (every email; functions v37/v6/v7)._
 
@@ -431,8 +431,7 @@ which mutate shared seed state — are in the same section.
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **UI restyle (Wave 9 item 8) is COMPLETE** (2026-10-14; `docs/plans/UI_RESTYLE_PLAN.md` closed, DESIGN.md adopted).
-   **7.1 (`d12210f`) is P4 and unverified:** read the next scheduled nightly before the next APP unit merges (or run the
-   full sweep if the user says yes). What it left: BACKLOG *UI restyle leftovers* (the admin 12px-floor decision is done:
+   **7.1 (`d12210f`) is verified** — nightly 38548376173 on `0cf8ed1` green (dispatched at the user's request). What it left: BACKLOG *UI restyle leftovers* (the admin 12px-floor decision is done:
    root font stops at 14px, 2026-10-14). Small, separate: *Cancelling a package
    request has no confirmation* (S). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
