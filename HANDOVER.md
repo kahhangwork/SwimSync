@@ -1,7 +1,7 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-14 — **UI restyle Phase 4 live** (auth + public screens, DEPLOYMENT #90); nightly
-`38430764913` dispatched on the user's word — **read it first**. Next: the user's prod hand-check, then Phase 5._
+_Last updated: 2026-10-14 — **UI restyle Phase 5 live and verified** (admin panel, `bfa971d`); scheduled nightly
+`38483193929` on `ffba544` **green, 74/74**, the user's prod hand-check passed. Next: Phase 6 (emails)._
 
 _Previously (§8.151, 2026-10-13 night) — UI restyle Phase 3 live (ten parent screens, DEPLOYMENT #89)._
 
@@ -415,9 +415,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-14:** `38430764913` read **GREEN** — Phase 4 verified. Then **all of Phase 5 (admin panel, 5.0–5.29)
-landed in one push on the user's word**; the user's prod hand-check PASSED — the NEXT nightly is its verdict: read it, fill the plan's three Phase 5 ledger
-rows, and land nothing more until it is green. 11 drivers were edited for the row "…" menu and have not run since. Previous: `38397974946` GREEN 74/74 (Phase 3).
+**State on 2026-10-14:** scheduled `38483193929` (on `ffba544`) read **GREEN, 74/74** — all of Phase 5 (admin panel,
+5.0–5.29, landed in one push on the user's word) verified; the 11 drivers edited for the row "…" menu and `money-admin`
+(44/44) all green. Zero unverified landings. Previous: `38430764913` GREEN 74/74 (Phase 4).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -435,9 +435,9 @@ which mutate shared seed state — are in the same section.
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
 3. **THE ACTIVE BUILD — UI restyle (Wave 9 item 8): follow `docs/plans/UI_RESTYLE_PLAN.md`** (its §0, then §3 for state).
-   **Phases 0–3 verified; Phase 4 live 2026-10-14, unverified until `38430764913` is read.** The **user's prod
-   hand-check PASSED** (2026-10-14). **Next build: Phase 5 (admin panel), step 5.1** — two of its drivers select by colour
-   class (§7.375): fix them by role in the step that restyles them. Small, separate: BACKLOG *Cancelling a package
+   **Phases 0–5 verified and live** (Phase 5 = admin panel: nightly `38483193929` green + the user's prod hand-check,
+   2026-10-14). **Next build: Phase 6 (emails)** — RISK 7 governs all of it (plan §Phase 6: email-only function diff,
+   Deno suite twice, a real test email). Small, separate: BACKLOG *Cancelling a package
    request has no confirmation* (S). Keep the lid open during any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
