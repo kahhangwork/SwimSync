@@ -1,5 +1,5 @@
-// DESIGN.md's buttons (UI restyle step 1.3). Lives beside the legacy
-// components/PrimaryButton until Phase 7 retires it — screens move one at a time.
+// DESIGN.md's buttons (UI restyle step 1.3). The legacy
+// components/PrimaryButton went in 7.1.
 //
 // Every class string below is a FULL literal in a Record: Tailwind keeps only a
 // class it can read whole in the source, so `bg-${x}` is purged with no error

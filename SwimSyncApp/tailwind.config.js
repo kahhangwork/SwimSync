@@ -15,24 +15,13 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
-      // DESIGN.md's tokens, ADDED beside the legacy palette — nothing here
-      // renames a class a screen already uses, so adding them changes no screen.
-      // Screens adopt them one at a time (BACKLOG → UI/UX improvements).
+      // DESIGN.md's tokens. The legacy sky shades (`primary-50…900`) were deleted in
+      // UI restyle 7.1, once no screen used them; the drift test's palette guard
+      // keeps every Tailwind default-palette colour out of the source.
       // TWIN: SwimSyncAdmin/tailwind.config.ts holds the same tokens; each app's
       // lib/designTokens.drift.test.ts pins its copy to DESIGN.md's front matter.
       colors: {
         primary: {
-          // Legacy sky shades — still on most screens until each migrates.
-          50:  "#f0f9ff",
-          100: "#e0f2fe",
-          200: "#bae6fd",
-          300: "#7dd3fc",
-          400: "#38bdf8",
-          500: "#0ea5e9",
-          600: "#0284c7",
-          700: "#0369a1",
-          800: "#075985",
-          900: "#0c4a6e",
           // DESIGN.md Lane Blue: `bg-primary`, `active:bg-primary-hover`.
           DEFAULT: "#2563eb",
           hover: "#1d4ed8",

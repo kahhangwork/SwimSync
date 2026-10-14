@@ -80,6 +80,7 @@ Decisions this plan makes (the user may overrule; none changes the look):
 ---
 
 ## 3. State (update in every commit that ticks a step)
+_2026-10-14 (night): **7.1 built** — `Card`/`PrimaryButton`/`SectionHeader` deleted (0 importers; `tsc` green), `primary-50…900` deleted from both configs (0 uses), app `Logo` tile `bg-blue-600` → `bg-primary` (same `#2563eb`; it was the last default-palette class outside `classColours.ts`). The drift tests' `primary-<shade>` ratchet is now the full RISK 10 guard (every default-palette colour class, allowlist `lib/classColours.ts`; >100 files scanned; a pattern self-check) — red in both apps on a scratch `bg-sky-500`. `--only` on the build: app-auth 29/29, smoke-app 73/73, payment-collection 20/20, smoke-admin 64/64. P4: lands under the HANDOVER §9 gate; the full sweep is proposed to the user as Phase 7 closes._
 _2026-10-14 (evening): **Phase 6 is COMPLETE.** The user pasted `recovery.html` into the dashboard (Reset Password; no `config push`); `/auth/v1/settings` still shows `mailer_autoconfirm: true`; the user requested a real prod reset, received the new template, set a password and signed in. `confirmation.html` rendered offline only, never sent (dormant). **Next: Phase 7 (retire the legacy), step 7.1.**_
 _2026-10-14 (afternoon): **Phase 6 code is live** (`2203cfa`…`ea0c253`, CI `38519921286` green): generate-invoices v37, credit-note-emails v6, package-emails v7 (deployed source greps `Geist,`, 0 `#0ea5e9`); admin invites via Vercel. Pre-deploy diff check: `git diff <last deploy sha> HEAD` per function = email file + test only (`functions download` now returns TYPE-STRIPPED source, so §7.187's clean-`git status` check is noise). Deno 306/306 twice; admin 1280/1280. All 13 rendered emails sent to the user's Gmail through Resend and checked there; **Outlook skipped on the user's word (no Outlook client)**. 6.1–6.4 ticked. **6.5 waits on the user's dashboard paste of `recovery.html`**, then the `mailer_autoconfirm` check and a real prod reset._
 _2026-10-14 (night): the scheduled nightly `38483193929` (on `ffba544`) read **green**, 74/74 — 5.0–5.29 verified (with the user's prod hand-check); zero unverified landings. `money-admin` 44/44 on its RowMenu fix; the 11 edited drivers all green. **Phase 5 is complete. Next: Phase 6 (emails).**_
@@ -448,7 +449,7 @@ are case-insensitive or read `textContent` (§7.362).
     tenant-provisioning` green.
 
 ### Phase 7 — retire the legacy
-- [ ] **7.1** Delete legacy `Card`, `PrimaryButton`, `StatusBadge` (both apps) once no importer remains; delete the `primary-50…900` sky shades from both configs; add a CI guard (a drift-test assertion) that the banned classes in §1 do not reappear outside the §7 allowlist.
+- [x] **7.1** Delete legacy `Card`, `PrimaryButton`, `StatusBadge` (both apps) once no importer remains; delete the `primary-50…900` sky shades from both configs; add a CI guard (a drift-test assertion) that the banned classes in §1 do not reappear outside the §7 allowlist.
   - ⚠ RISK 10 MITIGATION — Tailwind drops an unknown class silently. **Before deleting a config shade or a component,
     assert zero uses:** `grep -rEn '\-primary-[0-9]{2,3}\b'` across `app/ components/ features/ lib/` of both apps prints
     nothing, and `tsc` proves no importer. **The guard is a test, not a note:** it fails on any §1 banned class (the widened
@@ -594,6 +595,11 @@ not fix it inside a visual-only commit) · the BACKLOG items outside *UI/UX impr
 ---
 
 ## 10. Accepted consequences
+
+- **7.1 (2026-10-14): `StatusBadge` stays, in both apps.** 7.1 deletes it "once no importer remains"; 7 app and 11 admin
+  screens still import it, and since step 1.4 it is no longer legacy — a three-line word→tone adapter over `ui/Tag`
+  with no colour class of its own. Migrating 18 importers to call `Tag` + `statusTone` directly would move billing
+  screens for no visual change. `Card`, `PrimaryButton` and the dead `SectionHeader` (0 importers each) went.
 
 - **Phase 6 (2026-10-14): the tenant email header is white, not a sky band.** A tenant logo drawn for the old band
   (white on transparent) would vanish on it. Prod had **0 of 3 tenants with a logo** when this landed

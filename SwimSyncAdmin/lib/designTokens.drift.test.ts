@@ -14,7 +14,7 @@ import { describe, it, expect } from "vitest";
 // what DESIGN.md's format fixes.
 
 import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import config from "../tailwind.config";
 
 const ROOT = join(__dirname, "..", "..");
@@ -93,12 +93,24 @@ describe("DESIGN.md tokens ↔ tailwind config", () => {
   });
 });
 
-// The legacy sky shades (`primary-50…900`) stay in the config until Phase 7, but
-// DESIGN.md's Lane Blue is `primary` / `primary-hover` — a `bg-primary-500` written
-// today is SKY, the wrong blue, and looks almost right. Zero in the source on
-// 2026-10-12, so this is a ratchet that can only stay at zero (UI restyle 1.3).
-// MUTATION PROOF (§7.25): add `bg-primary-500` to any components/ file → RED.
+// UI restyle 7.1 (⚠ RISK 10): only DESIGN.md's token classes may colour the UI. Tailwind
+// drops an unknown class SILENTLY, so nothing else would notice one reappearing: this
+// fails on any Tailwind DEFAULT-PALETTE colour class (`bg-sky-500`, `text-gray-900`,
+// `border-red-200`, …) and on any `-primary-<shade>` (the deleted legacy sky shades).
+// White / black / transparent / current carry no shade and are not matched.
+// ALLOWLIST — extend only with a one-line reason here and in UI_RESTYLE_PLAN.md §7:
+//   lib/classColours.ts — the class colour palette is TENANT DATA (`classes.colour`
+//   keys), never restyled (⚠ RISK 9). Admin only.
+// TWIN: SwimSyncApp/lib/designTokens.drift.test.ts holds the same guard.
+// MUTATION PROOF (§7.25): add `bg-sky-500` to any components/ file → RED.
 const SCAN = ["app", "components", "lib"];
+const ALLOW = new Set(["lib/classColours.ts"]);
+const PALETTE =
+  "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
+const BANNED = new RegExp(
+  `[\\w:]*\\b(?:bg|text|border|ring|divide|outline|fill|stroke|from|to|via|placeholder|decoration)-(?:(?:${PALETTE})-\\d{2,3}|primary-\\d+)\\b`,
+  "g",
+);
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
@@ -108,17 +120,23 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-describe("no legacy primary-<shade> classes", () => {
-  const files = SCAN.flatMap((d) => sourceFiles(join(__dirname, "..", d)));
+describe("no Tailwind default-palette colour classes outside the allowlist", () => {
+  const root = join(__dirname, "..");
+  const files = SCAN.flatMap((d) => sourceFiles(join(root, d)));
 
   it("scanned the source (guards a silent zero-row pass)", () => {
     expect(files.length).toBeGreaterThan(100);
   });
 
-  it("zero `-primary-<number>` classes", () => {
-    const hits = files.flatMap((f) =>
-      (readFileSync(f, "utf8").match(/[\w:]*-primary-\d+\b/g) ?? []).map((c) => `${f}: ${c}`),
-    );
+  it("the pattern catches what it must (guards a pattern that matches nothing)", () => {
+    const probe = "bg-sky-500 hover:text-gray-900 border-red-200 bg-primary-500 bg-primary text-white";
+    expect(probe.match(BANNED)).toEqual(["bg-sky-500", "hover:text-gray-900", "border-red-200", "bg-primary-500"]);
+  });
+
+  it("zero banned classes", () => {
+    const hits = files
+      .filter((f) => !ALLOW.has(relative(root, f).split(sep).join("/")))
+      .flatMap((f) => (readFileSync(f, "utf8").match(BANNED) ?? []).map((c) => `${relative(root, f)}: ${c}`));
     expect(hits).toEqual([]);
   });
 });

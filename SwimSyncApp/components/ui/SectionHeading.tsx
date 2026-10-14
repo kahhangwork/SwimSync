@@ -1,6 +1,6 @@
 // DESIGN.md's section label (UI restyle step 1.3): the small muted heading over a
 // group of cards — "Coming up", "Done". The screen title is Display, a card title
-// Headline; this is neither. Beside the legacy components/SectionHeader until Phase 7.
+// Headline; this is neither. (The legacy SectionHeader went in 7.1.)
 import React from "react";
 import { Text } from "react-native";
 

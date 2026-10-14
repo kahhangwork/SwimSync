@@ -42,7 +42,7 @@ export default function Logo({
 
   return (
     <View
-      className={`bg-blue-600 items-center justify-center ${box} ${className}`}
+      className={`bg-primary items-center justify-center ${box} ${className}`}
       // Decorative. Every call site sits the mark next to text that already
       // names the product, so labelling it here just announces "SwimSync"
       // twice. The admin twin renders its SVG `aria-hidden` for the same reason.

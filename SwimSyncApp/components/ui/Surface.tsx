@@ -1,5 +1,5 @@
 // DESIGN.md's card (UI restyle step 1.3): Surface, 1px Border, 8px corners, 16px
-// padding, no shadow. Beside the legacy components/Card until Phase 7.
+// padding, no shadow. (The legacy Card went in 7.1.)
 import React from "react";
 import { View, type ViewProps } from "react-native";
 
