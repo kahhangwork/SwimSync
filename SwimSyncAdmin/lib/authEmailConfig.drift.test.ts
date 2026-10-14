@@ -167,6 +167,22 @@ describe("supabase auth email config", () => {
         expect(body).not.toMatch(/<link[\s>]/i);
         expect(body).not.toMatch(/src\s*=\s*["']https?:/i);
       });
+
+      // UI restyle Phase 6 (⚠ RISK 7): DESIGN.md, email-safe. Inline CSS only, and
+      // every family names Geist first and a system font last — mail clients never
+      // load Geist.
+      it("is styled email-safe, Geist first with a system fallback", () => {
+        const body = templateBody(contentPath());
+        for (const b of ["var(", "display:flex", "display:grid", "@font-face", "@import"]) {
+          expect(body).not.toContain(b);
+        }
+        const families = [...body.matchAll(/font-family:([^;"]+)/g)].map((m) => m[1]);
+        expect(families.length).toBeGreaterThan(0);
+        for (const f of families) {
+          expect(f.startsWith("Geist,"), `font-family must start with Geist: ${f}`).toBe(true);
+          expect(/sans-serif\s*$/.test(f), `font-family must end in a system fallback: ${f}`).toBe(true);
+        }
+      });
     });
   }
 });

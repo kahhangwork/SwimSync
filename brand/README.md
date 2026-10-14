@@ -72,6 +72,6 @@ platform is named in the footer only. That is a deliberate product decision; do
 not "fix" it by putting this mark in the header.
 
 The **password-recovery email** (`supabase/templates/recovery.html`) uses a plain
-text wordmark in its sky header. That is intentional too: SVG does not render in
+text wordmark in its header. That is intentional too: SVG does not render in
 most email clients, and a hosted PNG adds a broken-image and blocked-image failure
 mode to a message the user needs in order to get back into their account.

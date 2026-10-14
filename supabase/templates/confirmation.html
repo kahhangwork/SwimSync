@@ -4,7 +4,7 @@
   Local/CLI: referenced from supabase/config.toml [auth.email.template.confirmation].
   Supabase template vars available here: {{ .ConfirmationURL }} {{ .SiteURL }} {{ .Email }} {{ .Token }}
   Keep it inline-CSS + no external assets (email clients strip <style>/remote resources).
-  The sky header is a PLAIN TEXT wordmark on purpose — see brand/README.md: an SVG does
+  The header is a PLAIN TEXT wordmark on purpose — see brand/README.md: an SVG does
   not render in most email clients and a hosted PNG adds a blocked-image failure mode.
 
   ⚠ THIS TEMPLATE IS DORMANT, AND THAT IS THE POINT.
@@ -17,47 +17,47 @@
   the two live on the same dashboard page, which is exactly the trap.
   Guarded by SwimSyncAdmin/lib/authEmailConfig.drift.test.ts.
 -->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;padding:32px 0;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <tr>
     <td align="center">
-      <table role="presentation" width="440" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+      <table role="presentation" width="440" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e5e5e5;border-radius:8px;">
         <tr>
-          <td style="background:#0ea5e9;padding:24px 32px;">
-            <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">SwimSync</span>
+          <td style="padding:24px 32px;border-bottom:1px solid #f0f0f0;">
+            <span style="color:#0a0a0a;font-size:20px;font-weight:600;letter-spacing:-0.03em;">SwimSync</span>
           </td>
         </tr>
         <tr>
           <td style="padding:32px;">
-            <h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Confirm your email</h1>
-            <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
+            <h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Confirm your email</h1>
+            <p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#525252;">
               Thanks for signing up to SwimSync with <strong>{{ .Email }}</strong>.
               Tap the button below to confirm this address and finish setting up your account.
             </p>
             <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
               <tr>
-                <td style="border-radius:8px;background:#0ea5e9;">
+                <td style="border-radius:6px;background:#2563eb;">
                   <a href="{{ .ConfirmationURL }}"
-                     style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">
+                     style="display:inline-block;padding:12px 16px;font-size:14px;font-weight:600;line-height:20px;color:#ffffff;text-decoration:none;border-radius:6px;">
                     Confirm email
                   </a>
                 </td>
               </tr>
             </table>
-            <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#94a3b8;">
+            <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#6b6b6b;">
               If the button doesn't work, copy and paste this link into your browser:
             </p>
-            <p style="margin:0 0 24px;font-size:13px;line-height:1.6;word-break:break-all;">
-              <a href="{{ .ConfirmationURL }}" style="color:#0ea5e9;">{{ .ConfirmationURL }}</a>
+            <p style="margin:0 0 24px;font-size:13px;line-height:1.5;word-break:break-all;">
+              <a href="{{ .ConfirmationURL }}" style="color:#2563eb;">{{ .ConfirmationURL }}</a>
             </p>
-            <p style="margin:0;font-size:13px;line-height:1.6;color:#94a3b8;">
+            <p style="margin:0;font-size:13px;line-height:1.5;color:#6b6b6b;">
               Didn't sign up? You can safely ignore this email — the address stays
               unconfirmed and nobody can sign in with it.
             </p>
           </td>
         </tr>
         <tr>
-          <td style="padding:20px 32px;border-top:1px solid #eef2f6;">
-            <p style="margin:0;font-size:12px;color:#94a3b8;">SwimSync · Swim attendance &amp; billing</p>
+          <td style="padding:16px 32px;border-top:1px solid #f0f0f0;">
+            <p style="margin:0;font-size:12px;color:#6b6b6b;">SwimSync · Swim attendance &amp; billing</p>
           </td>
         </tr>
       </table>
