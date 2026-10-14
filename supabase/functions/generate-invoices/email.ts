@@ -186,8 +186,14 @@ export function buildInvoiceEmailSubject(data: InvoiceEmailData): string {
     : `Your SwimSync invoice for ${formatBillingMonth(data.billingMonth)}`;
 }
 
-// Branded HTML matching supabase/templates/recovery.html (sky header, white
-// card, inline CSS, no external assets — email clients strip <style>/remote).
+// DESIGN.md, inline: email clients strip <style> and never load Geist, so the
+// family always ends in a system fallback. Ground page, flat white card with a
+// 1px border, the tenant's name in Ink (never a SwimSync colour band), money in
+// Ink with tabular figures, one Lane Blue button.
+const FONT = "Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const LABEL_TD = "padding:6px 0;font-size:13px;color:#525252;text-align:right;";
+const MONEY_TD = "padding:6px 0;font-size:13px;color:#0a0a0a;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;";
+
 export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
   const appUrl = data.appUrl ?? DEFAULT_APP_URL;
   const monthLabel = formatBillingMonth(data.billingMonth);
@@ -198,15 +204,15 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
     .map(
       (i) => `
               <tr>
-                <td style="padding:8px 0;font-size:13px;color:#475569;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${escapeHtml(
+                <td style="padding:8px 0;font-size:13px;color:#525252;border-bottom:1px solid #f0f0f0;white-space:nowrap;">${escapeHtml(
                   formatSessionDate(i.sessionDate)
                 )}</td>
-                <td style="padding:8px 12px;font-size:13px;color:#0f172a;border-bottom:1px solid #f1f5f9;">${escapeHtml(
+                <td style="padding:8px 12px;font-size:13px;color:#0a0a0a;border-bottom:1px solid #f0f0f0;">${escapeHtml(
                   i.classTitle
-                )}<span style="color:#94a3b8;"> · ${escapeHtml(
+                )}<span style="color:#6b6b6b;"> · ${escapeHtml(
         i.studentName
       )}</span></td>
-                <td style="padding:8px 0;font-size:13px;color:#0f172a;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${escapeHtml(
+                <td style="padding:8px 0;font-size:13px;color:#0a0a0a;border-bottom:1px solid #f0f0f0;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;">${escapeHtml(
                   money(i.amount)
                 )}</td>
               </tr>`
@@ -217,8 +223,8 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
     (data.packageApplied ?? 0) > 0
       ? `
               <tr>
-                <td colspan="2" style="padding:6px 0;font-size:13px;color:#475569;text-align:right;">Package applied</td>
-                <td style="padding:6px 0;font-size:13px;color:#2563eb;text-align:right;white-space:nowrap;">−${escapeHtml(
+                <td colspan="2" style="${LABEL_TD}">Package applied</td>
+                <td style="${MONEY_TD}">−${escapeHtml(
                   money(data.packageApplied ?? 0)
                 )}</td>
               </tr>`
@@ -228,8 +234,8 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
     data.credit > 0
       ? `
               <tr>
-                <td colspan="2" style="padding:6px 0;font-size:13px;color:#475569;text-align:right;">Credit applied</td>
-                <td style="padding:6px 0;font-size:13px;color:#2563eb;text-align:right;white-space:nowrap;">−${escapeHtml(
+                <td colspan="2" style="${LABEL_TD}">Credit applied</td>
+                <td style="${MONEY_TD}">−${escapeHtml(
                   money(data.credit)
                 )}</td>
               </tr>`
@@ -240,8 +246,8 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
     (data.balanceAdjustment ?? 0) > 0
       ? `
               <tr>
-                <td colspan="2" style="padding:6px 0;font-size:13px;color:#475569;text-align:right;">Adjustment from a prior invoice</td>
-                <td style="padding:6px 0;font-size:13px;color:#dc2626;text-align:right;white-space:nowrap;">+${escapeHtml(
+                <td colspan="2" style="${LABEL_TD}">Adjustment from a prior invoice</td>
+                <td style="${MONEY_TD}">+${escapeHtml(
                   money(data.balanceAdjustment ?? 0)
                 )}</td>
               </tr>`
@@ -254,25 +260,25 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
         ? "your lesson package"
         : "your credit balance";
   const payBlock = fullyCovered
-    ? `<p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#475569;">
-              This invoice is <strong>fully covered by ${coveredBy}</strong> — there's nothing to pay. You can view the details in the app.
+    ? `<p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#525252;">
+              This invoice is <strong style="color:#0a0a0a;">fully covered by ${coveredBy}</strong> — there's nothing to pay. You can view the details in the app.
             </p>`
-    : `<p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
+    : `<p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#525252;">
               Pay via the coach's PayNow QR code shown in the app, then the coach will mark it as paid.
             </p>`;
 
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;padding:32px 0;font-family:${FONT};">
   <tr>
     <td align="center">
-      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e5e5e5;border-radius:8px;">
         <tr>
-          <td style="background:#0ea5e9;padding:24px 32px;">
+          <td style="padding:24px 32px;border-bottom:1px solid #f0f0f0;">
             ${
               data.logoUrl
                 ? `<img src="${escapeHtml(data.logoUrl)}" alt="${escapeHtml(
                     data.businessName ?? "Logo"
                   )}" height="28" style="height:28px;vertical-align:middle;border:0;" />`
-                : `<span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">${escapeHtml(
+                : `<span style="color:#0a0a0a;font-size:16px;font-weight:600;">${escapeHtml(
                     data.businessName ?? "SwimSync"
                   )}</span>`
             }
@@ -280,15 +286,15 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
         </tr>
         <tr>
           <td style="padding:32px;">
-            <h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Your invoice for ${escapeHtml(
+            <h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Your invoice for ${escapeHtml(
               monthLabel
             )} is ready</h1>
-            <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
+            <p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#525252;">
               Hi ${escapeHtml(
                 data.parentName
               )}, here's your ${escapeHtml(
                 data.businessName ?? "SwimSync"
-              )} invoice for <strong>${escapeHtml(
+              )} invoice for <strong style="color:#0a0a0a;">${escapeHtml(
     monthLabel
   )}</strong>.
             </p>
@@ -297,16 +303,14 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
             </table>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
               <tr>
-                <td colspan="2" style="padding:10px 0 6px;font-size:13px;color:#475569;text-align:right;">Subtotal</td>
-                <td style="padding:10px 0 6px;font-size:13px;color:#0f172a;text-align:right;white-space:nowrap;">${escapeHtml(
+                <td colspan="2" style="padding:10px 0 6px;font-size:13px;color:#525252;text-align:right;">Subtotal</td>
+                <td style="padding:10px 0 6px;font-size:13px;color:#0a0a0a;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;">${escapeHtml(
                   money(data.gross)
                 )}</td>
               </tr>${packageRow}${creditRow}${adjustmentRow}
               <tr>
-                <td colspan="2" style="padding:8px 0;font-size:16px;font-weight:700;color:#0f172a;text-align:right;border-top:2px solid #e2e8f0;">Amount due</td>
-                <td style="padding:8px 0;font-size:16px;font-weight:700;color:${
-                  fullyCovered ? "#16a34a" : "#dc2626"
-                };text-align:right;white-space:nowrap;border-top:2px solid #e2e8f0;">${escapeHtml(
+                <td colspan="2" style="padding:8px 0;font-size:16px;font-weight:600;color:#0a0a0a;text-align:right;border-top:1px solid #e5e5e5;">Amount due</td>
+                <td style="padding:8px 0;font-size:16px;font-weight:600;color:#0a0a0a;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;border-top:1px solid #e5e5e5;">${escapeHtml(
     money(data.net)
   )}</td>
               </tr>
@@ -314,9 +318,9 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
             ${payBlock}
             <table role="presentation" cellpadding="0" cellspacing="0" style="margin:12px 0 8px;">
               <tr>
-                <td style="border-radius:8px;background:#0ea5e9;">
+                <td style="border-radius:6px;background:#2563eb;">
                   <a href="${escapeHtml(appUrl)}"
-                     style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">
+                     style="display:inline-block;padding:12px 16px;font-size:14px;font-weight:600;line-height:20px;color:#ffffff;text-decoration:none;border-radius:6px;">
                     View invoice in the app
                   </a>
                 </td>
@@ -325,10 +329,10 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
           </td>
         </tr>
         <tr>
-          <td style="padding:20px 32px;border-top:1px solid #eef2f6;">
+          <td style="padding:16px 32px;border-top:1px solid #f0f0f0;">
             <!-- SwimSync stays in the FOOTER only: the platform is the sender
                  of record, but the bill is the business's. -->
-            <p style="margin:0;font-size:12px;color:#94a3b8;">${escapeHtml(
+            <p style="margin:0;font-size:12px;color:#6b6b6b;">${escapeHtml(
               data.businessName ?? "SwimSync"
             )} · sent via SwimSync</p>
           </td>
@@ -820,18 +824,18 @@ export function buildBlockedEmailHtml(
     )
     .join("");
 
-  return `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f8fafc;padding:24px">
-  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
-    <h2 style="margin:0 0 12px;font-size:18px;color:#0f172a">Invoices for ${escapeHtml(
+  return `<!doctype html><html><body style="margin:0;font-family:${FONT};background:#fafafa;padding:24px">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e5e5e5;border-radius:8px;padding:24px">
+    <h2 style="margin:0 0 12px;font-size:20px;font-weight:600;line-height:1.3;color:#0a0a0a">Invoices for ${escapeHtml(
       formatBillingMonth(billingMonth)
     )} could not be generated</h2>
-    <p style="margin:0 0 16px;font-size:14px;color:#475569">
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252">
       Some lessons still have no attendance marked. Nothing has been billed.
-      Mark these in the app — or mark them <strong>cancelled</strong> if the
+      Mark these in the app — or mark them <strong style="color:#0a0a0a">cancelled</strong> if the
       lesson did not run — and invoicing will continue automatically.
     </p>
-    <ul style="margin:0 0 16px;padding-left:18px;font-size:14px;color:#334155">${rows}</ul>
-    <p style="margin:0;font-size:12px;color:#94a3b8">
+    <ul style="margin:0 0 16px;padding-left:18px;font-size:14px;line-height:1.5;color:#0a0a0a">${rows}</ul>
+    <p style="margin:0;font-size:12px;color:#6b6b6b">
       You will not get this reminder again until the outstanding lessons change.
     </p>
   </div></body></html>`;

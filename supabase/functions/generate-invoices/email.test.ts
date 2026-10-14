@@ -412,3 +412,49 @@ Deno.test("formatSessionDate writes September as Sept; formatBillingMonth keeps 
   assertEquals(formatSessionDate("2026-08-06"), "6 Aug 2026");
   assertEquals(formatBillingMonth("2026-09"), "September 2026");
 });
+
+// ── Email-safe rendering (UI restyle Phase 6, ⚠ RISK 7) ────────────────────
+// The invoice email is best-effort: a broken template would be swallowed at
+// send time, so this test is the guard. Every variant must carry the amount,
+// the pay link and the tenant's name, in inline CSS only, with a Geist family
+// that falls back to a system font (mail clients never load Geist).
+
+const BANNED_IN_EMAIL = ["var(", "display:flex", "display:grid", "<link", "@font-face", "@import", "<style"];
+
+function assertEmailSafe(html: string, mustContain: string[]) {
+  for (const s of mustContain) assertStringIncludes(html, s);
+  for (const b of BANNED_IN_EMAIL) assert(!html.includes(b), `email must not contain ${b}`);
+  const families = [...html.matchAll(/font-family:([^;"]+)/g)].map((m) => m[1]);
+  assert(families.length > 0, "no font-family in the email");
+  for (const f of families) {
+    assert(f.startsWith("Geist,"), `font-family must start with Geist: ${f}`);
+    assert(/sans-serif\s*$/.test(f), `font-family must end in a system fallback: ${f}`);
+  }
+}
+
+Deno.test("invoice email: every variant is email-safe and complete", () => {
+  const appUrl = "https://swimsync.sg";
+  const base: InvoiceEmailData = { ...sample, businessName: "Rivervale Swim Academy", appUrl };
+  const variants: [string, InvoiceEmailData, string][] = [
+    ["plain", base, "S$75.00"],
+    ["with logo", { ...base, logoUrl: "https://x.test/logo.png" }, "S$75.00"],
+    ["with credit (fully covered)", { ...base, credit: 75, net: 0 }, "S$0.00"],
+    ["with package", { ...base, packageApplied: 35, net: 40 }, "S$40.00"],
+    ["with adjustment", { ...base, balanceAdjustment: 30, net: 105 }, "S$105.00"],
+    ["zero lines", { ...base, items: [], gross: 0, net: 0 }, "S$0.00"],
+  ];
+  for (const [name, data, amount] of variants) {
+    const html = buildInvoiceEmailHtml(data);
+    assertEmailSafe(html, [amount, `href="${appUrl}"`, "Rivervale Swim Academy"]);
+    // The header is the tenant's: SwimSync appears only in the footer.
+    const header = html.slice(0, html.indexOf("<h1"));
+    assert(!header.includes("SwimSync"), `${name}: SwimSync must not head a tenant's invoice`);
+  }
+});
+
+Deno.test("blocked-billing notice is email-safe", () => {
+  const html = buildBlockedEmailHtml("2026-09", [
+    { class_title: "Sat Beg", session_date: "2026-09-05", unmarked_student_count: 2 },
+  ]);
+  assertEmailSafe(html, ["Sept 2026", "Sat Beg"]);
+});
