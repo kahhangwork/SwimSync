@@ -14,6 +14,7 @@ import {
   type CreditNoteEmailData,
   formatDate,
   isSendableNote,
+  money,
   sendCreditNoteEmail,
   outcomeForStatus,
   settleActionFor,
@@ -384,5 +385,42 @@ Deno.test("sends as the BUSINESS, from the shared SwimSync address", async () =>
     assertEquals(seenFrom, "Coastal Swim School <noreply@swimsync.sg>");
   } finally {
     globalThis.fetch = original;
+  }
+});
+
+// ── Email-safe rendering (UI restyle Phase 6, ⚠ RISK 7) ────────────────────
+// Every variant carries the amount, a link and the tenant's name, in inline CSS
+// only, with a Geist family that falls back to a system font (mail clients never
+// load Geist). The header is the tenant's: SwimSync appears only in the footer.
+
+const BANNED_IN_EMAIL = ["var(", "display:flex", "display:grid", "<link", "@font-face", "@import", "<style"];
+
+function assertEmailSafe(html: string, mustContain: string[]) {
+  for (const s of mustContain) assertStringIncludes(html, s);
+  for (const b of BANNED_IN_EMAIL) assert(!html.includes(b), `email must not contain ${b}`);
+  const families = [...html.matchAll(/font-family:([^;"]+)/g)].map((m) => m[1]);
+  assert(families.length > 0, "no font-family in the email");
+  for (const f of families) {
+    assert(f.startsWith("Geist,"), `font-family must start with Geist: ${f}`);
+    assert(/sans-serif\s*$/.test(f), `font-family must end in a system fallback: ${f}`);
+  }
+  const header = html.slice(0, html.indexOf("<h1"));
+  assert(!header.includes("SwimSync"), "SwimSync must not head a tenant's email");
+}
+
+Deno.test("credit-note email: every variant is email-safe and complete", () => {
+  const variants: CreditNoteEmailData[] = [
+    base,
+    { ...base, logoUrl: "https://x.test/logo.png" },
+    { ...base, reason: null },
+    { ...base, amount: 0.5, creditBalance: 0.5 },
+  ];
+  for (const d of variants) {
+    assertEmailSafe(buildCreditNoteHtml(d), [
+      money(d.amount),
+      money(d.creditBalance),
+      'href="https://swimsync.sg"',
+      "Coastal Swim School",
+    ]);
   }
 });

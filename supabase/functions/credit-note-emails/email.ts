@@ -259,16 +259,16 @@ export function formatDate(dateStr: string): string {
 }
 
 function shell(businessName: string, logoUrl: string | null | undefined, body: string): string {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;padding:32px 0;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <tr>
     <td align="center">
-      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e5e5e5;border-radius:8px;">
         <tr>
-          <td style="background:#0ea5e9;padding:24px 32px;">
+          <td style="padding:24px 32px;border-bottom:1px solid #f0f0f0;">
             ${
               logoUrl
                 ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(businessName)}" height="28" style="height:28px;vertical-align:middle;border:0;" />`
-                : `<span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">${escapeHtml(businessName)}</span>`
+                : `<span style="color:#0a0a0a;font-size:16px;font-weight:600;">${escapeHtml(businessName)}</span>`
             }
           </td>
         </tr>
@@ -276,8 +276,8 @@ function shell(businessName: string, logoUrl: string | null | undefined, body: s
           <td style="padding:32px;">${body}</td>
         </tr>
         <tr>
-          <td style="padding:16px 32px;border-top:1px solid #f1f5f9;">
-            <p style="margin:0;font-size:12px;color:#94a3b8;">Sent via SwimSync · <a href="${DEFAULT_APP_URL}" style="color:#94a3b8;">swimsync.sg</a></p>
+          <td style="padding:16px 32px;border-top:1px solid #f0f0f0;">
+            <p style="margin:0;font-size:12px;color:#6b6b6b;">Sent via SwimSync · <a href="${DEFAULT_APP_URL}" style="color:#6b6b6b;">swimsync.sg</a></p>
           </td>
         </tr>
       </table>
@@ -309,7 +309,7 @@ export function buildCreditNoteSubject(d: CreditNoteEmailData): string {
  */
 export function buildCreditNoteHtml(d: CreditNoteEmailData): string {
   const reasonLine = d.reason
-    ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#64748b;">
+    ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
          Reason given: ${escapeHtml(d.reason)}
        </p>`
     : "";
@@ -317,50 +317,50 @@ export function buildCreditNoteHtml(d: CreditNoteEmailData): string {
   return shell(
     d.businessName,
     d.logoUrl,
-    `<h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">A lesson has been credited back</h1>
-     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+    `<h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">A lesson has been credited back</h1>
+     <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Hi ${escapeHtml(d.parentName)}, ${escapeHtml(d.businessName)} has corrected a
        lesson that was already invoiced, so its cost has been credited back to you.
      </p>
      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-            style="margin:0 0 20px;font-size:14px;color:#0f172a;border-collapse:collapse;">
+            style="margin:0 0 20px;font-size:14px;color:#0a0a0a;border-collapse:collapse;">
        <tr>
-         <td style="padding:8px 0;color:#64748b;">Lesson</td>
+         <td style="padding:8px 0;color:#525252;">Lesson</td>
          <td style="padding:8px 0;text-align:right;">
            ${escapeHtml(d.studentName)} · ${escapeHtml(d.classTitle)}
          </td>
        </tr>
        <tr>
-         <td style="padding:8px 0;color:#64748b;">Date</td>
+         <td style="padding:8px 0;color:#525252;">Date</td>
          <td style="padding:8px 0;text-align:right;">${escapeHtml(formatDate(d.sessionDate))}</td>
        </tr>
        <tr>
-         <td style="padding:8px 0;color:#64748b;">Credit note</td>
+         <td style="padding:8px 0;color:#525252;">Credit note</td>
          <td style="padding:8px 0;text-align:right;">${escapeHtml(d.referenceNumber)}</td>
        </tr>
        <tr>
-         <td style="padding:8px 0;border-top:1px solid #f1f5f9;color:#64748b;">This credit note</td>
-         <td style="padding:8px 0;border-top:1px solid #f1f5f9;text-align:right;font-weight:700;">
+         <td style="padding:8px 0;border-top:1px solid #f0f0f0;color:#525252;">This credit note</td>
+         <td style="padding:8px 0;border-top:1px solid #f0f0f0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">
            ${money(d.amount)}
          </td>
        </tr>
        <tr>
-         <td style="padding:8px 0;color:#64748b;">
+         <td style="padding:8px 0;color:#525252;">
            Total credit with ${escapeHtml(d.businessName)}
          </td>
-         <td style="padding:8px 0;text-align:right;font-weight:700;">
+         <td style="padding:8px 0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">
            ${money(d.creditBalance)}
          </td>
        </tr>
      </table>
      ${reasonLine}
-     <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#475569;">
+     <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#525252;">
        Your total includes this credit and any earlier ones still unused. It is
        applied automatically to your next invoice from
        ${escapeHtml(d.businessName)} — there is nothing you need to do, and no
        payment is needed for the credited lesson.
      </p>
-     <p style="margin:0;font-size:13px;line-height:1.6;color:#94a3b8;">
+     <p style="margin:0;font-size:13px;line-height:1.5;color:#6b6b6b;">
        If this doesn't look right, reply to your coach — they can correct the
        attendance again.
      </p>`,
