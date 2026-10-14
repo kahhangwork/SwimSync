@@ -143,3 +143,28 @@ describe("sendCoAdminInviteEmail", () => {
     expect(r.reason).toContain("fetch_error");
   });
 });
+
+// ── Email-safe rendering (UI restyle Phase 6, ⚠ RISK 7) ────────────────────
+// The invite IS the deliverable: every variant carries the link and the business
+// name, in inline CSS only, with a Geist family that falls back to a system font
+// (mail clients never load Geist).
+const BANNED_IN_EMAIL = ["var(", "display:flex", "display:grid", "<link", "@font-face", "@import", "<style"];
+
+function expectEmailSafe(html: string, mustContain: string[]) {
+  for (const s of mustContain) expect(html).toContain(s);
+  for (const b of BANNED_IN_EMAIL) expect(html).not.toContain(b);
+  const families = [...html.matchAll(/font-family:([^;"]+)/g)].map((m) => m[1]);
+  expect(families.length).toBeGreaterThan(0);
+  for (const f of families) {
+    expect(f.startsWith("Geist,"), `font-family must start with Geist: ${f}`).toBe(true);
+    expect(/sans-serif\s*$/.test(f), `font-family must end in a system fallback: ${f}`).toBe(true);
+  }
+}
+
+describe("co-admin invite email is email-safe (Phase 6)", () => {
+  it("names the business and carries the link", () => {
+    for (const d of [base, { ...base, adminName: "" }]) {
+      expectEmailSafe(buildCoAdminInviteEmailHtml(d), ["href=\"https://example.test/verify?token=abc&amp;type=invite\"", "Dolphin Swim Academy"]);
+    }
+  });
+});
