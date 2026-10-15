@@ -8,6 +8,7 @@ import {
   breakdownByPayout,
   type PayoutBreakdown,
 } from "@/lib/payoutBreakdown";
+import { formatSgd } from "@/lib/money";
 import { ITEM_LIMIT } from "../constants";
 import { fetchMyPayouts, fetchPayoutItems } from "../dao/coachPay.repo";
 import type { MyPayout } from "../types";
@@ -64,6 +65,8 @@ export function useMyPay() {
   const totalPaid = myPayouts
     .filter((p) => p.status === "paid")
     .reduce((sum, p) => sum + p.gross_amount, 0);
+  // Formatted here, not in the route: a route never imports @/lib (tier fence 4).
+  const totalPaidLabel = formatSgd(totalPaid);
 
   return {
     myPayouts,
@@ -71,5 +74,6 @@ export function useMyPay() {
     loading,
     loadData,
     totalPaid,
+    totalPaidLabel,
   };
 }

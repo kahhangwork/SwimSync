@@ -17,6 +17,7 @@ import { ReferralSection } from "./ReferralSection";
 import { PackageUsageList } from "./PackageUsageList";
 import { usePackageUsage } from "../domain/usePackageUsage";
 import type { useBilling } from "../domain/useBilling";
+import { formatSgd } from "@/lib/money";
 
 type Billing = ReturnType<typeof useBilling>;
 
@@ -79,9 +80,8 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                     lessons remaining
                   </Text>
                   <Text className="text-body-secondary text-ink-secondary mt-1" style={TABULAR}>
-                    S$
-                    {(pkg.live_value_remaining ?? pkg.total_value).toFixed(2)}{" "}
-                    of S${pkg.total_value.toFixed(2)}
+                    {formatSgd(pkg.live_value_remaining ?? pkg.total_value)}{" "}
+                    of {formatSgd(pkg.total_value)}
                   </Text>
                 </View>
                 {/* Lessons your child has attended show here the same
@@ -116,20 +116,20 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                   <Text className="text-body text-ink mb-3">
                     {pkg.business_name} has prepared your next package —{" "}
                     {pkg.lesson_count} lessons ·{" "}
-                    S${pkg.amount_payable.toFixed(2)}. Pay via PayNow to
+                    {formatSgd(pkg.amount_payable)}. Pay via PayNow to
                     activate it.
                   </Text>
                 ) : (
                   <Text className="text-body text-ink mb-3">
                     {pkg.lesson_count} lessons ·{" "}
-                    S${pkg.amount_payable.toFixed(2)}. Waiting for{" "}
+                    {formatSgd(pkg.amount_payable)}. Waiting for{" "}
                     {pkg.business_name} to confirm your PayNow payment.
                   </Text>
                 )}
                 {pkg.discount_amount > 0 && (
                   <Text className="text-body-secondary text-ink-secondary -mt-2 mb-3" style={TABULAR}>
-                    Referral discount: −S${pkg.discount_amount.toFixed(2)}{" "}
-                    off S${pkg.total_value.toFixed(2)}
+                    Referral discount: −{formatSgd(pkg.discount_amount)}{" "}
+                    off {formatSgd(pkg.total_value)}
                   </Text>
                 )}
                 <View>
@@ -184,10 +184,9 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                   {p.category_name ? ` · ${p.category_name} classes` : ""}
                 </Text>
                 <Text className="text-body text-ink mb-3">
-                  {p.lesson_count} lessons at S$
-                  {p.rate_per_lesson.toFixed(2)} each —{" "}
+                  {p.lesson_count} lessons at {formatSgd(p.rate_per_lesson)} each —{" "}
                   <Text className="font-semibold text-ink" style={TABULAR}>
-                    S${(p.lesson_count * p.rate_per_lesson).toFixed(2)}
+                    {formatSgd(p.lesson_count * p.rate_per_lesson)}
                   </Text>
                   , valid {p.validity_weeks} week
                   {p.validity_weeks === 1 ? "" : "s"} from its start date.

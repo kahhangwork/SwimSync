@@ -9,6 +9,7 @@ import StatusBadge from "@/components/StatusBadge";
 import { Surface } from "@/components/ui/Surface";
 import { formatDate, capitalize } from "../domain/billingFormat";
 import type { useBilling } from "../domain/useBilling";
+import { formatSgd } from "@/lib/money";
 
 type Billing = ReturnType<typeof useBilling>;
 
@@ -48,7 +49,7 @@ export function CreditNotesTab(p: Pick<Billing, "creditNotes">) {
               <View className="flex-row justify-between pt-2 border-t border-divider">
                 <Text className="text-body text-ink-secondary">Credit Amount</Text>
                 <Text className="text-body font-semibold text-ink" style={{ fontVariant: ["tabular-nums"] }}>
-                  −S${Number(cn.amount).toFixed(2)}
+                  −{formatSgd(cn.amount)}
                 </Text>
               </View>
             </Surface>

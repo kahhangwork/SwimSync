@@ -14,6 +14,7 @@ import { Image, Text, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Surface } from "@/components/ui/Surface";
 import type { PublicPackage } from "../types";
+import { formatSgd } from "@/lib/money";
 
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
 
@@ -24,15 +25,15 @@ export function OfferCard(p: { pkg: PublicPackage; startDate: string | null; val
       <Surface className="items-center mb-6">
         <Text className="text-body-secondary text-ink-secondary">Amount</Text>
         <Text selectable className="text-display font-semibold text-ink mt-1 mb-2" style={TABULAR}>
-          S${pkg.amount.toFixed(2)}
+          {formatSgd(pkg.amount)}
         </Text>
         {pkg.discount_amount > 0 ? (
           <Text className="text-body-secondary text-ink-secondary mb-1" style={TABULAR}>
-            S${pkg.total_value.toFixed(2)} − S${pkg.discount_amount.toFixed(2)} referral discount
+            {formatSgd(pkg.total_value)} − {formatSgd(pkg.discount_amount)} referral discount
           </Text>
         ) : null}
         <Text className="text-body-secondary text-ink-secondary" style={TABULAR}>
-          {pkg.lesson_count} lessons · S${pkg.rate.toFixed(2)} each
+          {pkg.lesson_count} lessons · {formatSgd(pkg.rate)} each
         </Text>
         <Text selectable className="text-body-secondary text-ink-secondary mt-1">
           Reference: {pkg.reference}

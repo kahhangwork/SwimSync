@@ -6,6 +6,7 @@ import { View, Text, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Surface } from "@/components/ui/Surface";
 import type { usePayNow } from "../domain/usePayNow";
+import { formatSgd } from "@/lib/money";
 
 type PayNow = ReturnType<typeof usePayNow>;
 
@@ -46,7 +47,7 @@ export function QrCard(p: Pick<PayNow, "businessName" | "dynamicQr" | "payee" | 
             className="text-headline font-semibold text-ink"
             style={{ fontVariant: ["tabular-nums"] }}
           >
-            S${netAmount?.toFixed(2) ?? "—"}
+            {netAmount != null ? formatSgd(netAmount) : "S$—"}
           </Text>
         </View>
       ) : (

@@ -119,6 +119,8 @@ try {
   await page.waitForTimeout(2500);
   await page.getByPlaceholder("Emma Tan").fill("Maya Tan");
   await page.getByPlaceholder("YYYY-MM-DD").fill("2020-07-19");
+  // Gender is required and never pre-selected (2026-10-15) — choose one or Save is refused.
+  await tap(page.getByRole("button", { name: "Male", exact: true }), "gender");
   await tap(page.getByText("Save Child Profile"), "Save");
   // handleSave() shows an "Is this right?" review modal before anything fires
   // (added 2026-07-26 — the same change that silently killed verify-parent-
@@ -140,6 +142,7 @@ try {
   // guard does when nothing happened).
   await page.getByPlaceholder("Emma Tan").fill("Maya Tan");
   await page.getByPlaceholder("YYYY-MM-DD").fill("2022-01-05");
+  await tap(page.getByRole("button", { name: "Male", exact: true }), "gender");
   await tap(page.getByText("Save Child Profile"), "Save (different DOB)");
   await page.waitForTimeout(1500);
   await tap(page.getByText(/Yes, add this child/i).last(), "confirm the details (different DOB)");

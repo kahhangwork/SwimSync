@@ -5,10 +5,14 @@ import { useAppStore } from "@/store/useAppStore";
 // Global toast rendered once at the root layout. Feedback shown via
 // useAppStore.showToast(message, type) appears here — it works on the web build,
 // unlike Alert.alert (a no-op on react-native-web). Auto-dismisses after 3s.
-const COLORS: Record<string, string> = {
-  success: "#16a34a",
-  error: "#dc2626",
-  info: "#334155",
+//
+// The fills are DESIGN.md tokens (tailwind.config.js), not Tailwind defaults: the
+// status scale's TEXT colours, because white sits on them at ≥ 4.5:1 (AA). The
+// old `#16a34a` success green was 3.3:1. Toast.test.tsx pins both facts.
+export const TOAST_COLORS: Record<string, string> = {
+  success: "#166534", // status.success.text
+  error: "#b91c1c", // status.danger.text
+  info: "#0a0a0a", // ink
 };
 
 export default function Toast() {
@@ -59,7 +63,7 @@ export default function Toast() {
     >
       <View
         style={{
-          backgroundColor: COLORS[toast.type] ?? COLORS.info,
+          backgroundColor: TOAST_COLORS[toast.type] ?? TOAST_COLORS.info,
           borderRadius: 12,
           paddingVertical: 12,
           paddingHorizontal: 18,

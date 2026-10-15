@@ -109,6 +109,8 @@ let joinCode = null;
 
     await page.getByPlaceholder("Emma Tan").last().fill("Join Test Kid");
     await page.getByPlaceholder("YYYY-MM-DD").last().fill("2018-04-01");
+    // Gender is required and never pre-selected (2026-10-15) — choose one or Save is refused.
+    await tap(page.getByRole("button", { name: "Male", exact: true }), "gender");
     await tap(page.getByText("Save Child Profile"), "save");
     await page.waitForTimeout(4000);
     body = await page.evaluate(() => document.body.innerText);

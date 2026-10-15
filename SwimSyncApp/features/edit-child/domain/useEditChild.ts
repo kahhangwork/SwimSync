@@ -15,7 +15,10 @@ export function useEditChild() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
-  const [gender, setGender] = useState("Male");
+  // "" = not chosen. A child with no gender on file (27 of 41 on prod, 2026-10-15)
+  // must open with NOTHING selected: a pre-selected "Male" was saved on any edit,
+  // silently recording a gender the parent never chose. Gender is required.
+  const [gender, setGender] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -37,7 +40,7 @@ export function useEditChild() {
         setName(data.full_name ?? "");
         setDob(data.date_of_birth ?? "");
         setGender(
-          data.gender ? data.gender.charAt(0).toUpperCase() + data.gender.slice(1) : "Male"
+          data.gender ? data.gender.charAt(0).toUpperCase() + data.gender.slice(1) : ""
         );
         setNotes(data.notes ?? "");
         setReady(true);
@@ -64,14 +67,18 @@ export function useEditChild() {
       showToast("Date of birth must be in YYYY-MM-DD format.", "error");
       return;
     }
+    if (!gender) {
+      showToast("Choose the child's gender.", "error");
+      return;
+    }
 
     setLoading(true);
     const { error } = await updateChild(id, {
       full_name: name.trim(),
       date_of_birth: dob.trim(),
-      // census: ui-cast (Wave 8) — the picker offers only GENDER_OPTIONS, and a loaded
-      // value is the enum capitalised (state defaults to "Male"), so lower-cased it is
-      // always a `gender_type`.
+      // census: ui-cast (Wave 8) — the picker offers only GENDER_OPTIONS, a loaded
+      // value is the enum capitalised, and "" (not chosen) is refused above, so
+      // lower-cased it is always a `gender_type`.
       gender: gender.toLowerCase() as Enums<"gender_type">,
       notes: notes.trim() || null,
     });

@@ -5,6 +5,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import { Surface } from "@/components/ui/Surface";
 import type { InvoiceDetail } from "../types";
+import { formatSgd } from "@/lib/money";
 
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
 
@@ -29,7 +30,7 @@ export function CreditNotesCard(p: { invoice: InvoiceDetail }) {
               ) : null}
             </View>
             <Text className="text-body text-ink" style={TABULAR}>
-              −S${cn.amount.toFixed(2)}
+              −{formatSgd(cn.amount)}
             </Text>
           </View>
         ))}

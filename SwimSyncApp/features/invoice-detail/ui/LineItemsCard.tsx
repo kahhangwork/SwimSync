@@ -9,6 +9,7 @@ import { View, Text } from "react-native";
 import { Surface } from "@/components/ui/Surface";
 import type { InvoiceDetail } from "../types";
 import { formatDate, capitalize } from "../domain/invoiceDetailFormat";
+import { formatSgd } from "@/lib/money";
 
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
 
@@ -45,7 +46,7 @@ export function LineItemsCard(p: { invoice: InvoiceDetail }) {
                 )}
               </View>
               <Text className="text-body text-ink" style={TABULAR}>
-                S${item.amount.toFixed(2)}
+                {formatSgd(item.amount)}
               </Text>
             </View>
           ))}

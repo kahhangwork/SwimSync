@@ -17,6 +17,7 @@ import {
   formatPeriod,
 } from "@/lib/payoutBreakdown";
 import type { useMyPay } from "../domain/useMyPay";
+import { formatSgd } from "@/lib/money";
 
 type Pay = ReturnType<typeof useMyPay>;
 
@@ -39,7 +40,7 @@ export function PayoutCards(p: Pick<Pay, "myPayouts" | "breakdowns">) {
                 <Tag label={paid ? "Paid" : "Draft"} tone={paid ? "success" : "neutral"} />
               </View>
               <Text className="text-headline font-semibold text-ink" style={TABULAR}>
-                S${p.gross_amount.toFixed(2)}
+                {formatSgd(p.gross_amount)}
               </Text>
             </View>
             {!paid && (
@@ -53,8 +54,7 @@ export function PayoutCards(p: Pick<Pay, "myPayouts" | "breakdowns">) {
                 covered lesson shows one more than the month before. */}
             {b.lessons > 0 && (
               <Text className="text-body-secondary text-ink-secondary mt-2" style={TABULAR}>
-                {describeLessons(b.lessons)} · S$
-                {b.lessonTotal.toFixed(2)}
+                {describeLessons(b.lessons)} · {formatSgd(b.lessonTotal)}
               </Text>
             )}
 

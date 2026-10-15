@@ -4,12 +4,15 @@
 // tag — Paid = Success, Draft = neutral; a correction to a paid month still shows.
 //
 // MUTATION PROOFS (§7.25) — each applied to PayoutCards.tsx, run, reverted:
-//   1. `S${p.gross_amount.toFixed(2)}` → `S${b.lessonTotal.toFixed(2)}`
+//   1. `formatSgd(p.gross_amount)` → `formatSgd(b.lessonTotal)`
 //      → RED: "prints each payout's own figures"
 //   2. `tone={paid ? "success" : "neutral"}` → `tone="neutral"`
 //      → RED: "Paid is a Success tag, Draft a neutral one; money is Ink"
 //   3. Deleted the `b.adjustments.map(…)` block
 //      → RED: "a correction to an already-paid month is shown"
+//   4. RED FIRST against the pre-lib/money.ts `S${….toFixed(2)}` (BACKLOG *UI restyle
+//      leftovers*): "a four-figure month has a thousands separator"
+//      → Unable to find an element with text: S$1,260.00
 import React from "react";
 import { render, screen } from "@testing-library/react-native";
 import { PayoutCards } from "./PayoutCards";
@@ -43,6 +46,16 @@ describe("PayoutCards", () => {
     expect(screen.getByText("Draft").props.className).toContain("text-status-neutral-text");
     expect(screen.getByText("S$120.00").props.className).toContain("text-ink");
     expect(screen.getByText("S$120.00").props.className).not.toMatch(/green|success/);
+  });
+
+  it("a four-figure month has a thousands separator", () => {
+    const big = [{ id: "p3", period_month: "2026-09-01", gross_amount: 1260, status: "paid" as const }];
+    const bigBreakdown = new Map<string, PayoutBreakdown>([
+      ["p3", { lessons: 21, lessonTotal: 1260, adjustments: [] } as PayoutBreakdown],
+    ]);
+    render(<PayoutCards myPayouts={big} breakdowns={bigBreakdown} />);
+    expect(screen.getByText("S$1,260.00")).toBeTruthy();
+    expect(screen.getByText(/21 lessons · S\$1,260\.00/)).toBeTruthy();
   });
 
   it("a correction to an already-paid month is shown", () => {

@@ -5,6 +5,7 @@
 // re-draw after a return is a new row), so a return is a label, not a line.
 
 import { formatSgStamp } from "@/lib/lessonDates";
+import { formatSgd } from "@/lib/money";
 
 export type PackageUsageRow = {
   lesson_date: string;
@@ -29,7 +30,7 @@ export type UsageLine = {
   note: string | null;
 };
 
-const money = (v: number | string) => `S$${Number(v).toFixed(2)}`;
+const money = formatSgd;
 
 export function usageLines(rows: PackageUsageRow[]): UsageLine[] {
   return rows.map((r) => ({

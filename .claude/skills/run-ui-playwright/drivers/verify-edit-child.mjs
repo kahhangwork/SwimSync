@@ -42,10 +42,28 @@ try {
   check(nameVal === "Noah Lim",
     "the form is pre-filled with the current values", `name field = "${nameVal}"`);
 
+  // Noah has no gender in the fixture either. Until 2026-10-15 the form showed
+  // "Male" pre-selected and SAVED it on any edit — a gender nobody chose. It must
+  // open with neither segment selected, and refuse to save until one is.
+  const male = page.getByRole("button", { name: "Male", exact: true });
+  const female = page.getByRole("button", { name: "Female", exact: true });
+  const selected = async (b) => (await b.first().getAttribute("aria-selected")) === "true";
+  check(!(await selected(male)) && !(await selected(female)),
+    "a child with no gender on file opens with no gender selected");
+
   // Noah has no DOB in the fixture — the legacy-row case. Supplying one is
   // exactly the backfill this screen exists for.
   await page.getByPlaceholder("Emma Tan").fill("Noah Lim Wei");
   await page.getByPlaceholder("YYYY-MM-DD").fill("2019-09-09");
+  await tap(page.getByText("Save Changes"), "Save Changes (no gender)");
+  await page.waitForTimeout(1500);
+  const refused = await page.evaluate(() => document.body.innerText);
+  check(/Choose the child's gender/.test(refused) &&
+        await page.getByPlaceholder("Emma Tan").isVisible().catch(() => false),
+    "Save without a gender is refused, and the form stays open");
+
+  await tap(male, "gender");
+  check(await selected(male), "the chosen gender is shown selected");
   await tap(page.getByText("Save Changes"), "Save Changes");
   await page.waitForTimeout(3000);
 

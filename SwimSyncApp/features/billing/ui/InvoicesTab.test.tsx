@@ -5,7 +5,7 @@
 // is offered only until it is made.
 //
 // MUTATION PROOFS (§7.25) — each applied to InvoicesTab.tsx and run red:
-//   1. `S$${inv.gross_amount.toFixed(2)}` → `S$${inv.net_amount.toFixed(2)}`
+//   1. `formatSgd(inv.gross_amount)` → `formatSgd(inv.net_amount)`
 //      → RED: "each money line is its own field, in the parent's words"
 //   2. `claimed ? "Claimed" : outstanding` → `outstanding`
 //      → RED: "a claimed invoice is tagged Claimed and still offers Pay"

@@ -13,6 +13,7 @@ import { Image, Text, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Surface } from "@/components/ui/Surface";
 import type { PublicInvoice } from "../types";
+import { formatSgd } from "@/lib/money";
 
 export function AmountCard(p: { invoice: PublicInvoice; paid: boolean; qrDataUrl: string | null; saveQr: () => void; claimed: boolean; claiming: boolean; claimPaid: () => void }) {
   const { invoice, paid, qrDataUrl, saveQr, claimed, claiming, claimPaid } = p;
@@ -25,7 +26,7 @@ export function AmountCard(p: { invoice: PublicInvoice; paid: boolean; qrDataUrl
           className="text-display font-semibold text-ink mt-1 mb-2"
           style={{ fontVariant: ["tabular-nums"] }}
         >
-          S${invoice.amount.toFixed(2)}
+          {formatSgd(invoice.amount)}
         </Text>
         <Text selectable className="text-body-secondary text-ink-secondary">
           Reference: {invoice.reference}

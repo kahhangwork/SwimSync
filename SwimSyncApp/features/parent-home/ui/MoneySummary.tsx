@@ -10,6 +10,7 @@ import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Surface } from "@/components/ui/Surface";
 import type { useParentHome } from "../domain/useParentHome";
+import { formatSgd } from "@/lib/money";
 
 type Home = ReturnType<typeof useParentHome>;
 
@@ -29,7 +30,7 @@ export function MoneySummary(p: Pick<Home, "totalOutstanding" | "creditBalance">
             </Text>
           </View>
           <Text className="text-display font-semibold text-ink" style={TABULAR}>
-            S${totalOutstanding.toFixed(2)}
+            {formatSgd(totalOutstanding)}
           </Text>
           <Text className="text-body-secondary text-ink-secondary mt-0.5">
             Across all children — tap an invoice to pay
@@ -47,7 +48,7 @@ export function MoneySummary(p: Pick<Home, "totalOutstanding" | "creditBalance">
             </Text>
           </View>
           <Text className="text-display font-semibold text-ink" style={TABULAR}>
-            S${creditBalance.toFixed(2)}
+            {formatSgd(creditBalance)}
           </Text>
           <Text className="text-body-secondary text-ink-secondary mt-0.5">
             Will be applied to your next invoice automatically

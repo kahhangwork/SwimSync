@@ -19,6 +19,8 @@
 // ⚠ NO CLOCK AND NO FETCH, like everything else in lib/ (§7.7). `formatPeriod`
 // builds a Date from explicit parts purely to name a month; it never reads one.
 
+import { formatSgd } from "./money";
+
 /** One row of `coach_payout_items`, flattened. */
 export type PayoutItem = {
   payoutId: string;
@@ -152,12 +154,8 @@ export function formatPeriod(period: string | null): string {
 
 /** "S$12.30", and "−S$12.30" for money going the other way. A minus sign
  *  rather than a hyphen: this is the one number a coach reads to find out they
- *  are being docked, and it should not look like a typo. */
-export function formatMoney(amount: number): string {
-  return amount < 0
-    ? `−S$${Math.abs(amount).toFixed(2)}`
-    : `S$${amount.toFixed(2)}`;
-}
+ *  are being docked, and it should not look like a typo. (lib/money.ts.) */
+export const formatMoney = (amount: number): string => formatSgd(amount);
 
 /** The one-line explanation of a correction, as the card prints it. */
 export function describeAdjustment(a: Adjustment): string {

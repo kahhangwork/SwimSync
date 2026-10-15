@@ -10,6 +10,7 @@ import { View, Text } from "react-native";
 import { Surface } from "@/components/ui/Surface";
 import { describeCoverage, type StudentCoverage } from "@/lib/packageCoverage";
 import type { ChildDetail } from "../types";
+import { formatSgd } from "@/lib/money";
 
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
 
@@ -36,13 +37,13 @@ export function BalancesCard(p: { child: ChildDetail; coverage: StudentCoverage 
             Outstanding
           </Text>
           <Text className="text-headline font-semibold text-ink" style={TABULAR}>
-            S${child.outstanding_amount.toFixed(2)}
+            {formatSgd(child.outstanding_amount)}
           </Text>
         </View>
         <View className="flex-1 rounded-control border p-3 bg-ground border-border">
           <Text className="text-label font-medium text-ink-secondary mb-1">Credit Balance</Text>
           <Text className="text-headline font-semibold text-ink" style={TABULAR}>
-            S${child.credit_balance.toFixed(2)}
+            {formatSgd(child.credit_balance)}
           </Text>
         </View>
       </View>

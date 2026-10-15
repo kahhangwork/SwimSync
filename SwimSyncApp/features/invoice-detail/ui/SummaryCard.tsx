@@ -9,6 +9,7 @@ import { Surface } from "@/components/ui/Surface";
 import { invoiceLabel } from "@/lib/invoiceLabel";
 import type { InvoiceDetail } from "../types";
 import { formatBillingMonth, formatDate } from "../domain/invoiceDetailFormat";
+import { formatSgd } from "@/lib/money";
 
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
 
@@ -53,24 +54,24 @@ export function SummaryCard(p: { invoice: InvoiceDetail }) {
             gross. A line-less invoice says "Lessons", never "0 lessons". */}
         <MoneyRow
           label={n > 0 ? `${n} ${n === 1 ? "lesson" : "lessons"}` : "Lessons"}
-          amount={`S$${invoice.gross_amount.toFixed(2)}`}
+          amount={formatSgd(invoice.gross_amount)}
         />
         {invoice.package_applied > 0 && (
-          <MoneyRow label="Package" amount={`−S$${invoice.package_applied.toFixed(2)}`} />
+          <MoneyRow label="Package" amount={`−${formatSgd(invoice.package_applied)}`} />
         )}
         {invoice.credit_applied > 0 && (
-          <MoneyRow label="Credit" amount={`−S$${invoice.credit_applied.toFixed(2)}`} />
+          <MoneyRow label="Credit" amount={`−${formatSgd(invoice.credit_applied)}`} />
         )}
         {invoice.balance_adjustment > 0 && (
           <MoneyRow
             label="Adjustment from a prior invoice"
-            amount={`+S$${invoice.balance_adjustment.toFixed(2)}`}
+            amount={`+${formatSgd(invoice.balance_adjustment)}`}
           />
         )}
         <View className="pt-2 border-t border-divider">
           <MoneyRow
             label={invoice.status === "outstanding" ? "To pay" : "Total"}
-            amount={`S$${invoice.net_amount.toFixed(2)}`}
+            amount={formatSgd(invoice.net_amount)}
             strong
           />
         </View>

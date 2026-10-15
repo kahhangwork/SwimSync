@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { invoiceLabel } from "@/lib/invoiceLabel";
 import { formatBillingMonth } from "../domain/billingFormat";
 import type { useBilling } from "../domain/useBilling";
+import { formatSgd } from "@/lib/money";
 
 type Billing = ReturnType<typeof useBilling>;
 
@@ -102,17 +103,17 @@ export function InvoicesTab(p: Pick<Billing, "invoices" | "claimPaid" | "claimin
                 {/* Plain Words (DESIGN.md): what the lessons cost, what was
                     taken off, what is left to pay — never Gross / Net. */}
                 <View className="gap-1">
-                  <MoneyRow label="Lessons" amount={`S$${inv.gross_amount.toFixed(2)}`} />
+                  <MoneyRow label="Lessons" amount={formatSgd(inv.gross_amount)} />
                   {inv.package_applied > 0 && (
-                    <MoneyRow label="Package" amount={`−S$${inv.package_applied.toFixed(2)}`} />
+                    <MoneyRow label="Package" amount={`−${formatSgd(inv.package_applied)}`} />
                   )}
                   {inv.credit_applied > 0 && (
-                    <MoneyRow label="Credit" amount={`−S$${inv.credit_applied.toFixed(2)}`} />
+                    <MoneyRow label="Credit" amount={`−${formatSgd(inv.credit_applied)}`} />
                   )}
                   <View className="pt-2 mt-1 border-t border-divider">
                     <MoneyRow
                       label={outstanding ? "To pay" : "Total"}
-                      amount={`S$${inv.net_amount.toFixed(2)}`}
+                      amount={formatSgd(inv.net_amount)}
                       strong
                     />
                   </View>

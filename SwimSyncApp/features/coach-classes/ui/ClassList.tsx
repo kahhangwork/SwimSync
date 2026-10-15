@@ -11,6 +11,7 @@ import { formatAttendees } from "@/lib/attendanceSummary";
 import { formatTime } from "../domain/classesFormat";
 import { weekdayLabel } from "../domain/weekOrder";
 import type { useCoachClasses } from "../domain/useCoachClasses";
+import { formatSgd } from "@/lib/money";
 
 type Classes = ReturnType<typeof useCoachClasses>;
 
@@ -88,7 +89,7 @@ export function ClassList(p: Pick<Classes, "loading" | "classes" | "groups">) {
                       <View className="flex-row items-center gap-2">
                         <Ionicons name="cash-outline" size={14} color="#525252" />
                         <Text className="text-body text-ink-secondary">
-                          S${cls.price_per_lesson.toFixed(2)} / lesson
+                          {formatSgd(cls.price_per_lesson)} / lesson
                         </Text>
                       </View>
                     </View>

@@ -12,9 +12,9 @@
 //      → RED: "credit only: the outstanding card is absent"
 //   2. `{creditBalance > 0 && (` → `{creditBalance >= 0 && (`
 //      → RED: "outstanding only: the credit card is absent"
-//   3. `S${totalOutstanding.toFixed(2)}` → `S${creditBalance.toFixed(2)}`
+//   3. `formatSgd(totalOutstanding)` → `formatSgd(creditBalance)`
 //      → RED: "outstanding card shows exactly its amount and says it is family-wide"
-//   4. `S${creditBalance.toFixed(2)}` → `S${totalOutstanding.toFixed(2)}`
+//   4. `formatSgd(creditBalance)` → `formatSgd(totalOutstanding)`
 //      → RED: "credit card shows exactly its amount"
 //   5. `Across all children — tap an invoice to pay` → `For this child — tap an invoice to pay`
 //      → RED: "outstanding card shows exactly its amount and says it is family-wide"

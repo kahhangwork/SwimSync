@@ -59,6 +59,8 @@ await page.waitForTimeout(4000);
 
 await page.getByPlaceholder("Emma Tan").fill("Ethan");
 await page.getByPlaceholder("YYYY-MM-DD").fill("2019-01-01");
+// Gender is required and never pre-selected (2026-10-15) — choose one or Save is refused.
+await tap(page.getByRole("button", { name: "Male", exact: true }), "gender");
 await tap(page.getByText("Save Child Profile").last(), "save (first attempt)");
 
 // "Save Child Profile" no longer reaches the server. `handleSave()` opens an
@@ -134,6 +136,7 @@ await tap(page.getByText("Add Child").first(), "open Add Child");
 await page.waitForTimeout(4000);
 await page.getByPlaceholder("Emma Tan").fill("Ethan");
 await page.getByPlaceholder("YYYY-MM-DD").fill("2019-01-01");
+await tap(page.getByRole("button", { name: "Male", exact: true }), "gender");
 await tap(page.getByText("Save Child Profile").last(), "save (second attempt)");
 await tap(page.getByText(/Yes, add this child/i).last(), "confirm the details (second attempt)");
 await page.waitForTimeout(3500);
@@ -233,6 +236,7 @@ await page.getByPlaceholder("Emma Tan").fill("Ethan Tan");
 // draft of this driver got wrong, asserting a pair would be flagged after
 // deliberately making it un-flaggable.
 await page.getByPlaceholder("YYYY-MM-DD").fill("2019-01-01");
+await tap(page.getByRole("button", { name: "Male", exact: true }), "gender");
 await tap(page.getByText("Save Child Profile").last(), "save (a genuinely different child)");
 await tap(page.getByText(/Yes, add this child/i).last(), "confirm the details (different child)");
 await page.waitForTimeout(3500);

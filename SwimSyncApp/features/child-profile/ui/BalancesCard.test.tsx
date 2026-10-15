@@ -7,9 +7,9 @@
 //
 // MUTATION PROOFS (§7.25) — applied through mutate.sh (restores from HEAD on exit):
 //   BalancesCard.tsx
-//   1. `S${child.outstanding_amount.toFixed(2)}` → `S${child.credit_balance.toFixed(2)}`
+//   1. `formatSgd(child.outstanding_amount)` → `formatSgd(child.credit_balance)`
 //      → RED: "each box shows exactly its own amount"
-//   2. `S${child.credit_balance.toFixed(2)}` → `S${child.outstanding_amount.toFixed(2)}`
+//   2. `formatSgd(child.credit_balance)` → `formatSgd(child.outstanding_amount)`
 //      → RED: "each box shows exactly its own amount"
 //   3. Outstanding amount hidden at zero (`{child.outstanding_amount > 0 ? … : null}`)
 //      → RED: "S$0.00 outstanding still renders both boxes"

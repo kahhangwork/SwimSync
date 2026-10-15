@@ -7,6 +7,7 @@ import React from "react";
 import { Text } from "react-native";
 import { Surface } from "@/components/ui/Surface";
 import type { usePayNow } from "../domain/usePayNow";
+import { formatSgd } from "@/lib/money";
 
 type PayNow = ReturnType<typeof usePayNow>;
 
@@ -20,7 +21,7 @@ export function AmountBanner(p: Pick<PayNow, "netAmount" | "billingMonth" | "pac
         className="text-display font-semibold text-ink mt-0.5"
         style={{ fontVariant: ["tabular-nums"] }}
       >
-        S${netAmount.toFixed(2)}
+        {formatSgd(netAmount)}
       </Text>
       {billingMonth && (
         <Text className="text-body-secondary text-ink-secondary mt-1">{billingMonth}</Text>

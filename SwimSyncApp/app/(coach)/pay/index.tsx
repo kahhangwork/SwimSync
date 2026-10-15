@@ -34,7 +34,7 @@ import { Surface } from "@/components/ui/Surface";
 // app fence), the payout cards in …/ui/PayoutCards; the rest of the markup stays here.
 
 export default function CoachPayScreen() {
-  const { myPayouts, breakdowns, loading, loadData, totalPaid } = useMyPay();
+  const { myPayouts, breakdowns, loading, loadData, totalPaid, totalPaidLabel } = useMyPay();
 
   useFocusEffect(
     useCallback(() => {
@@ -78,7 +78,7 @@ export default function CoachPayScreen() {
               <Surface className="items-center mb-5">
                 <Text className="text-body-secondary text-ink-secondary">Paid to you so far</Text>
                 <Text className="text-display font-semibold text-ink mt-0.5" style={{ fontVariant: ["tabular-nums"] }}>
-                  S${totalPaid.toFixed(2)}
+                  {totalPaidLabel}
                 </Text>
               </Surface>
             )}

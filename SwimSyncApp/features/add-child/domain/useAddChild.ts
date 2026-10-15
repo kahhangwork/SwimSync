@@ -24,7 +24,9 @@ export function useAddChild() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
-  const [gender, setGender] = useState("Male");
+  // "" = not chosen. Gender is required and never pre-selected: a default is a
+  // value the parent did not choose, and it is saved if they don't notice it.
+  const [gender, setGender] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -95,6 +97,10 @@ export function useAddChild() {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(dob.trim())) {
       showToast("Date of birth must be in YYYY-MM-DD format.", "error");
+      return;
+    }
+    if (!gender) {
+      showToast("Choose the child's gender.", "error");
       return;
     }
 

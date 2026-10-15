@@ -1589,16 +1589,9 @@ or one shared component; fix whenever the screen is touched, or as its own S. Th
 
 **Why:** DESIGN.md is adopted, so each of these is now a defect against it, not a taste question.
 
-**Found by the 7.2 audit (2026-10-14):**
-- **Toast is off-token, and its success colour fails contrast** (P1). `SwimSyncApp/components/Toast.tsx:9–11` —
-  `#16a34a` / `#dc2626` / `#334155`; white on `#16a34a` is 3.3:1 (AA needs 4.5:1). Move to the status scale's text
-  colours (`#166534` success, `#b91c1c` danger, Ink info). Shared chrome: P4, not visual-only.
+*Shipped 2026-10-16:* the Toast colours, ONE money formatter (`lib/money.ts`) and gender never pre-selected.
 
 **Verified open 2026-10-14:**
-- Coach Pay: `toFixed(2)` → `S$1260.00`, no thousands separator (`PayoutCards.tsx:42,57`) — wants ONE shared money
-  formatter, not a per-screen one.
-- Add / Edit child: gender state defaults to `"Male"` (`useAddChild.ts:27`, `useEditChild.ts:18`) — Edit pre-selects
-  Male where the profile shows "—".
 - Join screen (Profile → Add Child) highlights **Home**: the route lives under `home/join-tenant.tsx`.
 - Public package page: "Prefer a different package? Tell your coach." is a dead end → link to the business's contact
   (needs the contact on the page's data).
