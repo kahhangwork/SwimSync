@@ -47,7 +47,7 @@ try {
   // open with neither segment selected, and refuse to save until one is.
   const male = page.getByRole("button", { name: "Male", exact: true });
   const female = page.getByRole("button", { name: "Female", exact: true });
-  const selected = async (b) => (await b.first().getAttribute("aria-selected")) === "true";
+  const selected = async (b) => (await b.first().getAttribute("aria-pressed")) === "true";
   check(!(await selected(male)) && !(await selected(female)),
     "a child with no gender on file opens with no gender selected");
 

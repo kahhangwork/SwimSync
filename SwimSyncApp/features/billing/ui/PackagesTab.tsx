@@ -216,6 +216,7 @@ export function PackagesTab(p: Pick<Billing, "packageError" | "packages" | "prod
                                 className={`min-h-11 justify-center rounded-control px-4 border ${on ? "bg-selected border-border-strong" : "bg-surface border-border"}`}
                                 accessibilityRole="radio"
                                 accessibilityState={{ selected: on }}
+                                aria-checked={on}
                               >
                                 <Text className={`text-body ${on ? "font-semibold text-ink" : "font-medium text-ink-secondary"}`}>
                                   {k.name}

@@ -57,10 +57,11 @@ export function ChildForm(p: Pick<AddChild, "name" | "setName" | "dob" | "setDob
               onPress={() => setGender(g)}
               accessibilityRole="button"
               accessibilityState={{ selected: gender === g }}
-              // RN-web drops accessibilityState.selected; only aria-selected reaches
-              // the DOM, so without it no screen reader (or driver) can tell which
-              // gender is chosen — or that none is.
-              aria-selected={gender === g}
+              // RN-web drops accessibilityState; only aria-* reaches the DOM, so
+              // without this no screen reader (or driver) can tell which gender is
+              // chosen — or that none is. aria-pressed: the state ARIA defines for
+              // a button (aria-selected is only announced on tabs/options).
+              aria-pressed={gender === g}
               // DESIGN.md: the chosen segment is the Selected fill, not a blue.
               className={`flex-1 min-h-11 rounded-control border items-center justify-center ${
                 gender === g ? "bg-selected border-border-strong" : "bg-surface border-border"

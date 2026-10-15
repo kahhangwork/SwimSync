@@ -35,6 +35,7 @@ export function ChildSelector(p: Pick<Att, "loadingChildren" | "children" | "sel
               onPress={() => setSelectedChildId(child.id)}
               accessibilityRole="button"
               accessibilityState={{ selected: selectedChildId === child.id }}
+              aria-pressed={selectedChildId === child.id}
               className={`min-h-11 px-4 justify-center rounded-control border ${
                 selectedChildId === child.id
                   ? "bg-selected border-border-strong"

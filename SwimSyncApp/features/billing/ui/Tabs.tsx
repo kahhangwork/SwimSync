@@ -21,6 +21,7 @@ export function Tabs(p: Pick<Billing, "activeTab" | "setActiveTab">) {
             onPress={() => setActiveTab(tab)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
+            aria-pressed={active}
             className={`flex-1 min-h-11 rounded-control items-center justify-center ${
               active ? "bg-selected" : "bg-surface"
             }`}

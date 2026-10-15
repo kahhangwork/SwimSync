@@ -95,7 +95,9 @@ export default function StudentMarkList(p: {
                       key={key}
                       disabled={readOnly}
                       onPress={() => setTop(student.id, key)}
+                      accessibilityRole="button"
                       accessibilityState={{ selected: isSelected, disabled: readOnly }}
+                      aria-pressed={isSelected}
                       className={`${SEGMENT_BOX[isSelected ? tone : "idle"]} ${
                         readOnly && !isSelected ? "opacity-50" : ""
                       }`}
@@ -123,7 +125,9 @@ export default function StudentMarkList(p: {
                       key={key}
                       disabled={readOnly}
                       onPress={() => setSub(student.id, key)}
+                      accessibilityRole="button"
                       accessibilityState={{ selected: state.sub === key, disabled: readOnly }}
+                      aria-pressed={state.sub === key}
                       className={state.sub === key ? SUB_CHOSEN : SUB_IDLE}
                     >
                       <Text
@@ -152,7 +156,9 @@ export default function StudentMarkList(p: {
                       key={key}
                       disabled={readOnly}
                       onPress={() => setSub(student.id, key)}
+                      accessibilityRole="button"
                       accessibilityState={{ selected: state.sub === key, disabled: readOnly }}
+                      aria-pressed={state.sub === key}
                       className={state.sub === key ? SUB_CHOSEN : SUB_IDLE}
                     >
                       <Text

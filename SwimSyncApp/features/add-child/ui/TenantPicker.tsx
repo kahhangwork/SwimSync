@@ -31,6 +31,7 @@ export function TenantPicker(p: Pick<AddChild, "tenants" | "tenantId" | "setTena
               onPress={() => setTenantId(t.id)}
               accessibilityRole="button"
               accessibilityState={{ selected: tenantId === t.id }}
+              aria-pressed={tenantId === t.id}
               className={`min-h-11 justify-center px-3 rounded-control border ${
                 tenantId === t.id ? "bg-selected border-border-strong" : "bg-surface border-border"
               }`}

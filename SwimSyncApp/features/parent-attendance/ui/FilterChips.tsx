@@ -27,6 +27,7 @@ export function FilterChips(p: Pick<Att, "filter" | "setFilter">) {
             onPress={() => setFilter(opt)}
             accessibilityRole="button"
             accessibilityState={{ selected: filter === opt }}
+            aria-pressed={filter === opt}
             className={`min-h-11 px-4 justify-center rounded-control border ${
               filter === opt
                 ? "bg-selected border-border-strong"

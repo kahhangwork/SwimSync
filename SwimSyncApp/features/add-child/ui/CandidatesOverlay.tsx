@@ -46,6 +46,7 @@ export function CandidatesOverlay(p: Pick<AddChild, "candidates" | "chosen" | "s
                   onPress={() => setChosen(c.student_id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: chosen === c.student_id }}
+                  aria-pressed={chosen === c.student_id}
                   className={`min-h-11 justify-center py-2.5 px-3 rounded-control border ${
                     chosen === c.student_id
                       ? "bg-selected border-ink"

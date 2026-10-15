@@ -27,6 +27,7 @@ export function LocationChips(p: Pick<Classes, "locationOpts" | "effLocationFilt
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
+                aria-pressed={active}
                 // DESIGN.md: the selected segment is the Selected fill — not a
                 // second blue — and words, not shade alone, carry the choice.
                 className={`min-h-11 justify-center rounded-control border px-3.5 ${
