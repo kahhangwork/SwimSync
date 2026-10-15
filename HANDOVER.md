@@ -358,8 +358,9 @@ drift tests now fail on ANY Tailwind default-palette colour class (allowlist `cl
 `/impeccable audit` **16/20**, detector 0 static findings. **7.3:** DESIGN.md *adopted*; plan COMPLETE.
 
 - **Kept, not deleted:** `StatusBadge` (18 importers, already a `Tag` adapter) — plan §10.
-- **Found (BACKLOG *UI restyle leftovers*):** admin text under 12px below 1152px (a user decision — RISK 11's rem
-  scaling); Toast off-token, success 3.3:1. **Not done:** the full sweep for 7.1 (P4) — proposed to the user.
+- **Found (BACKLOG *UI restyle leftovers*):** Toast off-token, success 3.3:1. Admin text under 12px below 1152px →
+  the user chose to stop scaling at 14px (`41e48e8`, §7.193, DEPLOYMENT #94). **7.1 verified:** nightly 38548376173,
+  dispatched at the user's request.
 
 ## 8.154 (2026-10-14) — UI restyle Phase 6: every email, live
 

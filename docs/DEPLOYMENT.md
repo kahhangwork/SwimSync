@@ -1278,4 +1278,9 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     backend gate: `ui/phase7` → `main` as `d12210f`. Before: CI repo invariants locally; both typechecks; app 802/802,
     admin 1281/1281; `--only` app-auth 29/29, smoke-app 73/73, payment-collection 20/20, smoke-admin 64/64. Both Vercel
     builds green; swimsync.sg's entry bundle carries `bg-primary items-center justify-center` (the Logo tile). P4: the
-    next nightly (or a user-approved full sweep) is its verdict.
+    next nightly (or a user-approved full sweep) is its verdict. **Verdict: nightly 38548376173 green** (user-requested).
+
+94. **Deploy record (2026-10-14): admin root font stops at 14px.** App-only: `ui/admin-scale-floor` → `main` as
+    `41e48e8` (the 13px step at ≤1152px removed; user's call). Before: admin typecheck, vitest 1283/1283 (new floor
+    test proven red), `--only` smoke-admin 64/64, invoice-controls 18/18; 26 admin pages at 1152px, 0 overflow. Live
+    admin CSS has no `max-width:1152px` rule and keeps the 1280px one. CI green.
