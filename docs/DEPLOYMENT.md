@@ -1292,3 +1292,7 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `20261016000100` (0 pending; one `add_unclaimed_student`, `set_student_gender` new; anon EXECUTE false on both,
     `authenticated` only; prod md5 = local), then `da5a855` (admin). Live admin students chunk carries "Set gender
     (not recorded)" (~4.5 min). CI 38835989935 + 38836025203 green. First live use: the owner set Pranu + Aadi.
+97. **Deploy record (2026-10-17): Students opens on Active, in class order — admin-only.** `656ede3` to `main` (no
+    migration, no function — no gate; prod 0 pending). **Pushed WITHOUT a nightly covering `da5a855`, on the user's word**
+    ("skip the nightly"). Before: vitest 1318/1318, 16 `--only` drivers green. Live admin students chunk carries
+    `"All","Active","Inactive","Assigned","Unassigned"` and "Find them under the Inactive filter" (~4 min). CI 38931880969 green.

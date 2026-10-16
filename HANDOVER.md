@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-16 — **Admins record gender, live** (`20261016000100` → `da5a855`): Add student + Book trial require
-it; Students → Actions → *Set gender*. 25 prod children still blank. **Unverified by a nightly:** `da5a855`. Next: read
-tonight's nightly, then the rest of *UI restyle leftovers*._
+_Last updated: 2026-10-17 — **Students opens on Active, in class order, live** (`656ede3`): pills All/Active/Inactive/
+Assigned/Unassigned, reset on every visit; one weekday order (Monday-first). **Pushed without a nightly, on the user's
+word — `da5a855` + `656ede3` both unverified.** Next: read tonight's nightly._
 
-_Previously (§8.156, 2026-10-16) — UI restyle leftovers live (Toast, money formatter, app gender, selected state)._
+_Previously (§8.157, 2026-10-16) — admins record gender, live (migration → admin)._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,18 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.158 (2026-10-16 → 17) — Students list opens on Active, in class order — live
+
+**Shipped** (`656ede3`, DEPLOYMENT #97, admin-only): filter pills All · Active · Inactive · Assigned · Unassigned, opening
+on **Active** and class order (Mon→Sun, start time, name; no class last) on EVERY visit; *Package running low* stays a
+toggle; *No parent account* moved far right; a banner names the child after *Set inactive*; an empty list says which
+pill hid it (PRD §7.4). One weekday order, Monday-first — the Classes Day column flipped (§7.380). vitest 1318/1318, 16
+`--only` drivers green, each new check proven red.
+
+- **Found:** class chips sorted "10:15 AM" before "9:30 AM" (fixed); `verify-level-skills` picked its child by row
+  position and passed by luck (§7.381); a re-entry check via `page.goto` is vacuous (§7.379).
+- **Not done:** the nightly gate was skipped on the user's word, so tonight's run is the first over two app units.
+
 ## 8.157 (2026-10-16) — Admins record a child's gender: migration → admin, live
 
 **Shipped** (`88e96db` + `da5a855`, DEPLOYMENT #96): `add_unclaimed_student(p_gender)` + new `set_student_gender`; admin
@@ -361,17 +373,6 @@ Add student / Book trial require a gender (never pre-selected); Students → Act
 - **Found:** all 27 blank genders were admin-created (no gender input existed; 25 have no parent). Ang ×2: parent linked, no gender.
 - **Not done:** the database still accepts a missing gender (expand-only) → BACKLOG *Refuse a missing gender in the
   database too* (S). The 25 blank stay for the owner to fill.
-
-## 8.156 (2026-10-16) — UI restyle leftovers: Toast, money, gender, selected state — live
-
-**Shipped** (`23621a3` + `1243ca4`, DEPLOYMENT #95, app-only): Toast fills on DESIGN.md tokens (success 3.3:1 → ≥4.5:1);
-`lib/money.ts` `formatSgd()` replaces ~40 `toFixed(2)` sites (`S$1,260.00`; PayNow payload untouched); Add / Edit Child
-gender **required, never pre-selected** (user's decision, PRD Add/Edit Child row); `aria-pressed`/`aria-checked` on 13
-controls. Each new test proven red; nightly 38815783732 GREEN 74/74 on `1243ca4`.
-
-- **Found:** Edit Child loaded a missing gender as "Male" and saved it on ANY edit — 27 of 41 prod children have none
-  (whether a past edit already overwrote one cannot be told from the data). RN-web drops `accessibilityState` → §7.378, now a check.
-- **Not done:** the other *UI restyle leftovers* (BACKLOG); "other" gender shows no segment but keeps its value.
 
 ## 9. Next steps (pick with the user)
 
@@ -414,7 +415,8 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-10-16:** scheduled `38815783732` (on `1243ca4`, the UI restyle leftovers) read **GREEN, 74/74**.
-**Unverified since: `da5a855`** (admin gender; 4 `--only` drivers green) — read the next nightly before the next app unit. Previous: `38646598335` GREEN on `572ca8e` (7.1 + the admin 14px floor).
+**Unverified since: `da5a855` (admin gender) AND `656ede3` (Students Active default)** — the user waived the gate for
+`656ede3` (2026-10-17). A red tonight has two suspects; `--only` replay the student/gender drivers first. Previous: `38646598335` GREEN on `572ca8e` (7.1 + the admin 14px floor).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
