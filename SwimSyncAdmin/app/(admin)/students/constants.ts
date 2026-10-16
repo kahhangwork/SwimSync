@@ -6,15 +6,11 @@
  *  ⚠ RISK 3 / WAVE_C_SPOOL_PLAN.md Piece 1. */
 export const ROW_LIMIT = 1000;
 
-/** Monday-first. Orders a child's chips the way their week runs. */
-export const WEEKDAY_ORDER = [
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday",
-];
+/** The status pills, in the order the user asked for (2026-10-16). "Active" is
+ *  the default and covers Assigned + Unassigned; the other three are badge
+ *  labels. Running low and No parent account are toggles, not pills. */
+export const STATUS_FILTERS = ["All", "Active", "Inactive", "Assigned", "Unassigned"];
 
-export const STATUS_FILTERS = ["All", "Assigned", "Unassigned", "Inactive"];
+/** The page always OPENS on this — a plain useState default, so leaving the
+ *  page and coming back resets it. Never persist it (user, 2026-10-16). */
+export const DEFAULT_STATUS_FILTER = "Active";

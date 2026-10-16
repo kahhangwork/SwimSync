@@ -120,6 +120,8 @@ export default function StudentsPage() {
         loadError={loadError}
         capped={capped}
         searching={search.trim() !== ""}
+        flash={status.flash}
+        onDismissFlash={status.dismissFlash}
       />
 
       <StudentTable
@@ -131,6 +133,7 @@ export default function StudentsPage() {
         covMap={packages.covMap}
         busyId={status.busyId}
         onActions={drawer.open}
+        statusFilter={statusFilter}
       />
 
       <ActionsDrawer

@@ -7,7 +7,7 @@
 // of the page that can finally be unit-tested (studentRows.test.ts).
 
 import { formatTime } from "@/lib/utils";
-import { WEEKDAY_ORDER } from "../constants";
+import { dayOfWeekOrder } from "@/lib/tableSort";
 import type { EnrolledClass, StudentRow } from "../types";
 import type { StudentSelectRow } from "../dao/students.repo";
 
@@ -41,11 +41,13 @@ export function toStudentRow(s: StudentSelectRow, lessonCount: Map<string, numbe
       coach_name: e.classes!.coaches?.profiles?.full_name ?? null,
       day: e.classes!.day_of_week ?? null,
       start: e.classes!.start_time ? formatTime(e.classes!.start_time) : null,
+      start_time: e.classes!.start_time ?? null,
     }))
+    // By the RAW time: the formatted one put "10:15 AM" before "9:30 AM".
     .sort(
       (a: EnrolledClass, b: EnrolledClass) =>
-        WEEKDAY_ORDER.indexOf(a.day ?? "") - WEEKDAY_ORDER.indexOf(b.day ?? "") ||
-        (a.start ?? "").localeCompare(b.start ?? "")
+        (dayOfWeekOrder(a.day) ?? 7) - (dayOfWeekOrder(b.day) ?? 7) ||
+        (a.start_time ?? "").localeCompare(b.start_time ?? "")
     );
   return {
     id: s.id,
@@ -68,10 +70,29 @@ export function toStudentRow(s: StudentSelectRow, lessonCount: Map<string, numbe
     parent_name: s.parent_students?.[0]?.parents?.profiles?.full_name ?? "—",
     classes,
     // Sort keys only — see the type. First in weekday order.
-    class_title: classes[0]?.title ?? null,
+    class_sort_key: classSortKey(classes, s.full_name),
     coach_name: classes[0]?.coach_name ?? null,
     lessons: lessonCount.get(s.id) ?? 0,
   };
+}
+
+/**
+ * The Students page's default order (user, 2026-10-16): the child's earliest
+ * class by weekday (Monday-first — `dayOfWeekOrder`, the one weekday order),
+ * then start time, then name. `classes` arrives already in that order, so the
+ * first is the earliest.
+ *
+ * Compared by the table's `compareValues` (localeCompare, numeric,
+ * case-blind), which is why each part is fixed-width or a single digit. Null —
+ * never a "-1" or "null" fragment — when there is nothing to place, so
+ * `sortRows` keeps the child last in both directions.
+ */
+export function classSortKey(classes: EnrolledClass[], fullName: string): string | null {
+  const first = classes[0];
+  if (!first) return null;
+  const day = dayOfWeekOrder(first.day);
+  if (day === null || !first.start_time) return null;
+  return `${day}|${first.start_time}|${fullName.toLowerCase()}`;
 }
 
 /** Activity is the outer question ("still a customer?"), assignment the inner
@@ -105,7 +126,10 @@ export function matchesFilters(
   runningLow: (s: StudentRow) => boolean
 ): boolean {
   const label = statusLabel(s);
-  const matchStatus = f.statusFilter === "All" || label === f.statusFilter;
+  // "Active" is not a badge label — it is both active ones (Assigned + Unassigned).
+  const matchStatus =
+    f.statusFilter === "All" ||
+    (f.statusFilter === "Active" ? s.is_active : label === f.statusFilter);
   const matchLow = !f.lowOnly || runningLow(s);
   const matchUnclaimed = !f.unclaimedOnly || isUnclaimed(s);
   return matchStatus && matchLow && matchUnclaimed;

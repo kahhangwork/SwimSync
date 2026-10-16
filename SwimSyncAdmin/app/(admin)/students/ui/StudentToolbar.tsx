@@ -55,6 +55,7 @@ export function StudentToolbar(p: StudentToolbarProps) {
           <button
             key={f}
             onClick={() => p.onStatusFilter(f)}
+            aria-pressed={p.statusFilter === f}
             className={`rounded-control px-3 py-2 text-label font-semibold transition-colors ${
               p.statusFilter === f
                 ? "bg-selected text-ink border border-border-strong"
@@ -67,23 +68,9 @@ export function StudentToolbar(p: StudentToolbarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Only offered when there ARE any: a permanently-visible filter that
-            always returns nothing reads as a broken feature. */}
-        {p.unclaimedCount > 0 && (
-          <button
-            onClick={p.onToggleUnclaimed}
-            className={`rounded-control px-3 py-2 text-label font-semibold transition-colors ${
-              p.unclaimedOnly
-                ? "bg-selected text-ink border border-border-strong"
-                : "bg-surface border border-border text-ink-secondary hover:bg-ground"
-            }`}
-            title="Children a coach added before the family registered. Their billable lessons cannot be invoiced, and they hold the billing month open until the parent is invited or the money is recorded as settled."
-          >
-            No parent account ({p.unclaimedCount})
-          </button>
-        )}
         <button
           onClick={p.onToggleLow}
+          aria-pressed={p.lowOnly}
           className={`rounded-control px-3 py-2 text-label font-semibold transition-colors ${
             p.lowOnly
               ? "bg-selected text-ink border border-border-strong"
@@ -100,6 +87,23 @@ export function StudentToolbar(p: StudentToolbarProps) {
               Change on Packages
             </Link>
           </span>
+        )}
+        {/* Far right (user, 2026-10-16). Only offered when there ARE any active
+            ones: a permanently-visible filter that always returns nothing reads
+            as a broken feature. */}
+        {p.unclaimedCount > 0 && (
+          <button
+            onClick={p.onToggleUnclaimed}
+            aria-pressed={p.unclaimedOnly}
+            className={`rounded-control px-3 py-2 text-label font-semibold transition-colors ${
+              p.unclaimedOnly
+                ? "bg-selected text-ink border border-border-strong"
+                : "bg-surface border border-border text-ink-secondary hover:bg-ground"
+            }`}
+            title="Children a coach added before the family registered. Their billable lessons cannot be invoiced, and they hold the billing month open until the parent is invited or the money is recorded as settled."
+          >
+            No parent account ({p.unclaimedCount})
+          </button>
         )}
       </div>
     </div>

@@ -3,9 +3,18 @@
 // lifted it out; there is no fix for §7.25 to prove them red against. Their
 // job is to pin the mapping so a later slice cannot quietly change what the
 // table shows. The §7.28 nesting reads are the ones worth having.
+//
+// EXCEPT the blocks marked PROOF (2026-10-16, Active default + class-time sort).
+// MUTATION PROOFS (§7.25), each applied to studentRows.ts and reverted:
+//   1. chip sort on formatted `start` instead of `start_time` → RED "orders two classes on one day…"
+//   2. drop the `"Active" ? s.is_active` branch                → RED both "Active …" tests
+//   3. drop classSortKey's null guard                         → RED "is null — never a '-1' …"
+//   4. drop the name from the key                             → RED "ascending: …" + "uses the FIRST class…"
 
 import { describe, it, expect } from "vitest";
+import { sortRows } from "@/lib/tableSort";
 import {
+  classSortKey,
   countLessons,
   toStudentRow,
   statusLabel,
@@ -27,7 +36,7 @@ const base = (over: Partial<StudentRow> = {}): StudentRow => ({
   parent_id: "p1",
   parent_name: "Ms Tan",
   classes: [],
-  class_title: null,
+  class_sort_key: null,
   coach_name: null,
   lessons: 0,
   ...over,
@@ -94,14 +103,29 @@ describe("toStudentRow", () => {
       coach_name: "Coach B",
       day: "wednesday",
       start: "5:00 PM",
+      start_time: "17:00:00",
     });
     expect(r.classes[0].coach_name).toBeNull();
   });
 
   it("uses the FIRST class in weekday order as the sort keys", () => {
     const r = toStudentRow(row, new Map());
-    expect(r.class_title).toBe("Mon 9am");
+    expect(r.class_sort_key?.startsWith("0|09:00:00|")).toBe(true);
     expect(r.coach_name).toBeNull();
+  });
+
+  // PROOF — the old chip sort compared the FORMATTED start, so "10:15 AM"
+  // came before "9:30 AM" (and "12:00 PM" before "9:00 AM").
+  it("orders two classes on one day by real time, not by the formatted text", () => {
+    const cls = (id: string, start_time: string) => ({
+      is_active: true,
+      classes: { id, title: id, day_of_week: "sunday", start_time, coaches: null },
+    });
+    const r = toStudentRow(
+      { ...row, student_class_enrolments: [cls("late", "10:15:00"), cls("noon", "12:00:00"), cls("early", "09:30:00")] },
+      new Map()
+    );
+    expect(r.classes.map((c) => c.id)).toEqual(["early", "late", "noon"]);
   });
 
   it("keeps activity and assignment as two independent axes", () => {
@@ -116,6 +140,43 @@ describe("toStudentRow", () => {
     expect(r.parent_name).toBe("—");
     expect(r.lessons).toBe(3);
     expect(isUnclaimed(r)).toBe(true);
+  });
+});
+
+// PROOF — the default sort (user, 2026-10-16): earliest class by weekday
+// Mon→Sun, then start time, then name; no class last in BOTH directions.
+// Ordered THROUGH sortRows (localeCompare, numeric, base) — the comparator the
+// table really uses — never by comparing key strings with `<`.
+describe("classSortKey", () => {
+  const ec = (day: string, start_time: string) =>
+    ({ id: day + start_time, title: "", coach_name: null, day, start: null, start_time });
+  const kid = (full_name: string, classes: ReturnType<typeof ec>[]) =>
+    ({ full_name, key: classSortKey(classes, full_name) });
+
+  const kids = [
+    kid("Nobody", []),
+    kid("Sunny", [ec("sunday", "08:45:00")]),
+    kid("Zoe", [ec("monday", "10:15:00")]),
+    kid("adam", [ec("monday", "10:15:00")]),
+    kid("Mo", [ec("monday", "09:30:00")]),
+  ];
+
+  it("ascending: Monday before Sunday, earlier before later, then name (case-blind), no class last", () => {
+    expect(sortRows(kids, (k) => k.key, "asc").map((k) => k.full_name)).toEqual([
+      "Mo", "adam", "Zoe", "Sunny", "Nobody",
+    ]);
+  });
+
+  it("descending reverses the classes but keeps the no-class child last", () => {
+    expect(sortRows(kids, (k) => k.key, "desc").map((k) => k.full_name)).toEqual([
+      "Sunny", "Zoe", "adam", "Mo", "Nobody",
+    ]);
+  });
+
+  it("is null — never a '-1' or 'null' fragment — for no class, an unknown day, or no start", () => {
+    expect(classSortKey([], "A")).toBeNull();
+    expect(classSortKey([ec("someday", "09:00:00")], "A")).toBeNull();
+    expect(classSortKey([{ ...ec("monday", "09:00:00"), start_time: null }], "A")).toBeNull();
   });
 });
 
@@ -138,6 +199,21 @@ describe("matchesFilters", () => {
   it("status filter compares against the badge label, not the enum", () => {
     const f = { statusFilter: "Inactive", lowOnly: false, unclaimedOnly: false };
     expect(matchesFilters(base({ is_active: false }), f, never)).toBe(true);
+    expect(matchesFilters(base({ is_active: true }), f, never)).toBe(false);
+  });
+
+  // PROOF — "Active" is not a badge label, so the old label compare matched nobody.
+  it("Active keeps every active child, assigned or not, and no inactive one", () => {
+    const f = { statusFilter: "Active", lowOnly: false, unclaimedOnly: false };
+    expect(matchesFilters(base({ is_active: true, assignment_status: "assigned" }), f, never)).toBe(true);
+    expect(matchesFilters(base({ is_active: true, assignment_status: "unassigned" }), f, never)).toBe(true);
+    expect(matchesFilters(base({ is_active: false, assignment_status: "assigned" }), f, never)).toBe(false);
+  });
+
+  it("Active combines with Package running low", () => {
+    const f = { statusFilter: "Active", lowOnly: true, unclaimedOnly: false };
+    expect(matchesFilters(base({ is_active: true }), f, always)).toBe(true);
+    expect(matchesFilters(base({ is_active: false }), f, always)).toBe(false);
     expect(matchesFilters(base({ is_active: true }), f, never)).toBe(false);
   });
 

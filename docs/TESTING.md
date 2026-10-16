@@ -1218,6 +1218,13 @@ and a final assertion that counts rather than tests presence (§7.118).
 - **`verify-level-skills.mjs`** — its `/students` level-picker selector moved from `page.locator("select").nth(2)`
   to `table select` nth(2): the new scoped-search toolbar `<select>` shifted the bare position index. A
   position-based selector over a page whose toolbar can grow a control is the recurring driver trap.
+  **2026-10-16:** now Maya Tan's row BY NAME, with a count-is-1 check before `selectOption` — nth(2) had only
+  stayed on her by fixture coincidence, and the Students page opening in class order is that coincidence's end
+  (§7.381).
+- **`verify-active-inactive.mjs`** (2026-10-16) — §3a–3c: Students opens on **Active** and Class-ascending (read
+  from `aria-pressed` / `aria-sort`, with All="false" as the control); Set inactive names the child and they leave
+  the Active list but show under Inactive; leaving and returning via the SIDEBAR (never `page.goto`, §7.379)
+  resets both. Proven RED on the pre-change build: 7 new checks FAIL, 18 existing PASS.
 
 ### Wave C Piece 4 — swim-skill grading (2026-08-28)
 

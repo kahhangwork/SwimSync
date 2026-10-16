@@ -1074,6 +1074,15 @@ SwimSync shall allow **parents to create student profiles** and **superadmin to 
   class to remove them from, and the chip is the only control that says which one is going.
 - **A child is `Unassigned` only when they are in NO class.** Dropping one of two leaves
   them `Assigned`.
+- **The Students list opens on Active, in class order — every time** (user, 2026-10-16). Status pills:
+  **All · Active · Inactive · Assigned · Unassigned** (Active = Assigned + Unassigned active children);
+  **Package running low** is a toggle that combines with a pill; **No parent account (N)** sits far right and
+  appears only while an ACTIVE child has no parent. The default order is each child's earliest class — weekday
+  Monday-first, then start time, then name — with children in no class last; the other columns still sort on
+  click. Neither choice is remembered: leaving the page and coming back resets both. Search respects the pill
+  (an inactive child is found under All or Inactive), and an empty list says which pill hid it. **Set inactive**
+  confirms by name, because the child then leaves the Active list. Every admin table sorts weekdays
+  Monday-first (§7.380).
 
 ### 7.5 Lesson Session Generation
 
@@ -3693,7 +3702,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Unassigned Children** | Filterable table of unassigned students with parent info | Assign button per row; batch assign option |
 | **Assign to Class** | Select coach → select class → confirm assignment | Modal or side panel; show class capacity info |
 | **Classes** | Table of all classes; CRUD operations; coach assignment | Create/edit class form with all fields |
-| **Students** | All students table with filters; assignment status column | Click to view profile; show parent link |
+| **Students** | All students table with filters; assignment status column | Click to view profile; show parent link. *(implemented — opens on **Active**, sorted by class day/time; see §7.4.)* |
 | **Attendance** | Filter by class, coach, date range; per-student records | Read-only view; audit trail visible |
 | **Invoices** | All invoices with filters; mark as paid; view line items | Show gross, credit, net columns |
 | **Credit Notes** | All credit notes; filter by parent, status, date | Read-only; linked to invoices and lessons |

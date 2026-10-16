@@ -75,18 +75,18 @@ describe("dayOfWeekOrder", () => {
   it("orders the week as a calendar, not as an alphabet", () => {
     const days = ["friday", "monday", "sunday", "wednesday"];
     const ordered = sortRows(days, (d) => dayOfWeekOrder(d), "asc");
-    expect(ordered).toEqual(["sunday", "monday", "wednesday", "friday"]);
+    expect(ordered).toEqual(["monday", "wednesday", "friday", "sunday"]);
     // What plain A→Z would have given, and why this accessor exists:
     expect([...days].sort()).toEqual(["friday", "monday", "sunday", "wednesday"]);
   });
 
-  it("agrees with lessonDates' private DAY_INDEX (0 = Sunday)", () => {
-    expect(dayOfWeekOrder("sunday")).toBe(0);
-    expect(dayOfWeekOrder("saturday")).toBe(6);
+  it("is Monday-first, matching the day_of_week enum — the ONE weekday order (user, 2026-10-16)", () => {
+    expect(dayOfWeekOrder("monday")).toBe(0);
+    expect(dayOfWeekOrder("sunday")).toBe(6);
   });
 
   it("is case- and whitespace-insensitive, and blank for anything else", () => {
-    expect(dayOfWeekOrder(" Sunday ")).toBe(0);
+    expect(dayOfWeekOrder(" Sunday ")).toBe(6);
     expect(dayOfWeekOrder("")).toBeNull();
     expect(dayOfWeekOrder(null)).toBeNull();
     expect(dayOfWeekOrder("someday")).toBeNull();

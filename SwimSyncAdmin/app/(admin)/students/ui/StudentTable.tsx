@@ -23,11 +23,15 @@ export type StudentTableProps = {
   covMap: Map<string, StudentCoverage>;
   busyId: string | null;
   onActions: (s: StudentRow) => void;
+  /** The selected pill — an empty list under anything but All says so. */
+  statusFilter: string;
 };
 
 export function StudentTable(p: StudentTableProps) {
   const sort = useTableSort<StudentRow>({
-    key: "full_name",
+    // Opens in class order — weekday, start time, name (`classSortKey`). Plain
+    // state: every visit starts here again (user, 2026-10-16).
+    key: "class_sort_key",
     accessors: {
       // The badge, not the enum: what the Status column shows is
       // Assigned/Unassigned/Inactive, so that is what A→Z has to order.
@@ -50,7 +54,7 @@ export function StudentTable(p: StudentTableProps) {
         <Th>Left</Th>
         <Th>Expires</Th>
         <Th sort={sort} sortKey="status">Status</Th>
-        <Th sort={sort} sortKey="class_title">Class</Th>
+        <Th sort={sort} sortKey="class_sort_key">Class</Th>
         <Th sort={sort} sortKey="coach_name">Coach</Th>
         <Th>Actions</Th>
       </Thead>
@@ -65,6 +69,9 @@ export function StudentTable(p: StudentTableProps) {
           <Tr>
             <Td className="text-center text-ink-muted py-8" colSpan={7}>
               No students found.
+              {/* The list opens on Active, so a missing child is usually an
+                  inactive one — say which filter hid them. */}
+              {p.statusFilter !== "All" && ` Showing ${p.statusFilter} only — try All.`}
             </Td>
           </Tr>
         ) : (

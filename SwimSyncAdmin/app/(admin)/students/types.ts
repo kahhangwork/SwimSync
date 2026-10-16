@@ -29,11 +29,12 @@ export type StudentRow = {
    *  several, and this page is the one surface that owns the many-to-many:
    *  adding a class, and removing ONE of them. */
   classes: EnrolledClass[];
-  /** The FIRST class's title and coach, kept only as sort keys so the Class and
-   *  Coach columns still sort (§8.19). Never rendered — the cells render
-   *  `classes`. A child in two classes sorts by their earliest in the week,
-   *  which is the only ordering that is stable as classes are added. */
-  class_title: string | null;
+  /** Sort keys only, from the FIRST class (§8.19) — never rendered; the cells
+   *  render `classes`. A child in two classes sorts by their earliest in the
+   *  week. `class_sort_key` is weekday → start time → name (`classSortKey`), the
+   *  page's default order; null (no class) sorts last. `coach_name` follows
+   *  the same first class, which since 2026-10-16 is earliest by REAL time. */
+  class_sort_key: string | null;
   coach_name: string | null;
   /** Attendance rows. Decides which of a duplicate pair must survive a merge. */
   lessons: number;
@@ -44,6 +45,9 @@ export type EnrolledClass = {
   title: string;
   coach_name: string | null;
   day: string | null;
-  /** Pre-formatted "5:00pm" — the chip has no room for a range. */
+  /** Pre-formatted "5:00pm" — the chip has no room for a range. DISPLAY ONLY:
+   *  as text "10:15 AM" sorts before "9:30 AM". Order by `start_time`. */
   start: string | null;
+  /** Raw `HH:MM:SS` from Postgres — fixed width, so it compares correctly. */
+  start_time: string | null;
 };

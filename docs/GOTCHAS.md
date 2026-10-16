@@ -36,10 +36,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
-| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361 |
+| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371 |
@@ -3121,3 +3121,24 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     radio (`aria-selected` is only announced on tab/option/gridcell). **A driver check for an absent attribute needs a
     positive control** — assert it appears once selected. Promoted to a CHECK: `SwimSyncApp/lib/ariaState.drift.test.ts`.
     (2026-10-16, UI restyle leftovers.)
+
+379. **A driver check that state "resets when you come back" passes vacuously through `page.goto`.** A goto is a full
+    reload: every `useState` starts over whatever the code does, so the check is green on a page that persists its
+    filter. Leave and return by CLIENT-SIDE navigation — the sidebar links (`aside a[href="/dashboard"]`, then
+    `aside a[href="/students"]`) — and first assert a control: the state really changed before leaving. A helper that
+    reads an attribute must return a sentinel ("missing") when the element is absent, or `getAttribute`'s 30 s wait
+    crashes the driver and hides every check after it — which is how the first RED proof of this one read.
+    (2026-10-16, Students opens on Active; `verify-active-inactive` §3c.)
+
+380. **There is ONE weekday order — Monday-first, `dayOfWeekOrder()` in `SwimSyncAdmin/lib/tableSort.ts`.** Until
+    2026-10-16 it was Sunday-first while the Students page kept its own Monday-first `WEEKDAY_ORDER`, so one week
+    sorted two ways in one app. The user chose Monday-first everywhere (it matches the `day_of_week` enum, the app's
+    week view and the coach screens). Import it; never add another array for ordering. (`lessonDates`' Sunday-indexed
+    `DAY_NAMES` is a `getDay()` mapping, not an order.) A composite sort key built from it is tested THROUGH
+    `sortRows()` — the comparator is `localeCompare(numeric, base)`, not `<`. (2026-10-16.)
+
+381. **§7.101 again, on a driver it had already named: a positional `nth()` survived because the fixture happened to
+    sort that way.** `verify-level-skills` wrote a level onto `table select` nth(2) — Maya Tan only because the
+    children shared one class and so kept name order — for two months after §7.101 said "every driver". Any change
+    to a list page's DEFAULT sort or filter: grep its drivers for `nth(`/`.first()` on rows, and grep for the route
+    WITHOUT its slash too (`verify-admin-table-geometry` lists `"students"` in `ROUTES`). (2026-10-16.)

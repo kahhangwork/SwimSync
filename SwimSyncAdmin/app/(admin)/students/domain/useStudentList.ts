@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDebouncedValue } from "@/components/useDebouncedValue";
 import * as repo from "../dao/students.repo";
-import { ROW_LIMIT } from "../constants";
+import { DEFAULT_STATUS_FILTER, ROW_LIMIT } from "../constants";
 import type { SearchField, StudentRow } from "../types";
 import { countLessons, toStudentRow } from "./studentRows";
 
@@ -29,7 +29,9 @@ export function useStudentList() {
   // Only the latest load() may write state: a slow response to an old term must
   // not overwrite the newest one (the attendance page's guard, as a counter).
   const loadSeq = useRef(0);
-  const [statusFilter, setStatusFilter] = useState("All");
+  // Opens on Active every time (and the table on Class order) — plain state, so
+  // leaving the page resets both. Deliberately not persisted (user, 2026-10-16).
+  const [statusFilter, setStatusFilter] = useState(DEFAULT_STATUS_FILTER);
   // ── "Running low" package filter ──────────────────────────────────────────
   // Families whose LIVE package balance (stored minus attended-but-uninvoiced
   // draws — package_live_balances(), the single derivation, never recomputed

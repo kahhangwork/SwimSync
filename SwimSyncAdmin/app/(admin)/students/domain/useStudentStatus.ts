@@ -24,6 +24,9 @@ export function useStudentStatus(reload: () => Promise<void>) {
   const [family, setFamily] = useState<FamilyChild[]>([]);
   const [takeSiblings, setTakeSiblings] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // The list opens on Active, so a child set inactive LEAVES the table — this
+  // is the confirmation the old "Inactive" badge used to give (2026-10-16).
+  const [flash, setFlash] = useState<string | null>(null);
 
   async function openInactive(student: StudentRow) {
     setTakeSiblings(false);
@@ -58,6 +61,7 @@ export function useStudentStatus(reload: () => Promise<void>) {
     }
     setBusyId(student.id);
     setActionError(null);
+    setFlash(null);
     const ids =
       mode === "inactive" && takeSiblings
         ? family.map((c) => c.student_id)
@@ -72,6 +76,14 @@ export function useStudentStatus(reload: () => Promise<void>) {
       setActionError(`Could not update ${student.full_name}: ${error}`);
       return;
     }
+    if (mode === "inactive") {
+      const names =
+        ids.length > 1
+          ? family.filter((c) => ids.includes(c.student_id)).map((c) => c.full_name)
+          : [student.full_name];
+      const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+      setFlash(`${list} set inactive. Find them under the Inactive filter.`);
+    }
     await reload();
   }
 
@@ -84,6 +96,8 @@ export function useStudentStatus(reload: () => Promise<void>) {
     setTakeSiblings,
     lastActive,
     actionError,
+    flash,
+    dismissFlash: () => setFlash(null),
     openInactive,
     openRemove,
     close: () => setPending(null),

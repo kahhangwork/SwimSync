@@ -61,13 +61,13 @@ export function compareValues(a: SortValue, b: SortValue): number {
 }
 
 const DAY_ORDER = [
-  "sunday",
   "monday",
   "tuesday",
   "wednesday",
   "thursday",
   "friday",
   "saturday",
+  "sunday",
 ] as const;
 
 /**
@@ -77,15 +77,16 @@ const DAY_ORDER = [
  * week runs Friday, Monday, Saturday, Sunday, Thursday, Tuesday, Wednesday,
  * which tells an admin nothing about which classes run near each other.
  *
- * `lib/lessonDates.ts` holds the same order in a private `DAY_INDEX`, and it is
- * deliberately not exported or imported here: that file is duplicated
- * byte-identical across SwimSyncAdmin, SwimSyncApp and the Edge Function
- * (`docs/ARCHITECTURE.md` §6), so widening its surface for a display concern
- * would mean editing three copies. Sorting is not a lesson-date calculation.
- * The order is a calendar fact and cannot drift; `tableSort.test.ts` pins it.
+ * MONDAY-FIRST, and the ONE weekday order the admin sorts by (user,
+ * 2026-10-16): it matches the `day_of_week` enum, the app's week view and the
+ * coach screens. It was Sunday-first until then, while the Students page kept
+ * its own Monday-first copy — two orders for one week. Do not add another;
+ * import this. (`lib/lessonDates.ts`'s Sunday-indexed `DAY_NAMES` is a
+ * `getDay()` mapping, not a display order, and stays as it is.)
+ * `tableSort.test.ts` pins it.
  */
 export function dayOfWeekOrder(day: string | null | undefined): number | null {
-  if (!day) return null; // blank, so it sorts last rather than as Sunday
+  if (!day) return null; // blank, so it sorts last rather than as Monday
   const i = DAY_ORDER.indexOf(day.trim().toLowerCase() as (typeof DAY_ORDER)[number]);
   return i === -1 ? null : i;
 }

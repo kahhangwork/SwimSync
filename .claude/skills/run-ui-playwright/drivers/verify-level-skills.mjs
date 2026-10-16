@@ -88,11 +88,16 @@ try {
   // Place a student on the level so the app screens have something to show.
   await page.goto(`${ADMIN}/students`, { waitUntil: "networkidle" });
   await page.waitForTimeout(2000);
-  // Scoped to the table: the Students toolbar now carries a scoped-search
-  // field <select> (Wave C Piece 1), so a bare `select` nth() would target it
-  // instead of a per-row Level dropdown. `table select` counts only the row
-  // dropdowns, restoring the original target regardless of toolbar controls.
-  await page.locator("table select").nth(2).selectOption({ label: "Toddler 1" });
+  // ⚠ MAYA'S ROW BY NAME, NEVER BY POSITION (§7.101). This was
+  // `table select` nth(2) — "the third child" — which stayed on Maya only
+  // because the fixture children happened to sort that way; the Students page
+  // opening in class order (2026-10-16) is exactly the kind of change that
+  // writes the level onto somebody else's child instead.
+  const mayaSelect = page.getByRole("row").filter({ hasText: "Maya Tan" }).locator("select");
+  check(await mayaSelect.count() === 1,
+    "the students table has a level picker on Maya Tan's row",
+    `${await mayaSelect.count()} selects found in her row`);
+  await mayaSelect.selectOption({ label: "Toddler 1" });
   await page.waitForTimeout(2000);
 
   console.log("\n[coach] the curriculum is available poolside");

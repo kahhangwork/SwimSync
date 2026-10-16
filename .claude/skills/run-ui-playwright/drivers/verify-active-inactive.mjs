@@ -58,6 +58,21 @@ check("both children are in the Unassigned queue while active",
 // ── 3. Setting one child inactive OFFERS the sibling, and says what follows ─
 await page.goto(`${ADMIN}/students`);
 await page.waitForTimeout(1500);
+
+// ── 3a. The page OPENS on Active, in class order (user, 2026-10-16) ──────────
+// Read from the DOM (aria-pressed / aria-sort), never the colour class — §7.375,
+// §7.378. Positive control: All must read "false" too, or a missing attribute
+// would pass as "not All".
+// "missing" rather than a 30s wait when the pill does not exist: an absent
+// button is a FAIL to record, not a crash that hides the checks after it.
+const pill = async (name) => {
+  const b = page.getByRole("button", { name, exact: true });
+  return (await b.count()) === 1 ? b.getAttribute("aria-pressed") : "missing";
+};
+const classSort = () => page.locator("th", { hasText: /^Class/ }).getAttribute("aria-sort");
+check("Students opens on the Active filter", (await pill("Active")) === "true" && (await pill("All")) === "false",
+  `Active=${await pill("Active")} All=${await pill("All")}`);
+check("Students opens sorted by Class, ascending", (await classSort()) === "ascending", `${await classSort()}`);
 // Set inactive now lives in the per-row Actions drawer (Decision 10): open it,
 // then click the drawer's Set inactive, which opens the confirm modal.
 await page.locator("tr", { hasText: "Ethan Tan" }).getByRole("button", { name: /^Actions$/ }).click();
@@ -84,6 +99,35 @@ await page.screenshot({ path: shot("ai-family-consequence.png"), fullPage: true 
 await page.locator('input[type="radio"]').first().check();
 await page.getByRole("button", { name: /^Set inactive$/ }).last().click();
 await page.waitForTimeout(1800);
+
+// ── 3b. Under Active the child LEAVES the list, so the page says where to ────
+body = await page.innerText("body");
+check("Set inactive confirms by name and points at the Inactive filter",
+  /Ethan Tan set inactive\. Find them under the Inactive filter\./.test(body));
+check("…and the inactive child is gone from the Active list",
+  (await page.locator("tbody tr", { hasText: "Ethan Tan" }).count()) === 0);
+await page.getByRole("button", { name: "Inactive", exact: true }).click();
+await page.waitForTimeout(500);
+check("…and is there under Inactive",
+  (await page.locator("tbody tr", { hasText: "Ethan Tan" }).count()) === 1);
+
+// ── 3c. Leaving and coming back resets filter AND sort ───────────────────────
+// Via the SIDEBAR both ways — a client-side navigation. page.goto is a full
+// reload, which resets every useState whatever the code does, so a goto here
+// would pass on a page that persisted its filter (GOTCHAS §7.379).
+await page.getByRole("button", { name: "All", exact: true }).click();
+await page.locator("th", { hasText: /^Student/ }).getByRole("button").click();
+await page.waitForTimeout(300);
+check("(control) the filter and sort really changed before leaving",
+  (await pill("All")) === "true" && (await classSort()) === "none");
+await page.locator('aside a[href="/dashboard"]').click();
+await page.waitForURL(/\/dashboard/);
+await page.waitForTimeout(800);
+await page.locator('aside a[href="/students"]').click();
+await page.waitForURL(/\/students/);
+await page.waitForTimeout(1500);
+check("coming back resets to Active", (await pill("Active")) === "true" && (await pill("All")) === "false");
+check("coming back resets to Class order", (await classSort()) === "ascending", `${await classSort()}`);
 
 check("only the chosen child was deactivated",
   sql("SELECT is_active FROM students WHERE id='5d000000-0000-0000-0000-000000000001'") === "f" &&
