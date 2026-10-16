@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.155** | 2026-10-14 | UI restyle Phase 7: COMPLETE — legacy retired, DESIGN.md adopted, admin font floor 14px | plan UI_RESTYLE §3, §10 · §7.193 · DEPLOYMENT #93–#94 |
 | **8.154** | 2026-10-14 | UI restyle Phase 6: every email, live (functions v37/v6/v7) | plan UI_RESTYLE §3, §10 · §7.187 · DEPLOYMENT #92 |
 | **8.153** | 2026-10-14 | UI restyle Phase 5: the admin panel, live and nightly-green | plan UI_RESTYLE §3 · PRD §14.3 · §7.376–§7.377 · DEPLOYMENT #91 |
 | **8.152** | 2026-10-14 | UI restyle Phase 4: auth + public screens, live | plan UI_RESTYLE §3 · PRD §7.21, §14.1 · §7.375 · DEPLOYMENT #90 |

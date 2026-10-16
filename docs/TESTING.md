@@ -1237,6 +1237,14 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
+### Admins record a child's gender (2026-10-16)
+
+**`supabase/tests/student_gender_admin.test.sql` (15).** `add_unclaimed_student` stores `p_gender` (ongoing + trial),
+the old call shape still works (expand-only), one function (no overload), and `set_student_gender` admits only the
+row's operations/edit admin, refuses NULL, is audited. Red before the migration; 2 mutations red. Admin vitest:
+`useAddStudent`, `useTrialsGender`, `useGender`, `GenderField`. `verify-contact-details` (26) adds: Add disabled
+until a gender, the stored gender, and *Set gender (not recorded)* on a child with none; `verify-trials` taps one.
+
 ### A selected state reaches the DOM (2026-10-16)
 
 **`SwimSyncApp/lib/ariaState.drift.test.ts` (2 checks).** Scans `app/`, `features/`, `components/` source: every JSX

@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-16 — **UI restyle leftovers, live** (`23621a3`, `1243ca4`): Toast on tokens, ONE money formatter,
-gender required + never pre-selected, selected state reaches the DOM on 13 controls. Nightly 38815783732 on `1243ca4`
-GREEN 74/74. Next: the rest of *UI restyle leftovers*._
+_Last updated: 2026-10-16 — **Admins record gender, live** (`20261016000100` → `da5a855`): Add student + Book trial require
+it; Students → Actions → *Set gender*. 25 prod children still blank. **Unverified by a nightly:** `da5a855`. Next: read
+tonight's nightly, then the rest of *UI restyle leftovers*._
 
-_Previously (§8.155, 2026-10-14) — UI restyle COMPLETE (Phase 7; DESIGN.md adopted; admin root font floored at 14px)._
+_Previously (§8.156, 2026-10-16) — UI restyle leftovers live (Toast, money formatter, app gender, selected state)._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,16 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.157 (2026-10-16) — Admins record a child's gender: migration → admin, live
+
+**Shipped** (`88e96db` + `da5a855`, DEPLOYMENT #96): `add_unclaimed_student(p_gender)` + new `set_student_gender`; admin
+Add student / Book trial require a gender (never pre-selected); Students → Actions → *Set gender* (PRD §7.17). pgTAP
+15/15, vitest 1300/1300, 4 `--only` drivers green; the owner set Pranu and Aadi on prod.
+
+- **Found:** all 27 blank genders were admin-created (no gender input existed; 25 have no parent). Ang ×2: parent linked, no gender.
+- **Not done:** the database still accepts a missing gender (expand-only) → BACKLOG *Refuse a missing gender in the
+  database too* (S). The 25 blank stay for the owner to fill.
+
 ## 8.156 (2026-10-16) — UI restyle leftovers: Toast, money, gender, selected state — live
 
 **Shipped** (`23621a3` + `1243ca4`, DEPLOYMENT #95, app-only): Toast fills on DESIGN.md tokens (success 3.3:1 → ≥4.5:1);
@@ -362,17 +372,6 @@ controls. Each new test proven red; nightly 38815783732 GREEN 74/74 on `1243ca4`
 - **Found:** Edit Child loaded a missing gender as "Male" and saved it on ANY edit — 27 of 41 prod children have none
   (whether a past edit already overwrote one cannot be told from the data). RN-web drops `accessibilityState` → §7.378, now a check.
 - **Not done:** the other *UI restyle leftovers* (BACKLOG); "other" gender shows no segment but keeps its value.
-
-## 8.155 (2026-10-14) — UI restyle Phase 7: the restyle is COMPLETE
-
-**7.1 live** (`d12210f`): dead `Card`/`PrimaryButton`/`SectionHeader` and the `primary-50…900` shades deleted; both
-drift tests now fail on ANY Tailwind default-palette colour class (allowlist `classColours.ts`), proven red. **7.2:**
-`/impeccable audit` **16/20**, detector 0 static findings. **7.3:** DESIGN.md *adopted*; plan COMPLETE.
-
-- **Kept, not deleted:** `StatusBadge` (18 importers, already a `Tag` adapter) — plan §10.
-- **Found (BACKLOG *UI restyle leftovers*):** Toast off-token, success 3.3:1. Admin text under 12px below 1152px →
-  the user chose to stop scaling at 14px (`41e48e8`, §7.193, DEPLOYMENT #94). **7.1 verified:** nightly 38548376173,
-  dispatched at the user's request.
 
 ## 9. Next steps (pick with the user)
 
@@ -415,7 +414,7 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-10-16:** scheduled `38815783732` (on `1243ca4`, the UI restyle leftovers) read **GREEN, 74/74**.
-**Nothing unverified** on `main`. Previous: `38646598335` GREEN on `572ca8e` (7.1 + the admin 14px floor).
+**Unverified since: `da5a855`** (admin gender; 4 `--only` drivers green) — read the next nightly before the next app unit. Previous: `38646598335` GREEN on `572ca8e` (7.1 + the admin 14px floor).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -432,11 +431,13 @@ which mutate shared seed state — are in the same section.
 2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
-3. **UI restyle leftovers — what's left** (BACKLOG *UI restyle leftovers*; Toast, money and gender shipped 2026-10-16):
+3. **Gender:** 25 prod children blank (23 active) — the owner fills them via Students → Actions → *Set gender*. Then
+   BACKLOG *Refuse a missing gender in the database too* (S, a contract migration).
+4. **UI restyle leftovers — what's left** (BACKLOG *UI restyle leftovers*; Toast, money and gender shipped 2026-10-16):
    the Join screen's Home highlight, the public package page's dead end, Packages settings, Overdue (needs a product
    decision first). Small, separate: *Cancelling a package request has no confirmation* (S). Keep the lid open during
    any local batch (§7.370).
-4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
+5. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
@@ -456,8 +457,8 @@ explained by one line in the commit message), its screen's `--only` drivers pass
 a P4 / Phase 4 step. At most three unverified landings in a row; **a red nightly freezes restyle landings**, and a red
 attributed to one is reverted (`git revert <sha>` → push) in the same session unless the fix is a one-line string.
 
-**No migration is HELD or in flight.** Latest applied is `20261013000100` (legacy matcher removed), on prod, 0 pending
-(2026-10-13). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
+**No migration is HELD or in flight.** Latest applied is `20261016000100` (admin gender), on prod, 0 pending
+(2026-10-16). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

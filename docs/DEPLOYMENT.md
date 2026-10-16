@@ -1288,3 +1288,7 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `main` as `23621a3` + `1243ca4` (no migration, no function — no gate). Before: jest 822/822, 16 `--only` drivers
     green. Live `swimsync.sg` bundle (~3.5 min) carries "Choose the child's gender", `#166534` and no `#16a34a`. CI
     38774450334 green; nightly 38815783732 on `1243ca4` GREEN 74/74.
+96. **Deploy record (2026-10-16): admins record gender — migration → admin.** `88e96db` to `main`, then `db push`
+    `20261016000100` (0 pending; one `add_unclaimed_student`, `set_student_gender` new; anon EXECUTE false on both,
+    `authenticated` only; prod md5 = local), then `da5a855` (admin). Live admin students chunk carries "Set gender
+    (not recorded)" (~4.5 min). CI 38835989935 + 38836025203 green. First live use: the owner set Pranu + Aadi.
