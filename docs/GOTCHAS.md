@@ -40,7 +40,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377 |
-| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371 |
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359 |
@@ -3113,3 +3113,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     codemod rewrote a `classColours.ts` assertion in its *test* (RISK 9: that file and its values are frozen) to the
     new token — the suite would then have pinned the wrong thing. Caught before landing, reverted. Exclude `**/*.test.*`, `__tests__/` and `drivers/` from any codemod; a test is edited by hand,
     on purpose, or not at all. (2026-10-14, UI restyle Phase 5.)
+
+378. **RN-web ignores `accessibilityState` — only `aria-*` props reach the DOM.** `accessibilityState={{ selected }}`
+    on a chip, tab or segment told no screen reader (and no driver) which option was chosen on the deployed web app;
+    13 controls shipped that way, and a driver asserting "none selected" via `aria-selected` passed VACUOUSLY because
+    the attribute never existed. Add the ARIA state the role defines: `aria-pressed` on a button, `aria-checked` on a
+    radio (`aria-selected` is only announced on tab/option/gridcell). **A driver check for an absent attribute needs a
+    positive control** — assert it appears once selected. Promoted to a CHECK: `SwimSyncApp/lib/ariaState.drift.test.ts`.
+    (2026-10-16, UI restyle leftovers.)

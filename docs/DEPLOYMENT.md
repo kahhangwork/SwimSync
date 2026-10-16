@@ -1284,3 +1284,7 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `41e48e8` (the 13px step at ≤1152px removed; user's call). Before: admin typecheck, vitest 1283/1283 (new floor
     test proven red), `--only` smoke-admin 64/64, invoice-controls 18/18; 26 admin pages at 1152px, 0 overflow. Live
     admin CSS has no `max-width:1152px` rule and keeps the 1280px one. CI green.
+95. **Deploy record (2026-10-16): UI restyle leftovers + selected state, app-only.** `ui/restyle-leftovers-3` →
+    `main` as `23621a3` + `1243ca4` (no migration, no function — no gate). Before: jest 822/822, 16 `--only` drivers
+    green. Live `swimsync.sg` bundle (~3.5 min) carries "Choose the child's gender", `#166534` and no `#16a34a`. CI
+    38774450334 green; nightly 38815783732 on `1243ca4` GREEN 74/74.

@@ -1,9 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-14 — **UI restyle COMPLETE** (Phase 7: legacy retired + palette guard `d12210f`, audit 16/20,
-DESIGN.md adopted). 7.1 verified (user-requested nightly 38548376173 green). Admin root font floored at 14px (`41e48e8`). Next: *UI restyle leftovers*._
+_Last updated: 2026-10-16 — **UI restyle leftovers, live** (`23621a3`, `1243ca4`): Toast on tokens, ONE money formatter,
+gender required + never pre-selected, selected state reaches the DOM on 13 controls. Nightly 38815783732 on `1243ca4`
+GREEN 74/74. Next: the rest of *UI restyle leftovers*._
 
-_Previously (§8.154, 2026-10-14) — UI restyle Phase 6 live (every email; functions v37/v6/v7)._
+_Previously (§8.155, 2026-10-14) — UI restyle COMPLETE (Phase 7; DESIGN.md adopted; admin root font floored at 14px)._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -26,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.374** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.378** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -351,6 +352,17 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.156 (2026-10-16) — UI restyle leftovers: Toast, money, gender, selected state — live
+
+**Shipped** (`23621a3` + `1243ca4`, DEPLOYMENT #95, app-only): Toast fills on DESIGN.md tokens (success 3.3:1 → ≥4.5:1);
+`lib/money.ts` `formatSgd()` replaces ~40 `toFixed(2)` sites (`S$1,260.00`; PayNow payload untouched); Add / Edit Child
+gender **required, never pre-selected** (user's decision, PRD Add/Edit Child row); `aria-pressed`/`aria-checked` on 13
+controls. Each new test proven red; nightly 38815783732 GREEN 74/74 on `1243ca4`.
+
+- **Found:** Edit Child loaded a missing gender as "Male" and saved it on ANY edit — 27 of 41 prod children have none
+  (whether a past edit already overwrote one cannot be told from the data). RN-web drops `accessibilityState` → §7.378, now a check.
+- **Not done:** the other *UI restyle leftovers* (BACKLOG); "other" gender shows no segment but keeps its value.
+
 ## 8.155 (2026-10-14) — UI restyle Phase 7: the restyle is COMPLETE
 
 **7.1 live** (`d12210f`): dead `Card`/`PrimaryButton`/`SectionHeader` and the `primary-50…900` shades deleted; both
@@ -361,16 +373,6 @@ drift tests now fail on ANY Tailwind default-palette colour class (allowlist `cl
 - **Found (BACKLOG *UI restyle leftovers*):** Toast off-token, success 3.3:1. Admin text under 12px below 1152px →
   the user chose to stop scaling at 14px (`41e48e8`, §7.193, DEPLOYMENT #94). **7.1 verified:** nightly 38548376173,
   dispatched at the user's request.
-
-## 8.154 (2026-10-14) — UI restyle Phase 6: every email, live
-
-**6.1–6.5 shipped** (`2203cfa`…`ea0c253`, DEPLOYMENT #92): invoice, blocked-billing, credit-note, package, admin-invite
-and auth emails on DESIGN.md, wording unchanged; functions v37/v6/v7. Each template's new email-safe test was proven red
-on the old one. Deno 306 twice. The user checked 13 real sends in Gmail, pasted `recovery.html`, and completed a prod reset.
-
-- **Decided by the user:** Outlook check skipped (no client); `swimsync-edge` key used for the test sends.
-- **Found:** `functions download` now type-strips — §7.187 amended with the replacement check. White email header vs a
-  white logo: plan §10, PRD `logo_url` row. Drift fixed: HANDOVER's `_Previously` budget grep matched nothing.
 
 ## 9. Next steps (pick with the user)
 
@@ -412,9 +414,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-14:** scheduled `38483193929` (on `ffba544`) read **GREEN, 74/74** — all of Phase 5 (admin panel,
-5.0–5.29, landed in one push on the user's word) verified; the 11 drivers edited for the row "…" menu and `money-admin`
-(44/44) all green. **Unverified since: 7.1 (`d12210f`, P4)** — Phase 6 changed no screen (user: no nightly for it). Previous: `38430764913` GREEN 74/74 (Phase 4).
+**State on 2026-10-16:** scheduled `38815783732` (on `1243ca4`, the UI restyle leftovers) read **GREEN, 74/74**.
+**Nothing unverified** on `main`. Previous: `38646598335` GREEN on `572ca8e` (7.1 + the admin 14px floor).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -431,10 +432,10 @@ which mutate shared seed state — are in the same section.
 2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
-3. **UI restyle (Wave 9 item 8) is COMPLETE** (2026-10-14; `docs/plans/UI_RESTYLE_PLAN.md` closed, DESIGN.md adopted).
-   **7.1 (`d12210f`) is verified** — nightly 38548376173 on `0cf8ed1` green (dispatched at the user's request). What it left: BACKLOG *UI restyle leftovers* (the admin 12px-floor decision is done:
-   root font stops at 14px, 2026-10-14). Small, separate: *Cancelling a package
-   request has no confirmation* (S). Keep the lid open during any local batch (§7.370).
+3. **UI restyle leftovers — what's left** (BACKLOG *UI restyle leftovers*; Toast, money and gender shipped 2026-10-16):
+   the Join screen's Home highlight, the public package page's dead end, Packages settings, Overdue (needs a product
+   decision first). Small, separate: *Cancelling a package request has no confirmation* (S). Keep the lid open during
+   any local batch (§7.370).
 4. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 

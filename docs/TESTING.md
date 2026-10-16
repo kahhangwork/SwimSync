@@ -1237,6 +1237,15 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
+### A selected state reaches the DOM (2026-10-16)
+
+**`SwimSyncApp/lib/ariaState.drift.test.ts` (2 checks).** Scans `app/`, `features/`, `components/` source: every JSX
+tag whose `accessibilityState` carries `selected` must also carry `aria-pressed`/`aria-checked` (RN-web drops
+`accessibilityState`, §7.378). A second check requires ≥11 such tags, so the scan cannot go vacuous. Proven red by
+deleting `Tabs.tsx`'s `aria-pressed`. Alongside it: `lib/money.test.ts` (`formatSgd`), `components/Toast.test.tsx`
+(token + 4.5:1 contrast) and hook tests for Add / Edit Child (gender required); `verify-edit-child` asserts a child
+with no gender opens with none selected and Save is refused.
+
 ### DESIGN.md tokens match the Tailwind configs (2026-10-11)
 
 **`lib/designTokens.drift.test.ts` — twins in BOTH apps (29 checks each).** Parses `DESIGN.md`'s front matter and
