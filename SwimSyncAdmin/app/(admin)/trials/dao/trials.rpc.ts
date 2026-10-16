@@ -5,6 +5,7 @@
 // layer must not pre-empt, default, or reshape them. Every args type is
 // hand-written with all keys REQUIRED, and asserted against the generated Args
 // so a renamed param is a compile error (§7.345).
+import type { Gender } from "@/lib/gender";
 import { supabase } from "@/lib/supabase";
 import type { Assert, Extends, Rpc } from "@/lib/database.overrides";
 
@@ -29,6 +30,8 @@ export type AddUnclaimedStudentArgs = {
   p_session_date: string;
   p_contact_phone: string | null;
   p_contact_email: string | null;
+  // Required here though the SQL defaults it (expand-only, 20261016000100) — dropping it is a compile error (§7.345).
+  p_gender: Gender;
 };
 type _CheckAddUnclaimed = Assert<Extends<AddUnclaimedStudentArgs, Rpc<"add_unclaimed_student">["Args"]>>;
 export function addUnclaimedStudent(args: AddUnclaimedStudentArgs) {

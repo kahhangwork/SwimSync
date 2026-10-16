@@ -18,6 +18,7 @@ const base = (over: Partial<StudentRow> = {}): StudentRow => ({
   id: "s1",
   full_name: "Anya",
   date_of_birth: null,
+  gender: null,
   level_id: null,
   level_label: null,
   assignment_status: "unassigned",
@@ -46,6 +47,7 @@ describe("toStudentRow", () => {
     id: "s1",
     full_name: "Anya",
     date_of_birth: "2018-01-02",
+    gender: "female",
     level_id: "L2",
     assignment_status: "assigned",
     is_active: true,
@@ -76,6 +78,11 @@ describe("toStudentRow", () => {
     expect(r.level_label).toBe("Seahorse");
     expect(r.parent_id).toBe("p1");
     expect(r.parent_name).toBe("Ms Tan");
+  });
+
+  it("carries the gender through, so the Actions drawer can say when none is recorded", () => {
+    expect(toStudentRow(row, new Map()).gender).toBe("female");
+    expect(toStudentRow({ ...row, gender: null }, new Map()).gender).toBeNull();
   });
 
   it("keeps ALL active enrolments, weekday-ordered, and drops inactive ones", () => {

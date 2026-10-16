@@ -51,6 +51,7 @@ export function toStudentRow(s: StudentSelectRow, lessonCount: Map<string, numbe
     id: s.id,
     full_name: s.full_name,
     date_of_birth: s.date_of_birth,
+    gender: s.gender,
     level_id: s.level_id,
     // Read off the JOINED tenant_levels row, not off the student — the
     // select is `any`, so the wrong nesting level typechecks and renders

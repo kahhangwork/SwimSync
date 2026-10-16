@@ -2444,6 +2444,13 @@ one you use depends on whether the child is *visiting* or *attending*:
 Nobody else can do either: a parent cannot put a child on someone's roster, and neither
 can a coach from another business.
 
+*(implemented 2026-10-16)* **Both forms require the child's gender, and neither pre-selects one** — the same rule
+as the parent's Add / Edit Child. Before this neither asked, so every admin-added child had none (27 on prod). For
+those, and any child, the admin sets it from the student's row: **Actions → Set gender** (the button reads *Set
+gender (not recorded)* when none is). A trial booked for a child already in SwimSync asks nothing — they are on
+file. Setting is audited; a gender is never cleared. *(The database still accepts an add without one, so the
+already-deployed admin kept working while this shipped; the forms are where it is required.)*
+
 > **THE COACH CANNOT DO EITHER, AND THIS IS DELIBERATE** *(confirmed 2026-07-26)*.
 > Trials are **arranged ahead of time, not walked in** — so the person who arranges them
 > is the business's admin, at a desk, not the coach at the poolside. The coach account's

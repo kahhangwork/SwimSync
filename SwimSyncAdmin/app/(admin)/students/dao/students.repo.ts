@@ -76,7 +76,7 @@ export function fetchStudents(term: string, searchField: SearchField) {
   let query = supabase
     .from("students")
     .select(`
-        id, full_name, date_of_birth, level_id, assignment_status, is_active, inactivated_at,
+        id, full_name, date_of_birth, gender, level_id, assignment_status, is_active, inactivated_at,
         tenant_levels(id, label),
         ${parentEmbed},
         student_class_enrolments(

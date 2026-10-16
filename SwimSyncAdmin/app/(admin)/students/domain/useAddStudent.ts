@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useStartsOn } from "@/components/StartsOnField";
 import * as rpc from "../dao/students.rpc";
 import type { RosterCandidate } from "./rosterDuplicates";
+import type { Gender } from "@/lib/gender";
 
 // Wave 4 (20261005000100): add_unclaimed_student takes an optional p_starts_on
 // — a child who already swam before the admin added them.
@@ -22,6 +23,8 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
   const [addClassId, setAddClassId] = useState("");
   const [addPhone, setAddPhone] = useState("");
   const [addEmail, setAddEmail] = useState("");
+  // "" = not chosen. Required, never pre-selected (20261016000100; user, 2026-10-16).
+  const [addGender, setAddGender] = useState<Gender | "">("");
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   // The Add-student duplicate warning (ADD_STUDENT_DUP_WARNING_PLAN.md).
@@ -49,6 +52,7 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
     setAddClassId("");
     setAddPhone("");
     setAddEmail("");
+    setAddGender("");
     setAddDupCandidates([]);
     setAddConfirmed(false);
     setAddError(null);
@@ -69,7 +73,7 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
     const name = addName.trim();
     // Phone is required (the button enforces it too) — it is the strongest
     // duplicate signal, so never add without it.
-    if (!name || !addClassId || !addPhone.trim()) return;
+    if (!name || !addClassId || !addPhone.trim() || !addGender) return;
     // RISK 1: a start in an earlier, unbilled month needs a second press.
     if (start.holdForConfirmation()) return;
     setAddBusy(true);
@@ -117,6 +121,7 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
       p_contact_phone: addPhone.trim() || null,
       p_contact_email: addEmail.trim() || null,
       p_starts_on: start.startsOnParam(),
+      p_gender: addGender,
     });
 
     setAddBusy(false);
@@ -144,6 +149,8 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
     setAddPhone,
     addEmail,
     setAddEmail,
+    addGender,
+    setAddGender,
     addBusy,
     addError,
     addDupCandidates,

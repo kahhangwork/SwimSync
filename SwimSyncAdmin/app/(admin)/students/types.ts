@@ -16,6 +16,8 @@ export type StudentRow = {
   id: string;
   full_name: string;
   date_of_birth: string | null;
+  /** null = never recorded (every admin-added child before 20261016000100). */
+  gender: string | null;
   level_id: string | null;
   level_label: string | null;
   assignment_status: string;

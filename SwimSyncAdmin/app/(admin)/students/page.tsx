@@ -6,9 +6,11 @@ import { isUnclaimed, matchesFilters } from "./domain/studentRows";
 import { StudentToolbar } from "./ui/StudentToolbar";
 import { ListNotices } from "./ui/ListNotices";
 import { useRename } from "./domain/useRename";
+import { useGender } from "./domain/useGender";
 import { useAddClass } from "./domain/useAddClass";
 import { useStudentStatus } from "./domain/useStudentStatus";
 import { RenameModal } from "./ui/RenameModal";
+import { GenderModal } from "./ui/GenderModal";
 import { AddClassModal } from "./ui/AddClassModal";
 import { StatusChangeModal } from "./ui/StatusChangeModal";
 import { useMerge } from "./domain/useMerge";
@@ -51,6 +53,7 @@ export default function StudentsPage() {
   // Slices 3, 4, 5 — rename, add-to-class, inactive/remove. Each hook takes
   // load() so its write refetches the table exactly as the inline code did.
   const rename = useRename(load);
+  const gender = useGender(load);
   const addClass = useAddClass(load);
   const status = useStudentStatus(load);
   // Slice 2 — duplicate pairs are derived from the list on every render.
@@ -135,6 +138,7 @@ export default function StudentsPage() {
         onInvite={invite.open}
         onContact={contact.openContact}
         onRename={rename.openRename}
+        onGender={gender.openGender}
         onGrade={(s) => void grading.openGrading(s)}
         onInactive={status.openInactive}
         onRemove={status.openRemove}
@@ -150,6 +154,8 @@ export default function StudentsPage() {
       {/* ── Rename a child ──────────────────────────────────────────────────
           Not frozen under a pending claim — see openRename's note. */}
       <RenameModal rename={rename} />
+
+      <GenderModal g={gender} />
 
       <InviteModal invite={invite} />
 

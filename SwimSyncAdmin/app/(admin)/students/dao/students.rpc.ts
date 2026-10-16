@@ -18,6 +18,7 @@
 // NO LOGIC. Each function returns the raw `{ data, error }` the page's inline
 // call did.
 
+import type { Gender } from "@/lib/gender";
 import { supabase } from "@/lib/supabase";
 import * as studentStatus from "@/lib/studentStatus";
 
@@ -51,6 +52,11 @@ export const renameStudent = (studentId: string, newName: string) =>
     p_new_name: newName,
   });
 
+/** The admin's way to set a child's gender (20261016000100) — operations/edit, tenant from the row, audited.
+ *  Never a raw `.update({ gender })`. */
+export const setStudentGender = (studentId: string, gender: Gender) =>
+  supabase.rpc("set_student_gender", { p_student_id: studentId, p_gender: gender });
+
 /** Per-child package verdict, category- and expiry-aware, computed in SQL. */
 export const fetchPackageCoverage = () =>
   supabase.rpc("student_package_coverage");
@@ -75,4 +81,7 @@ export const addUnclaimedStudent = (args: {
   p_contact_phone: string | null;
   p_contact_email: string | null;
   p_starts_on: string | null;
+  // Required here though the SQL defaults it (expand-only, 20261016000100): the form requires a gender, and a
+  // required key makes dropping it a compile error (§7.345).
+  p_gender: Gender;
 }) => supabase.rpc("add_unclaimed_student", args);

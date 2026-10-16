@@ -128,6 +128,8 @@ await page.getByPlaceholder("Child's name").fill(KID);
 // after this one then fails for a reason that has nothing to do with what they
 // assert. It hid because the driver skipped itself six days in seven (below).
 await page.getByPlaceholder(/Parent's phone/i).fill("91234567");
+// A new child's gender is required, never pre-selected (20261016000100).
+await tap(page.getByRole("button", { name: "Male", exact: true }), "gender");
 await tap(page.getByRole("button", { name: /Book the trial/i }).first(), "book");
 await page.waitForTimeout(3000);
 

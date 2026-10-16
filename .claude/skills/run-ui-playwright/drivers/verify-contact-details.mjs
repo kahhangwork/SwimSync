@@ -62,6 +62,8 @@ sql(`UPDATE students SET provisional_contact_name  = 'Old Contact Name',
                         provisional_contact_phone = '964',
                         provisional_contact_email = 'old@example.com'
       WHERE id = '${WANDA}'`);
+// …and her gender, which section 8b sets (a re-run must start from "not recorded").
+sql(`UPDATE students SET gender = NULL WHERE id = '${WANDA}'`);
 
 // The row whose "Contact details" button we want. Scoping by row keeps this
 // honest on a page that lists every child in the business.
@@ -282,6 +284,13 @@ check(
 );
 
 const addBtn = modal.getByRole("button", { name: /^Add student$/ });
+// Gender is required and never pre-selected (20261016000100, user 2026-10-16): no gender, no Add.
+check(
+  "Add is disabled until a gender is chosen — none is pre-selected",
+  !(await addBtn.isEnabled()) &&
+    (await modal.getByRole("button", { name: "Female", exact: true }).getAttribute("aria-pressed")) === "false"
+);
+await modal.getByRole("button", { name: "Female", exact: true }).click();
 check(
   "…but the Add button stays enabled — the shape never gates submit",
   await addBtn.isEnabled(),
@@ -295,7 +304,36 @@ check(
   sql(`SELECT count(*) FROM students WHERE full_name = 'Quentin Newkid'`) === "1",
   "a create that fails here would be a regression, not a validation win"
 );
+check(
+  "…with the gender the admin chose",
+  sql(`SELECT gender FROM students WHERE full_name = 'Quentin Newkid'`) === "female"
+);
 purgeQuentin();
+
+// ══ 8b. Set a gender on a child who has none (20261016000100) ═════════════
+// Every admin-added child before this had no gender and no screen could set one. The drawer says so, the modal
+// opens with NOTHING selected, Save waits for a choice, and the choice is stored.
+await rowFor(page, "Wanda Unclaimed").getByRole("button", { name: /^Actions$/ }).click();
+await page.waitForTimeout(400);
+const setGender = page.getByRole("button", { name: "Set gender (not recorded)" });
+check("the drawer says when no gender is recorded", await setGender.isVisible().catch(() => false));
+await setGender.click();
+await page.waitForTimeout(800);
+const gModal = page.locator("div.relative.z-10");
+const saveGender = gModal.getByRole("button", { name: "Save gender" });
+check(
+  "…the modal opens with no gender selected, and Save waits for one",
+  (await gModal.getByRole("button", { name: "Male", exact: true }).getAttribute("aria-pressed")) === "false" &&
+    (await gModal.getByRole("button", { name: "Female", exact: true }).getAttribute("aria-pressed")) === "false" &&
+    !(await saveGender.isEnabled())
+);
+await gModal.getByRole("button", { name: "Female", exact: true }).click();
+await saveGender.click();
+await page.waitForTimeout(1500);
+check(
+  "…and the chosen gender is stored",
+  sql(`SELECT gender FROM students WHERE id = '${WANDA}'`) === "female"
+);
 
 // ══ 9. The same warning on the Trials booking form ════════════════════════
 await page.goto(`${ADMIN}/trials`, { waitUntil: "networkidle" });

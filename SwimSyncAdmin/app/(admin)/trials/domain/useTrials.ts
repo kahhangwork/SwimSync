@@ -11,6 +11,7 @@ import { setEnrolmentStart } from "@/lib/enrolmentStart.rpc";
 import { useStartsOn } from "@/components/StartsOnField";
 import type { Booking, Category, ClassRow } from "../types";
 import { NO_TENANT_MESSAGE } from "@/lib/noTenant";
+import type { Gender } from "@/lib/gender";
 
 // All Trials state, loads and writes (Admin L-D, BATCH_D_PLAN.md).
 //
@@ -40,6 +41,8 @@ export function useTrials() {
   const [bookDate, setBookDate] = useState("");
   const [bookPhone, setBookPhone] = useState("");
   const [bookEmail, setBookEmail] = useState("");
+  // A NEW child's gender: "" = not chosen. Required, never pre-selected (20261016000100).
+  const [bookGender, setBookGender] = useState<Gender | "">("");
   const [bookBusy, setBookBusy] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
   // Children with no ACTIVE enrolment — the only ones eligible for a trial.
@@ -126,6 +129,10 @@ export function useTrials() {
       setBookError("Enter a name, or choose a child already in SwimSync.");
       return;
     }
+    if (!bookExisting && !bookGender) {
+      setBookError("Choose the child's gender.");
+      return;
+    }
     setBookBusy(true);
 
     const { error } = bookExisting
@@ -141,6 +148,8 @@ export function useTrials() {
           p_session_date: bookDate,
           p_contact_phone: bookPhone.trim() || null,
           p_contact_email: bookEmail.trim() || null,
+          // Narrowed by the guard above; TS cannot see through the bookExisting branch.
+          p_gender: bookGender as Gender,
         });
 
     setBookBusy(false);
@@ -155,6 +164,7 @@ export function useTrials() {
     setBookExisting("");
     setBookPhone("");
     setBookEmail("");
+    setBookGender("");
     await loadAll();
   }
 
@@ -316,6 +326,8 @@ export function useTrials() {
     setBookPhone,
     bookEmail,
     setBookEmail,
+    bookGender,
+    setBookGender,
     bookBusy,
     bookError,
     eligible,

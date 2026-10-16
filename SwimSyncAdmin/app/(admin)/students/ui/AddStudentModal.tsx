@@ -9,6 +9,7 @@ import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ContactHint } from "@/components/ContactHint";
 import { StartsOnField } from "@/components/StartsOnField";
+import { GenderField } from "@/components/GenderField";
 import { checkSgPhone, checkEmail } from "@/lib/sgPhone";
 import type { AddStudentState } from "../domain/useAddStudent";
 import {
@@ -78,6 +79,8 @@ export function AddStudentModal(p: {
             className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
         </label>
+
+        <GenderField value={add.addGender} onChange={add.setAddGender} />
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
@@ -166,7 +169,11 @@ export function AddStudentModal(p: {
           // Phone required for the same reason as a trial booking: it is the
           // only signal that survives how a name gets written.
           disabled={
-            add.addBusy || !add.addName.trim() || !add.addClassId || !add.addPhone.trim()
+            add.addBusy ||
+            !add.addName.trim() ||
+            !add.addClassId ||
+            !add.addPhone.trim() ||
+            !add.addGender
           }
           onClick={add.handleAddStudent}
         >

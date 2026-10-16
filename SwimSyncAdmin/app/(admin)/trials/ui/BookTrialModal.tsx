@@ -1,6 +1,7 @@
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { ContactHint } from "@/components/ContactHint";
+import { GenderField } from "@/components/GenderField";
 import { checkSgPhone, checkEmail } from "@/lib/sgPhone";
 import { formatSgDate } from "@/lib/lessonDates";
 import type { TrialsState } from "../domain/useTrials";
@@ -83,6 +84,9 @@ export function BookTrialModal(p: { t: TrialsState }) {
                 placeholder="Child's name"
                 className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
               />
+              <div className="mt-2">
+                <GenderField value={p.t.bookGender} onChange={p.t.setBookGender} />
+              </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div>
                   <input
@@ -126,7 +130,9 @@ export function BookTrialModal(p: { t: TrialsState }) {
 
         <Button
           className="w-full"
-          disabled={p.t.bookBusy || !p.t.bookClass || !p.t.bookDate}
+          disabled={
+            p.t.bookBusy || !p.t.bookClass || !p.t.bookDate || (!p.t.bookExisting && !p.t.bookGender)
+          }
           onClick={p.t.handleBook}
         >
           {p.t.bookBusy ? "Booking…" : "Book the trial"}
