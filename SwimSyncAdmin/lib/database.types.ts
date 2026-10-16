@@ -1658,7 +1658,7 @@ isOneToOne: false
             }[]
                            },
 "add_unclaimed_student":
-{ Args: { "p_class_id": string,"p_contact_email"?: string,"p_contact_name"?: string,"p_contact_phone"?: string,"p_date_of_birth"?: string,"p_full_name": string,"p_kind": Database["public"]['Enums']["unclaimed_student_kind"],"p_session_date"?: string,"p_starts_on"?: string,"p_status"?: Database["public"]['Enums']["attendance_status"] }; Returns: string
+{ Args: { "p_class_id": string,"p_contact_email"?: string,"p_contact_name"?: string,"p_contact_phone"?: string,"p_date_of_birth"?: string,"p_full_name": string,"p_gender"?: Database["public"]['Enums']["gender_type"],"p_kind": Database["public"]['Enums']["unclaimed_student_kind"],"p_session_date"?: string,"p_starts_on"?: string,"p_status"?: Database["public"]['Enums']["attendance_status"] }; Returns: string
                            },
 "app_now":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -2174,6 +2174,9 @@ isOneToOne: false
                            },
 "set_session_main_coach":
 { Args: { "p_coach_id": string,"p_session_id": string }; Returns: undefined
+                           },
+"set_student_gender":
+{ Args: { "p_gender": Database["public"]['Enums']["gender_type"],"p_student_id": string }; Returns: undefined
                            },
 "set_students_active":
 { Args: { "p_active": boolean,"p_student_ids": (string)[] }; Returns: undefined
