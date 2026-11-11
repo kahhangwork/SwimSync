@@ -233,11 +233,11 @@ RESET ROLE;
 -- coach is refused at the AUTH gate first. Only the admin arm reaches capacity.
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000002","role":"authenticated"}';  -- coach owns K
-SELECT throws_ok($$ SELECT add_unclaimed_student('cf900000-0000-0000-0000-000000000001','New Kid C','ongoing') $$,
+SELECT throws_ok($$ SELECT add_unclaimed_student('cf900000-0000-0000-0000-000000000001','New Kid C','ongoing', p_gender => 'female') $$,
   'not permitted to add a student to this class',
   '16a: the class''s own coach is refused at the AUTH gate — the coach arm is closed, capacity never reached');
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000001","role":"authenticated"}';  -- admin
-SELECT throws_ok($$ SELECT add_unclaimed_student('cf900000-0000-0000-0000-000000000001','New Kid A','ongoing') $$,
+SELECT throws_ok($$ SELECT add_unclaimed_student('cf900000-0000-0000-0000-000000000001','New Kid A','ongoing', p_gender => 'female') $$,
   'P0001', NULL, '16b: the admin cannot enrol into a full K (is full)');
 RESET ROLE;
 

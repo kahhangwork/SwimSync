@@ -111,7 +111,7 @@ SET LOCAL ROLE authenticated;
 -- 1. A PARENT cannot put a child on a roster.
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000d1","role":"authenticated"}';
 SELECT throws_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Parent Made This','ongoing') $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Parent Made This','ongoing', p_gender => 'female') $$,
   'not permitted to add a student to this class',
   'a PARENT cannot add an unclaimed student');
 
@@ -120,14 +120,14 @@ SELECT throws_ok(
 --    DEFINER writer (§7.42), so this gate is the whole boundary.
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000c2","role":"authenticated"}';
 SELECT throws_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Cross Tenant Kid','ongoing') $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Cross Tenant Kid','ongoing', p_gender => 'female') $$,
   'not permitted to add a student to this class',
   'a coach of ANOTHER business cannot add to this class');
 
 -- 3. anon cannot.
 SET LOCAL ROLE anon;
 SELECT throws_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Anon Kid','ongoing') $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Anon Kid','ongoing', p_gender => 'female') $$,
   '42501', NULL, 'anon has no EXECUTE on add_unclaimed_student');
 RESET ROLE;
 
@@ -144,14 +144,14 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000c1"
 --    the same delegation refused for parent self-enrolment and coach-assisted
 --    assignment. (c1 is class A's own coach, set at line 108.)
 SELECT throws_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Ongoing','ongoing') $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Ongoing','ongoing', p_gender => 'female') $$,
   'not permitted to add a student to this class',
   'the class''s own coach can NO LONGER add an ONGOING student — admin-only now');
 
 -- 6. Nor may that coach create a trial — that arm always was admin-only.
 --    Schools arrange trials at the admin, and a private coach IS the admin.
 SELECT throws_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Trial','trial',(SELECT sat1 FROM td)) $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Trial','trial',(SELECT sat1 FROM td), p_gender => 'female') $$,
   'only this business''s admin may book a trial',
   'a COACH cannot book a trial');
 
@@ -159,7 +159,7 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1"
 
 -- 7-11. The ADMIN adds the ongoing child — now the ONLY path — and its shape.
 SELECT lives_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Ongoing Kid','ongoing') $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Ongoing Kid','ongoing', p_gender => 'female') $$,
   'the ADMIN adds an ONGOING unclaimed student — the coach arm is gone');
 SELECT is((SELECT tenant_id FROM students WHERE full_name='Ongoing Kid'),
   '66666666-0000-0000-0000-000000000001'::uuid,
@@ -179,7 +179,7 @@ SELECT is((SELECT e.is_active FROM student_class_enrolments e JOIN students s ON
 -- 12. The admin can also book a trial. The date is the window's first Saturday; what
 --     matters is that no attendance is asserted.
 SELECT lives_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Trial Kid','trial',(SELECT sat1 FROM td)) $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Trial Kid','trial',(SELECT sat1 FROM td), p_gender => 'female') $$,
   'the ADMIN can create a child and book their trial');
 
 -- 13-16. A booking is NOT an enrolment, NOT attendance, and NOT a session.

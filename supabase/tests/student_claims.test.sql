@@ -288,7 +288,7 @@ SELECT is(
 -- 13-14. A MATCH creates nothing and returns the candidates.
 SELECT is(
   (SELECT outcome FROM add_child_or_claim(
-     'c1a11111-0000-0000-0000-000000000001','Ethan','2019-01-01',NULL,NULL,'check',NULL)),
+     'c1a11111-0000-0000-0000-000000000001','Ethan','2019-01-01','female',NULL,'check',NULL)),
   'candidates', 'a matching name returns candidates instead of creating');
 
 SELECT is(
@@ -298,7 +298,7 @@ SELECT is(
 -- 15. A parent cannot claim a student that is not one of their candidates.
 SELECT throws_ok(
   $$ SELECT * FROM add_child_or_claim(
-       'c1a11111-0000-0000-0000-000000000001','Ethan','2019-01-01',NULL,NULL,
+       'c1a11111-0000-0000-0000-000000000001','Ethan','2019-01-01','female',NULL,
        'claim_confirmed','c1a99999-0000-0000-0000-000000000004') $$,
   'that child is not one you can claim',
   'a parent cannot claim an arbitrary student id they guessed');
@@ -306,19 +306,19 @@ SELECT throws_ok(
 -- 19. A NULL-dob child with no match is created (sets up assertion 21).
 SELECT is(
   (SELECT outcome FROM add_child_or_claim(
-     'c1a11111-0000-0000-0000-000000000001','No Dob Child',NULL,NULL,NULL,'check',NULL)),
+     'c1a11111-0000-0000-0000-000000000001','No Dob Child',NULL,'female',NULL,'check',NULL)),
   'created', 'a NULL-dob child with no match is created');
 
 -- 20-21. Not Sure files a claim too, and then blocks a re-add.
 SELECT is(
   (SELECT outcome FROM add_child_or_claim(
-     'c1a11111-0000-0000-0000-000000000001','Sophia','2019-03-04',NULL,NULL,
+     'c1a11111-0000-0000-0000-000000000001','Sophia','2019-03-04','female',NULL,
      'claim_unsure','c1a99999-0000-0000-0000-000000000002')),
   'pending', 'Not Sure files a claim for the admin to decide');
 
 SELECT is(
   (SELECT outcome FROM add_child_or_claim(
-     'c1a11111-0000-0000-0000-000000000001','Sophia','2019-03-04',NULL,NULL,'check',NULL)),
+     'c1a11111-0000-0000-0000-000000000001','Sophia','2019-03-04','female',NULL,'check',NULL)),
   'already_pending', 'while a claim is pending the parent cannot re-add that child');
 
 -- 22. ⚠ THE NULL-DOB BLOCK. Half the children this feature exists for have no
@@ -327,20 +327,20 @@ SELECT is(
 --     this whole slice exists to prevent comes straight back.
 SELECT is(
   (SELECT outcome FROM add_child_or_claim(
-     'c1a11111-0000-0000-0000-000000000001','Ethan Tan',NULL,NULL,NULL,
+     'c1a11111-0000-0000-0000-000000000001','Ethan Tan',NULL,'female',NULL,
      'claim_confirmed','c1a99999-0000-0000-0000-000000000001')),
   'pending', 'a claim can be filed with NO date of birth');
 
 SELECT is(
   (SELECT outcome FROM add_child_or_claim(
-     'c1a11111-0000-0000-0000-000000000001','Ethan Tan',NULL,NULL,NULL,'check',NULL)),
+     'c1a11111-0000-0000-0000-000000000001','Ethan Tan',NULL,'female',NULL,'check',NULL)),
   'already_pending', '⚠ and the block still fires when the dob is NULL on both sides');
 
 -- ── P1 files a competing claim on the same child (RISK 6) ─────────────────
 SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000d1","role":"authenticated"}';
 SELECT is(
   (SELECT outcome FROM add_child_or_claim(
-     'c1a11111-0000-0000-0000-000000000001','Ethan','2019-01-01',NULL,NULL,
+     'c1a11111-0000-0000-0000-000000000001','Ethan','2019-01-01','female',NULL,
      'claim_confirmed','c1a99999-0000-0000-0000-000000000001')),
   'pending', 'a SECOND parent can also file a claim on the same child');
 

@@ -258,13 +258,13 @@ SELECT is((enrolment_start_bounds('e5a20000-0000-0000-0000-0000000000c1') ->> 'f
 -- ── 14. The fourth path: add_unclaimed_student (D12) ────────────────────────────
 SELECT pg_temp.as_user('e5a10000-0000-0000-0000-0000000000a1');
 SELECT lives_ok($$ SELECT add_unclaimed_student(p_class_id => 'e5a20000-0000-0000-0000-000000000001',
-  p_full_name => 'ESD Old Shape', p_kind => 'ongoing') $$,
-  '14: the OLD named-argument call still works (the live app until it is redeployed)');
+  p_full_name => 'ESD Old Shape', p_kind => 'ongoing', p_gender => 'female') $$,
+  '14: the call without p_starts_on still works (D12 old shape; gender required since 20261111000100)');
 SELECT lives_ok(format($$ SELECT add_unclaimed_student(p_class_id => 'e5a20000-0000-0000-0000-000000000001',
-  p_full_name => 'ESD New Shape', p_kind => 'ongoing', p_starts_on => %L) $$, (SELECT d7 FROM f)),
+  p_full_name => 'ESD New Shape', p_kind => 'ongoing', p_starts_on => %L, p_gender => 'female') $$, (SELECT d7 FROM f)),
   '14: a new child with a past start');
 SELECT throws_ok(format($$ SELECT add_unclaimed_student(p_class_id => 'e5a20000-0000-0000-0000-000000000001',
-  p_full_name => 'ESD Trial', p_kind => 'trial', p_session_date => %L, p_starts_on => %L) $$,
+  p_full_name => 'ESD Trial', p_kind => 'trial', p_session_date => %L, p_starts_on => %L, p_gender => 'female') $$,
   (SELECT today FROM f), (SELECT d7 FROM f)), '23514', NULL, '14: a trial with a start date is refused');
 
 RESET ROLE;

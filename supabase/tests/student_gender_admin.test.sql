@@ -3,8 +3,8 @@
 -- WHY. Every prod child without a gender (27 on 2026-10-16) was created by an admin through
 -- add_unclaimed_student, which had no gender input; nothing could set one afterwards. This file pins:
 --   • add_unclaimed_student stores p_gender — for an ongoing student AND a trial (both admin forms);
---   • the OLD call shape (no p_gender) still works — the migration is expand-only, so the deployed admin keeps
---     adding students until it is redeployed (§7.123);
+--   • the OLD call shape (no p_gender) is REFUSED — since the contract step 20261111000100 (until then it was
+--     the expand-shape guard, §7.123);
 --   • exactly ONE add_unclaimed_student exists (§7.124 — an overload makes PostgREST refuse every call);
 --   • set_student_gender: admin of the row's tenant only (not another tenant's admin, a view-only role, a coach or
 --     a parent), refuses NULL, and is audited.
@@ -90,16 +90,16 @@ INSERT INTO made SELECT 'ongoing', add_unclaimed_student(p_class_id => '6e500000
   p_full_name => 'SG Ongoing', p_kind => 'ongoing', p_gender => 'female');
 INSERT INTO made SELECT 'trial', add_unclaimed_student(p_class_id => '6e500000-0000-0000-0000-000000000001',
   p_full_name => 'SG Trial', p_kind => 'trial', p_session_date => '2026-10-17', p_gender => 'male');
--- The deployed admin's call shape: no p_gender.
-INSERT INTO made SELECT 'legacy', add_unclaimed_student(p_class_id => '6e500000-0000-0000-0000-000000000001',
-  p_full_name => 'SG Legacy', p_kind => 'ongoing');
+-- The pre-2026-10-16 call shape: no p_gender. Refused since the CONTRACT step 20261111000100 (it was the
+-- expand-shape guard until then). Full contract coverage: student_gender_required.test.sql.
+SELECT throws_ok($$ SELECT add_unclaimed_student(p_class_id => '6e500000-0000-0000-0000-000000000001',
+  p_full_name => 'SG Legacy', p_kind => 'ongoing') $$,
+  '23514', 'a gender is required', '4: the old call shape (no p_gender) is refused — 20261111000100 contract');
 RESET ROLE;
 SELECT is((SELECT gender::text FROM students WHERE id = (SELECT v FROM made WHERE k = 'ongoing')), 'female',
   '2: an ongoing student added by the admin keeps the gender given');
 SELECT is((SELECT gender::text FROM students WHERE id = (SELECT v FROM made WHERE k = 'trial')), 'male',
   '3: a trial booked for a new child keeps the gender given');
-SELECT ok((SELECT gender IS NULL FROM students WHERE id = (SELECT v FROM made WHERE k = 'legacy')),
-  '4: the old call shape (no p_gender) still adds the student — expand-only');
 
 -- ══ 3. set_student_gender ══════════════════════════════════════════════════════════════════════════════════════
 SELECT pg_temp.as_user('6e100000-0000-0000-0000-0000000000a1');

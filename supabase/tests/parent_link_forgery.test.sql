@@ -138,7 +138,7 @@ SELECT is(
 SELECT lives_ok(
   $$ SELECT add_child_or_claim(
        '1f000000-0000-0000-0000-000000000001'::uuid,
-       'Mallory Junior', '2019-07-07'::date, NULL, NULL,
+       'Mallory Junior', '2019-07-07'::date, 'female', NULL,
        'create_anyway'::add_child_mode, NULL) $$,
   'a parent can still add their own child');
 
