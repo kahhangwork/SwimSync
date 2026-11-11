@@ -5,6 +5,7 @@ import {
   signOut,
   updatePassword,
 } from "../dao/resetPassword.repo";
+import { accountEmailOf } from "./accountEmail";
 
 export function useResetPassword() {
   const [status, setStatus] = useState<"checking" | "valid" | "invalid">(
@@ -15,15 +16,17 @@ export function useResetPassword() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
 
   // The recovery link lands here with the session token in the URL hash.
   // supabase-js (detectSessionInUrl, on by default in the browser) parses it and
   // fires PASSWORD_RECOVERY. Wait for that session; fail if the link is expired.
   useEffect(() => {
     let settled = false;
-    const settle = (ok: boolean) => {
+    const settle = (ok: boolean, session?: unknown) => {
       if (!settled) {
         settled = true;
+        if (ok) setEmail(accountEmailOf(session));
         setStatus(ok ? "valid" : "invalid");
       }
     };
@@ -39,12 +42,12 @@ export function useResetPassword() {
     }
 
     getSession().then(({ data }) => {
-      if (data.session) settle(true);
+      if (data.session) settle(true, data.session);
     });
     const {
       data: { subscription },
     } = onAuthStateChange((_event, session) => {
-      if (session) settle(true);
+      if (session) settle(true, session);
     });
     const timer = setTimeout(() => settle(false), 3000);
 
@@ -85,6 +88,7 @@ export function useResetPassword() {
 
   return {
     status,
+    email,
     password,
     setPassword,
     confirm,

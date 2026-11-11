@@ -42,9 +42,10 @@
 //
 //   | # | mutation                                                            | result | red checks |
 //   |---|---------------------------------------------------------------------|--------|------------|
-//   | 1 | reset-password/domain/useResetPassword.ts:74 → `{ error: null }`     | 15/18  | "the stored password hash CHANGED", "the NEW password signs in", "password123 no longer signs in" (the page still says "Password updated" — only the DB/sign-in asserts see it) |
+//   | 1 | reset-password/domain/useResetPassword.ts:77 → `{ error: null }`     | 15/18  | "the stored password hash CHANGED", "the NEW password signs in", "password123 no longer signs in" (the page still says "Password updated" — only the DB/sign-in asserts see it) |
 //   |   |   instead of `await updatePassword(password)`                       |        |            |
-//   | 2 | reset-password/domain/useResetPassword.ts:35 → `/never=/`            | 16/18  | "an #error= link reads Link expired even with a live session" (the page offered the password form), "…offers Request New Link" |
+//   | 2 | reset-password/domain/useResetPassword.ts:38 → `/never=/`            | 16/18  | "an #error= link reads Link expired even with a live session" (the page offered the password form), "…offers Request New Link" |
+//   | 3 | reset-password/domain/accountEmail.ts → `return null`                | 18/19  | "…and names the account it is for" (2026-11-11; the page fell back to the generic line) |
 //
 // (2026-09-26, both reverted — scores recounted to 18: the two sign-in probes dropped afterwards were
 // green in both proofs; `git diff --exit-code -- SwimSyncAdmin SwimSyncApp` clean; the served
@@ -62,7 +63,7 @@ for (const u of [ADMIN, EXPO]) {
   }
 }
 
-const EXPECTED_CHECKS = 18;
+const EXPECTED_CHECKS = 19; // 18 + "names the account" (2026-11-11)
 
 const DB = execFileSync("docker", ["ps", "--format", "{{.Names}}"], { encoding: "utf8" })
   .split("\n").find((n) => n.startsWith("supabase_db_"));
@@ -173,6 +174,9 @@ try {
   const validBranch = await settled(rp);
   check("⚠ a VALID recovery link renders the Set New Password form (not \"Link expired\")",
     validBranch === "valid", validBranch);
+  // The page names the account the link is for (BACKLOG *UI restyle leftovers*, closed 2026-11-11).
+  const shown = await rp.getByTestId("reset-account").innerText().catch(() => null);
+  check("…and names the account it is for (the recovery session's email)", shown === EMAIL, String(shown));
 
   const pw = rp.locator('input[type="password"]');
   const submit = rp.getByRole("button", { name: "Update Password" });

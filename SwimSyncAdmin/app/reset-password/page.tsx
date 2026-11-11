@@ -11,6 +11,7 @@ import { useResetPassword } from "./domain/useResetPassword";
 export default function ResetPasswordPage() {
   const {
     status,
+    email,
     password,
     setPassword,
     confirm,
@@ -29,7 +30,16 @@ export default function ResetPasswordPage() {
           <Logo size="lg" className="mb-3" />
           <h1 className="text-display font-semibold text-ink">Set New Password</h1>
           <p className="text-body text-ink-secondary mt-1 text-center">
-            Choose a new password for your admin account
+            {email && status === "valid" && !done ? (
+              <>
+                Choose a new password for{" "}
+                <span data-testid="reset-account" className="font-semibold text-ink break-all">
+                  {email}
+                </span>
+              </>
+            ) : (
+              "Choose a new password for your admin account"
+            )}
           </p>
         </div>
 
