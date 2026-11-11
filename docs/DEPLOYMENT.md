@@ -1296,3 +1296,19 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     migration, no function — no gate; prod 0 pending). **Pushed WITHOUT a nightly covering `da5a855`, on the user's word**
     ("skip the nightly"). Before: vitest 1318/1318, 16 `--only` drivers green. Live admin students chunk carries
     `"All","Active","Inactive","Assigned","Unassigned"` and "Find them under the Inactive filter" (~4 min). CI 38931880969 green.
+98. **Deploy record (2026-11-11): parent package Cancel asks first — app-only.** `17b570f` to `main` (no migration, no
+    function — no gate; the §9 nightly gate allowed it, the previous app units being cleared). `app-money` 28/28. Live
+    app bundle carries "Discard this package request". CI 43042318820 green.
+99. **Deploy record (2026-11-11): Packages settings card to the page foot — admin, VISUAL-ONLY landing.**
+    `53bdcbd` + `3adfced` (BACKLOG, separate commit so the range stays visual-only). `check-visual-only.sh` →
+    VISUAL-ONLY; all 8 drivers that open `/packages` green on `53bdcbd`. Vercel success both apps. CI 43051135249 RED in
+    *Engine tests (Deno)* — a CDN lock-file integrity miss, not the change (§7.385); the next runs green.
+100. **Deploy record (2026-11-12): gender required server-side — migration → three app units, WITHOUT a nightly, on
+    the user's word.** `ee56b9f` (migration + overrides comments) to `main`; `db push` run BY THE USER (the sandbox
+    classifies it as a production deploy and refuses). Rollback rehearsed first (DOWN restored prod's md5s byte for
+    byte). After: `20261111000100` remote, 0 pending; prod md5 `1eb62e5d…`/`48cbcf2a…` = local; anon EXECUTE false,
+    `authenticated` true. Then `7803ca4` (Join tab), `c77fa55` (reset-password account), `90625d3` (package link),
+    ONE push per command (chained pushes were rejected, cause unknown — `/deploy` step 3d). Before: on the combined tip
+    app jest 831, admin vitest 1320, both typechecks, `smoke-app` 85, `admin-reset-password` 19, `app-money` 33. Live:
+    app bundle carries "Sign in to choose another", `profile/join-tenant`, `tab=packages`; admin reset-password chunk
+    carries `reset-account`. CI green on all four.

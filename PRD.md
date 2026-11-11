@@ -871,7 +871,8 @@ opening it lands the user on an in-app **Set New Password** screen that calls
 web and a `swimsync://` deep link on native. Raw auth errors (invalid credentials,
 duplicate email, unconfirmed email, rate limit) are mapped to friendly messages.
 The **admin panel** now has the same self-service reset (`/forgot-password` →
-`/reset-password`), so a superadmin can recover their own password.
+`/reset-password`), so a superadmin can recover their own password; the reset page names the account the link is
+for *(implemented 2026-11-11)*.
 
 ### 7.2 Parent Account and Child Linking
 
@@ -2345,7 +2346,9 @@ cash paid always equals value granted — nothing to reconcile.
   pre-selected from the family's last package, or from a per-category / all-classes
   **default** the admin sets on the Packages page. The parent gets a business-branded email
   and a tokenised **`/package` pay page** — the same dynamic PayNow QR, locked amount +
-  `PKG-` reference, and "I've paid" claim an invoice has (§7.21) — and the admin works a
+  `PKG-` reference, and "I've paid" claim an invoice has (§7.21); *(implemented 2026-11-11)* its "Prefer a different
+  package?" line links to **Billing → Packages** (Sign In first when signed out) — no business contact is shown, by
+  the user's choice — and the admin works a
   **WhatsApp queue** of `wa.me` links, the same shared queue the invoice reminders use. A
   per-family **Generate invoice** button acts on one family; **Generate all** previews every
   low family (product + start date editable per row) before anything is sent — nothing goes
@@ -2457,8 +2460,10 @@ can a coach from another business.
 as the parent's Add / Edit Child. Before this neither asked, so every admin-added child had none (27 on prod). For
 those, and any child, the admin sets it from the student's row: **Actions → Set gender** (the button reads *Set
 gender (not recorded)* when none is). A trial booked for a child already in SwimSync asks nothing — they are on
-file. Setting is audited; a gender is never cleared. *(The database still accepts an add without one, so the
-already-deployed admin kept working while this shipped; the forms are where it is required.)*
+file. Setting is audited; a gender is never cleared. *(implemented 2026-11-11)* **The database refuses a new child
+without one too** — both the admin's add and the parent's Add Child (every mode, a claim included) are refused with
+*a gender is required*; until then only the forms required it. The column stays nullable: children created before
+are filled via *Set gender*, never forced.
 
 > **THE COACH CANNOT DO EITHER, AND THIS IS DELIBERATE** *(confirmed 2026-07-26)*.
 > Trials are **arranged ahead of time, not walked in** — so the person who arranges them

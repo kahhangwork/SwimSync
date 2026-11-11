@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-11 — **Nightly reds triaged + CI hardened** (`3d1626d`): five reds on one commit were the CI edge
-runtime answering 503 (§7.84), not the product. The workflow now waits for it (one restart) and uploads `functions.log`.
-No app change. Next: read tonight's nightly, then bill October._
+_Last updated: 2026-11-12 — **Wave 9 leftovers shipped** (§8.160): gender refused server-side (`20261111000100`, on
+prod) + five small UI fixes, all live — three app units and the migration WITHOUT a nightly, on the user's word.
+Next: read the 2026-11-12 nightly (first over all of it), then bill October._
 
-_Previously (§8.158, 2026-10-17) — Students opens on Active, in class order, live._
+_Previously (§8.159, 2026-11-11) — nightly reds were the CI edge runtime; the workflow now waits for it._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.160 (2026-11-11 → 12) — Wave 9 leftovers: gender required server-side + five small fixes, all live
+
+**Shipped** (DEPLOYMENT #98–100): parent package Cancel asks first; Packages' settings card at the page foot (the
+visual-only landing); `20261111000100` — both child-creating functions refuse a missing gender (PRD §7.17); Profile →
+Add Child → Join stays on Profile; admin reset-password names the account; the public package page's *different
+package?* line links to Billing → Packages (PRD §7.16). BACKLOG items closed; *UI restyle leftovers* is down to Overdue.
+
+- **Found:** a gender check placed before the permission gates told unauthorised callers "gender missing" (fixed,
+  pinned by a mutation); a signed-out push into the app is redirected nowhere (§7.383); `pressByText` misses a `Link`
+  (§7.382, second hit → BACKLOG S); zsh `path`/`=` (§7.384); a CDN lock-file red on `3adfced` (§7.385). Deploy-skill
+  step 3d now: one push per command; never delete a branch before its tip is on `main`.
+- **Not done, by decision:** Overdue parked (user); the 4 *not re-verified* restyle items untouched; the three app
+  units and the migration shipped WITHOUT a nightly (user's word) — the 2026-11-12 run is the first over all of them.
+
 ## 8.159 (2026-11-11) — Nightly reds triaged: the CI edge runtime, not the product; workflow hardened
 
 **Shipped** (`597bc80`, `447c2b8`, `3d1626d`; CI-only, no app or backend change): `ui-drivers.yml` gained *Wait for the
@@ -362,18 +376,6 @@ edge runtime* (probe → one restart → one clear error) and *Keep the edge-run
   *Hit again*, promoted to the CI check above. Reading a red: TESTING §5.
 - **Not done:** the root cause of the runtime not serving is unknown (no log existed). The new workflow has not run on
   GitHub yet; October is not billed.
-
-## 8.158 (2026-10-16 → 17) — Students list opens on Active, in class order — live
-
-**Shipped** (`656ede3`, DEPLOYMENT #97, admin-only): filter pills All · Active · Inactive · Assigned · Unassigned, opening
-on **Active** and class order (Mon→Sun, start time, name; no class last) on EVERY visit; *Package running low* stays a
-toggle; *No parent account* moved far right; a banner names the child after *Set inactive*; an empty list says which
-pill hid it (PRD §7.4). One weekday order, Monday-first — the Classes Day column flipped (§7.380). vitest 1318/1318, 16
-`--only` drivers green, each new check proven red.
-
-- **Found:** class chips sorted "10:15 AM" before "9:30 AM" (fixed); `verify-level-skills` picked its child by row
-  position and passed by luck (§7.381); a re-entry check via `page.goto` is vacuous (§7.379).
-- **Not done:** the nightly gate was skipped on the user's word, so tonight's run is the first over two app units.
 
 ## 9. Next steps (pick with the user)
 
@@ -415,9 +417,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-11:** latest `42928067577` GREEN on `a234c0b`. The 5 reds since 10-30 were the CI edge runtime
-(503, §7.84), not the product. **`3d1626d` adds a runtime wait + `functions.log` upload — the 2026-11-12 nightly is its
-first run.** If it fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
+**State on 2026-11-12:** latest `42928067577` GREEN on `a234c0b`. **The 2026-11-12 nightly is the first over FIVE app
+units** (`17b570f`, `3adfced`, `7803ca4`, `c77fa55`, `90625d3` — §8.160, shipped without one on the user's word) **and the
+first run of `3d1626d`'s runtime wait.** A red names its driver: replay it `--only`; each unit reverts on its own. If it
+fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -434,12 +437,11 @@ which mutate shared seed state — are in the same section.
 2. **Single-child packages are LIVE but unused** (0 one-child products on prod). Flipping a Little Orcas product is
    the owner's call (Packages → *Change*). D11 means the Ang family's shared PKG-2026-0002 must be used up (or
    cancelled/refunded) before that family can buy a one-child package — say so before any flip.
-3. **Gender:** 25 prod children blank (23 active) — the owner fills them via Students → Actions → *Set gender*. Then
-   BACKLOG *Refuse a missing gender in the database too* (S, a contract migration).
-4. **UI restyle leftovers — what's left** (BACKLOG *UI restyle leftovers*; Toast, money and gender shipped 2026-10-16):
-   the Join screen's Home highlight, the public package page's dead end, Packages settings, Overdue (needs a product
-   decision first). Small, separate: *Cancelling a package request has no confirmation* (S). Keep the lid open during
-   any local batch (§7.370).
+3. **Gender:** the database now refuses a new child without one (`20261111000100`, live). 25 prod children are still
+   blank (23 active) — the owner fills them via Students → Actions → *Set gender*; nothing forces it.
+4. **UI restyle leftovers — only Overdue is left, PARKED by the user** (2026-11-11: needs a rule for when an invoice is
+   overdue, then a stored due date). The *not re-verified* list in that BACKLOG item is untouched — check before
+   building. Keep the lid open during any local batch (§7.370).
 5. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
    '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
 
@@ -460,8 +462,8 @@ explained by one line in the commit message), its screen's `--only` drivers pass
 a P4 / Phase 4 step. At most three unverified landings in a row; **a red nightly freezes restyle landings**, and a red
 attributed to one is reverted (`git revert <sha>` → push) in the same session unless the fix is a one-line string.
 
-**No migration is HELD or in flight.** Latest applied is `20261016000100` (admin gender), on prod, 0 pending
-(2026-10-16). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
+**No migration is HELD or in flight.** Latest applied is `20261111000100` (gender required), on prod, 0 pending
+(2026-11-12). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

@@ -39,11 +39,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381 |
-| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378 |
-| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383 |
+| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371 |
-| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359 |
+| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359, 384 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
 `supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` + `scripts/check-sept.sh` + `sg_date_label.test.sql` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` · driver/fixture clock reads → `drivers/check-driver-clock.sh` ·
@@ -3151,3 +3151,28 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     children shared one class and so kept name order — for two months after §7.101 said "every driver". Any change
     to a list page's DEFAULT sort or filter: grep its drivers for `nth(`/`.first()` on rows, and grep for the route
     WITHOUT its slash too (`verify-admin-table-geometry` lists `"students"` in `ROUTES`). (2026-10-16.)
+
+382. **`pressByText` presses the leaf's PARENT — an expo-router `<Link>` is the leaf, so the click misses it.** A
+    `Link` renders its text straight into the `<a>`, so the `children.length === 0` match IS the anchor and the
+    synthetic click lands on its container: "pressed", nothing navigates, and the URL check fails as if the route
+    were broken. For a link, click the role — `page.getByRole("link", { name }).click()` — which is also what a user
+    does. **Second time:** `verify-smoke-app`'s bad-token link hit it on 2026-10-14 and the lesson stayed in
+    `docs/TESTING.md` §5 only; `verify-app-money` C3 re-found it 2026-11-11. Promotion (make `pressByText` click
+    `el.closest("a")` when there is one) is filed in `BACKLOG.md` — it changes every driver, so it needs a sweep.
+
+383. **An in-app push to a signed-in route while signed OUT is redirected nowhere.** `app/_layout.tsx` routes on
+    launch and on auth events only, so a public page (`/package/…`, `/invoice/…`) that links into `/(parent)/…` drops
+    a signed-out visitor on a screen with no session and no data. A public page's link into the app picks its target
+    from the session — `features/public-package/ui/Footer.tsx` sends signed-out visitors to `/(auth)/login`. The
+    driver, not the unit test, found it (`verify-app-money` C3, 2026-11-11).
+
+384. **The Bash tool's shell is zsh: `path` is not a free variable name, and `=word` expands.** zsh ties the `path`
+    array to `PATH`, so `for path in …` empties the command search path and the next line reads `command not found:
+    curl`. A bare `====` (or any word starting `=`) is `=cmd` expansion and aborts the whole command line — which
+    silently skipped the rest of a chained branch-fixing command (2026-11-12). Use another name; quote separators.
+
+385. **A red `backend-tests` reading "Integrity check failed for remote specifier" is the CDN, not the commit.** CI run
+    43051135249 (on `3adfced`, an admin-only restyle) failed in *Engine tests (Deno)* because a fetched `jsr.io/@std/…`
+    file did not match `deno.lock`'s hash; the next four runs on the same lock file were green. Read the failing STEP
+    before the diff: if it is this error and the commit touches no Deno code, re-run that job — never "fix" it by
+    regenerating the lock file, which would accept whatever the CDN served. (2026-11-11, noticed only at /update-docs.)
