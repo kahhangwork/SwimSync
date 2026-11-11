@@ -4,13 +4,15 @@
 // Selected fill, not a blue.
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import { router } from "expo-router";
+import { router, useSegments } from "expo-router";
 import { Surface } from "@/components/ui/Surface";
 import type { useAddChild } from "../domain/useAddChild";
+import { joinTenantHref } from "../domain/joinTenantHref";
 
 type AddChild = ReturnType<typeof useAddChild>;
 
 export function TenantPicker(p: Pick<AddChild, "tenants" | "tenantId" | "setTenantId">) {
+  const joinHref = joinTenantHref(useSegments());
   const { tenants, tenantId, setTenantId } = p;
   // Which business. Shown as a read-only line when there is only one, a
   // picker when the family deals with several — the expected case for a
@@ -48,7 +50,7 @@ export function TenantPicker(p: Pick<AddChild, "tenants" | "tenantId" | "setTena
         </View>
       )}
       <TouchableOpacity
-        onPress={() => router.push("/(parent)/home/join-tenant")}
+        onPress={() => router.push(joinHref)}
         className="mt-1 min-h-11 justify-center self-start"
       >
         <Text className="text-body font-semibold text-primary">

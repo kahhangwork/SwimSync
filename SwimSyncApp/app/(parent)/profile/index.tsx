@@ -51,7 +51,7 @@ export default function ParentProfileScreen() {
           <MenuItem
             icon="person-add-outline"
             label="Add Child Profile"
-            onPress={() => router.push("/(parent)/home/add-child")}
+            onPress={() => router.push("/(parent)/profile/add-child")}
           />
           <MenuItem
             icon="location-outline"

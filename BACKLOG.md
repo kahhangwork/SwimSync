@@ -1591,9 +1591,9 @@ or one shared component; fix whenever the screen is touched, or as its own S. Th
 
 *Shipped 2026-10-16:* the Toast colours, ONE money formatter (`lib/money.ts`) and gender never pre-selected.
 *Shipped 2026-11-11:* Packages' *running low* settings card moved to the page foot (old S10 — every page now done).
+*Shipped 2026-11-11:* Profile → Add Child → Join stays on the Profile tab (`profile/add-child`, `profile/join-tenant`).
 
 **Verified open 2026-10-14:**
-- Join screen (Profile → Add Child) highlights **Home**: the route lives under `home/join-tenant.tsx`.
 - Public package page: "Prefer a different package? Tell your coach." is a dead end → link to the business's contact
   (needs the contact on the page's data).
 - Admin reset-password page does not say which account it is for (needs data the page does not load).

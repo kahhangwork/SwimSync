@@ -3,14 +3,16 @@
 // App L-F); DESIGN.md in UI restyle step 3.6.
 import React from "react";
 import { Text } from "react-native";
-import { router } from "expo-router";
+import { router, useSegments } from "expo-router";
 import { Surface } from "@/components/ui/Surface";
 import { Button } from "@/components/ui/Button";
 import type { useAddChild } from "../domain/useAddChild";
+import { joinTenantHref } from "../domain/joinTenantHref";
 
 type AddChild = ReturnType<typeof useAddChild>;
 
 export function JoinFirstPrompt(p: Pick<AddChild, "tenants">) {
+  const joinHref = joinTenantHref(useSegments());
   const { tenants } = p;
   // No business joined yet: the form is useless until there is one, so
   // send them to the join screen rather than letting them fill it in and
@@ -27,7 +29,7 @@ export function JoinFirstPrompt(p: Pick<AddChild, "tenants">) {
       </Text>
       <Button
         label="Enter a join code"
-        onPress={() => router.push("/(parent)/home/join-tenant")}
+        onPress={() => router.push(joinHref)}
         className="mt-4"
       />
     </Surface>

@@ -144,6 +144,16 @@ async function visitByPress(page, label, expected, routeName) {
   await settleAndAssert(page, routeName, expected);
 }
 
+// The URL is the route expected, and the tab bar's selected tab is `tab`.
+async function checkStack(page, route, tab) {
+  const url = new URL(page.url()).pathname;
+  check(url === route, `${route} — URL is ${route}`, url);
+  const selected = await page.locator('[role="tab"][aria-selected="true"]').allInnerTexts();
+  // innerText carries the icon-font glyphs first ("\n\nProfile") — the label is the last line.
+  check(selected.length === 1 && selected[0].trim().split("\n").pop().trim() === tab,
+    `${route} — the ${tab} tab is the selected one`, JSON.stringify(selected));
+}
+
 // Deep-link a route and assert ONLY that nothing errored while it mounted.
 async function visitErrorsOnly(page, route) {
   errors = []; failedRequests = [];
@@ -213,6 +223,15 @@ try {
   await visit(page, "/home", "Welcome back,");
   await visitByPress(page, "Profile", "Account Details", "/profile (tab)");
   await visitByPress(page, "Change Password", "Confirm New Password", "/profile/change-password");
+  // Profile → Add Child Profile → Join stays in the PROFILE stack, so the tab bar keeps
+  // Profile lit (BACKLOG *UI restyle leftovers*, closed 2026-11-11: it used to push the
+  // Home copy and light Home). The URL and the selected tab are both asserted.
+  await visit(page, "/home", "Welcome back,");
+  await visitByPress(page, "Profile", "Account Details", "/profile (tab)");
+  await visitByPress(page, "Add Child Profile", "Additional Notes", "/profile/add-child");
+  await checkStack(page, "/profile/add-child", "Profile");
+  await visitByPress(page, "+ Add another coach or school", "Join your coach", "/profile/join-tenant");
+  await checkStack(page, "/profile/join-tenant", "Profile");
   // REGRESSION PIN, errors only: a hard reload of /profile/contact used to fire
   // two `eq.undefined` 400s before the session restored (fixed 2026-09-13).
   // The render is not asserted here — the landing replace may pop the screen
