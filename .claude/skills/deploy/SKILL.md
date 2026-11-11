@@ -187,6 +187,29 @@ Push **branch-to-branch** (`<branch>:main`), never by checking out `main`. The
 fast-forward-only push is the safety property — it fails loudly instead of merging
 work you have not seen.
 
+**Several commits or branches to land? One push per command, and prove each one
+moved `main` before the next** (2026-11-12):
+
+```bash
+git push origin <sha-or-branch>:refs/heads/main      # never -q — the error is the evidence
+git ls-remote origin refs/heads/main                 # must now print <sha>
+```
+
+- On 2026-11-12, three pushes chained in one loop each returned `failed to push some
+  refs` while every one was a valid fast-forward; the same pushes run one per command
+  all succeeded. **Cause unknown** — `-q` hid the rejection reason, and no push hook
+  exists. If it recurs, keep the full error and file the cause as a §7 gotcha; do not
+  guess one here.
+- **Never delete a branch until its tip is proven on `main`.** The same run chained
+  `git branch -D` after the failed pushes and deleted branches whose commits were on
+  no remote (recovered by SHA). Delete only after:
+
+  ```bash
+  git fetch origin && git merge-base --is-ancestor <branch> origin/main && git branch -d <branch>
+  ```
+
+  Use `-d`, not `-D`: `-d` refuses an unmerged branch, which is the check you want.
+
 ---
 
 ## Step 4 — Post-deploy verification
