@@ -1,8 +1,8 @@
 # SwimSync — Session Handover
 
 _Last updated: 2026-10-17 — **Students opens on Active, in class order, live** (`656ede3`): pills All/Active/Inactive/
-Assigned/Unassigned, reset on every visit; one weekday order (Monday-first). **Pushed without a nightly, on the user's
-word — `da5a855` + `656ede3` both unverified.** Next: read tonight's nightly._
+Assigned/Unassigned, reset on every visit; one weekday order (Monday-first). Pushed without a nightly on the user's
+word; **cleared** by `38973558057` (GREEN on `a234c0b`, 2026-10-17). Next: bill October._
 
 _Previously (§8.157, 2026-10-16) — admins record gender, live (migration → admin)._
 
@@ -414,9 +414,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-16:** scheduled `38815783732` (on `1243ca4`, the UI restyle leftovers) read **GREEN, 74/74**.
-**Unverified since: `da5a855` (admin gender) AND `656ede3` (Students Active default)** — the user waived the gate for
-`656ede3` (2026-10-17). A red tonight has two suspects; `--only` replay the student/gender drivers first. Previous: `38646598335` GREEN on `572ca8e` (7.1 + the admin 14px floor).
+**State on 2026-11-11:** every scheduled run since 2026-10-17 is on the same commit, `a234c0b` — so `da5a855` (admin
+gender) and `656ede3` (Students Active default) are **verified**: the first run over them, `38973558057`, read GREEN.
+Latest `42928067577` GREEN. **5 reds on that unchanged commit** (10-30, 10-31, 11-03, 11-06, 11-08) — with no code
+change between them they are environment/flake, not a regression; triage in progress 2026-11-11.
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
