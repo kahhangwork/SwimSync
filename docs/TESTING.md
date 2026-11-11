@@ -1665,6 +1665,11 @@ form never appeared` (tenant-suspension, coach-disable) is a page that never loa
 a red on those checks WITHOUT it is a real login verdict (§7.263). A red on `app-auth`'s *typed form survives*
 (step 4 or 5) is a real re-mount verdict (§7.274), not a flake.
 
+**A third, since 2026-11-11:** a run that fails at *Wait for the edge runtime* with `edge runtime never came up`
+never reached the drivers — it is the CI functions server, not the product (§7.84). Read `functions.log` in the
+`ui-driver-run` artifact (it ends with an END-OF-RUN PROBE line). A yellow *restarting functions serve* warning on a
+GREEN run means the restart saved it — read the same log for the first failure.
+
 Then the four rules, all bought with real time:
 
 - **A sweep left red stops being an alarm.** A deliberate page-count pin nobody bumped (§7.178)

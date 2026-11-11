@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-17 — **Students opens on Active, in class order, live** (`656ede3`): pills All/Active/Inactive/
-Assigned/Unassigned, reset on every visit; one weekday order (Monday-first). Pushed without a nightly on the user's
-word; **cleared** by `38973558057` (GREEN on `a234c0b`, 2026-10-17). Next: bill October._
+_Last updated: 2026-11-11 — **Nightly reds triaged + CI hardened** (`3d1626d`): five reds on one commit were the CI edge
+runtime answering 503 (§7.84), not the product. The workflow now waits for it (one restart) and uploads `functions.log`.
+No app change. Next: read tonight's nightly, then bill October._
 
-_Previously (§8.157, 2026-10-16) — admins record gender, live (migration → admin)._
+_Previously (§8.158, 2026-10-17) — Students opens on Active, in class order, live._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,17 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.159 (2026-11-11) — Nightly reds triaged: the CI edge runtime, not the product; workflow hardened
+
+**Shipped** (`597bc80`, `447c2b8`, `3d1626d`; CI-only, no app or backend change): `ui-drivers.yml` gained *Wait for the
+edge runtime* (probe → one restart → one clear error) and *Keep the edge-runtime log*. Probe proven locally both ways
+(503 down, `404 not_found` up). The §8.157/§8.158 app units were cleared by `38973558057` (GREEN, 2026-10-17).
+
+- **Found:** 5 reds (10-30 → 11-08) on unchanged `a234c0b`, all one cause — `/functions/v1` 503 for the whole run → §7.84
+  *Hit again*, promoted to the CI check above. Reading a red: TESTING §5.
+- **Not done:** the root cause of the runtime not serving is unknown (no log existed). The new workflow has not run on
+  GitHub yet; October is not billed.
+
 ## 8.158 (2026-10-16 → 17) — Students list opens on Active, in class order — live
 
 **Shipped** (`656ede3`, DEPLOYMENT #97, admin-only): filter pills All · Active · Inactive · Assigned · Unassigned, opening
@@ -363,16 +374,6 @@ pill hid it (PRD §7.4). One weekday order, Monday-first — the Classes Day col
 - **Found:** class chips sorted "10:15 AM" before "9:30 AM" (fixed); `verify-level-skills` picked its child by row
   position and passed by luck (§7.381); a re-entry check via `page.goto` is vacuous (§7.379).
 - **Not done:** the nightly gate was skipped on the user's word, so tonight's run is the first over two app units.
-
-## 8.157 (2026-10-16) — Admins record a child's gender: migration → admin, live
-
-**Shipped** (`88e96db` + `da5a855`, DEPLOYMENT #96): `add_unclaimed_student(p_gender)` + new `set_student_gender`; admin
-Add student / Book trial require a gender (never pre-selected); Students → Actions → *Set gender* (PRD §7.17). pgTAP
-15/15, vitest 1300/1300, 4 `--only` drivers green; the owner set Pranu and Aadi on prod.
-
-- **Found:** all 27 blank genders were admin-created (no gender input existed; 25 have no parent). Ang ×2: parent linked, no gender.
-- **Not done:** the database still accepts a missing gender (expand-only) → BACKLOG *Refuse a missing gender in the
-  database too* (S). The 25 blank stay for the owner to fill.
 
 ## 9. Next steps (pick with the user)
 
@@ -414,14 +415,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-11:** every scheduled run since 2026-10-17 is on the same commit, `a234c0b` — so `da5a855` (admin
-gender) and `656ede3` (Students Active default) are **verified**: the first run over them, `38973558057`, read GREEN.
-Latest `42928067577` GREEN. **5 reds on that unchanged commit** (10-30, 10-31, 11-03, 11-06, 11-08) — with no code
-change between them. **Triaged 2026-11-11: all five are ONE cause — the CI edge runtime answered 503 for the whole
-run** (§7.84's shape), so the same 5 function-dependent drivers fail every time: `app-money`, `payment-collection`,
-`referrals`, `smoke-app`, `trial-onboarding`. Not a product bug. Why `functions serve` didn't come up is unknown —
-`functions.log` sat outside the uploaded dir. **Fixed in CI (2026-11-11):** the workflow now waits for the runtime
-(one restart, then ONE clear error) and uploads `functions.log` with an end-of-run probe — read it on the next such red.
+**State on 2026-11-11:** latest `42928067577` GREEN on `a234c0b`. The 5 reds since 10-30 were the CI edge runtime
+(503, §7.84), not the product. **`3d1626d` adds a runtime wait + `functions.log` upload — the 2026-11-12 nightly is its
+first run.** If it fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).

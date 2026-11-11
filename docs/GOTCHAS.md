@@ -758,6 +758,15 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - Fix: `supabase functions serve public-invoice --env-file supabase/functions/.env
       --no-verify-jwt`, then re-run (19/19).
     - The driver's setup notes do not mention the edge function. (2026-08-04.)
+    - **Hit again (2026-11-11, §8.159) — in CI, intermittently.** Five nightlies (2026-10-30 → 11-08) on ONE
+      unchanged commit answered 503 on `/functions/v1` for the whole sweep; the same five drivers went red each
+      time (`app-money`, `payment-collection`, `referrals`, `smoke-app`, `trial-onboarding`) and read as product
+      bugs ("Package not found"). Not the Docker rate limit (two reds had none). The workflow started
+      `functions serve` in the background and never checked it, and `functions.log` was not uploaded, so the
+      cause left no trace. **Promoted to a CHECK:** `ui-drivers.yml` *Wait for the edge runtime* probes
+      `public-package` with a dummy token (its own `404 not_found` = serving), restarts once, else fails with
+      `edge runtime never came up`; *Keep the edge-runtime log* uploads `functions.log` + an end-of-run probe.
+      Root cause still unknown — read that log on the next occurrence.
 
 85. **`ALTER DEFAULT PRIVILEGES … IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`
     SUCCEEDS AND DOES NOTHING.** Two mechanisms hand a new function to `anon`:
