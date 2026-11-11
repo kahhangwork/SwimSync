@@ -15,7 +15,8 @@
 //   C2. That page's own "I've paid", logged OUT (postPublicPackageClaim) — ONE
 //      confirm, one bare POST, paid_claimed_at stamped, status stays pending,
 //      the claimed line survives a reload.
-//   D. Billing → Packages → Cancel on that request (cancelRequest) → cancelled.
+//   D. Billing → Packages → Cancel on that request (cancelRequest) → ONE Discard
+//      confirm → cancelled.
 //
 // Setup:
 //   docker exec -i supabase_db_SwimSync psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
@@ -203,8 +204,14 @@ try {
     await page.waitForTimeout(3000);
     await pressByText(page, "Packages");
     await page.waitForTimeout(2000);
+    // Cancel ASKS first (BACKLOG *Cancelling a package request has no confirmation*,
+    // closed 2026-11-11). RECORD ONLY — launch() accepts the dialog.
+    const dDialogs = [];
+    page.on("dialog", (d) => dDialogs.push(d.message()));
     check("D: the pending request offers Cancel", await pressByText(page, "Cancel"));
     await page.waitForTimeout(3000);
+    check("D: Cancel asks first — exactly one Discard confirm",
+      dDialogs.length === 1 && dDialogs[0].startsWith("Discard"), JSON.stringify(dDialogs));
     check(
       "D: Cancel sets the request to cancelled",
       psql(`SELECT status FROM parent_packages WHERE public_token = '${token}'`) === "cancelled"

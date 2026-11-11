@@ -175,15 +175,30 @@ export function useBilling() {
     [parentId, loadData]
   );
 
+  // Asks first (confirmAction, never Alert.alert — a no-op on RN-web): Cancel sits
+  // under Pay in the thumb's path, and one mis-tap on a business-prepared offer
+  // (`offered_by`) means asking the business to prepare it again. The dialog says
+  // "Discard", never "Cancel": web's confirm buttons are OK / Cancel, so a
+  // "Cancel …?" question would make the dialog's Cancel mean KEEP it.
   const cancelRequest = useCallback(
-    async (pkg: ParentPackage) => {
-      setPackageError(null);
-      const { error } = await cancelPackageRequest(pkg.id);
-      if (error) {
-        setPackageError("Could not cancel that request.");
-        return;
-      }
-      loadData();
+    (pkg: ParentPackage) => {
+      const message = pkg.offered_by
+        ? `Discard the package ${pkg.business_name} prepared for you? To get it back you will need to ask them to prepare it again.`
+        : "Discard this package request? You can request a package again at any time.";
+      confirmAction(
+        "Discard package?",
+        message,
+        async () => {
+          setPackageError(null);
+          const { error } = await cancelPackageRequest(pkg.id);
+          if (error) {
+            setPackageError("Could not cancel that request.");
+            return;
+          }
+          loadData();
+        },
+        "Discard"
+      );
     },
     [loadData]
   );
