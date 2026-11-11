@@ -1312,3 +1312,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     app jest 831, admin vitest 1320, both typechecks, `smoke-app` 85, `admin-reset-password` 19, `app-money` 33. Live:
     app bundle carries "Sign in to choose another", `profile/join-tenant`, `tab=packages`; admin reset-password chunk
     carries `reset-account`. CI green on all four.
+101. **Prod DATA change (2026-11-12): 4 Epic Swim test children deleted, Anya (Small) set to female — no code.**
+    One guarded `DO` block (scratchpad `prod-cleanup-2026-11-12.sql`), run BY THE USER via `supabase db query --linked
+    -f`. It refused unless the 4 ids were Epic Swim's and held ZERO history in all 11 child-referencing tables (FK census
+    from `pg_constraint`); then 5 enrolments + 4 students deleted, Anya's NULL gender → `female`. Guard proven on local
+    (refused, rolled back). After: 37 students, 20 with no gender (19 active Little Orcas + the duplicate below).
+    **The INACTIVE Brayden Ong (`4c5460e9…`, Little Orcas) is NOT a disposable duplicate — do not delete it.** It holds
+    the child's 6 + 13 Sep lessons and the sealed-September `written_off` settlement; the active record
+    (`f09aad38…`) holds 20 Sep onward. Deleting it erases billed history in a sealed month; `merge_students` refuses
+    (both have lessons, PRD *Duplicates that already exist*). Left inactive by recommendation; set its gender with the
+    active one's.

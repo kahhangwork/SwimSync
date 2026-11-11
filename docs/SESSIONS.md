@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.159** | 2026-11-11 | Nightly reds were the CI edge runtime; ui-drivers.yml now waits for it and keeps its log | §7.84 · TESTING §5 |
 | **8.158** | 2026-10-17 | Students list opens on Active, in class order; one Monday-first weekday order | PRD §7.4 · §7.379–381 · DEPLOYMENT #97 |
 | **8.157** | 2026-10-16 | Admins record a child's gender: add_unclaimed_student(p_gender) + set_student_gender, live | PRD §7.17 · DEPLOYMENT #96 · BACKLOG gender |
 | **8.156** | 2026-10-16 | UI restyle leftovers live: Toast tokens, formatSgd, required gender, selected state | §7.378 · PRD Add/Edit Child · DEPLOYMENT #95 |
