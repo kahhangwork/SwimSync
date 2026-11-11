@@ -36,11 +36,13 @@ export type { Json };
  * answer is its existing refusal.
  */
 export const NULLABLE_RPC_ARGS = {
-  // L57 `IF p_candidate_id IS NULL` (a plain add); L83/L127 NULLIF(btrim(COALESCE(p_notes,''))).
+  // L63 `IF p_candidate_id IS NULL` (a plain add); L89/L133 NULLIF(btrim(COALESCE(p_notes,''))).
+  // p_gender is NOT nullable: L35 refuses a missing one (20261111000100).
   // p_tenant_id: L25 `IF NOT parent_in_tenant(p_tenant_id)` refuses a NULL tenant.
   add_child_or_claim: ["p_candidate_id", "p_notes", "p_tenant_id"],
-  // L34 `IF p_session_date IS NULL`; L39 `IF p_starts_on IS NOT NULL`; L56 inserts
-  // p_date_of_birth as is (students.date_of_birth is nullable); L61–63 NULLIF(trim(COALESCE(…))).
+  // L34 `IF p_session_date IS NULL`; L39 `IF p_starts_on IS NOT NULL`; L63 inserts
+  // p_date_of_birth as is (students.date_of_birth is nullable); L68–70 NULLIF(trim(COALESCE(…))).
+  // p_gender is NOT nullable: L53 refuses a missing one (20261111000100).
   add_unclaimed_student: [
     "p_session_date", "p_starts_on", "p_date_of_birth",
     "p_contact_name", "p_contact_phone", "p_contact_email",
