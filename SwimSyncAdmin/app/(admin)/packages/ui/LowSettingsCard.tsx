@@ -11,7 +11,7 @@ const blurOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
 
 export function LowSettingsCard({ low }: { low: LowSettingsState }) {
   return (
-    <div className="mb-6 rounded-card border border-border bg-surface p-4">
+    <div className="mt-6 rounded-card border border-border bg-surface p-4">
       <h2 className="text-headline font-semibold text-ink">When is a package running low?</h2>
       <p className="mt-1 text-label text-ink-muted">
         A family is due a renewal offer — and flagged on the Students page — when its package has

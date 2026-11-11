@@ -162,8 +162,6 @@ export default function PackagesPage() {
         </Button>
       </div>
 
-      <LowSettingsCard low={low} />
-
       <ListNotices error={error} />
 
 
@@ -225,6 +223,10 @@ export default function PackagesPage() {
         checking={backlog.checking}
         openChangeChild={changeChild.openChangeChild}
       />
+
+      {/* ── Settings — after the work, never above it (DESIGN.md; the Invoices
+          page's Billing settings card is the precedent) ─────────────────── */}
+      <LowSettingsCard low={low} />
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
       <ProductModal
