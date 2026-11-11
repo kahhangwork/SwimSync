@@ -2,6 +2,7 @@ import React, { useCallback } from "react";
 import { View, ScrollView, SafeAreaView, ActivityIndicator } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useBilling } from "@/features/billing/domain/useBilling";
+import { useTabParam } from "@/features/billing/domain/useTabParam";
 import { Header } from "@/features/billing/ui/Header";
 import { Tabs } from "@/features/billing/ui/Tabs";
 import { InvoicesTab } from "@/features/billing/ui/InvoicesTab";
@@ -31,6 +32,8 @@ export default function BillingScreen() {
     cancelRequest,
     familyChildren,
   } = useBilling();
+  // `?tab=packages` — the public package page's "choose another package" link.
+  useTabParam(setActiveTab);
 
   useFocusEffect(
     useCallback(() => {

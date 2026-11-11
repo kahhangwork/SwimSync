@@ -1590,13 +1590,12 @@ or one shared component; fix whenever the screen is touched, or as its own S. Th
 **Why:** DESIGN.md is adopted, so each of these is now a defect against it, not a taste question.
 
 *Shipped 2026-10-16:* the Toast colours, ONE money formatter (`lib/money.ts`) and gender never pre-selected.
+*Shipped 2026-11-11:* the public package page's "different package?" line links to Billing → Packages (Sign In when signed out) — the user chose this over a business contact field (none exists) or the owner's personal details.
 *Shipped 2026-11-11:* Packages' *running low* settings card moved to the page foot (old S10 — every page now done).
 *Shipped 2026-11-11:* Profile → Add Child → Join stays on the Profile tab (`profile/add-child`, `profile/join-tenant`).
 *Shipped 2026-11-11:* the admin reset-password page names the account (from the recovery session).
 
 **Verified open 2026-10-14:**
-- Public package page: "Prefer a different package? Tell your coach." is a dead end → link to the business's contact
-  (needs the contact on the page's data).
 - **Overdue** (old S7): every unpaid invoice is *Outstanding* = Due (amber). Showing Overdue (red) needs a product
   decision first — when is an invoice overdue — then a stored due date. Never derive it in a client.
 

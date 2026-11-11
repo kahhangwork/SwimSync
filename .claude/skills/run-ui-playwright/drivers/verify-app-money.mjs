@@ -15,6 +15,8 @@
 //   C2. That page's own "I've paid", logged OUT (postPublicPackageClaim) — ONE
 //      confirm, one bare POST, paid_claimed_at stamped, status stays pending,
 //      the claimed line survives a reload.
+//   C3. "Prefer a different package?" links to Billing → Packages: signed out → Sign In,
+//      signed in → Billing on the Packages segment.
 //   D. Billing → Packages → Cancel on that request (cancelRequest) → ONE Discard
 //      confirm → cancelled.
 //
@@ -188,6 +190,13 @@ try {
       await out.page.reload({ waitUntil: "domcontentloaded" });
       check("C2: …and survives a reload", await waitOk(claimedLine.waitFor({ timeout: 30000 })));
       check("C2: no I've paid button after the reload", (await out.page.getByText("I've paid", { exact: true }).count()) === 0);
+      // C3. "Prefer a different package?" is no dead end (BACKLOG *UI restyle leftovers*, closed
+      // 2026-11-11): signed OUT, its link reaches Sign In.
+      // A real click on the LINK role: pressByText presses the text's PARENT, and this <a> is the leaf itself.
+      check("C3 (logged out): the different-package link is offered",
+        await out.page.getByRole("link", { name: "Sign in to choose another in Billing → Packages" }).click({ timeout: 10000 }).then(() => true, () => false));
+      await out.page.waitForURL(/\/login/, { timeout: 20000 }).catch(() => {});
+      check("C3 (logged out): …and it opens Sign In", /\/login/.test(out.page.url()), out.page.url());
       await out.browser.close();
     }
     // Logged in is the case that matters: the app HAS a session to leak into the call.
@@ -195,6 +204,17 @@ try {
       const extra = inHeaders.flat().filter((h) => AUTH_HEADERS.includes(h));
       check("C (logged in): public-package requests carry no auth header", inHeaders.length > 0 && extra.length === 0, `${inHeaders.length} req, extra: ${extra.join(",") || "none"}`);
     }
+
+    // ── C3. the same link, signed IN — lands on Billing with the Packages segment chosen ──
+    await page.goto(`${EXPO}/package/${token}`, { waitUntil: "domcontentloaded" });
+    await page.getByText(/Reference: PKG-/).first().waitFor({ timeout: 30000 }).catch(() => {});
+    check("C3 (logged in): the different-package link is offered",
+      await page.getByRole("link", { name: "Sign in to choose another in Billing → Packages" }).click({ timeout: 10000 }).then(() => true, () => false));
+    await page.waitForURL(/\/billing/, { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(2500);
+    check("C3 (logged in): …it opens Billing", /\/billing/.test(page.url()), page.url());
+    check("C3 (logged in): …on the Packages segment",
+      (await page.locator('[aria-pressed="true"]').filter({ hasText: /^Packages$/ }).count()) === 1);
 
     // ── D. cancel the request from Billing ──
     await page.goto(`${EXPO}/home`, { waitUntil: "domcontentloaded" });
