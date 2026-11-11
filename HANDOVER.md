@@ -417,7 +417,10 @@ for one marked inactive.
 **State on 2026-11-11:** every scheduled run since 2026-10-17 is on the same commit, `a234c0b` — so `da5a855` (admin
 gender) and `656ede3` (Students Active default) are **verified**: the first run over them, `38973558057`, read GREEN.
 Latest `42928067577` GREEN. **5 reds on that unchanged commit** (10-30, 10-31, 11-03, 11-06, 11-08) — with no code
-change between them they are environment/flake, not a regression; triage in progress 2026-11-11.
+change between them. **Triaged 2026-11-11: all five are ONE cause — the CI edge runtime answered 503 for the whole
+run** (§7.84's shape), so the same 5 function-dependent drivers fail every time: `app-money`, `payment-collection`,
+`referrals`, `smoke-app`, `trial-onboarding`. Not a product bug. Why `functions serve` didn't come up is unknown —
+`functions.log` sits outside the uploaded dir and the workflow never waits on :54321/functions.
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
