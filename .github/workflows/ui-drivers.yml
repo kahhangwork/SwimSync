@@ -123,6 +123,36 @@ jobs:
           BUNDLE="$(curl -s http://localhost:8081 | grep -o 'src="[^"]*bundle[^"]*"' | head -1 | sed 's/^src="//;s/"$//')"
           [ -n "$BUNDLE" ] && curl -s -o /dev/null --max-time 600 "http://localhost:8081$BUNDLE" || true
 
+      # The edge runtime must be SERVING before any driver runs. Five nightlies
+      # (2026-10-30 → 11-08, all on one unchanged commit) answered 503 on
+      # /functions/v1 for the whole sweep, and that surfaced as five "product"
+      # reds (app-money, payment-collection, referrals, smoke-app,
+      # trial-onboarding) — §7.84's shape. Probe a REAL function with a dummy
+      # token: its own 404 {"error":"not_found"} proves the runtime is up (a 503
+      # or 502 is the gateway with nothing behind it). One restart, then fail
+      # with one clear line instead of five misleading driver reds.
+      - name: Wait for the edge runtime (one restart)
+        run: |
+          PROBE="http://127.0.0.1:54321/functions/v1/public-package?token=00000000000000000000000000000000"
+          serving() {
+            for i in $(seq 1 36); do
+              body="$(curl -s --max-time 30 -w ' HTTP%{http_code}' "$PROBE" || true)"
+              case "$body" in *not_found*HTTP404) echo "edge runtime serving (attempt $i)"; return 0 ;; esac
+              sleep 5
+            done
+            echo "last probe: $body"; return 1
+          }
+          serving && exit 0
+          echo "::warning::edge runtime not serving after 3 min — restarting functions serve once"
+          echo "===== RESTART $(date -u '+%H:%M:%S UTC') =====" >> "$RUNNER_TEMP/functions.log"
+          pkill -f "supabase functions serve" || true
+          sleep 5
+          nohup supabase functions serve --env-file supabase/functions/.env --no-verify-jwt >> "$RUNNER_TEMP/functions.log" 2>&1 &
+          serving && exit 0
+          echo "::error::edge runtime never came up (503 on /functions/v1) — not a product bug; read functions.log in the ui-driver-run artifact"
+          tail -50 "$RUNNER_TEMP/functions.log"
+          exit 1
+
       - name: Run every UI driver
         id: sweep
         env:
@@ -133,6 +163,21 @@ jobs:
           ARGS=""
           [ -n "$ONLY" ] && ARGS="--only $ONLY"
           .claude/skills/run-ui-playwright/drivers/run-all-drivers.sh $ARGS
+
+      # functions.log lives in $RUNNER_TEMP, outside the uploaded dir — so the
+      # 2026-10-30 → 11-08 503s left no trace of WHY. Copy it in, with one
+      # end-of-run probe so a runtime that died MID-sweep is told apart from
+      # one that never started.
+      - name: Keep the edge-runtime log
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/ui-drivers"
+          cp "$RUNNER_TEMP/functions.log" "$RUNNER_TEMP/ui-drivers/functions.log" 2>/dev/null || echo "(no functions.log was written)" > "$RUNNER_TEMP/ui-drivers/functions.log"
+          {
+            echo
+            echo "===== END-OF-RUN PROBE $(date -u '+%H:%M:%S UTC') ====="
+            curl -s --max-time 30 -w ' HTTP%{http_code}\n' "http://127.0.0.1:54321/functions/v1/public-package?token=00000000000000000000000000000000" || echo "probe failed"
+          } >> "$RUNNER_TEMP/ui-drivers/functions.log"
 
       - name: Upload logs + screenshots
         if: always()

@@ -420,7 +420,8 @@ Latest `42928067577` GREEN. **5 reds on that unchanged commit** (10-30, 10-31, 1
 change between them. **Triaged 2026-11-11: all five are ONE cause — the CI edge runtime answered 503 for the whole
 run** (§7.84's shape), so the same 5 function-dependent drivers fail every time: `app-money`, `payment-collection`,
 `referrals`, `smoke-app`, `trial-onboarding`. Not a product bug. Why `functions serve` didn't come up is unknown —
-`functions.log` sits outside the uploaded dir and the workflow never waits on :54321/functions.
+`functions.log` sat outside the uploaded dir. **Fixed in CI (2026-11-11):** the workflow now waits for the runtime
+(one restart, then ONE clear error) and uploads `functions.log` with an end-of-run probe — read it on the next such red.
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
