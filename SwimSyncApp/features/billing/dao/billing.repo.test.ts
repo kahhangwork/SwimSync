@@ -46,7 +46,7 @@ describe("billing.repo money chains", () => {
       [
         "select",
         "id,reference_number,billing_month,gross_amount,package_applied,credit_applied," +
-          "net_amount,status,paid_claimed_at,tenant_id,tenants(display_name)",
+          "net_amount,status,paid_claimed_at,due_date,is_overdue,tenant_id,tenants(display_name)",
       ],
       ["eq", "parent_id", "parent-1"],
       ["order", "billing_month", { ascending: false }],

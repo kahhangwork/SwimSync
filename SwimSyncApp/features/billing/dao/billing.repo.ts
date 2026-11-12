@@ -20,7 +20,7 @@ export const fetchParentId = (session: Session) =>
 export const fetchInvoices = (parentId: string) =>
   supabase
     .from("invoices")
-    .select("id, reference_number, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, paid_claimed_at, tenant_id, tenants(display_name)")
+    .select("id, reference_number, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, paid_claimed_at, due_date, is_overdue, tenant_id, tenants(display_name)")
     .eq("parent_id", parentId)
     .order("billing_month", { ascending: false });
 

@@ -39,6 +39,7 @@ export function invoicesOf(rows: InvoiceListRow[] | null): Invoice[] {
       package_applied: Number(inv.package_applied ?? 0),
       credit_applied: Number(inv.credit_applied),
       net_amount: Number(inv.net_amount),
+      is_overdue: inv.is_overdue === true,
       business_name: t?.display_name ?? "Your coach",
     };
   });

@@ -9,6 +9,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import StatusBadge from "@/components/StatusBadge";
+import { dueLine, invoiceTag } from "@/lib/invoiceTag";
 import { Surface } from "@/components/ui/Surface";
 import { Button } from "@/components/ui/Button";
 import { invoiceLabel } from "@/lib/invoiceLabel";
@@ -49,7 +50,9 @@ export function InvoicesTab(p: Pick<Billing, "invoices" | "claimPaid" | "claimin
             // A claim is a STATEMENT, never a status change (PRD §7.21): the
             // invoice stays outstanding until the coach confirms it. The tag
             // says who it is waiting on — DESIGN.md's Claimed Is Its Own State.
-            const claimed = outstanding && !!inv.paid_claimed_at;
+            // Overdue is the database's verdict; Claimed beats it (D4) — both
+            // decided in lib/invoiceTag, never here.
+            const due = dueLine(inv);
             return (
             /* The Surface is the OUTER element and the action row below is a
                SIBLING of the touchable, not nested inside it — so the
@@ -94,10 +97,7 @@ export function InvoicesTab(p: Pick<Billing, "invoices" | "claimPaid" | "claimin
                       {invoiceLabel(inv)}
                     </Text>
                   </View>
-                  <StatusBadge
-                    status={claimed ? "Claimed" : outstanding ? "Outstanding" : "Paid"}
-                    size="sm"
-                  />
+                  <StatusBadge status={invoiceTag(inv)} size="sm" />
                 </View>
 
                 {/* Plain Words (DESIGN.md): what the lessons cost, what was
@@ -116,6 +116,15 @@ export function InvoicesTab(p: Pick<Billing, "invoices" | "claimPaid" | "claimin
                       amount={formatSgd(inv.net_amount)}
                       strong
                     />
+                    {due && (
+                      <Text
+                        className={`text-label text-right mt-1 ${
+                          due.overdue ? "font-semibold text-status-danger-text" : "text-ink-muted"
+                        }`}
+                      >
+                        {due.text}
+                      </Text>
+                    )}
                   </View>
                 </View>
 

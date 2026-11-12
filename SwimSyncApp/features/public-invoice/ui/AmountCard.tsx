@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Surface } from "@/components/ui/Surface";
 import type { PublicInvoice } from "../types";
 import { formatSgd } from "@/lib/money";
+import { dueLine } from "@/lib/invoiceTag";
 
 export function AmountCard(p: { invoice: PublicInvoice; paid: boolean; qrDataUrl: string | null; saveQr: () => void; claimed: boolean; claiming: boolean; claimPaid: () => void }) {
   const { invoice, paid, qrDataUrl, saveQr, claimed, claiming, claimPaid } = p;
@@ -31,6 +32,19 @@ export function AmountCard(p: { invoice: PublicInvoice; paid: boolean; qrDataUrl
         <Text selectable className="text-body-secondary text-ink-secondary">
           Reference: {invoice.reference}
         </Text>
+        {(() => {
+          // Claimed beats Overdue (D4); a paid invoice has no due line.
+          const due = dueLine(invoice);
+          return due ? (
+            <Text
+              className={`text-body-secondary mt-1 ${
+                due.overdue ? "font-semibold text-status-danger-text" : "text-ink-secondary"
+              }`}
+            >
+              {due.text}
+            </Text>
+          ) : null;
+        })()}
 
         {paid ? (
           <View className="mt-5 w-full bg-status-success-bg border border-status-success-border rounded-card px-4 py-3 items-center">

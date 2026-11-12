@@ -19,6 +19,10 @@ export type Invoice = {
    *  Fetched here, not only on the detail screen, because the list now
    *  carries the claim control too. */
   paid_claimed_at: string | null;
+  /** "YYYY-MM-DD" (SGT), stored at generation (20261112000100). */
+  due_date: string;
+  /** The database's verdict (is_overdue computed field) — never derived here. */
+  is_overdue: boolean;
   /** Which business issued it. A parent may deal with several, and an
    *  ungrouped list gives no way to tell whose bill is whose. */
   tenant_id: string;

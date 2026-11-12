@@ -10,5 +10,9 @@ export interface PublicInvoice {
   billing_month: string;
   status: string;
   paid_claimed_at: string | null;
+  /** "YYYY-MM-DD" (SGT) — public-invoice v3 (20261112000100). */
+  due_date: string;
+  /** The database's verdict, served by public-invoice — never derived here. */
+  is_overdue: boolean;
   students: string[];
 }

@@ -49,7 +49,7 @@ describe("invoiceDetail.repo money chains", () => {
       [
         "select",
         "id,reference_number,billing_month,gross_amount,package_applied,credit_applied," +
-          "balance_adjustment,net_amount,status,generated_at,paid_at,paid_claimed_at," +
+          "balance_adjustment,net_amount,status,generated_at,paid_at,paid_claimed_at,due_date,is_overdue," +
           "tenants(display_name),invoice_items(id,lesson_session_id,amount,class_title," +
           "session_date,attendance_status,student_name,students(full_name))",
       ],

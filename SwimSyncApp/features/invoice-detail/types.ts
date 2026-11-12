@@ -36,6 +36,10 @@ export type InvoiceDetail = {
   generated_at: string;
   paid_at: string | null;
   paid_claimed_at: string | null;
+  /** "YYYY-MM-DD" (SGT), stored at generation (20261112000100). */
+  due_date: string;
+  /** The database's verdict (is_overdue computed field) — never derived here. */
+  is_overdue: boolean;
   items: InvoiceItem[];
   credit_notes: CreditNoteApplied[];
   coach_id: string | null;

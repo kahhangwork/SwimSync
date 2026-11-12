@@ -34,6 +34,8 @@ const inv = (over: Partial<Invoice> = {}): Invoice => ({
   net_amount: 90,
   status: "outstanding",
   paid_claimed_at: null,
+  due_date: "2026-11-26",
+  is_overdue: false,
   tenant_id: "tA",
   business_name: "Orcas",
   ...over,
@@ -42,6 +44,32 @@ const inv = (over: Partial<Invoice> = {}): Invoice => ({
 function setup(invoice: Invoice) {
   render(<InvoicesTab invoices={[invoice]} claimPaid={jest.fn()} claimingId={null} />);
 }
+
+// ── Overdue (OVERDUE_INVOICES_PLAN.md Unit 4) ───────────────────────────────
+it("an outstanding invoice shows its due date; an overdue one reads Overdue in red", () => {
+  setup(inv());
+  expect(screen.getByText("Due 26 Nov")).toBeTruthy();
+  expect(screen.getByText("Outstanding")).toBeTruthy();
+});
+
+it("overdue: the tag and the due line both say so", () => {
+  setup(inv({ is_overdue: true }));
+  expect(screen.getByText("Overdue")).toBeTruthy();
+  const line = screen.getByText("Overdue — was due 26 Nov");
+  expect(String(line.props.className)).toContain("text-status-danger-text");
+});
+
+it("claimed beats overdue: Claimed tag, a plain due line", () => {
+  setup(inv({ is_overdue: true, paid_claimed_at: "2026-11-27T02:00:00Z" }));
+  expect(screen.getByText("Claimed")).toBeTruthy();
+  expect(screen.queryByText(/Overdue/)).toBeNull();
+  expect(screen.getByText("Due 26 Nov")).toBeTruthy();
+});
+
+it("a paid invoice has no due line", () => {
+  setup(inv({ status: "paid", is_overdue: false }));
+  expect(screen.queryByText(/Due 26 Nov/)).toBeNull();
+});
 
 it("each money line is its own field, in the parent's words", () => {
   setup(inv());

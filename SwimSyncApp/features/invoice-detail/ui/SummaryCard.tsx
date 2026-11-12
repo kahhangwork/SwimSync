@@ -10,6 +10,7 @@ import { invoiceLabel } from "@/lib/invoiceLabel";
 import type { InvoiceDetail } from "../types";
 import { formatBillingMonth, formatDate } from "../domain/invoiceDetailFormat";
 import { formatSgd } from "@/lib/money";
+import { dueLine } from "@/lib/invoiceTag";
 
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
 
@@ -74,6 +75,18 @@ export function SummaryCard(p: { invoice: InvoiceDetail }) {
             amount={formatSgd(invoice.net_amount)}
             strong
           />
+          {(() => {
+            const due = dueLine(invoice);
+            return due ? (
+              <Text
+                className={`text-label text-right mt-1 ${
+                  due.overdue ? "font-semibold text-status-danger-text" : "text-ink-muted"
+                }`}
+              >
+                {due.text}
+              </Text>
+            ) : null;
+          })()}
         </View>
       </View>
     </Surface>

@@ -1,6 +1,7 @@
 import React from "react";
 import { ScrollView, SafeAreaView } from "react-native";
 import { useInvoiceDetail } from "@/features/invoice-detail/domain/useInvoiceDetail";
+import { statusLabelOf } from "@/features/invoice-detail/domain/invoiceDetailFormat";
 import { LoadingView } from "@/features/invoice-detail/ui/LoadingView";
 import { NotFoundView } from "@/features/invoice-detail/ui/NotFoundView";
 import { Header } from "@/features/invoice-detail/ui/Header";
@@ -26,12 +27,8 @@ export default function InvoiceDetailScreen() {
 
   // A claim never changes the status (PRD §7.21) — the tag only says who the
   // outstanding invoice is now waiting on (DESIGN.md: Claimed is its own state).
-  const statusLabel =
-    invoice.status === "outstanding"
-      ? invoice.paid_claimed_at
-        ? "Claimed"
-        : "Outstanding"
-      : "Paid";
+  // Overdue is the database's verdict; the precedence lives in lib/invoiceTag.
+  const statusLabel = statusLabelOf(invoice);
 
   return (
     <SafeAreaView className="flex-1 bg-ground">

@@ -22,6 +22,8 @@ export const fetchInvoiceDetail = (id: string) =>
       generated_at,
       paid_at,
       paid_claimed_at,
+      due_date,
+      is_overdue,
       tenants(display_name),
       invoice_items(
         id,

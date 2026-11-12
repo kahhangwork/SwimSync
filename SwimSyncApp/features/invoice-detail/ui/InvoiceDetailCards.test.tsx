@@ -29,7 +29,7 @@ const invoice = (over: Partial<InvoiceDetail> = {}): InvoiceDetail => ({
   id: "i1", reference_number: "INV-2026-0001", billing_month: "2026-09",
   gross_amount: 105, package_applied: 0, credit_applied: 15, balance_adjustment: 0,
   net_amount: 90, status: "outstanding", generated_at: "2026-10-01T01:00:00Z",
-  paid_at: null, paid_claimed_at: null,
+  paid_at: null, paid_claimed_at: null, due_date: "2026-11-26", is_overdue: false,
   items: [item("a", 35), item("b", 35), item("c", 35)],
   credit_notes: [], coach_id: null, business_name: "Orcas", ...over,
 });
@@ -62,3 +62,13 @@ it("a line-less invoice says so, and never 0 lessons", () => {
   expect(screen.queryByText(/0 lessons/)).toBeNull();
   expect(screen.getByText("No lessons are listed on this invoice.")).toBeTruthy();
 });
+
+it("the summary shows the due date, and Overdue in red past it", () => {
+  const { rerender } = render(<SummaryCard invoice={invoice()} />);
+  expect(screen.getByText("Due 26 Nov")).toBeTruthy();
+  rerender(<SummaryCard invoice={invoice({ is_overdue: true })} />);
+  expect(String(screen.getByText("Overdue — was due 26 Nov").props.className)).toContain("text-status-danger-text");
+  rerender(<SummaryCard invoice={invoice({ status: "paid" })} />);
+  expect(screen.queryByText(/due 26 Nov|Due 26 Nov/)).toBeNull();
+});
+

@@ -6,6 +6,7 @@
 // timeZone — pinned by path in BOTH sgDisplay.drift.test.ts twins ("parseInt(month)
 // - 1"), repointed here from the route (plan ⚠ R6). Correct in every zone.
 import { formatSgStamp } from "@/lib/lessonDates";
+import { invoiceTag } from "@/lib/invoiceTag";
 import type { InvoiceItem, InvoiceDetail } from "../types";
 import type { AppliedCreditNoteRow, InvoiceRow } from "../dao/invoiceDetail.repo";
 
@@ -53,6 +54,8 @@ export function invoiceDetailOf(
     generated_at: inv.generated_at,
     paid_at: inv.paid_at,
     paid_claimed_at: inv.paid_claimed_at ?? null,
+    due_date: inv.due_date,
+    is_overdue: inv.is_overdue === true,
     items: (inv.invoice_items ?? [])
       .map((item) => ({
         id: item.id,
@@ -75,4 +78,10 @@ export function invoiceDetailOf(
     })),
     coach_id: coachId,
   };
+}
+
+/** The detail header's tag — lib/invoiceTag's D4 precedence (Paid > Claimed >
+ *  Overdue > Outstanding), so the list and the detail can never disagree. */
+export function statusLabelOf(invoice: Pick<InvoiceDetail, "status" | "paid_claimed_at" | "is_overdue">): string {
+  return invoiceTag(invoice);
 }
