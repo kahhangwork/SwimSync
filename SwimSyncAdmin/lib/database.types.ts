@@ -482,6 +482,37 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"invoice_due_date_changes": {
+                  Row: {
+                    "changed_at": string,"changed_by": string,"id": string,"invoice_id": string,"new_due_date": string,"old_due_date": string,"reason": string,"tenant_id": string
+                  }
+                  Insert: {
+                    "changed_at"?: string,"changed_by": string,"id"?: string,"invoice_id": string,"new_due_date": string,"old_due_date": string,"reason"?: string,"tenant_id": string
+                  }
+                  Update: {
+                    "changed_at"?: string,"changed_by"?: string,"id"?: string,"invoice_id"?: string,"new_due_date"?: string,"old_due_date"?: string,"reason"?: string,"tenant_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoice_due_date_changes_changed_by_fkey"
+      columns: ["changed_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "invoice_due_date_changes_invoice_id_fkey"
+      columns: ["invoice_id"]
+isOneToOne: false
+      referencedRelation: "invoices"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "invoice_due_date_changes_tenant_id_fkey"
+      columns: ["tenant_id"]
+isOneToOne: false
+      referencedRelation: "tenants"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"invoice_items": {
                   Row: {
                     "amount": number,"attendance_status": Database["public"]['Enums']["attendance_status"],"class_title": string,"id": string,"invoice_id": string,"lesson_session_id": string,"session_date": string,"student_id": string,"student_name": string | null
@@ -515,13 +546,13 @@ isOneToOne: false
                   ]
                 },"invoices": {
                   Row: {
-                    "balance_adjustment": number,"billing_month": string,"credit_applied": number,"generated_at": string,"gross_amount": number,"id": string,"invoice_email_claimed_at": string | null,"invoice_email_sent_at": string | null,"net_amount": number,"package_applied": number,"paid_at": string | null,"paid_claimed_at": string | null,"paid_marked_by": string | null,"parent_id": string,"public_token": string,"reference_number": string,"reminded_at": string | null,"status": Database["public"]['Enums']["invoice_status"],"tenant_id": string,"invoice_email_state": string | null
+                    "balance_adjustment": number,"billing_month": string,"credit_applied": number,"due_date": string,"generated_at": string,"gross_amount": number,"id": string,"invoice_email_claimed_at": string | null,"invoice_email_sent_at": string | null,"net_amount": number,"package_applied": number,"paid_at": string | null,"paid_claimed_at": string | null,"paid_marked_by": string | null,"parent_id": string,"public_token": string,"reference_number": string,"reminded_at": string | null,"status": Database["public"]['Enums']["invoice_status"],"tenant_id": string,"invoice_email_state": string | null,"is_overdue": boolean | null
                   }
                   Insert: {
-                    "balance_adjustment"?: number,"billing_month": string,"credit_applied"?: number,"generated_at"?: string,"gross_amount": number,"id"?: string,"invoice_email_claimed_at"?: string | null,"invoice_email_sent_at"?: string | null,"net_amount": number,"package_applied"?: number,"paid_at"?: string | null,"paid_claimed_at"?: string | null,"paid_marked_by"?: string | null,"parent_id": string,"public_token": string,"reference_number": string,"reminded_at"?: string | null,"status"?: Database["public"]['Enums']["invoice_status"],"tenant_id": string
+                    "balance_adjustment"?: number,"billing_month": string,"credit_applied"?: number,"due_date": string,"generated_at"?: string,"gross_amount": number,"id"?: string,"invoice_email_claimed_at"?: string | null,"invoice_email_sent_at"?: string | null,"net_amount": number,"package_applied"?: number,"paid_at"?: string | null,"paid_claimed_at"?: string | null,"paid_marked_by"?: string | null,"parent_id": string,"public_token": string,"reference_number": string,"reminded_at"?: string | null,"status"?: Database["public"]['Enums']["invoice_status"],"tenant_id": string
                   }
                   Update: {
-                    "balance_adjustment"?: number,"billing_month"?: string,"credit_applied"?: number,"generated_at"?: string,"gross_amount"?: number,"id"?: string,"invoice_email_claimed_at"?: string | null,"invoice_email_sent_at"?: string | null,"net_amount"?: number,"package_applied"?: number,"paid_at"?: string | null,"paid_claimed_at"?: string | null,"paid_marked_by"?: string | null,"parent_id"?: string,"public_token"?: string,"reference_number"?: string,"reminded_at"?: string | null,"status"?: Database["public"]['Enums']["invoice_status"],"tenant_id"?: string
+                    "balance_adjustment"?: number,"billing_month"?: string,"credit_applied"?: number,"due_date"?: string,"generated_at"?: string,"gross_amount"?: number,"id"?: string,"invoice_email_claimed_at"?: string | null,"invoice_email_sent_at"?: string | null,"net_amount"?: number,"package_applied"?: number,"paid_at"?: string | null,"paid_claimed_at"?: string | null,"paid_marked_by"?: string | null,"parent_id"?: string,"public_token"?: string,"reference_number"?: string,"reminded_at"?: string | null,"status"?: Database["public"]['Enums']["invoice_status"],"tenant_id"?: string
                   }
                   Relationships: [
                     {
@@ -1533,13 +1564,13 @@ isOneToOne: false
                   ]
                 },"tenants": {
                   Row: {
-                    "auto_invoice_enabled": boolean,"created_at": string,"credit_note_counter": number,"default_package_product_id": string | null,"display_name": string,"holiday_extension_days": number,"id": string,"invoice_counter": number,"invoice_run_day": number,"join_code": string,"logo_url": string | null,"low_package_lessons": number,"owner_profile_id": string | null,"package_counter": number,"package_expiry_warning_days": number,"paynow_mobile": string | null,"paynow_qr_url": string | null,"paynow_uen": string | null,"rain_pays_coach": boolean,"referral_discount_type": string | null,"referral_discount_value": number | null,"referral_enabled": boolean,"referral_reward_expiry_days": number | null,"slug": string,"suspended_at": string | null,"updated_at": string,"wage_run_day": number
+                    "auto_invoice_enabled": boolean,"created_at": string,"credit_note_counter": number,"default_package_product_id": string | null,"display_name": string,"holiday_extension_days": number,"id": string,"invoice_counter": number,"invoice_payment_days": number,"invoice_run_day": number,"join_code": string,"logo_url": string | null,"low_package_lessons": number,"owner_profile_id": string | null,"package_counter": number,"package_expiry_warning_days": number,"paynow_mobile": string | null,"paynow_qr_url": string | null,"paynow_uen": string | null,"rain_pays_coach": boolean,"referral_discount_type": string | null,"referral_discount_value": number | null,"referral_enabled": boolean,"referral_reward_expiry_days": number | null,"slug": string,"suspended_at": string | null,"updated_at": string,"wage_run_day": number
                   }
                   Insert: {
-                    "auto_invoice_enabled"?: boolean,"created_at"?: string,"credit_note_counter"?: number,"default_package_product_id"?: string | null,"display_name": string,"holiday_extension_days"?: number,"id"?: string,"invoice_counter"?: number,"invoice_run_day"?: number,"join_code": string,"logo_url"?: string | null,"low_package_lessons"?: number,"owner_profile_id"?: string | null,"package_counter"?: number,"package_expiry_warning_days"?: number,"paynow_mobile"?: string | null,"paynow_qr_url"?: string | null,"paynow_uen"?: string | null,"rain_pays_coach"?: boolean,"referral_discount_type"?: string | null,"referral_discount_value"?: number | null,"referral_enabled"?: boolean,"referral_reward_expiry_days"?: number | null,"slug": string,"suspended_at"?: string | null,"updated_at"?: string,"wage_run_day"?: number
+                    "auto_invoice_enabled"?: boolean,"created_at"?: string,"credit_note_counter"?: number,"default_package_product_id"?: string | null,"display_name": string,"holiday_extension_days"?: number,"id"?: string,"invoice_counter"?: number,"invoice_payment_days"?: number,"invoice_run_day"?: number,"join_code": string,"logo_url"?: string | null,"low_package_lessons"?: number,"owner_profile_id"?: string | null,"package_counter"?: number,"package_expiry_warning_days"?: number,"paynow_mobile"?: string | null,"paynow_qr_url"?: string | null,"paynow_uen"?: string | null,"rain_pays_coach"?: boolean,"referral_discount_type"?: string | null,"referral_discount_value"?: number | null,"referral_enabled"?: boolean,"referral_reward_expiry_days"?: number | null,"slug": string,"suspended_at"?: string | null,"updated_at"?: string,"wage_run_day"?: number
                   }
                   Update: {
-                    "auto_invoice_enabled"?: boolean,"created_at"?: string,"credit_note_counter"?: number,"default_package_product_id"?: string | null,"display_name"?: string,"holiday_extension_days"?: number,"id"?: string,"invoice_counter"?: number,"invoice_run_day"?: number,"join_code"?: string,"logo_url"?: string | null,"low_package_lessons"?: number,"owner_profile_id"?: string | null,"package_counter"?: number,"package_expiry_warning_days"?: number,"paynow_mobile"?: string | null,"paynow_qr_url"?: string | null,"paynow_uen"?: string | null,"rain_pays_coach"?: boolean,"referral_discount_type"?: string | null,"referral_discount_value"?: number | null,"referral_enabled"?: boolean,"referral_reward_expiry_days"?: number | null,"slug"?: string,"suspended_at"?: string | null,"updated_at"?: string,"wage_run_day"?: number
+                    "auto_invoice_enabled"?: boolean,"created_at"?: string,"credit_note_counter"?: number,"default_package_product_id"?: string | null,"display_name"?: string,"holiday_extension_days"?: number,"id"?: string,"invoice_counter"?: number,"invoice_payment_days"?: number,"invoice_run_day"?: number,"join_code"?: string,"logo_url"?: string | null,"low_package_lessons"?: number,"owner_profile_id"?: string | null,"package_counter"?: number,"package_expiry_warning_days"?: number,"paynow_mobile"?: string | null,"paynow_qr_url"?: string | null,"paynow_uen"?: string | null,"rain_pays_coach"?: boolean,"referral_discount_type"?: string | null,"referral_discount_value"?: number | null,"referral_enabled"?: boolean,"referral_reward_expiry_days"?: number | null,"slug"?: string,"suspended_at"?: string | null,"updated_at"?: string,"wage_run_day"?: number
                   }
                   Relationships: [
                     {
@@ -1734,6 +1765,9 @@ isOneToOne: false
 "cancel_trial_booking":
 { Args: { "p_booking_id": string }; Returns: undefined
                            },
+"change_invoice_due_date":
+{ Args: { "p_invoice_id": string,"p_new_date": string,"p_reason"?: string }; Returns: string
+                           },
 "claim_credit_note_email":
 { Args: { "p_credit_note_id": string,"p_manual"?: boolean }; Returns: {
               "claimed_at": string,"issued_at": string,"prior_state": string
@@ -1916,8 +1950,14 @@ isOneToOne: false
 "holiday_covering_package":
 { Args: { "p_category_id": string,"p_date": string,"p_student_id": string,"p_tenant_id": string }; Returns: string
                            },
+"invoice_due_date_for":
+{ Args: { "p_generated_at": string,"p_tenant": string }; Returns: string
+                           },
 "invoice_email_state":
 { Args: { "": Database["public"]['Tables']["invoices"]['Row'] }; Returns: { error: true } & "the function public.invoice_email_state with parameter or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache"
+                           },
+"is_overdue":
+{ Args: { "": Database["public"]['Tables']["invoices"]['Row'] }; Returns: { error: true } & "the function public.is_overdue with parameter or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache"
                            },
 "is_platform_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
