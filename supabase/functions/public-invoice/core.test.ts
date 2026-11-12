@@ -23,6 +23,8 @@ const ROW = {
   billing_month: "2026-07",
   status: "outstanding",
   paid_claimed_at: null,
+  due_date: "2026-08-14",
+  is_overdue: false,
   reference_number: "INV-2026-0001",
   tenants: { display_name: "Swim A", paynow_uen: null, paynow_mobile: "91234567" },
   invoice_items: [
@@ -37,6 +39,8 @@ Deno.test("serializer: the public key set is EXACT — a new key is a failure", 
     "amount",
     "billing_month",
     "business_name",
+    "due_date",
+    "is_overdue",
     "paid_claimed_at",
     "paynow_mobile",
     "paynow_uen",
@@ -62,7 +66,7 @@ Deno.test("serializer: survives the PostgREST array-embed shape and null items",
 
 // ── Against the local stack ─────────────────────────────────────────────────
 
-async function invoiceFixture() {
+async function invoiceFixture(due_date?: string) {
   const s = await newScenario();
   const { data, error } = await s.db
     .from("invoices")
@@ -72,6 +76,7 @@ async function invoiceFixture() {
       billing_month: "2026-06",
       gross_amount: 120,
       net_amount: 120,
+      ...(due_date ? { due_date } : {}),
     })
     .select("public_token, reference_number")
     .single();
@@ -88,6 +93,41 @@ Deno.test("lookup: a real token returns the invoice; the trigger's ref rides alo
     assertEquals(inv!.billing_month, "2026-06");
     assertEquals(inv!.reference, ref);
     assertEquals(inv!.status, "outstanding");
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("serializer: is_overdue is strictly true-or-false (a null reads not overdue)", () => {
+  assertEquals(serializePublicInvoice({ ...ROW, is_overdue: null }).is_overdue, false);
+  assertEquals(serializePublicInvoice({ ...ROW, is_overdue: true }).is_overdue, true);
+});
+
+// Overdue plan Unit 2 (⚠ RISK 1): the service-role select must READ is_overdue —
+// a missing grant would be the shared 404 on every payment link.
+Deno.test("lookup: a fresh invoice carries its due date and is not overdue", async () => {
+  const { s, token } = await invoiceFixture();
+  try {
+    const inv = await lookupInvoice(s.db, token);
+    assertNotEquals(inv, null);
+    assertEquals(/^\d{4}-\d{2}-\d{2}$/.test(inv!.due_date), true);
+    assertEquals(inv!.is_overdue, false);
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("lookup: past its due date → overdue, and a claim does not change the SQL answer", async () => {
+  const { s, token } = await invoiceFixture("2026-01-01");
+  try {
+    const inv = await lookupInvoice(s.db, token);
+    assertEquals(inv!.due_date, "2026-01-01");
+    assertEquals(inv!.is_overdue, true);
+    await claimInvoice(s.db, token);
+    const claimed = await lookupInvoice(s.db, token);
+    // Claimed beats Overdue in the TAG (D4) — decided on the page, not here.
+    assertEquals(claimed!.is_overdue, true);
+    assertNotEquals(claimed!.paid_claimed_at, null);
   } finally {
     await s.teardown();
   }

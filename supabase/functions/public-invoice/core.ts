@@ -31,6 +31,11 @@ export interface PublicInvoice {
   billing_month: string;
   status: string;
   paid_claimed_at: string | null;
+  /** "YYYY-MM-DD", SGT — the stored invoices.due_date (20261112000100). */
+  due_date: string;
+  /** Decided in SQL (is_overdue computed field, app_today()) — never on the page.
+   *  Claimed still beats Overdue in the TAG; the page decides that. */
+  is_overdue: boolean;
   students: string[];
 }
 
@@ -40,6 +45,8 @@ export function serializePublicInvoice(row: {
   billing_month: string;
   status: string;
   paid_claimed_at: string | null;
+  due_date: string;
+  is_overdue: boolean | null;
   reference_number: string;
   tenants: unknown;
   invoice_items: unknown;
@@ -74,6 +81,8 @@ export function serializePublicInvoice(row: {
     billing_month: row.billing_month,
     status: row.status,
     paid_claimed_at: row.paid_claimed_at,
+    due_date: row.due_date,
+    is_overdue: row.is_overdue === true,
     students,
   };
 }
@@ -88,7 +97,9 @@ export async function lookupInvoice(
   const { data, error } = await db
     .from("invoices")
     .select(
-      "net_amount, billing_month, status, paid_claimed_at, reference_number, " +
+      // is_overdue needs EXECUTE for service_role (20261112000100) — any select
+      // error here is the shared 404 on EVERY family's payment link.
+      "net_amount, billing_month, status, paid_claimed_at, reference_number, due_date, is_overdue, " +
         "tenants(display_name, paynow_uen, paynow_mobile), " +
         "invoice_items(student_name)",
     )

@@ -63,6 +63,9 @@ export type InvoiceEmailData = {
    *  it ADDS to what's owed, so it renders with a + sign. */
   balanceAdjustment?: number;
   net: number;
+  /** "YYYY-MM-DD" — the stored invoices.due_date. Printed only when there is
+   *  something to pay ("Please pay by …"); never computed here. */
+  dueDate: string;
   items: InvoiceEmailItem[];
   appUrl?: string;
 };
@@ -264,7 +267,9 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
               This invoice is <strong style="color:#0a0a0a;">fully covered by ${coveredBy}</strong> — there's nothing to pay. You can view the details in the app.
             </p>`
     : `<p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#525252;">
-              Pay via the coach's PayNow QR code shown in the app, then the coach will mark it as paid.
+              Please pay by <strong style="color:#0a0a0a;">${escapeHtml(
+                formatSessionDate(data.dueDate)
+              )}</strong>. Pay via the coach's PayNow QR code shown in the app, then the coach will mark it as paid.
             </p>`;
 
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;padding:32px 0;font-family:${FONT};">
@@ -552,6 +557,7 @@ async function emailInvoices(
           credit: inv.credit,
           balanceAdjustment: inv.balance_adjustment,
           net: inv.net,
+          dueDate: inv.due_date,
           appUrl,
           items: inv.items.map((i) => ({
             studentName: studentName[i.student_id] ?? "",
@@ -616,7 +622,7 @@ export function shouldRetryTenantEmails(
 }
 
 const INVOICE_EMAIL_SELECT =
-  "id, parent_id, tenant_id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount";
+  "id, parent_id, tenant_id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, due_date";
 
 // Rebuild CreatedInvoice shapes from stored rows. The itemised lines come from
 // invoice_items. `ok: false` on an item-fetch error — the caller sends NOTHING
@@ -659,6 +665,7 @@ async function rebuildInvoices(
       credit: Number(r.credit_applied),
       balance_adjustment: Number(r.balance_adjustment ?? 0),
       net: Number(r.net_amount),
+      due_date: r.due_date,
       items,
     });
   }

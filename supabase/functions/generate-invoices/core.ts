@@ -98,6 +98,9 @@ export type CreatedInvoice = {
   /** A prior-period DEBIT (voided-then-paid credit) folded onto this invoice. */
   balance_adjustment: number;
   net: number;
+  /** "YYYY-MM-DD", SGT — the stored invoices.due_date (set by the insert trigger,
+   *  20261112000100). Printed as read; no TypeScript ever computes a due date. */
+  due_date: string;
   items: CreatedInvoiceItem[];
 };
 
@@ -1331,7 +1334,8 @@ async function generateForTenant(
         net_amount: net,
         status: net === 0 ? "paid" : "outstanding",
       })
-      .select("id")
+      // due_date comes back from the BEFORE INSERT trigger — never sent, never computed here.
+      .select("id, due_date")
       .single();
 
     if (invErr || !invoice) {
@@ -1428,6 +1432,7 @@ async function generateForTenant(
       credit: creditApplied,
       balance_adjustment: balanceAdjustment,
       net: netApplied,
+      due_date: invoice.due_date as string,
       items: items.map((i) => ({
         student_id: i.student_id,
         session_date: i.session_date,

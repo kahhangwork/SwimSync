@@ -540,6 +540,62 @@ Deno.test("emailCreatedInvoices: with a key, emails each invoice to the resolved
   }
 });
 
+// Overdue plan Unit 2 (OVERDUE_INVOICES_PLAN.md ⚠ RISK 2): the due date is the
+// STORED column (trigger: SGT generated date + tenants.invoice_payment_days),
+// carried on result.created AND on the retry rebuild — both email paths print it.
+Deno.test("due date: created + retried emails print the stored due_date (tenant on 7 days)", async () => {
+  const s = await newScenario({ price: 30, billing: monthEnded("2026-05") });
+  const orig = globalThis.fetch;
+  const resendCalls: Array<Record<string, string>> = [];
+  globalThis.fetch = ((url: string | URL | Request, init?: RequestInit) => {
+    if (String(url).includes("api.resend.com")) {
+      resendCalls.push(JSON.parse((init?.body as string) ?? "{}"));
+      return Promise.resolve(new Response(JSON.stringify({ id: "e1" }), { status: 200 }));
+    }
+    return orig(url as string | URL | Request, init);
+  }) as typeof fetch;
+  try {
+    // The scenario's tenant is torn down with it, so the 7 cannot leak (§7.15).
+    const { error: upErr } = await s.db.from("tenants")
+      .update({ invoice_payment_days: 7 }).eq("id", s.tenantId);
+    assertEquals(upErr, null);
+
+    const a = await s.addSession("2026-05-02"); await s.mark(a, "present");
+    await s.completeMonth("2026-05");
+    const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-05", now: s.now,
+    });
+    assertEquals(res.invoices_created, 1);
+
+    const { data: row } = await s.db.from("invoices")
+      .select("id, generated_at, due_date").eq("id", res.created![0].invoice_id).single();
+    // SGT date of the stamp + 7, computed independently of the SQL.
+    const sgDate = new Date(row!.generated_at).toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+    const [y, m, d] = sgDate.split("-").map(Number);
+    const expected = new Date(Date.UTC(y, m - 1, d + 7)).toISOString().slice(0, 10);
+    assertEquals(row!.due_date, expected, "stored due date = SGT generated date + 7");
+    assertEquals(res.created![0].due_date, row!.due_date, "result.created carries the stored date");
+
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const [ey, em, ed] = expected.split("-").map(Number);
+    const label = `${ed} ${MONTHS[em - 1]} ${ey}`;
+
+    // First send has NO key → released (UNSENT), nothing left our side.
+    await emailCreatedInvoices(s.db, res.created ?? [], {});
+    assertEquals(resendCalls.length, 0);
+
+    // The retry path rebuilds from INVOICE_EMAIL_SELECT — it must carry due_date too.
+    const r = await retryUnsentInvoiceEmails(s.db, s.tenantId, "2026-05", { apiKey: "re_test" });
+    assertEquals(r.emailsRetried, 1);
+    assertEquals(resendCalls.length, 1);
+    assertStringIncludes(resendCalls[0].html, "Please pay by");
+    assertStringIncludes(resendCalls[0].html, `>${label}</strong>`);
+  } finally {
+    globalThis.fetch = orig;
+    await s.teardown();
+  }
+});
+
 // ── Multi-class parent ─────────────────────────────────────────────────────
 // A parent with children in TWO classes used to be billed for only one: the
 // invoice was created during the first class and the "already exists" guard

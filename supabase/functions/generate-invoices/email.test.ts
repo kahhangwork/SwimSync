@@ -24,6 +24,7 @@ import {
 const sample: InvoiceEmailData = {
   parentName: "Jane Tan",
   billingMonth: "2026-07",
+  dueDate: "2026-11-26",
   gross: 75,
   credit: 0,
   net: 75,
@@ -85,6 +86,26 @@ Deno.test("html: net=0 shows 'fully covered by credit', no PayNow prompt", () =>
   assert(!html.includes("PayNow"));
   // credit line rendered
   assertStringIncludes(html, "Credit applied");
+});
+
+// Overdue plan Unit 2 (OVERDUE_INVOICES_PLAN.md ⚠ RISK 2): the due date rides the
+// payable branch ONLY, printed from the stored column — an email cannot be recalled.
+Deno.test("html: a payable invoice says 'Please pay by <due date>'", () => {
+  const html = buildInvoiceEmailHtml({ ...sample, dueDate: "2026-11-26" });
+  assertStringIncludes(html, "Please pay by");
+  assertStringIncludes(html, ">26 Nov 2026</strong>");
+});
+
+Deno.test("html: a fully-covered invoice carries no 'Please pay by'", () => {
+  const html = buildInvoiceEmailHtml({ ...sample, gross: 75, credit: 75, net: 0, dueDate: "2026-11-26" });
+  assert(!html.includes("Please pay by"), "nothing to pay → no due date");
+  assert(!html.includes("26 Nov 2026"));
+});
+
+Deno.test("html: a malformed due date prints raw and does not throw", () => {
+  const html = buildInvoiceEmailHtml({ ...sample, dueDate: "soon<b>" });
+  assertStringIncludes(html, "Please pay by");
+  assertStringIncludes(html, "soon&lt;b&gt;");
 });
 
 Deno.test("html: a folded debit renders a +Adjustment line and the total reconciles", () => {
@@ -303,6 +324,7 @@ Deno.test("invoice email is branded as the BUSINESS, not SwimSync", () => {
     parentName: "Alice",
     businessName: "Rivervale Swim Academy",
     billingMonth: "2026-09",
+    dueDate: "2026-11-26",
     gross: 60,
     credit: 0,
     net: 60,
@@ -327,6 +349,7 @@ Deno.test("invoice email falls back to SwimSync when no business is known", () =
   const data = {
     parentName: "Alice",
     billingMonth: "2026-09",
+    dueDate: "2026-11-26",
     gross: 10,
     credit: 0,
     net: 10,
@@ -345,6 +368,7 @@ Deno.test("a business logo renders as an image, and its URL is escaped", () => {
     businessName: 'Evil "Swim"',
     logoUrl: 'https://x.test/l.png?a="b',
     billingMonth: "2026-09",
+    dueDate: "2026-11-26",
     gross: 10, credit: 0, net: 10,
     items: [{ studentName: "K", sessionDate: "2026-09-05", classTitle: "C", amount: 10 }],
   });
