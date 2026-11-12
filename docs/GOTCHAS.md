@@ -36,13 +36,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
-| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380 |
+| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380, 386 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387 |
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359, 384 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
@@ -3173,6 +3173,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     array to `PATH`, so `for path in …` empties the command search path and the next line reads `command not found:
     curl`. A bare `====` (or any word starting `=`) is `=cmd` expansion and aborts the whole command line — which
     silently skipped the rest of a chained branch-fixing command (2026-11-12). Use another name; quote separators.
+    - **Hit again (2026-11-12, §8.164):** `echo =====` between two psql reads aborted the line (`==== not found`) —
+      the day the item was filed. Not promotable to a check (nothing scans a Bash command line); the habit is
+      `echo '---'`.
 
 385. **A red `backend-tests` reading "Integrity check failed for remote specifier" is the CDN, not the commit.** CI run
     43051135249 (on `3adfced`, an admin-only restyle) failed in *Engine tests (Deno)* because a fetched `jsr.io/@std/…`
@@ -3185,3 +3188,21 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       `npm:@supabase/supabase-js@2.110.2` — **never go back to `esm.sh`**; an upgrade edits all 14 imports + the lock —
       and `setup-deno` `cache: true` (keyed on `deno.lock`), so a run only downloads after a lock change or a 7-day-idle
       eviction. Vendoring (zero downloads) was weighed and refused (BACKLOG *Deliberately not doing*).
+
+386. **A new `tenants` column an admin edits is REFUSED until `guard_tenant_columns()` maps it.** The guard is an
+    allowlist (`v_map`): any changed column with no entry raises `tenants.<col> is not mapped to an area` for every
+    `authenticated` caller, so a settings field ships broken while service-role tests and the migration itself pass.
+    Map it to its area (never `"any"`), re-bodied from `pg_get_functiondef` (§7.40), and pin one pgTAP save for the
+    allowed role AND one refusal for a role without it. Caught at plan review, not in prod — `invoice_payment_days`
+    (20261112000100); §7.325 covers the `"nobody"` side of the same guard.
+
+387. **`supabase functions serve` restarts on ANY file written under `supabase/functions/`.** A throwaway probe script
+    saved in a function folder triggered "File change detected … Setting up Edge Functions runtime", and the probe's
+    own request got `503 {"message":"name resolution failed"}` — reading like a broken function. Put probe scripts in
+    the scratchpad and import helpers by absolute path. (2026-11-12, the public-invoice local probe.)
+
+388. **A driver's ABSENCE check must look for the phrase, never a bare word a fixture name can carry.** The overdue
+    driver's "a claimed invoice never reads Overdue" failed on a correct page because the fixture business is named
+    "Overdue Driver Swim". Assert the absence of the rendered phrase (`was due`), and name fixture rows so they cannot
+    contain the words under test. Costs one 100-second run each time; §7.140 is the opposite failure (a false PASS).
+

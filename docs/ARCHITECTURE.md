@@ -1068,6 +1068,21 @@ both workflows) with WIDENINGS applied. A dao exports its row types derived from
   regenerates in the SAME commit (CLAUDE.md, §7.350); never "fix" a type error with `?? ""`, a dropped key, `!inner`
   or a deleted `?.` (plan *The rules*).
 
+### 6ah. A due date is STORED; Overdue is the DATABASE's verdict; one tag helper per app (2026-11-12)
+
+`20261112000100`, `docs/plans/OVERDUE_INVOICES_PLAN.md` (D1–D7, the user's).
+- **`invoices.due_date` is written once, at insert**, by `trg_set_invoice_due_date` through the one formula
+  `invoice_due_date_for()` (SGT generated date + `tenants.invoice_payment_days`) — the backfill used the same function.
+  It moves only through **`change_invoice_due_date()`** (billing edit, outstanding, later, ≤ +365 d, audited in
+  `invoice_due_date_changes`); `pin_invoice_public_fields()` refuses a direct client UPDATE.
+- **Overdue = `is_overdue(invoices)`**, a PostgREST computed field on `app_today()` (so `swimsync.now` pins it);
+  `service_role` holds EXECUTE because `public-invoice` reads it.
+- **The tag** is `lib/invoiceTag.ts` in each app (twins): Paid > Claimed > Overdue > Outstanding; the email prints the
+  stored date only on a payable invoice.
+- ⚠ **Prohibitions:** never compute a due date or compare one to a clock in TypeScript (apps or engine); never
+  re-derive a stored due date when Days to pay changes (D2); never refine `is_overdue` for Claimed (the tag decides);
+  never use a column-level grant to protect `due_date` (§7.292) — the pin trigger is the guard.
+
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 
 `Alert.alert` has **no `react-native-web` implementation** — on the deployed web app

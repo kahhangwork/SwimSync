@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.162** | 2026-11-12 | Owner's reply on prod: genders complete, Little Orcas one-child only; Ang PKG-2026-0002 open | DEPLOYMENT #102 |
 | **8.161** | 2026-11-12 | Prod data tidy: 4 Epic Swim test children deleted, Anya gender set | DEPLOYMENT #101 |
 | **8.160** | 2026-11-11 → 12 | Wave 9 leftovers live: gender required server-side + five small fixes | PRD §7.16, §7.17 · §7.382–385 · DEPLOYMENT #98–100 |
 | **8.159** | 2026-11-11 | Nightly reds were the CI edge runtime; ui-drivers.yml now waits for it and keeps its log | §7.84 · TESTING §5 |

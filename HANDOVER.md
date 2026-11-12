@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-12 (latest) — **CI's CDN flakes fixed, no behaviour change** (§8.163): Edge Functions on
-`npm:` supabase-js (all 5 redeployed), Deno module cache in CI, every function `index.ts` now type-checked. Still waiting
-on the owner: the Ang family's expired S$350 package. Next: bill October._
+_Last updated: 2026-11-12 (latest) — **Invoice due dates + Overdue live** (§8.164): migration, public-invoice v3,
+generate-invoices v39 and both apps, in order; *Change due date* and *Days to pay* in admin. Next: **bill October, one
+tenant first** (check due dates + one email), then read the nightly. Ang S$350 still waits on the owner._
 
-_Previously (§8.162, 2026-11-12) — owner's reply applied on prod: genders complete, Little Orcas one-child only._
+_Previously (§8.163, 2026-11-12) — CI's CDN flakes fixed: Edge Functions on `npm:` supabase-js, Deno cache, every `index.ts` type-checked._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.385** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.388** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -352,6 +352,18 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.164 (2026-11-12) — Invoice due dates + Overdue, live end to end (UI restyle's last leftover)
+
+**Shipped** (`87c280a`…`047ab42`; DEPLOYMENT #104; PRD → invoice generation; ARCHITECTURE §6ah): the user's rule —
+due = SGT generated date + Days to pay (default 14), Overdue from the day after, Claimed beats it — stored at insert,
+decided in SQL, shown on every invoice surface and in the email/WhatsApp text; *Change due date* (later only, audited).
+Planned with `/plan-with-confidence` + `/plan-review` (`docs/plans/OVERDUE_INVOICES_PLAN.md`, 10 ranked risks inlined).
+
+- **Found:** the plan as first drafted would have shipped *Days to pay* unsaveable (§7.386) and a column-grant fix
+  `table_grants` forbids; review caught both. Due labels first hand-built months ("Sep"); now `formatSgDate` ("Sept").
+- **Not done:** no live "Please pay by" email yet (October's first tenant is the proof, plan §3 step 4); no prod
+  Days-to-pay save (no admin login here). Due-date history screen filed (BACKLOG).
+
 ## 8.163 (2026-11-12) — CI's CDN flakes fixed; Edge Function entry points type-checked
 
 **Shipped** (`a4bf508`, `197c7da`; DEPLOYMENT #103): the two red CI runs (`3adfced`, `03256d8`) were CDN bytes failing
@@ -361,15 +373,6 @@ cleared, 10 latent type errors in `package-emails` (§7.106).
 
 - **Not done:** package-emails / credit-note-emails not exercised live (DEPLOYMENT #103); `197c7da` not deployed
   (type-only). Vendoring refused (BACKLOG *Deliberately not doing*). October still unbilled.
-
-## 8.162 (2026-11-12) — Owner's reply applied: genders complete, Little Orcas sells one-child packages only
-
-**Shipped** (no code; DEPLOYMENT #102): one guarded script the user ran — 20 genders set, the 5 active Little Orcas
-products flipped to *One child only*, *10 Lesson Packages (2 Siblings)* retired. Verified after by a read-only query.
-
-- **Found:** PKG-2026-0002 (Ang family, shared) is `active` but expired 2026-10-04 with S$350 / 10 lessons unused.
-  Left untouched (D2); with it expired, D11 lets Adabelle and Alexis each buy a one-child package.
-- **Not done:** the S$350 waits on the owner (extend or refund — message sent by the user). October not yet billed.
 
 ## 9. Next steps (pick with the user)
 
@@ -388,8 +391,8 @@ Everything below is the monthly loop from here on:
    WhatsApp queue (Invoices → *WhatsApp reminders*, with the **Claimed** filter) is the
    chasing tool when a future month needs it.
 2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) and **Little Orcas September is SEALED**
-   (2026-10-12, 0 invoices — all package-funded or settled). Keep October marked as it happens (the coach's
-   **NEEDS MARKING** list is the tracker) and bill it in early November. **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
+   (2026-10-12, 0 invoices — all package-funded or settled). **October is due now** (NEXT BUILD item 1 — one tenant first; the coach's
+   **NEEDS MARKING** list is the tracker). **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
    > apart from students**, so the head-count finally agrees with the number of marks the
    > lesson actually needs, and the **Classes tab lands on the class list** rather than
@@ -424,18 +427,18 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — Wave 9 (BACKLOG Build order)
 
-1. **Little Orcas September is SEALED** (2026-10-12 03:49 SGT, 0 invoices: all 16 children incl. Brayden Ong recorded
-   as written-off settlements; 8 live package draws in the month). Engine v35 ran clean (DEPLOYMENT #81; logs unread).
-   **Wave 9 item 9 SHIPPED 2026-10-13** (§8.150) — first live Generate on engine v36 is the next billing run.
-2. **Little Orcas is one-child only** (2026-11-12, DEPLOYMENT #102) — no shared product on sale. **Open: PKG-2026-0002**
-   (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — **the owner has been asked extend or refund**; act on the
-   reply (an extension is `manual_extension_days`; a refund is the in-app refund, PRD §7.16).
-3. **Gender: done** — 0 prod children blank; the database refuses a new child without one (`20261111000100`).
-4. **UI restyle leftovers — only Overdue is left, PARKED by the user** (2026-11-11: needs a rule for when an invoice is
-   overdue, then a stored due date). The *not re-verified* list in that BACKLOG item is untouched — check before
-   building. Keep the lid open during any local batch (§7.370).
-5. **Read each nightly** (never dispatch it unasked). Red → replay with `run-all-drivers.sh --only <driver> --now
-   '<day> <time>+08'` (TESTING §5). `--only` now tears its fixture down after a PASS; driver writes still need a reset.
+1. **Bill October — ONE tenant first** (`INVOICE_RUNBOOK.md`; first run on engine v39 with due dates). Then, by a bare
+   `scripts/prod-query-ro.sh`, check each new invoice's `due_date = (generated_at AT TIME ZONE 'Asia/Singapore')::date +
+   invoice_payment_days` and open one received email for **"Please pay by"** before generating the rest
+   (`docs/plans/OVERDUE_INVOICES_PLAN.md` §3 step 4). Save *Days to pay* once on prod and re-read it — not yet tried live.
+2. **Read the next nightly before the next APP unit merges** — `047ab42` (Overdue) is the unit it must cover; its own
+   driver is `verify-invoice-overdue` (TESTING §5). Never dispatch it unasked. Red → replay with
+   `run-all-drivers.sh --only <driver> --now '<day> <time>+08'` (TESTING §5).
+3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
+   extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
+
+The UI restyle leftovers are DONE except the *not re-verified* list in that BACKLOG item (check before building).
+The next unbuilt items are BACKLOG's Build order; *Show an invoice's due-date change history* (S) is new.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).

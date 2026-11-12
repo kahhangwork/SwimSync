@@ -1340,3 +1340,15 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     (own code). package-emails / credit-note-emails NOT exercised live — the gateway refuses the publishable key, so the
     first admin package offer or credit note is their first live call. 0 pending migrations; CI 43175192078 green, the
     next (43178301666) a Deno cache hit. `197c7da` (package-emails type-only fix) is NOT deployed — runtime identical.
+
+104. **Deploy record (2026-11-12): invoice due dates + Overdue — migration → 2 functions → both apps, in order**
+    (`docs/plans/OVERDUE_INVOICES_PLAN.md`). Pre-flight (read-only): 0 October invoices, 0 UNSENT/RETRYABLE emails,
+    `pg_cron` not installed (so `cron.job` does not exist — check `pg_extension`). **`20261112000100`** pushed after a
+    `--dry-run` (a piped `yes` is refused by the sandbox as a blind apply); re-bodied `guard_tenant_columns` /
+    `pin_invoice_public_fields` had prod md5 = local pre-change md5 (§7.336); DOWN rehearsed in a transaction (restores
+    both md5s); 0 pending; remote grant dump exactly as planned, no anon; all 25 prod invoices backfilled to
+    generated + 14. **public-invoice v2→v3** first (prod probe with a paid token: 200, `due_date` + `is_overdue:false`),
+    then **generate-invoices v38→v39** ("Please pay by" — first live proof is October's first tenant, plan §3 step 4).
+    Apps `047ab42` (from `1b5d3c8`, `56ca854`): live admin `invoices/page-*.js` carries "Change due date", the app
+    `entry-*.js` "was due"; CI green. **Not done:** a prod Days-to-pay save (no admin login here; proven locally through
+    the real PATCH by `verify-invoice-overdue`).
