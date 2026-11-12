@@ -96,10 +96,11 @@ Deno.serve(async (req) => {
     if (type === "referral_reward") {
       const { data: reward } = await svc
         .from("referral_rewards")
+        // ONE string literal, never `+`-joined: a concatenation widens to `string`,
+        // supabase-js can no longer parse the column list, and the row is typed
+        // GenericStringError — every field access below fails `deno check`.
         .select(
-          "id, tenant_id, parent_id, expires_at, " +
-            "parents(profiles(full_name, email)), " +
-            "tenants(display_name, logo_url, referral_discount_type, referral_discount_value)"
+          "id, tenant_id, parent_id, expires_at, parents(profiles(full_name, email)), tenants(display_name, logo_url, referral_discount_type, referral_discount_value)"
         )
         .eq("id", reward_id)
         .maybeSingle();

@@ -129,6 +129,16 @@ jobs:
           deno-version: v2.x
           cache: true
 
+      # Type-check every Edge Function ENTRY point. The Deno suite only checks
+      # what its tests import, and no test imports an index.ts — so
+      # package-emails/index.ts carried 10 type errors unseen (a `+`-joined
+      # .select() string widened to `string`, typing the row GenericStringError).
+      # The glob picks up a new function without editing this step. Runs before
+      # the stack boots: it needs no database, so it fails fast.
+      - name: Edge Function entry points type-check (deno check)
+        working-directory: supabase/functions/generate-invoices
+        run: deno check ../*/index.ts
+
       # `supabase start` boots the Docker stack (Postgres/Auth/REST/Storage),
       # applies supabase/migrations/*, and seeds supabase/seed.sql.
       - name: Start Supabase stack
