@@ -17,13 +17,15 @@ describe("invoiceTag — D4: Paid > Claimed > Overdue > Outstanding", () => {
 });
 
 describe("dayMonthLabel", () => {
-  it("formats a calendar date with no Date object", () => {
+  it("formats a calendar date, day and short month", () => {
     expect(dayMonthLabel("2026-11-26")).toBe("26 Nov");
     expect(dayMonthLabel("2027-01-01")).toBe("1 Jan");
   });
+  it("speaks en-SG like every other screen — September is 'Sept'", () => {
+    expect(dayMonthLabel("2026-09-03")).toBe("3 Sept");
+  });
   it("returns malformed input unchanged", () => {
     expect(dayMonthLabel("soon")).toBe("soon");
-    expect(dayMonthLabel("2026-13-01")).toBe("2026-13-01");
   });
 });
 

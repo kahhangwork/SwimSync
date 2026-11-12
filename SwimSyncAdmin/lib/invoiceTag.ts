@@ -8,6 +8,8 @@
 // type, so a select that forgot `is_overdue` fails typecheck instead of silently
 // showing Outstanding. Its sibling is SwimSyncApp/lib/invoiceTag.ts.
 
+import { formatSgDate } from "./lessonDates";
+
 export type InvoiceTag = "Paid" | "Claimed" | "Overdue" | "Outstanding";
 
 /** D4: Paid > Claimed > Overdue > Outstanding. Only `is_overdue === true` is
@@ -23,15 +25,12 @@ export function invoiceTag(inv: {
   return "Outstanding";
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** "2026-11-26" → "26 Nov". String parse only — a due date is a calendar DATE,
- *  never a moment, so no Date object (and no timezone) touches it. Malformed
- *  input comes back unchanged. */
+/** "2026-11-26" → "26 Nov" (and September → "Sept", en-SG — the same CLDR month
+ *  every other screen shows, §7.302). A due date is a calendar DATE, never a
+ *  moment, so formatSgDate (UTC-pinned, date-only) — not a clock, not a local
+ *  Date. Malformed input comes back unchanged. */
 export function dayMonthLabel(ymd: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
-  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
-  return m && month ? `${Number(m[3])} ${month}` : ymd;
+  return formatSgDate(ymd, { day: "numeric", month: "short" });
 }
 
 /** The calendar day after a "YYYY-MM-DD" — the earliest date Change due date may

@@ -1592,6 +1592,24 @@ lesson, and there is no override (see the blocking rule above). What differs is 
 - **Automatic** — a daily scheduled run (cron) that generates invoices for the previous month from the business's **run day** onward (`tenants.invoice_run_day`, default the **7th**). It respects the business's **Automatic generation** switch (`tenants.auto_invoice_enabled`), skips a business whose settings cannot be read rather than assume a default *(implemented 2026-09-24)*, and **defers** any parent whose child sits in a class with incomplete attendance rather than writing a partial invoice a later retry could never top up.
 - **Manual (on-demand)** — a superadmin action in the web admin panel that generates invoices for a chosen billing month immediately. It **ignores the automatic switch and the run day** — an explicit instruction must not be held back by a schedule — but is **subject to the same completeness gate**.
 
+*(implemented 2026-11-12, `docs/plans/OVERDUE_INVOICES_PLAN.md`)* **Every invoice has a due date, and
+an unpaid one past it is Overdue.** The due date is the invoice's **Singapore generated date + the
+business's Days to pay** (`tenants.invoice_payment_days`, default **14**, 1–90, set on the Invoices
+page under Billing settings). It is **stored when the invoice is created** and never re-derived, so
+changing Days to pay affects new invoices only. An outstanding invoice is **Overdue from the day after
+its due date** — decided by the database (`is_overdue`, on the business clock), never by a screen.
+The tag precedence everywhere is **Paid > Claimed > Overdue > Outstanding**: a parent who has said
+"I've paid" reads Claimed even when late. Where it shows: the admin's invoice list (a **Due** column,
+the red **Overdue** tag, and the CSV), the dashboard's Outstanding card ("Unpaid · N overdue",
+claimed ones excluded), the parent's invoice list and detail ("Due 26 Nov" / a red "Overdue — was
+due 26 Nov"), the public payment page, the invoice email (**"Please pay by 26 Nov 2026"**, only when
+there is something to pay) and the WhatsApp reminder ("It is due by …" / "It was due on …"; the
+queue offers overdue invoices first). **An admin with Billing: Edit can move one outstanding
+invoice's due date LATER** (row menu → *Change due date*; at most a year further; an optional reason)
+through `change_invoice_due_date()` only — every change is recorded (who, when, old, new, reason)
+and the family is **not** messaged; the new date simply shows. A due date cannot be moved earlier,
+and a paid invoice's cannot be moved at all.
+
 *(implemented)* **Everything in this section happens per business.** The engine runs one
 tenant at a time: it bills, gates, blocks and seals each independently. One school's
 forgotten lesson cannot hold up an unrelated coach's invoices, and one business
@@ -3285,6 +3303,7 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 | **net_amount** | Decimal | Yes | Amount payable (gross minus credit) |
 | **status** | Enum | Yes | outstanding \| paid |
 | **generated_at** | Timestamp | Yes | When invoice was generated |
+| **due_date** | Date | Yes | *(implemented 2026-11-12)* SGT generated date + the business's Days to pay; stored at creation, moved later only by `change_invoice_due_date()` (audited in `invoice_due_date_changes`). Overdue = outstanding and past it (computed, `is_overdue`) |
 | **paid_at** | Timestamp | No | When marked as paid |
 | **paid_marked_by** | UUID (FK) | No | References Profiles.id |
 
@@ -3676,7 +3695,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Add / Edit Child** | Name, DOB, gender, notes fields | Form with save/cancel; validation on required fields (no swimming-ability field — see §5.1). *(implemented 2026-10-13 — Date of Birth is the **browser's date picker** on the web; a native build keeps the `YYYY-MM-DD` text field. Either way the stored value is the same `YYYY-MM-DD`. **Gender is required and never pre-selected** (2026-10-16): the form opens with neither option chosen — including Edit, for a child with no gender on file — and Save is refused until one is. A default had been saved on edits as a gender nobody chose)* |
 | **Child Profile** | Child details card; assignment status; class info if assigned | Show coach name, class day/time/location when assigned |
 | **Attendance History** | Chronological list of lessons with status badges | Color-coded: green = present, grey = absent, blue = trial |
-| **Invoices** | Monthly invoice list with status; **pay or claim from the card itself**; tap for detail | Show gross, credit applied, net amount; red = outstanding. *(implemented 2026-10-13, UI restyle 3.1 — labelled in the parent's words: **Lessons / Package / Credit / To pay**, never Gross / Net; amounts in black, unpaid is an amber **Outstanding** tag, and a claimed invoice's tag reads **Claimed** (blue) while it stays outstanding. **Pay via PayNow** is the one full-width button; **I've paid** is a text link beneath it)* *(implemented — each card names the invoice by its **`INV-YYYY-NNNN` reference**, the same string as the QR and the bank statement, §7.21)*. *(implemented 2026-08-08 — an outstanding card carries **Pay via PayNow** and **I've paid** directly, so the in-app path is no longer slower than the public tokenized page the WhatsApp reminder links to. A claimed card replaces the button with the same acknowledgement line the other two surfaces use, and stays **outstanding** — a claim is a statement, never a status change)* |
+| **Invoices** | Monthly invoice list with status; **pay or claim from the card itself**; tap for detail | Show gross, credit applied, net amount; red = outstanding. *(implemented 2026-10-13, UI restyle 3.1 — labelled in the parent's words: **Lessons / Package / Credit / To pay**, never Gross / Net; amounts in black, unpaid is an amber **Outstanding** tag, and a claimed invoice's tag reads **Claimed** (blue) while it stays outstanding. *(2026-11-12)* Each unpaid card also says **Due 26 Nov**, and past that date the tag is a red **Overdue** with **Overdue — was due 26 Nov**; Claimed still wins. **Pay via PayNow** is the one full-width button; **I've paid** is a text link beneath it)* *(implemented — each card names the invoice by its **`INV-YYYY-NNNN` reference**, the same string as the QR and the bank statement, §7.21)*. *(implemented 2026-08-08 — an outstanding card carries **Pay via PayNow** and **I've paid** directly, so the in-app path is no longer slower than the public tokenized page the WhatsApp reminder links to. A claimed card replaces the button with the same acknowledgement line the other two surfaces use, and stays **outstanding** — a claim is a statement, never a status change)* |
 | **Invoice Detail** | Line items per lesson; credit notes applied; total | PayNow QR button to open payment view. *(implemented — carries the **reference**, selectable so it can be copied into a transfer made outside the QR, §7.21)*. *(implemented 2026-10-13 — the same words and tags as the list; the lesson line counts the invoice's lines ("8 lessons"); Pay sits above the line items; an invoice with no lines says so instead of showing an empty card)* |
 | **Credit Notes** | List of credit notes with reference number and amount | Linked to original invoice; show applied/pending status |
 | **PayNow QR** | The QR of the business that issued the invoice; invoice amount display | Correct QR per **business** *(implemented — changed from per-coach, §7.10)*; amount shown for reference |

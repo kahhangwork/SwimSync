@@ -139,9 +139,10 @@ const exportBtn = page.getByRole("button", { name: "Export CSV" });
 const capBanner = page.getByText(/^Too many invoices to export at once/);
 const cappedNote = page.getByText(/^Showing the first 1000 invoices\./);
 // The table shows no reference, so a row is read as "parent|month|status".
+// Status is cell 8 since the Due column (cell 7) landed (OVERDUE_INVOICES_PLAN.md).
 const rowSig = async () => (await page.locator("tbody tr", { hasText: "InvAdm" }).evaluateAll((trs) =>
   trs.map((tr) => [...tr.querySelectorAll("td")].map((td) => td.innerText.trim()))
-    .map((c) => `${c[0]}|${c[2]}|${c[7]}`))).sort().join(",");
+    .map((c) => `${c[0]}|${c[2]}|${c[8]}`))).sort().join(",");
 // Press Export CSV and report the download (or its absence) within `ms`.
 async function exportAndCatch(ms = 4000) {
   const dl = page.waitForEvent("download", { timeout: ms }).catch(() => null);
@@ -282,7 +283,7 @@ try {
   const file = await exportAndCatch();
   const fileRefs = [...new Set((file?.body ?? "").match(/INV-IA-\d{4}/g) ?? [])].sort().join(",");
   check("Export CSV downloads the visible rows (header + all three references)",
-    !!file && /^﻿?Parent,Students,Month,Gross,Package,Credit,Adjustment,Net,Status,Parent says paid,Reference/.test(file.body) &&
+    !!file && /^﻿?Parent,Students,Month,Gross,Package,Credit,Adjustment,Net,Due,Status,Parent says paid,Reference/.test(file.body) &&
       fileRefs === REFS && /^invoices-\d{4}-\d{2}-\d{2}\.csv$/.test(file.name),
     file ? `${file.name} · ${fileRefs}` : "(no download)");
   check("…with no cap banner", !(await capBanner.isVisible()));

@@ -664,6 +664,20 @@ empty database — §7.62's lesson applied at the driver.
 > both-ends-inclusive enrolment span or the attendance union), so one regression will not turn
 > it red; `lib/attendanceRoster.test.ts` pins the two mechanisms separately;
 
+`verify-invoice-overdue.mjs` (+ `fixtures-invoice-overdue.sql` and its `-teardown.sql`;
+`docs/plans/OVERDUE_INVOICES_PLAN.md` Unit 5, 26 checks) drives due dates and Overdue end to end:
+the admin's Due column and tag from the database's verdict — Overdue, **Claimed beats Overdue**, and
+a **due-today** invoice that is NOT overdue (the boundary at the UI layer) —, *Days to pay* saved
+through the real tenants PATCH and re-read after a reload, *Change due date* (row menu → modal →
+the DB moved, one audit row, the row re-reads Outstanding), a Billing: **View** admin offered no
+Change due date, the dashboard's "Unpaid · 1 overdue", the parent's Billing list, and the
+sessionless public page (overdue, and a claimed one reading Due). **Overdue comes from the fixture,
+never from a pinned future clock**: `--now` replays only the past, so each invoice's `generated_at`
+is backdated from `app_now()` and the trigger derives its due date (§7.360). The fixture's business
+is named "Overdue Driver Swim" — so a check for the ABSENCE of overdue text looks for "was due",
+never the word "Overdue". Proven red: Claimed/Overdue order swapped in the admin's
+`lib/invoiceTag` → 25/26. Requires `supabase functions serve` beside both dev servers.
+
 `verify-payment-collection.mjs` (+ `fixtures-payment-collection.sql` and its
 `-teardown.sql`) drives fee-free payment collection (PRD §7.21) end to end (20 checks):
 the admin's PayNow settings round-trip incl. `+65` normalization, the WhatsApp button's

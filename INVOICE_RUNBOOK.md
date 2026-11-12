@@ -160,6 +160,11 @@ Billing is based on **actual attendance**, so make sure last month is complete:
   the app (`swimsync.sg`).
 - **As payments arrive in your bank**, mark each invoice **Paid**:
   Invoices → find the row → **Mark Paid**. This stamps the paid time.
+- **Due dates are set at generation** *(2026-11-12)*: generated date + **Days to pay**
+  (Billing settings, default 14). The email says "Please pay by …"; the day after, an
+  unpaid invoice reads **Overdue**. To give a family more time: the row's **…** →
+  **Change due date** (later only; recorded; the family is not messaged). Changing
+  Days to pay never moves an invoice already generated.
 
 ---
 

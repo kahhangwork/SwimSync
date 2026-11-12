@@ -1,6 +1,6 @@
 # Overdue invoices — due date, Overdue status, per-invoice extension
 
-_Drafted 2026-11-12, hardened by /plan-review the same day. BACKLOG → *UI restyle leftovers* → **Overdue** (old S7). Ships BEFORE October is billed (user)._
+_Drafted 2026-11-12, hardened by /plan-review the same day. **Built 2026-11-12:** Units 0–2 live on prod (`20261112000100`; public-invoice v3, generate-invoices v39); Units 3–5 committed (`1b5d3c8`, `56ca854`, Unit 5). BACKLOG → *UI restyle leftovers* → **Overdue** (old S7). Ships BEFORE October is billed (user)._
 
 ## 1. Decisions (user, 2026-11-12) — not to be re-opened
 
@@ -86,7 +86,7 @@ _Ran 2026-11-12: all four ticked._
    - `REVOKE ALL … FROM PUBLIC, anon, authenticated, service_role; GRANT EXECUTE … TO authenticated;`.
    - `changed_at` comes from the column default. If the body itself ever writes a stamp, mark the line `-- clock: stamp` and add the function to the frozen census in the same commit.
 
-pgTAP `supabase/tests/invoice_due_date.test.sql`. Copy a pinned file's header verbatim (`set_config('swimsync.now', '… +08', true)` as its first statement, G1). Write `SELECT plan(N)` with N equal to the assertion count, and record N here: ___.
+pgTAP `supabase/tests/invoice_due_date.test.sql`. Copy a pinned file's header verbatim (`set_config('swimsync.now', '… +08', true)` as its first statement, G1). Write `SELECT plan(N)` with N equal to the assertion count, and record N here: **49**.
 - Default 14 on a new tenant. A tenant set to 7 gives SGT generated date + 7.
 - ⚠ RISK 5 MITIGATION, SGT boundary with differing UTC and SGT dates:
   - generated `2026-12-01 00:30+08` (= `2026-11-30 16:30Z`) → due `2026-12-15`;
@@ -144,7 +144,7 @@ Gate for Unit 1:
 - Engine test in `core.test.ts`: a tenant set to 7 gives `created[0].due_date` = SGT today + 7, read from the DB row. The test restores the tenant's value in `finally` (§7.15).
 - Retry/resend test: an UNSENT invoice rebuilt by `rebuildInvoices` carries `due_date`.
 - Prove the email test red by moving the line outside the branch.
-- Run `test.sh` **twice**; both green with the same count, recorded: ___.
+- Run `test.sh` **twice**; both green with the same count, recorded: **313 / 313**.
 - ⚠ Before deploying: write one payable and one fully-covered `buildInvoiceEmailHtml` output to the scratchpad and open both by eye.
 
 **public-invoice**

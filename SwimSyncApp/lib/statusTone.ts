@@ -13,10 +13,11 @@
 // each app's components/ui/Tag, because the app's Tailwind does not scan lib/ (a
 // class string here would be purged with no error — §7.191's trap).
 //
-// "Due" vs "Overdue": there is NO due-date source (no due_date column, none in
-// the PRD — checked 2026-10-11), so an unpaid invoice is "Outstanding" = Due,
-// amber. "Overdue" is a key for the day one exists; never derive it in a client
-// from a month or an invoice's age — that is a business rule, not a style.
+// "Due" vs "Overdue": an unpaid invoice is "Outstanding" = Due, amber, until the
+// day after its stored due date (invoices.due_date, 20261112000100), when it is
+// "Overdue", red. That verdict is the DATABASE's (the is_overdue computed field);
+// the word comes from lib/invoiceTag — never derive it in a client from a month
+// or an invoice's age. That is a business rule, not a style.
 //
 // Matching is on the word before any qualifier — "Cancelled (Rain)" and
 // "Void · duplicate" take Cancelled's and Void's tones. An unknown word is

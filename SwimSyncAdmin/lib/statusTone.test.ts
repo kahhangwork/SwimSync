@@ -100,22 +100,35 @@ function badgeLiterals(): string[] {
   });
 }
 
+/** Every word lib/invoiceTag can return — both apps render invoice tags through
+ *  `status={invoiceTag(…)}`, which holds no literal for the scan above to see
+ *  (OVERDUE_INVOICES_PLAN.md). Read from BOTH twins' `export type InvoiceTag`. */
+function invoiceTagWords(): string[] {
+  const ROOT = join(__dirname, "..", "..");
+  return ["SwimSyncAdmin/lib/invoiceTag.ts", "SwimSyncApp/lib/invoiceTag.ts"].flatMap((f) => {
+    const m = readFileSync(join(ROOT, f), "utf8").match(/export type InvoiceTag = ([^;]+);/);
+    return m ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : [];
+  });
+}
+
 describe("every rendered status word has a decided tone", () => {
   const enums = ["invoice_status", "assignment_status", "claim_status"].map((n) => [n, enumValues(n)] as const);
-  const literals = badgeLiterals();
+  const literals = [...badgeLiterals(), ...invoiceTagWords()];
 
   it("found the sources (guards a silent zero-row pass)", () => {
     for (const [n, v] of enums) expect([n, v.length >= 2]).toEqual([n, true]);
     expect(Object.keys(STATUS_LABELS).length).toBeGreaterThanOrEqual(7);
     // Outstanding, Paid, Claimed, Disabled, Active, Inactive, Applied, Available, Converted, Pending …
     expect(new Set(literals).size).toBeGreaterThanOrEqual(10);
+    // Both twins read, four words each — Overdue among them.
+    expect(invoiceTagWords().filter((w) => w === "Overdue").length).toBe(2);
   });
 
   const words = new Set<string>([
     ...enums.flatMap(([, v]) => v.map(cap)),
     ...Object.values(STATUS_LABELS),
     ...Object.values(CHECKS).flat().map(cap),
-    ...badgeLiterals(),
+    ...literals,
     // Billing months (BillingMonthsCard passes its own tone, but the word still has one).
     "Closed", "Open", "Not billed yet", "Not run yet", "Nothing to bill",
     // The parent app's attendance dash, and the coach marking card's tag (UI restyle 2.2).
