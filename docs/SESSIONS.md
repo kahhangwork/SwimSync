@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.161** | 2026-11-12 | Prod data tidy: 4 Epic Swim test children deleted, Anya gender set | DEPLOYMENT #101 |
 | **8.160** | 2026-11-11 → 12 | Wave 9 leftovers live: gender required server-side + five small fixes | PRD §7.16, §7.17 · §7.382–385 · DEPLOYMENT #98–100 |
 | **8.159** | 2026-11-11 | Nightly reds were the CI edge runtime; ui-drivers.yml now waits for it and keeps its log | §7.84 · TESTING §5 |
 | **8.158** | 2026-10-17 | Students list opens on Active, in class order; one Monday-first weekday order | PRD §7.4 · §7.379–381 · DEPLOYMENT #97 |

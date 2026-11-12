@@ -1332,3 +1332,11 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `RAISE NOTICE`**: the success output is `rows: []`, so confirm with `scripts/prod-query-ro.sh`. After: **0 children
     without a gender on prod**, Little Orcas sells no shared product. PKG-2026-0002 (Ang, shared) untouched (D2) —
     still `active`, expired 2026-10-04 with S$350 / 10 lessons left; the owner has been asked extend-or-refund.
+103. **Deploy record (2026-11-12): all 5 Edge Functions redeployed on `npm:@supabase/supabase-js@2.110.2` — no
+    behaviour change.** `a4bf508` swapped every `esm.sh/@supabase/supabase-js@2` import (§7.385). Before: Deno suite
+    306/306 twice; all 5 booted on the local edge runtime. Deployed one at a time: generate-invoices v38, package-emails
+    v8, public-invoice v2, public-package v3, credit-note-emails v7 (prod may have run a newer 2.x from the floating
+    `@2`; same major). Live: public-invoice / public-package `{"error":"not_found"}`, generate-invoices `Unauthorized`
+    (own code). package-emails / credit-note-emails NOT exercised live — the gateway refuses the publishable key, so the
+    first admin package offer or credit note is their first live call. 0 pending migrations; CI 43175192078 green, the
+    next (43178301666) a Deno cache hit. `197c7da` (package-emails type-only fix) is NOT deployed — runtime identical.

@@ -1597,6 +1597,9 @@ in auto mode and its email-retry skip (§7.265, §7.266). No run-day test writes
   `database.types.ts`, then `scripts/check-db-overrides.sh` (NULLABLE_RPC_ARGS: function exists, none STRICT, params
   real; TRIGGER_FILLED_COLUMNS: NOT NULL + an enabled BEFORE INSERT ROW trigger with no WHEN assigns it, comments/
   strings/`:= NULL` ignored; strict block grammar). **Run it locally before a push** — CI runs after Vercel.
+- **Edge Function entry points** (CI backend-tests, before `supabase start`, 2026-11-12): `deno check ../*/index.ts`
+  from `generate-invoices/`. The Deno suite only checks what tests import, and none imports an `index.ts` (§7.106).
+  The glob covers a new function. Proven red on the pre-fix `package-emails/index.ts`.
 - **`cmp`** of the two types files and **G6** `scripts/check-db-any.sh` (repo-invariants): per-file `any` count =
   allowance; never above the push base; `database.types` imported as types only; ts-directives counted on raw text.
 - **Runtime identity** `scripts/check-runtime-identical.sh` (CI job `runtime-identity`): every `types(…)` commit in a

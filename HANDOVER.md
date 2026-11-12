@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-12 (latest) — **owner's reply applied on prod, no code** (§8.162): 0 children without a gender,
-every Little Orcas product one-child, the 2-Siblings product retired. Waiting on the owner: the Ang family's expired
-S$350 package (extend or refund). Next: bill October._
+_Last updated: 2026-11-12 (latest) — **CI's CDN flakes fixed, no behaviour change** (§8.163): Edge Functions on
+`npm:` supabase-js (all 5 redeployed), Deno module cache in CI, every function `index.ts` now type-checked. Still waiting
+on the owner: the Ang family's expired S$350 package. Next: bill October._
 
-_Previously (§8.161, 2026-11-12) — prod data tidy: 4 Epic Swim test children deleted, Anya set female._
+_Previously (§8.162, 2026-11-12) — owner's reply applied on prod: genders complete, Little Orcas one-child only._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.378** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.385** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -352,6 +352,16 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.163 (2026-11-12) — CI's CDN flakes fixed; Edge Function entry points type-checked
+
+**Shipped** (`a4bf508`, `197c7da`; DEPLOYMENT #103): the two red CI runs (`3adfced`, `03256d8`) were CDN bytes failing
+`deno.lock`, not code. Fix: Edge Functions import `npm:@supabase/supabase-js@2.110.2` (all 5 redeployed) and CI caches
+Deno modules — the next run was a cache hit (§7.385). A new CI `deno check` over every `index.ts` caught, and the fix
+cleared, 10 latent type errors in `package-emails` (§7.106).
+
+- **Not done:** package-emails / credit-note-emails not exercised live (DEPLOYMENT #103); `197c7da` not deployed
+  (type-only). Vendoring refused (BACKLOG *Deliberately not doing*). October still unbilled.
+
 ## 8.162 (2026-11-12) — Owner's reply applied: genders complete, Little Orcas sells one-child packages only
 
 **Shipped** (no code; DEPLOYMENT #102): one guarded script the user ran — 20 genders set, the 5 active Little Orcas
@@ -360,16 +370,6 @@ products flipped to *One child only*, *10 Lesson Packages (2 Siblings)* retired.
 - **Found:** PKG-2026-0002 (Ang family, shared) is `active` but expired 2026-10-04 with S$350 / 10 lessons unused.
   Left untouched (D2); with it expired, D11 lets Adabelle and Alexis each buy a one-child package.
 - **Not done:** the S$350 waits on the owner (extend or refund — message sent by the user). October not yet billed.
-
-## 8.161 (2026-11-12) — Prod data tidy: Epic Swim test children gone, owner asked for genders + package kind
-
-**Shipped** (no code; DEPLOYMENT #101): the 4 Epic Swim test children and their enrolments deleted by one guarded
-script the user ran; Anya (Small) set to female. Blank genders 25 → 20.
-
-- **Found:** the inactive "duplicate" Brayden Ong holds real September billing history — not deletable, not mergeable
-  (DEPLOYMENT #101). All 6 active Little Orcas products are still shared (0 one-child).
-- **Not done:** the inactive Brayden left as is (recommended; not deleted); the 19 genders and any
-  one-child flip wait on the owner's reply (message sent by the user). The 2026-11-12 nightly had not appeared yet.
 
 ## 9. Next steps (pick with the user)
 

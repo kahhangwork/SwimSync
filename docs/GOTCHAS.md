@@ -1069,6 +1069,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - **Rule:** keep a `.select()` on one line, or use a template literal with no interpolation.
       Do not "fix" a `GenericStringError` by casting the row — that is §7.76 (a renamed field
       reads blank forever). (2026-08-09.)
+    - **Hit again (2026-11-12, §8.163):** `package-emails/index.ts`'s referral-reward select was `+`-joined — 10
+      errors, unseen since it shipped, because no test imports an Edge Function `index.ts`, so nothing type-checked
+      it. **Promoted to a CHECK:** CI `backend-tests` runs `deno check ../*/index.ts` (TESTING §5, Wave 8 list).
 
 107. **`loginExpo` SHORT-CIRCUITS WHEN THE PAGE IS ALREADY SIGNED IN, SO A DRIVER THAT
     CHANGES PERSONA KEEPS THE PREVIOUS USER AND REPORTS SUCCESS.** `authed()` checks only "on
@@ -3176,3 +3179,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     file did not match `deno.lock`'s hash; the next four runs on the same lock file were green. Read the failing STEP
     before the diff: if it is this error and the commit touches no Deno code, re-run that job — never "fix" it by
     regenerating the lock file, which would accept whatever the CDN served. (2026-11-11, noticed only at /update-docs.)
+    - **Hit again (2026-11-12, §8.163):** CI 43067273482 on `03256d8` (docs only) — `esm.sh/tslib@2.8.1` this time.
+      esm.sh REBUILDS its bundles, so one URL can serve new bytes; jsr/npm files never change (a miss there is a bad
+      download). **Promoted to a fix** (`a4bf508`, DEPLOYMENT #103): Edge Functions import
+      `npm:@supabase/supabase-js@2.110.2` — **never go back to `esm.sh`**; an upgrade edits all 14 imports + the lock —
+      and `setup-deno` `cache: true` (keyed on `deno.lock`), so a run only downloads after a lock change or a 7-day-idle
+      eviction. Vendoring (zero downloads) was weighed and refused (BACKLOG *Deliberately not doing*).
