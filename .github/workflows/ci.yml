@@ -119,10 +119,15 @@ jobs:
         with:
           version: 2.119.0
 
+      # cache: reuse the module cache from the last run on this exact deno.lock
+      # (the action keys it on a hash of the lock files), so most runs never
+      # touch a CDN. Two reds were CDN bytes failing the lock's integrity check,
+      # not code (§7.385). Deno still verifies cached files against the lock.
       - name: Install Deno
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+          cache: true
 
       # `supabase start` boots the Docker stack (Postgres/Auth/REST/Storage),
       # applies supabase/migrations/*, and seeds supabase/seed.sql.

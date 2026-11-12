@@ -21,7 +21,7 @@
 // OFFER is money for lessons that may never run. A suspended business must not
 // sell a prepayment, so a suspended tenant is the uniform not-found here.
 
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 
 const TOKEN_RE = /^[0-9a-f]{32}$/;
 

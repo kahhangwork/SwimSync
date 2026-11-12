@@ -25,7 +25,7 @@
 //  • Dates are formatted from the stored YYYY-MM-DD string WITHOUT constructing a
 //    Date (no UTC drift — the same discipline the apps use for SG-local dates).
 
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import type { CreatedInvoice, CreatedInvoiceItem } from "./core.ts";
 
 const MONTHS_LONG = [

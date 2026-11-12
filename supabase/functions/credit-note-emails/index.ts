@@ -31,7 +31,7 @@
 // {sent:0} and a reason. An attendance save, and the credit note itself, must never
 // look failed because an email was.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.110.2";
 import {
   fetchBalances,
   fetchTenantSuspended,

@@ -8,7 +8,7 @@
 //   GET  ?token=<32 hex>            → the public invoice shape
 //   POST {"token": "...", "action": "claim"} → parent's "I've paid" stamp
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.110.2";
 import { claimInvoice, lookupInvoice } from "./core.ts";
 
 const ALLOWED_ORIGINS = new Set([

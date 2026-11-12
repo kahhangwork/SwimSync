@@ -11,7 +11,7 @@
 // nothing about the path that actually fires. core.test.ts drives the
 // handle_attendance_update TRIGGER and throws if it produced no row.
 
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import {
   buildCreditNoteHtml,
   buildCreditNoteSubject,

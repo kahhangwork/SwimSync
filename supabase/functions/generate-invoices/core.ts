@@ -24,7 +24,7 @@
 // the rest permanently. Better to bill nothing and retry than to bill wrong.
 // Both modes apply available credit FIFO via the credit_applications ledger.
 
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import {
   APP_TIMEZONE,
   clampRunDay,

@@ -28,7 +28,7 @@
 // mirror is pinned by orderingGuard.test.ts's cross-check against the real engine
 // verdict. If you change the window clamps in core.ts, change them here too.
 
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import {
   APP_TIMEZONE,
   dateInTimeZone,

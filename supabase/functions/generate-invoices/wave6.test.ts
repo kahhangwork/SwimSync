@@ -13,7 +13,7 @@
 // today are never "unmarked", so the guard stays out of these engine tests.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import { generateInvoices } from "./core.ts";
 import { newScenario, monthEnded, getInvoice, checkInvariants, type Scenario } from "./test-helpers.ts";
 

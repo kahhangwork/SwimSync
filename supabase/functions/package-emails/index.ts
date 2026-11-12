@@ -19,7 +19,7 @@
 // Best-effort by contract: every failure returns 200 with {sent:false} —
 // a purchase or confirmation must never look failed because an email was.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.110.2";
 import {
   authorizePackageEmail,
   buildConfirmedHtml,

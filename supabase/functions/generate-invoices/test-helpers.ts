@@ -10,7 +10,7 @@
 import {
   createClient,
   type SupabaseClient,
-} from "https://esm.sh/@supabase/supabase-js@2";
+} from "npm:@supabase/supabase-js@2.110.2";
 import {
   APP_TIMEZONE,
   dateInTimeZone,

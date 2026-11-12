@@ -17,7 +17,7 @@
 //     service_role INSERT explicitly (⚠ RISK 1) and the tests assert the row
 //     EXISTS, not merely that billing returned.
 
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import type { GenerateOptions, GenerateResult } from "./core.ts";
 
 /** Engine statuses that mean "did not attempt this month". Exported as the ONE
