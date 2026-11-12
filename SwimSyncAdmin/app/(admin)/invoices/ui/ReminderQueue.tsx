@@ -10,6 +10,7 @@
 // ⚠ RISK 7: the stamp means "chat opened", never "sent". Copy below says so.
 
 import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
+import { dayMonthLabel } from "@/lib/invoiceTag";
 
 export interface QueueRow {
   id: string;
@@ -21,6 +22,9 @@ export interface QueueRow {
   wa_number: string | null;
   /** What the parent typed, for the advisory note on unusable numbers. */
   raw_phone: string | null;
+  due_date: string;
+  /** The database's verdict; overdue rows are offered first. */
+  is_overdue: boolean;
 }
 
 export function ReminderQueue({
@@ -40,10 +44,13 @@ export function ReminderQueue({
     id: r.id,
     parentName: r.parent_name,
     subtitle: r.student_names,
-    meta: `S$${r.net_amount.toFixed(2)} · ${r.reference_number}`,
+    meta: `S$${r.net_amount.toFixed(2)} · ${r.reference_number} · ${
+      r.is_overdue ? `overdue — was due ${dayMonthLabel(r.due_date)}` : `due ${dayMonthLabel(r.due_date)}`
+    }`,
     waNumber: r.wa_number,
     rawPhone: r.raw_phone,
     openedStamp: r.reminded_at,
+    priority: r.is_overdue ? 1 : 0,
   }));
 
   return (

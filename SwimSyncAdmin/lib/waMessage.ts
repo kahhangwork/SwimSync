@@ -12,6 +12,7 @@
 // broken link (design RISK: visible degradation).
 
 import { normalizeSgPhone } from "./sgPhone";
+import { dayMonthLabel } from "./invoiceTag";
 
 /** "6591234567" for wa.me, or null when the number can't carry a chat. */
 export function toWaNumber(input: string | null | undefined): string | null {
@@ -29,6 +30,10 @@ export interface ReminderMessageOpts {
   /** The tokenized public invoice page URL (carries the QR). */
   link: string;
   reference: string;
+  /** "YYYY-MM-DD" — the stored invoices.due_date. */
+  dueDate: string;
+  /** The database's is_overdue verdict — never derived from dueDate here. */
+  isOverdue: boolean;
 }
 
 const MONTHS = [
@@ -49,10 +54,14 @@ export function monthLabel(billingMonth: string): string {
 export function buildReminderMessage(opts: ReminderMessageOpts): string {
   const children =
     opts.studentNames.length > 0 ? opts.studentNames.join(", ") : "your child";
+  // D7 (OVERDUE_INVOICES_PLAN.md): the message names the date.
+  const due = opts.isOverdue
+    ? `It was due on ${dayMonthLabel(opts.dueDate)}.`
+    : `It is due by ${dayMonthLabel(opts.dueDate)}.`;
   return (
     `Hi! This is a payment reminder from ${opts.businessName}.\n\n` +
     `Invoice for ${children} — ${monthLabel(opts.billingMonth)}: ` +
-    `$${opts.amount.toFixed(2)} (ref ${opts.reference}).\n\n` +
+    `$${opts.amount.toFixed(2)} (ref ${opts.reference}). ${due}\n\n` +
     `You can view the invoice and pay by PayNow here:\n${opts.link}\n\n` +
     `Thank you!`
   );

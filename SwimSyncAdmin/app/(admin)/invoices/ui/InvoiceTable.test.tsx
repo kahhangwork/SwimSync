@@ -69,6 +69,8 @@ function inv(over: Partial<InvoiceRow> = {}): InvoiceRow {
     public_token: "tok-1",
     reminded_at: null,
     paid_claimed_at: null,
+    due_date: "2026-11-26",
+    is_overdue: false,
     wa_number: "6591234567",
     raw_phone: "91234567",
     student_name_list: ["Ben Tan"],
@@ -87,9 +89,11 @@ function setup(over: Partial<Props> = {}) {
     sort: { key: null, dir: "asc", toggle: vi.fn(), apply: (r) => [...r] },
     markingPaid: null,
     copiedLink: null,
+    canChangeDue: true,
     onMarkPaid: vi.fn(),
     onWhatsApp: vi.fn(),
     onCopyLink: vi.fn(),
+    onChangeDue: vi.fn(),
     ...over,
   };
   const { unmount } = render(<InvoiceTable {...props} />);
@@ -129,8 +133,8 @@ describe("InvoiceTable", () => {
       visible: [inv({ id: "inv-1" }), inv({ id: "inv-2", status: "paid" })],
     });
     const [o, p] = bodyRows();
-    expect(cells(o)[7].textContent).toBe("Outstanding");
-    expect(cells(p)[7].textContent).toBe("Paid");
+    expect(cells(o)[8].textContent).toBe("Outstanding"); // [7] is Due
+    expect(cells(p)[8].textContent).toBe("Paid");
   });
 
   it("a claimed outstanding invoice reads Claimed, with the parent's date beneath", () => {
@@ -253,5 +257,47 @@ describe("InvoiceTable", () => {
     unmount();
     setup({ visible: [] });
     expect(screen.getByText("No invoices found.")).toBeTruthy();
+  });
+
+  // ── Overdue (OVERDUE_INVOICES_PLAN.md Unit 3) ────────────────────────────
+  it("an overdue row reads Overdue; a claimed one still reads Claimed (D4)", () => {
+    setup({
+      visible: [
+        inv({ id: "a", parent_name: "Late Lee", is_overdue: true }),
+        inv({ id: "b", parent_name: "Claimed Chan", is_overdue: true, paid_claimed_at: STAMP }),
+        inv({ id: "c", parent_name: "Fresh Fong", is_overdue: false }),
+      ],
+    });
+    const rowOf = (name: string) => screen.getByText(name).closest("tr")!;
+    expect(within(rowOf("Late Lee")).queryByText("Overdue")).not.toBeNull();
+    expect(within(rowOf("Claimed Chan")).queryByText("Claimed")).not.toBeNull();
+    expect(within(rowOf("Claimed Chan")).queryByText("Overdue")).toBeNull();
+    expect(within(rowOf("Fresh Fong")).queryByText("Outstanding")).not.toBeNull();
+  });
+
+  it("the Due column shows the stored date, day and month", () => {
+    setup({ visible: [inv({ due_date: "2026-12-03" })] });
+    expect(screen.getByText("3 Dec")).toBeTruthy();
+  });
+
+  it("Change due date sits in the row menu, acts on THAT row, and only for billing edit", () => {
+    const onChangeDue = vi.fn();
+    const { unmount } = setup({
+      onChangeDue,
+      visible: [inv({ id: "a", parent_name: "Ann" }), inv({ id: "b", parent_name: "Bo" })],
+    });
+    const row = screen.getByText("Bo").closest("tr")!;
+    fireEvent.click(within(row).getByRole("button", { name: "More actions" }));
+    fireEvent.click(within(row).getByRole("button", { name: "Change due date" }));
+    expect(onChangeDue).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }));
+    unmount();
+
+    setup({ canChangeDue: false });
+    expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
+  });
+
+  it("a paid row offers no Change due date", () => {
+    setup({ visible: [inv({ status: "paid" })] });
+    expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
   });
 });

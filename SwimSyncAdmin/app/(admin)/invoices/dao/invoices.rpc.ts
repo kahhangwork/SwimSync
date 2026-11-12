@@ -38,3 +38,12 @@ export const writeOffParentBalance = (
 // page's old direct UPDATE wrote neither audit field.
 export const confirmInvoicePaid = (invoiceId: string) =>
   supabase.rpc("confirm_invoice_paid", { p_invoice_id: invoiceId });
+
+// The ONLY due-date writer (20261112000100): billing edit, outstanding, later
+// only, audited. A direct UPDATE of due_date is refused by the pin trigger.
+export const changeInvoiceDueDate = (invoiceId: string, newDate: string, reason: string) =>
+  supabase.rpc("change_invoice_due_date", {
+    p_invoice_id: invoiceId,
+    p_new_date: newDate,
+    p_reason: reason,
+  });

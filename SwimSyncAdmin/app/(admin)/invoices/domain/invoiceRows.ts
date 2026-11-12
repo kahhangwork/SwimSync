@@ -41,6 +41,8 @@ export function mapInvoiceRow(inv: InvoiceSelectRow): InvoiceRow {
     public_token: inv.public_token ?? "",
     reminded_at: inv.reminded_at ?? null,
     paid_claimed_at: inv.paid_claimed_at ?? null,
+    due_date: inv.due_date,
+    is_overdue: inv.is_overdue === true,
     wa_number: toWaNumber(inv.parents?.profiles?.phone ?? null),
     raw_phone: inv.parents?.profiles?.phone ?? null,
     student_name_list: nameList,

@@ -41,6 +41,9 @@ export interface WaQueueRow {
   rawPhone?: string | null;
   /** A durable "chat opened" date (invoices persist one; offers pass null). */
   openedStamp?: string | null;
+  /** Higher sorts first, before the opened-stamp order (invoices: overdue = 1).
+   *  Omitted = 0, so callers that pass none keep the order they had. */
+  priority?: number;
 }
 
 export function WhatsAppQueue({
@@ -64,6 +67,8 @@ export function WhatsAppQueue({
   const ordered = useMemo(
     () =>
       [...rows].sort((a, b) => {
+        const pr = (b.priority ?? 0) - (a.priority ?? 0);
+        if (pr !== 0) return pr;
         const as = a.openedStamp ?? null;
         const bs = b.openedStamp ?? null;
         if (as === null && bs !== null) return -1;

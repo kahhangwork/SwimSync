@@ -13,6 +13,8 @@ import {
   type TableSort,
 } from "@/components/Table";
 import { Button } from "@/components/Button";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
+import { dayMonthLabel, invoiceTag } from "@/lib/invoiceTag";
 import { DMY, ROW_LIMIT } from "../constants";
 import type { InvoiceRow, SearchField } from "../types";
 import { formatBillingMonth } from "../domain/invoiceRows";
@@ -27,9 +29,11 @@ export function InvoiceTable({
   sort,
   markingPaid,
   copiedLink,
+  canChangeDue,
   onMarkPaid,
   onWhatsApp,
   onCopyLink,
+  onChangeDue,
 }: {
   loading: boolean;
   loadError: string | null;
@@ -40,9 +44,12 @@ export function InvoiceTable({
   sort: TableSort<InvoiceRow>;
   markingPaid: string | null;
   copiedLink: string | null;
+  /** Billing EDIT only — the RPC refuses anyone else; this keeps the page honest. */
+  canChangeDue: boolean;
   onMarkPaid: (id: string) => void;
   onWhatsApp: (inv: InvoiceRow) => void;
   onCopyLink: (inv: InvoiceRow) => void;
+  onChangeDue: (inv: InvoiceRow) => void;
 }) {
   return (
     <>
@@ -72,19 +79,20 @@ export function InvoiceTable({
           <Th sort={sort} sortKey="package_applied" firstDir="desc" className="text-right">Package</Th>
           <Th sort={sort} sortKey="credit_applied" firstDir="desc" className="text-right">Credit</Th>
           <Th sort={sort} sortKey="net_amount" firstDir="desc" className="text-right">Net</Th>
+          <Th sort={sort} sortKey="due_date">Due</Th>
           <Th sort={sort} sortKey="status">Status</Th>
           <Th>Action</Th>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-ink-muted py-8" colSpan={9}>
+              <Td className="text-center text-ink-muted py-8" colSpan={10}>
                 Loading…
               </Td>
             </Tr>
           ) : visible.length === 0 ? (
             <Tr>
-              <Td className="text-center text-ink-muted py-8" colSpan={9}>
+              <Td className="text-center text-ink-muted py-8" colSpan={10}>
                 No invoices found.
               </Td>
             </Tr>
@@ -110,19 +118,15 @@ export function InvoiceTable({
                 <Td className="text-right tabular-nums font-semibold text-ink">
                   S${inv.net_amount.toFixed(2)}
                 </Td>
+                {/* A calendar DATE, not a moment — no timezone to pin. */}
+                <Td className="whitespace-nowrap tabular-nums">{dayMonthLabel(inv.due_date)}</Td>
                 <Td>
                   {/* Claimed is its own state, not a footnote under Outstanding
                       (DESIGN.md's Claimed Is Its Own State Rule). The stored
-                      status stays outstanding until Mark Paid (PRD §7.21). */}
-                  <StatusBadge
-                    status={
-                      inv.status !== "outstanding"
-                        ? "Paid"
-                        : inv.paid_claimed_at
-                          ? "Claimed"
-                          : "Outstanding"
-                    }
-                  />
+                      status stays outstanding until Mark Paid (PRD §7.21).
+                      Overdue is the database's verdict; the precedence (Claimed
+                      beats Overdue, D4) is lib/invoiceTag's, nowhere else. */}
+                  <StatusBadge status={invoiceTag(inv)} />
                   {inv.status === "outstanding" && inv.paid_claimed_at && (
                     <div
                       className="text-label text-status-info-text mt-0.5"
@@ -180,6 +184,13 @@ export function InvoiceTable({
                         <LinkIcon className="h-3.5 w-3.5" />
                         {copiedLink === inv.id ? "Copied" : "Link"}
                       </Button>
+                      <RowMenu>
+                        {canChangeDue && (
+                          <RowMenuItem onClick={() => onChangeDue(inv)}>
+                            Change due date
+                          </RowMenuItem>
+                        )}
+                      </RowMenu>
                     </div>
                   )}
                   {inv.status === "outstanding" && inv.reminded_at && (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
+import { invoiceTag } from "@/lib/invoiceTag";
 import {
   countMetrics,
   loadOutstandingInvoices,
@@ -25,6 +26,7 @@ export function useDashboard() {
         { count: totalCoaches },
         { count: totalClasses },
         { count: inactiveStudents },
+        { count: overdueInvoices },
       ] = await countMetrics();
 
       setMetrics({
@@ -32,6 +34,7 @@ export function useDashboard() {
         inactiveStudents: inactiveStudents ?? 0,
         unassignedCount: unassignedCount ?? 0,
         outstandingInvoices: outstandingInvoices ?? 0,
+        overdueInvoices: overdueInvoices ?? 0,
         totalCreditNotes: totalCreditNotes ?? 0,
         totalCoaches: totalCoaches ?? 0,
         totalClasses: totalClasses ?? 0,
@@ -62,6 +65,7 @@ export function useDashboard() {
           billing_month: inv.billing_month,
           net_amount: Number(inv.net_amount),
           parent_name: inv.parents?.profiles?.full_name ?? "—",
+          tag: invoiceTag(inv),
         }))
       );
 

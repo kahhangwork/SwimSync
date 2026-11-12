@@ -21,6 +21,8 @@ import { BillingMonthsCard } from "./ui/BillingMonthsCard";
 import { ConfirmGenerateModal } from "./ui/ConfirmGenerateModal";
 import { BlockedLessonsModal } from "./ui/BlockedLessonsModal";
 import { ReminderQueue } from "./ui/ReminderQueue";
+import { ChangeDueDateModal } from "./ui/ChangeDueDateModal";
+import { useInvoiceAccess } from "./domain/useInvoiceAccess";
 
 export default function InvoicesPage() {
   // Each slice is one hook (docs/refactor/INVOICES_REFACTOR_PLAN.md). tenantId is
@@ -31,6 +33,7 @@ export default function InvoicesPage() {
   const list = useInvoiceList();
   const tenant = useTenantBilling();
   const { tenantId, isPlatformAdmin, businessName } = tenant;
+  const { canChangeDue } = useInvoiceAccess(isPlatformAdmin);
   const unclaimed = useUnclaimed();
   const orphans = useOrphans(tenantId);
   const debits = usePendingDebits(tenantId);
@@ -209,6 +212,8 @@ export default function InvoicesPage() {
             reminded_at: i.reminded_at,
             wa_number: i.wa_number,
             raw_phone: i.raw_phone,
+            due_date: i.due_date,
+            is_overdue: i.is_overdue,
           }))}
         onOpenChat={(id) => {
           const inv = list.invoices.find((i) => i.id === id);
@@ -226,9 +231,19 @@ export default function InvoicesPage() {
         sort={list.sort}
         markingPaid={list.markingPaid}
         copiedLink={list.copiedLink}
+        canChangeDue={canChangeDue}
         onMarkPaid={list.handleMarkPaid}
         onWhatsApp={(inv) => list.handleWhatsApp(inv, businessName)}
         onCopyLink={list.copyLink}
+        onChangeDue={list.openChangeDue}
+      />
+
+      <ChangeDueDateModal
+        invoice={list.dueTarget}
+        saving={list.savingDue}
+        error={list.dueError}
+        onClose={list.closeChangeDue}
+        onSave={list.handleChangeDue}
       />
 
       <BillingSettingsCard
@@ -240,6 +255,11 @@ export default function InvoicesPage() {
         savingRunDay={tenant.savingRunDay}
         runDayMessage={tenant.runDayMessage}
         onSaveRunDay={tenant.handleSaveRunDay}
+        paymentDays={tenant.paymentDays}
+        setPaymentDays={tenant.setPaymentDays}
+        savingPaymentDays={tenant.savingPaymentDays}
+        paymentDaysMessage={tenant.paymentDaysMessage}
+        onSavePaymentDays={tenant.handleSavePaymentDays}
         paynowUen={tenant.paynowUen}
         setPaynowUen={tenant.setPaynowUen}
         paynowMobile={tenant.paynowMobile}

@@ -27,7 +27,9 @@ export const INVOICE_CSV_COLUMNS: CsvColumn<InvoiceRow>[] = [
   { header: "Credit", value: (r) => r.credit_applied },
   { header: "Adjustment", value: (r) => r.balance_adjustment },
   { header: "Net", value: (r) => r.net_amount },
-  { header: "Status", value: (r) => (r.status === "paid" ? "Paid" : "Outstanding") },
+  { header: "Due", value: (r) => r.due_date },
+  // Claimed has its own column ("Parent says paid"), so it is not folded in here.
+  { header: "Status", value: (r) => (r.status === "paid" ? "Paid" : r.is_overdue ? "Overdue" : "Outstanding") },
   { header: "Parent says paid", value: (r) => (r.paid_claimed_at ? "yes" : "") },
   { header: "Reference", value: (r) => r.reference_number },
 ];

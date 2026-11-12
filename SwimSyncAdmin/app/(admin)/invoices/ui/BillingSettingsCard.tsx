@@ -16,6 +16,11 @@ export function BillingSettingsCard({
   savingRunDay,
   runDayMessage,
   onSaveRunDay,
+  paymentDays,
+  setPaymentDays,
+  savingPaymentDays,
+  paymentDaysMessage,
+  onSavePaymentDays,
   paynowUen,
   setPaynowUen,
   paynowMobile,
@@ -31,6 +36,11 @@ export function BillingSettingsCard({
   savingRunDay: boolean;
   runDayMessage: string | null;
   onSaveRunDay: (n: number) => void;
+  paymentDays: number | null;
+  setPaymentDays: (n: number) => void;
+  savingPaymentDays: boolean;
+  paymentDaysMessage: string | null;
+  onSavePaymentDays: (n: number) => void;
   paynowUen: string | null;
   setPaynowUen: (s: string) => void;
   paynowMobile: string | null;
@@ -120,6 +130,34 @@ export function BillingSettingsCard({
       {runDayMessage && (
         <p id="run-day-message" className="mt-1 text-body font-medium text-status-danger-text">
           {runDayMessage}
+        </p>
+      )}
+
+      {/* Days to pay (OVERDUE_INVOICES_PLAN.md D2). Applies to every invoice,
+          automatic or manual — so, unlike the run day, never greyed out. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label htmlFor="payment-days" className="text-body text-ink-secondary">
+          Days to pay
+        </label>
+        <input
+          id="payment-days"
+          type="number"
+          min={1}
+          max={90}
+          value={paymentDays ?? ""}
+          placeholder="—"
+          disabled={savingPaymentDays || paymentDays === null}
+          onChange={(e) => setPaymentDays(Number(e.target.value))}
+          onBlur={(e) => onSavePaymentDays(Number(e.target.value))}
+          className="h-9 w-16 rounded-control border border-border-strong bg-surface px-2 text-body text-ink focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-status-neutral-bg disabled:text-ink-muted"
+        />
+        <span className="text-body text-ink-muted">
+          after an invoice is created, then it shows as Overdue. New invoices only.
+        </span>
+      </div>
+      {paymentDaysMessage && (
+        <p id="payment-days-message" className="mt-1 text-body font-medium text-status-danger-text">
+          {paymentDaysMessage}
         </p>
       )}
 

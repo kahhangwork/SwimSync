@@ -44,6 +44,7 @@ vi.mock("./domain/usePendingDebits", () => ({
 vi.mock("./domain/useUnclaimed", () => ({ useUnclaimed: () => stub({}) }));
 vi.mock("./domain/useOrphans", () => ({ useOrphans: () => stub({}) }));
 vi.mock("./domain/useBillingMonths", () => ({ useBillingMonths: () => stub({ rows: [] }) }));
+vi.mock("./domain/useInvoiceAccess", () => ({ useInvoiceAccess: () => ({ canChangeDue: true }) }));
 vi.mock("./domain/useGenerate", () => ({
   useGenerate: (opts: { afterGenerate: () => Promise<void> }) => {
     h.afterGenerate = opts.afterGenerate;
@@ -62,6 +63,7 @@ vi.mock("./ui/BillingMonthsCard", () => ({ BillingMonthsCard: () => null }));
 vi.mock("./ui/ConfirmGenerateModal", () => ({ ConfirmGenerateModal: () => null }));
 vi.mock("./ui/BlockedLessonsModal", () => ({ BlockedLessonsModal: () => null }));
 vi.mock("./ui/ReminderQueue", () => ({ ReminderQueue: () => null }));
+vi.mock("./ui/ChangeDueDateModal", () => ({ ChangeDueDateModal: () => null }));
 vi.mock("@/lib/supabase", () => {
   throw new Error("tripwire: InvoicesPage test reached the real supabase client");
 });

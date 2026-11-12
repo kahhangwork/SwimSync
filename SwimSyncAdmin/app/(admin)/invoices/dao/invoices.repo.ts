@@ -48,7 +48,7 @@ export const fetchTenant = (tenantId: string) =>
   supabase
     .from("tenants")
     .select(
-      "display_name, auto_invoice_enabled, invoice_run_day, paynow_uen, paynow_mobile"
+      "display_name, auto_invoice_enabled, invoice_run_day, invoice_payment_days, paynow_uen, paynow_mobile"
     )
     .eq("id", tenantId)
     .maybeSingle();
@@ -160,7 +160,7 @@ export const fetchInvoices = (term: string, searchField: SearchField) => {
   let query = supabase
     .from("invoices")
     .select(
-      `id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, ${parentEmbed}, invoice_items(student_name, students(full_name))`
+      `id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, due_date, is_overdue, ${parentEmbed}, invoice_items(student_name, students(full_name))`
     )
     .order("generated_at", { ascending: false })
     .limit(ROW_LIMIT);

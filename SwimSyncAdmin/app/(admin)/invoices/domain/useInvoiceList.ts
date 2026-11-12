@@ -3,6 +3,7 @@ import { exportCsv } from "@/lib/csv";
 import { todayInSg } from "@/lib/lessonDates";
 import { buildReminderMessage, buildWaLink } from "@/lib/waMessage";
 import { useTableSort } from "@/components/Table";
+import { invoiceTag } from "@/lib/invoiceTag";
 import { useDebouncedValue } from "@/components/useDebouncedValue";
 import { ROW_LIMIT, INVOICE_CSV_COLUMNS } from "../constants";
 import type { InvoiceRow, SearchField } from "../types";
@@ -34,6 +35,10 @@ export function useInvoiceList() {
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
   const [queueOpen, setQueueOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  // Change due date (OVERDUE_INVOICES_PLAN.md D5): the invoice being edited.
+  const [dueTarget, setDueTarget] = useState<InvoiceRow | null>(null);
+  const [savingDue, setSavingDue] = useState(false);
+  const [dueError, setDueError] = useState<string | null>(null);
 
   async function load() {
     const seq = ++invoiceSeq.current;
@@ -77,6 +82,8 @@ export function useInvoiceList() {
       amount: inv.net_amount,
       link: invoiceLink(inv),
       reference: inv.reference_number,
+      dueDate: inv.due_date,
+      isOverdue: inv.is_overdue,
     });
     window.open(buildWaLink(inv.wa_number, message), "_blank", "noopener");
     const stamp = new Date().toISOString();
@@ -99,6 +106,34 @@ export function useInvoiceList() {
     );
   }
 
+  function openChangeDue(inv: InvoiceRow) {
+    setDueError(null);
+    setDueTarget(inv);
+  }
+
+  function closeChangeDue() {
+    setDueTarget(null);
+    setDueError(null);
+  }
+
+  /** The RPC is the ONLY due-date writer and the authority on every rule; its
+   *  refusal is shown verbatim. On success the list is REFETCHED — the tag and
+   *  Due column come from the database's fresh due_date / is_overdue, never
+   *  from a locally flipped value (⚠ RISK 8). */
+  async function handleChangeDue(newDate: string, reason: string) {
+    if (!dueTarget) return;
+    setSavingDue(true);
+    setDueError(null);
+    const { error } = await rpc.changeInvoiceDueDate(dueTarget.id, newDate, reason);
+    setSavingDue(false);
+    if (error) {
+      setDueError(error.message);
+      return;
+    }
+    setDueTarget(null);
+    await load();
+  }
+
   function copyLink(inv: InvoiceRow) {
     navigator.clipboard?.writeText(invoiceLink(inv));
     setCopiedLink(inv.id);
@@ -116,7 +151,7 @@ export function useInvoiceList() {
       // Sort the AMOUNTS, not the rendered "−S$40.00" strings — a currency
       // string sorts by its leading character, so a minus sign and a dash would
       // decide the order before the number did.
-      status: (inv) => (inv.status === "outstanding" ? "Outstanding" : "Paid"),
+      status: (inv) => invoiceTag(inv),
     },
   });
   const visible = sort.apply(filtered);
@@ -150,6 +185,12 @@ export function useInvoiceList() {
     setQueueOpen,
     copiedLink,
     copyLink,
+    dueTarget,
+    savingDue,
+    dueError,
+    openChangeDue,
+    closeChangeDue,
+    handleChangeDue,
     load,
     handleWhatsApp,
     handleMarkPaid,

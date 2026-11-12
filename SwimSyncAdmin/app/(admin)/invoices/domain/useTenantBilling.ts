@@ -3,6 +3,7 @@ import { blankToNull, normalizeSgPhone } from "@/lib/sgPhone";
 import * as repo from "../dao/invoices.repo";
 import { payNowProxyWarning } from "./paynow";
 import { runDaySaveOutcome } from "./runDay";
+import { paymentDaysOf, paymentDaysSaveOutcome } from "./paymentDays";
 
 /** The tenant this admin bills for and its billing schedule (auto on/off, run
  *  day, PayNow proxy, business name). `tenantId` is the shared spine — orphans,
@@ -17,6 +18,10 @@ export function useTenantBilling() {
   const [runDay, setRunDay] = useState<number | null>(null);
   const [savingRunDay, setSavingRunDay] = useState(false);
   const [runDayMessage, setRunDayMessage] = useState<string | null>(null);
+  // Days a family has to pay (tenants.invoice_payment_days). null = not loaded.
+  const [paymentDays, setPaymentDays] = useState<number | null>(null);
+  const [savingPaymentDays, setSavingPaymentDays] = useState(false);
+  const [paymentDaysMessage, setPaymentDaysMessage] = useState<string | null>(null);
   // PayNow proxy — where invoice QRs point the money. null = not loaded yet
   // (platform admin has no tenant); "" = loaded and unset.
   const [paynowUen, setPaynowUen] = useState<string | null>(null);
@@ -51,6 +56,7 @@ export function useTenantBilling() {
     setAutoEnabled(tenant?.auto_invoice_enabled ?? true);
     const n = Number(tenant?.invoice_run_day);
     setRunDay(Number.isFinite(n) && n >= 1 ? Math.min(28, n) : 7);
+    setPaymentDays(paymentDaysOf(tenant?.invoice_payment_days));
     setPaynowUen((tenant?.paynow_uen as string | null) ?? "");
     setPaynowMobile((tenant?.paynow_mobile as string | null) ?? "");
     return tid;
@@ -107,6 +113,29 @@ export function useTenantBilling() {
     setSavingRunDay(false);
   }
 
+  // Due date = SGT generated date + this, set when each invoice is created
+  // (20261112000100) — so a change reaches NEW invoices only. 1–90, the CHECK.
+  async function handleSavePaymentDays(next: number) {
+    if (!tenantId) return;
+    const clamped = Math.min(90, Math.max(1, Math.trunc(next) || 1));
+    setSavingPaymentDays(true);
+    setPaymentDaysMessage(null);
+    const { error } = await repo.updateTenant(tenantId, {
+      invoice_payment_days: clamped,
+      updated_at: new Date().toISOString(),
+    });
+    // Re-read, whatever the update said (paymentDaysSaveOutcome).
+    const { data: stored, error: readError } = await repo.fetchTenant(tenantId);
+    const outcome = paymentDaysSaveOutcome(
+      clamped,
+      error?.message ?? null,
+      readError || !stored ? undefined : stored.invoice_payment_days
+    );
+    if (outcome.days !== null) setPaymentDays(outcome.days);
+    setPaymentDaysMessage(outcome.message);
+    setSavingPaymentDays(false);
+  }
+
   async function handleToggleAuto() {
     if (autoEnabled === null || !tenantId) return;
     setTogglingAuto(true);
@@ -128,6 +157,11 @@ export function useTenantBilling() {
     setRunDay,
     savingRunDay,
     runDayMessage,
+    paymentDays,
+    setPaymentDays,
+    savingPaymentDays,
+    paymentDaysMessage,
+    handleSavePaymentDays,
     paynowUen,
     setPaynowUen,
     paynowMobile,

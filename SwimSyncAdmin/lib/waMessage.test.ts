@@ -72,7 +72,20 @@ describe("buildReminderMessage", () => {
     amount: 300,
     link: "https://swimsync.sg/invoice/abc123",
     reference: "INV-2026-0001",
+    dueDate: "2026-08-14",
+    isOverdue: false,
   };
+
+  it("names the due date — 'due by' before it, 'was due on' after (D7)", () => {
+    expect(buildReminderMessage(base)).toContain("It is due by 14 Aug.");
+    const late = buildReminderMessage({ ...base, isOverdue: true });
+    expect(late).toContain("It was due on 14 Aug.");
+    expect(late).not.toContain("due by");
+  });
+
+  it("a malformed due date prints raw rather than throwing", () => {
+    expect(buildReminderMessage({ ...base, dueDate: "soon" })).toContain("It is due by soon.");
+  });
 
   it("interpolates every field of the fixed template", () => {
     const msg = buildReminderMessage(base);
@@ -107,6 +120,8 @@ describe("buildWaLink", () => {
       amount: 10,
       link: "https://swimsync.sg/invoice/t",
       reference: "INV-2026-0002",
+      dueDate: "2026-08-14",
+      isOverdue: false,
     });
     const link = buildWaLink("6591234567", msg);
     expect(link.startsWith("https://wa.me/6591234567?text=")).toBe(true);

@@ -34,7 +34,11 @@ export function MetricGrid({ metrics, loading, showBilling = true }: Props) {
         title="Outstanding Invoices"
         value={loading ? "—" : metrics?.outstandingInvoices ?? 0}
         icon={Receipt}
-        subtitle="Unpaid"
+        subtitle={
+          !loading && (metrics?.overdueInvoices ?? 0) > 0
+            ? `Unpaid · ${metrics!.overdueInvoices} overdue`
+            : "Unpaid"
+        }
       />
       <MetricCard
         title="Credit Notes"

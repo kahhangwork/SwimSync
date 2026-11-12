@@ -73,7 +73,7 @@ describe("fetchInvoices — the invoice list (money)", () => {
     fetchInvoices("", "parent");
     expect(log).toEqual([
       ["from", "invoices"],
-      ["select", "id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"],
+      ["select", "id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, due_date, is_overdue, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"],
       ["order", "generated_at", { ascending: false }],
       ["limit", ROW_LIMIT],
     ]);
@@ -83,7 +83,7 @@ describe("fetchInvoices — the invoice list (money)", () => {
     fetchInvoices("ann", "parent");
     expect(log).toEqual([
       ["from", "invoices"],
-      ["select", "id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, parents!inner(profiles!inner(full_name, phone)), invoice_items(student_name, students(full_name))"],
+      ["select", "id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, due_date, is_overdue, parents!inner(profiles!inner(full_name, phone)), invoice_items(student_name, students(full_name))"],
       ["order", "generated_at", { ascending: false }],
       ["limit", ROW_LIMIT],
       ["ilike", "parents.profiles.full_name", "%ann%"],

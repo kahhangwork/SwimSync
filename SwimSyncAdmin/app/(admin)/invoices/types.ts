@@ -22,6 +22,12 @@ export type InvoiceRow = {
   reminded_at: string | null;
   /** The parent's "I've paid" claim — check the bank, then confirm. */
   paid_claimed_at: string | null;
+  /** "YYYY-MM-DD" (SGT) — stored at generation, moved later only by
+   *  change_invoice_due_date() (20261112000100). */
+  due_date: string;
+  /** The database's verdict (is_overdue computed field, app_today()). Never
+   *  derived here; the tag comes from lib/invoiceTag. */
+  is_overdue: boolean;
   /** wa.me-ready "65XXXXXXXX", or null → the button reads "no number". */
   wa_number: string | null;
   /** What the parent actually typed — the queue's advisory when unusable. */

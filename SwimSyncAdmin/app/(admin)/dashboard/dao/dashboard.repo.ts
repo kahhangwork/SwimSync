@@ -52,6 +52,14 @@ export function countMetrics() {
       .from("students")
       .select("id", { count: "exact", head: true })
       .eq("is_active", false),
+    // Appended LAST (8th). Overdue is the database's verdict (is_overdue
+    // computed field, app_today()) — never a date compared here. Claimed rows
+    // are left out: Claimed beats Overdue (OVERDUE_INVOICES_PLAN.md D4).
+    supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("is_overdue", true)
+      .is("paid_claimed_at", null),
   ]);
 }
 
@@ -68,7 +76,7 @@ export function loadUnassigned() {
 export function loadOutstandingInvoices() {
   return supabase
     .from("invoices")
-    .select("id, billing_month, net_amount, parents(profiles(full_name))")
+    .select("id, billing_month, net_amount, paid_claimed_at, due_date, is_overdue, status, parents(profiles(full_name))")
     .eq("status", "outstanding")
     .order("generated_at", { ascending: false })
     .limit(5);

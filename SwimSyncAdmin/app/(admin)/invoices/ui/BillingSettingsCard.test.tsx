@@ -42,6 +42,11 @@ function setup(over: Partial<Props> = {}) {
     savingRunDay: false,
     runDayMessage: null,
     onSaveRunDay: vi.fn(),
+    paymentDays: 14,
+    setPaymentDays: vi.fn(),
+    savingPaymentDays: false,
+    paymentDaysMessage: null,
+    onSavePaymentDays: vi.fn(),
     paynowUen: "",
     setPaynowUen: vi.fn(),
     paynowMobile: "",
@@ -149,5 +154,25 @@ describe("BillingSettingsCard — PayNow", () => {
     expect(line.className).toMatch(/text-status-danger-text/);
     rerender(<BillingSettingsCard {...props} runDayMessage={null} />);
     expect(screen.queryByText(/Not saved|^Error:/)).toBeNull();
+  });
+
+  // ── Days to pay (OVERDUE_INVOICES_PLAN.md Unit 3, ⚠ RISK 4) ──────────────
+  it("Days to pay shows the stored value and saves on blur, not per keystroke", () => {
+    const { props } = setup({ paymentDays: 14 });
+    const input = screen.getByLabelText("Days to pay") as HTMLInputElement;
+    expect(input.value).toBe("14");
+    fireEvent.change(input, { target: { value: "21" } });
+    expect(props.onSavePaymentDays).not.toHaveBeenCalled();
+    fireEvent.blur(input, { target: { value: "21" } });
+    expect(props.onSavePaymentDays).toHaveBeenCalledWith(21);
+  });
+
+  it("Days to pay is locked and blank while unknown; a refused save is said in red", () => {
+    const { rerender, props } = setup({ paymentDays: null });
+    const input = screen.getByLabelText("Days to pay") as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(input.value).toBe("");
+    rerender(<BillingSettingsCard {...props} paymentDays={14} paymentDaysMessage="Not saved — families still have 14 days to pay." />);
+    expect(screen.getByText(/families still have 14 days/).className).toMatch(/text-status-danger-text/);
   });
 });

@@ -51,7 +51,7 @@ export function OutstandingMini({ invoices, loading }: Props) {
                   S${inv.net_amount.toFixed(2)}
                 </Td>
                 <Td>
-                  <StatusBadge status="Outstanding" />
+                  <StatusBadge status={inv.tag} />
                 </Td>
               </Tr>
             ))
