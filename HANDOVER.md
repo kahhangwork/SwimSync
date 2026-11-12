@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-12 (later) — **prod data tidy, no code** (§8.161): 4 Epic Swim test children deleted, Anya set
-female; owner asked for 19 genders + the one-child package choice. Next: read the first nightly over §8.160's units
-(not yet run at session end), then bill October._
+_Last updated: 2026-11-12 (latest) — **owner's reply applied on prod, no code** (§8.162): 0 children without a gender,
+every Little Orcas product one-child, the 2-Siblings product retired. Waiting on the owner: the Ang family's expired
+S$350 package (extend or refund). Next: bill October._
 
-_Previously (§8.160, 2026-11-12) — Wave 9 leftovers live: gender required server-side + five small fixes._
+_Previously (§8.161, 2026-11-12) — prod data tidy: 4 Epic Swim test children deleted, Anya set female._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,15 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.162 (2026-11-12) — Owner's reply applied: genders complete, Little Orcas sells one-child packages only
+
+**Shipped** (no code; DEPLOYMENT #102): one guarded script the user ran — 20 genders set, the 5 active Little Orcas
+products flipped to *One child only*, *10 Lesson Packages (2 Siblings)* retired. Verified after by a read-only query.
+
+- **Found:** PKG-2026-0002 (Ang family, shared) is `active` but expired 2026-10-04 with S$350 / 10 lessons unused.
+  Left untouched (D2); with it expired, D11 lets Adabelle and Alexis each buy a one-child package.
+- **Not done:** the S$350 waits on the owner (extend or refund — message sent by the user). October not yet billed.
+
 ## 8.161 (2026-11-12) — Prod data tidy: Epic Swim test children gone, owner asked for genders + package kind
 
 **Shipped** (no code; DEPLOYMENT #101): the 4 Epic Swim test children and their enrolments deleted by one guarded
@@ -361,20 +370,6 @@ script the user ran; Anya (Small) set to female. Blank genders 25 → 20.
   (DEPLOYMENT #101). All 6 active Little Orcas products are still shared (0 one-child).
 - **Not done:** the inactive Brayden left as is (recommended; not deleted); the 19 genders and any
   one-child flip wait on the owner's reply (message sent by the user). The 2026-11-12 nightly had not appeared yet.
-
-## 8.160 (2026-11-11 → 12) — Wave 9 leftovers: gender required server-side + five small fixes, all live
-
-**Shipped** (DEPLOYMENT #98–100): parent package Cancel asks first; Packages' settings card at the page foot (the
-visual-only landing); `20261111000100` — both child-creating functions refuse a missing gender (PRD §7.17); Profile →
-Add Child → Join stays on Profile; admin reset-password names the account; the public package page's *different
-package?* line links to Billing → Packages (PRD §7.16). BACKLOG items closed; *UI restyle leftovers* is down to Overdue.
-
-- **Found:** a gender check placed before the permission gates told unauthorised callers "gender missing" (fixed,
-  pinned by a mutation); a signed-out push into the app is redirected nowhere (§7.383); `pressByText` misses a `Link`
-  (§7.382, second hit → BACKLOG S); zsh `path`/`=` (§7.384); a CDN lock-file red on `3adfced` (§7.385). Deploy-skill
-  step 3d now: one push per command; never delete a branch before its tip is on `main`.
-- **Not done, by decision:** Overdue parked (user); the 4 *not re-verified* restyle items untouched; the three app
-  units and the migration shipped WITHOUT a nightly (user's word) — the 2026-11-12 run is the first over all of them.
 
 ## 9. Next steps (pick with the user)
 
@@ -416,9 +411,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-12:** latest `42928067577` GREEN on `a234c0b`; the 2026-11-12 run had NOT appeared by session end. **The 2026-11-12 nightly is the first over FIVE app
-units** (`17b570f`, `3adfced`, `7803ca4`, `c77fa55`, `90625d3` — §8.160, shipped without one on the user's word) **and the
-first run of `3d1626d`'s runtime wait.** A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-12:** latest `43135062308` GREEN on `03256d8` — it covers all five §8.160 app units and `3d1626d`'s
+runtime wait, so the §9 gate is clear. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -433,11 +427,10 @@ which mutate shared seed state — are in the same section.
 1. **Little Orcas September is SEALED** (2026-10-12 03:49 SGT, 0 invoices: all 16 children incl. Brayden Ong recorded
    as written-off settlements; 8 live package draws in the month). Engine v35 ran clean (DEPLOYMENT #81; logs unread).
    **Wave 9 item 9 SHIPPED 2026-10-13** (§8.150) — first live Generate on engine v36 is the next billing run.
-2. **Single-child packages are LIVE but unused** (0 of 6 active Little Orcas products, 2026-11-12). **The owner has been
-   asked** (2026-11-12, incl. the Ang family's D11 catch) — act on their reply; the owner flips it in Packages → *Change*.
-3. **Gender:** the database refuses a new child without one (`20261111000100`, live). **20 prod children blank**
-   (2026-11-12): 19 active Little Orcas — **owner asked; when the user pastes the reply, write ONE guarded script** like
-   DEPLOYMENT #101 — plus the inactive Brayden Ong duplicate, which **must not be deleted** (#101); give it the active one's gender.
+2. **Little Orcas is one-child only** (2026-11-12, DEPLOYMENT #102) — no shared product on sale. **Open: PKG-2026-0002**
+   (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — **the owner has been asked extend or refund**; act on the
+   reply (an extension is `manual_extension_days`; a refund is the in-app refund, PRD §7.16).
+3. **Gender: done** — 0 prod children blank; the database refuses a new child without one (`20261111000100`).
 4. **UI restyle leftovers — only Overdue is left, PARKED by the user** (2026-11-11: needs a rule for when an invoice is
    overdue, then a stored due date). The *not re-verified* list in that BACKLOG item is untouched — check before
    building. Keep the lid open during any local batch (§7.370).

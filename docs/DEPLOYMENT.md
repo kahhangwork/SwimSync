@@ -1322,3 +1322,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     (`f09aad38…`) holds 20 Sep onward. Deleting it erases billed history in a sealed month; `merge_students` refuses
     (both have lessons, PRD *Duplicates that already exist*). Left inactive by recommendation; set its gender with the
     active one's.
+102. **Prod DATA change (2026-11-12, later): Little Orcas genders + one-child products — no code.** One guarded `DO`
+    block (scratchpad `prod-orcas-2026-11-12.sql`), run BY THE USER via `supabase db query --linked -f`, on the owner's
+    reply. It refused unless all 20 children (tenant, exact name, active flag, gender NULL) and all 6 products (name,
+    active, shared) matched the state read that day: 20 genders set (19 active + the inactive Brayden duplicate, M),
+    the 5 active products → `single_child = true`, *10 Lesson Packages (2 Siblings)* retired (`is_active = false`).
+    Proven on local against a mirror of the prod rows (pass, a drifted row refused, rolled back) — that run caught
+    `gender` being enum `gender_type` (a text value needs `::gender_type`). **`db query --linked` does not relay
+    `RAISE NOTICE`**: the success output is `rows: []`, so confirm with `scripts/prod-query-ro.sh`. After: **0 children
+    without a gender on prod**, Little Orcas sells no shared product. PKG-2026-0002 (Ang, shared) untouched (D2) —
+    still `active`, expired 2026-10-04 with S$350 / 10 lessons left; the owner has been asked extend-or-refund.
