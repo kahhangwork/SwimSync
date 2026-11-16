@@ -100,8 +100,19 @@ fast-forward-only push is the safety property: it fails loudly instead of
 silently merging work you have not looked at.
 
 Afterwards: fast-forward the root checkout
-(`git -C <root> merge --ff-only origin/main`), confirm CI is green, and — if
-the change touches a deployed surface — confirm the deploy actually carries it.
+(`git -C <root> merge --ff-only origin/main`), then watch the deploy and CI with
+**`scripts/watch-deploy.sh` under the Monitor tool** — never a hand-written loop:
+
+```
+Monitor  command: scripts/watch-deploy.sh <sha> --expect https://swimsync.sg/ '<string only the new build has>'
+         timeout_ms: 1800000
+```
+
+Use the admin URL for an admin change, `--expect` twice for both, and drop
+`--expect` only when nothing deployed changed (it then says so). **Tell the user
+the moment the `DEPLOY`/`LIVE` lines arrive — they are the deploy; `CI` is a
+separate, later report.** Why, and the two silent watchers that made this a
+script: `/deploy` Step 4.
 
 Then report: the findings you fixed, anything you deliberately left, the commit
 SHA, and whether it is on `main`.

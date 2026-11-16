@@ -214,10 +214,28 @@ git ls-remote origin refs/heads/main                 # must now print <sha>
 
 ## Step 4 — Post-deploy verification
 
-- **Web apps:** wait for the Vercel build (~1–3 min), then load the live URL
-  (`admin.swimsync.sg` / `swimsync.sg`) and confirm a user-visible string only the
-  new build has is present — for a data-reading change, that the affected page
-  actually loads. A green build is not proof the page works against prod data.
+- **Web apps: run `scripts/watch-deploy.sh` under the Monitor tool — never a
+  hand-written polling loop.** Each output line is one event, so the user hears
+  "deployed" the moment Vercel finishes and CI as a separate, later line:
+
+  ```
+  Monitor  command: scripts/watch-deploy.sh <sha> --expect https://swimsync.sg/ '<string only the new build has>'
+           timeout_ms: 1800000
+  ```
+
+  **Tell the user the moment the `DEPLOY`/`LIVE` lines arrive** — do not wait for
+  `CI`. Lines start `DEPLOY · LIVE · CI · FAIL`; every exit prints one. Then, for a
+  data-reading change, load the affected page against prod: a green build is not
+  proof it works against prod data.
+
+  *Why a script (2026-11-16):* two improvised watchers failed silently in one
+  session — one gated the deploy report behind CI (the user waited long after the
+  apps were live), one passed a short sha to `gh run list --commit`, which returns
+  `[]` with exit 0, so "query is broken" looked exactly like "still running". The
+  script resolves the full sha, treats "found nothing" as a FAIL after a short
+  grace period, and has a deadline on every phase. **If you must watch something it
+  does not cover, run the query once in the foreground first and make empty output
+  exit the loop.**
 - **Migrations:** `supabase migration list --linked` remote filled, 0 pending (again,
   from the linked project, not memory).
 - **Engine/functions:** served-bundle grep.
@@ -237,6 +255,9 @@ left (a follow-up deploy, a manual step).
 - **"`db push` said Finished, so it applied."** The `pgdelta` stack trace prints next
   to `Finished` and means nothing. → `migration list --linked` is the fact.
 - **"200 / green build, so it's live."** Grep the served bundle for a new string. → Step 4.
+- **A silent watcher.** A hand-rolled loop whose query matches nothing waits forever
+  and says nothing, and one that waits for CI hides a deploy that finished long ago.
+  → Step 4, `scripts/watch-deploy.sh` under Monitor.
 - **Privilege drift** local-vs-cloud: `anon` silently keeps EXECUTE on a new function
   on the cloud. → Step 3a grant dump.
 - **Rollback that was never run:** a committed DOWN with valid-looking SQL that
