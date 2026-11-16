@@ -106,13 +106,13 @@ isOneToOne: false
                   ]
                 },"billing_runs": {
                   Row: {
-                    "billing_month": string,"blocking": Json | null,"classes_still_incomplete": number | null,"earlier_unbilled_month": string | null,"error": string | null,"id": string,"invoices_created": number,"message": string | null,"mode": string | null,"ran_at": string,"ran_by": string | null,"sealed": boolean,"status": string,"tenant_id": string,"unclaimed_billable": number | null,"unclaimed_students": Json | null
+                    "billing_month": string,"blocking": Json | null,"classes_still_incomplete": number | null,"duration_ms": number | null,"earlier_unbilled_month": string | null,"error": string | null,"id": string,"invoices_created": number,"message": string | null,"mode": string | null,"ran_at": string,"ran_by": string | null,"sealed": boolean,"status": string,"tenant_id": string,"unclaimed_billable": number | null,"unclaimed_students": Json | null
                   }
                   Insert: {
-                    "billing_month": string,"blocking"?: Json | null,"classes_still_incomplete"?: number | null,"earlier_unbilled_month"?: string | null,"error"?: string | null,"id"?: string,"invoices_created"?: number,"message"?: string | null,"mode"?: string | null,"ran_at"?: string,"ran_by"?: string | null,"sealed"?: boolean,"status": string,"tenant_id": string,"unclaimed_billable"?: number | null,"unclaimed_students"?: Json | null
+                    "billing_month": string,"blocking"?: Json | null,"classes_still_incomplete"?: number | null,"duration_ms"?: number | null,"earlier_unbilled_month"?: string | null,"error"?: string | null,"id"?: string,"invoices_created"?: number,"message"?: string | null,"mode"?: string | null,"ran_at"?: string,"ran_by"?: string | null,"sealed"?: boolean,"status": string,"tenant_id": string,"unclaimed_billable"?: number | null,"unclaimed_students"?: Json | null
                   }
                   Update: {
-                    "billing_month"?: string,"blocking"?: Json | null,"classes_still_incomplete"?: number | null,"earlier_unbilled_month"?: string | null,"error"?: string | null,"id"?: string,"invoices_created"?: number,"message"?: string | null,"mode"?: string | null,"ran_at"?: string,"ran_by"?: string | null,"sealed"?: boolean,"status"?: string,"tenant_id"?: string,"unclaimed_billable"?: number | null,"unclaimed_students"?: Json | null
+                    "billing_month"?: string,"blocking"?: Json | null,"classes_still_incomplete"?: number | null,"duration_ms"?: number | null,"earlier_unbilled_month"?: string | null,"error"?: string | null,"id"?: string,"invoices_created"?: number,"message"?: string | null,"mode"?: string | null,"ran_at"?: string,"ran_by"?: string | null,"sealed"?: boolean,"status"?: string,"tenant_id"?: string,"unclaimed_billable"?: number | null,"unclaimed_students"?: Json | null
                   }
                   Relationships: [
                     {

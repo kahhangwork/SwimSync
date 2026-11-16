@@ -16,7 +16,7 @@
 BEGIN;
 SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(15);
+SELECT plan(19);
 SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- ── Grants (⚠ RISK 1) ───────────────────────────────────────────────────────
@@ -114,6 +114,15 @@ SELECT lives_ok(
 SELECT is((SELECT count(*)::int FROM billing_runs
             WHERE tenant_id = '86000000-0000-0000-0000-0000000000a0' AND ran_by IS NULL), 1,
   'their run survives with ran_by NULL — the record outlives the account');
+
+-- ── duration_ms (20261116000100) — the run's timing, NULL when not measured ───
+SELECT has_column('public', 'billing_runs', 'duration_ms', 'billing_runs.duration_ms exists');
+SELECT col_type_is('public', 'billing_runs', 'duration_ms', 'integer', 'duration_ms is an integer (ms)');
+SELECT col_is_null('public', 'billing_runs', 'duration_ms', 'duration_ms is nullable — older runs were never measured');
+SELECT throws_ok(
+  $$ INSERT INTO billing_runs (tenant_id, billing_month, status, duration_ms)
+     VALUES ('86000000-0000-0000-0000-0000000000a0', '2026-08', 'x', -1) $$,
+  '23514', NULL, 'a negative duration is refused');
 
 SELECT * FROM finish();
 ROLLBACK;
