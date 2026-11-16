@@ -17,6 +17,7 @@ export default function CoachSettingsScreen() {
     session,
     paynowUrl,
     uploading,
+    qrReady,
     canEditQr,
     isAdmin,
     hasPaynowId,
@@ -40,7 +41,7 @@ export default function CoachSettingsScreen() {
       >
         <Avatar session={session} />
 
-        <PayNowQrCard hasPaynowId={hasPaynowId} showQrUpload={showQrUpload} setShowQrUpload={setShowQrUpload} paynowUrl={paynowUrl} uploading={uploading} handleUploadQR={handleUploadQR} />
+        <PayNowQrCard hasPaynowId={hasPaynowId} showQrUpload={showQrUpload} setShowQrUpload={setShowQrUpload} paynowUrl={paynowUrl} uploading={uploading} qrReady={qrReady} handleUploadQR={handleUploadQR} />
 
         <AdminPanelCard isAdmin={isAdmin} openAdminPanel={openAdminPanel} />
 

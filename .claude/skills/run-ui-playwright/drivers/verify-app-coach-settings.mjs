@@ -72,7 +72,12 @@ try {
   await pressByText(page, "Settings");
   await page.getByText("Fallback QR image — advanced").first().waitFor({ timeout: 20000 });
   await pressByText(page, "Fallback QR image — advanced");
-  await page.getByText("Upload QR Code").last().waitFor({ timeout: 10000 });
+  // The button reads "Loading…" and is disabled until loadCoach settles. The
+  // 2026-11-14 nightly red was a click that beat the load: canEditQr was still
+  // false, the handler refused with a toast, and no file chooser ever opened.
+  // Waiting for the LABEL is waiting for the load — "Upload QR Code" only
+  // renders once the button is enabled.
+  await page.getByText("Upload QR Code").last().waitFor({ timeout: 20000 });
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser", { timeout: 15000 }),
     // A TRUSTED click: the web picker is an <input type=file>.click(), which Chrome
@@ -106,6 +111,9 @@ try {
   check("B: …and a reload stays signed out", /\/login/.test(page.url()), page.url());
 } catch (e) {
   check("driver completed without throwing", false, String(e));
+  // The 2026-11-14 red left nothing to look at: the only screenshot is taken
+  // after a successful upload. Shoot the failing screen before the browser closes.
+  await page.screenshot({ path: shot("FAIL") }).catch(() => {});
 } finally {
   await browser.close().catch(() => {});
   await restoreSeed().catch((e) => console.error(`✗ could not restore the seed PayNow QR: ${e.message}`));

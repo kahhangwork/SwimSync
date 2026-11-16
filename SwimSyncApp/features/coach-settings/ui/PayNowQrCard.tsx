@@ -11,8 +11,8 @@ import type { useCoachSettings } from "../domain/useCoachSettings";
 
 type Settings = ReturnType<typeof useCoachSettings>;
 
-export function PayNowQrCard(p: Pick<Settings, "hasPaynowId" | "showQrUpload" | "setShowQrUpload" | "paynowUrl" | "uploading" | "handleUploadQR">) {
-  const { hasPaynowId, showQrUpload, setShowQrUpload, paynowUrl, uploading, handleUploadQR } = p;
+export function PayNowQrCard(p: Pick<Settings, "hasPaynowId" | "showQrUpload" | "setShowQrUpload" | "paynowUrl" | "uploading" | "qrReady" | "handleUploadQR">) {
+  const { hasPaynowId, showQrUpload, setShowQrUpload, paynowUrl, uploading, qrReady, handleUploadQR } = p;
   return (
     <>
       {/* PayNow QR Management */}
@@ -83,10 +83,16 @@ export function PayNowQrCard(p: Pick<Settings, "hasPaynowId" | "showQrUpload" | 
               </View>
             ) : null}
 
+            {/* Disabled until the coach's billing permission has loaded — a
+                press before then would refuse with the wrong reason. Until
+                then paynowUrl is unknown too, so Upload vs Replace is a guess. */}
             <Button
               variant="secondary"
+              disabled={!qrReady}
               label={
-                uploading
+                !qrReady
+                  ? "Loading…"
+                  : uploading
                   ? "Uploading…"
                   : paynowUrl
                   ? "Replace QR Code"

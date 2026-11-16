@@ -13,6 +13,8 @@
 //      → RED: "Sign Out is confirmLogout, in Danger text"
 //   4. Avatar: `{coachTitle(session?.fullName)}` → `Coach {session?.fullName ?? "—"}`
 //      → RED: "the title never doubles 'Coach'"
+//   5. PayNowQrCard: `disabled={!qrReady}` → `disabled={false}`
+//      → RED: "until the load settles the upload reads Loading… and cannot be pressed"
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react-native";
 import { PayNowQrCard } from "./PayNowQrCard";
@@ -24,7 +26,7 @@ jest.mock("@expo/vector-icons", () => {
   return { Ionicons: (p: { name: string }) => <Text>{`icon:${p.name}`}</Text> };
 });
 
-function renderCard(over: Partial<{ hasPaynowId: boolean; showQrUpload: boolean }> = {}) {
+function renderCard(over: Partial<{ hasPaynowId: boolean; showQrUpload: boolean; qrReady: boolean }> = {}) {
   const setShowQrUpload = jest.fn();
   const handleUploadQR = jest.fn();
   render(
@@ -34,6 +36,7 @@ function renderCard(over: Partial<{ hasPaynowId: boolean; showQrUpload: boolean 
       setShowQrUpload={setShowQrUpload}
       paynowUrl={null}
       uploading={false}
+      qrReady={over.qrReady ?? true}
       handleUploadQR={handleUploadQR}
     />
   );
@@ -64,6 +67,13 @@ describe("coach Settings UI", () => {
     const open = renderCard({ showQrUpload: true });
     fireEvent.press(screen.getByText("Upload QR Code"));
     expect(open.handleUploadQR).toHaveBeenCalledTimes(1);
+  });
+
+  it("until the load settles the upload reads Loading… and cannot be pressed", () => {
+    const { handleUploadQR } = renderCard({ showQrUpload: true, qrReady: false });
+    expect(screen.queryByText("Upload QR Code")).toBeNull();
+    fireEvent.press(screen.getByText("Loading…"));
+    expect(handleUploadQR).not.toHaveBeenCalled();
   });
 
   it("Sign Out is confirmLogout, in Danger text", () => {

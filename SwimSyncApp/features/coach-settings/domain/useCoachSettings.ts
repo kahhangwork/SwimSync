@@ -1,13 +1,13 @@
 // The coach Settings tab's state, its load, the fallback-QR upload and Sign Out
-// (docs/refactor/BATCH_FGH_PLAN.md, App L-H). Moved VERBATIM from
+// (docs/refactor/BATCH_FGH_PLAN.md, App L-H). Moved from
 // app/(coach)/settings/index.tsx — store reads, state, loadCoach (deps [session]),
 // the handlers; builders are dao calls. The mount effect that calls loadCoach
-// stays on the route.
+// stays on the route. Since 2026-11-16 the upload waits for `qrReady` (the
+// nightly's 2026-11-14 race; useCoachSettings.test.ts).
 //
 // ⚠ The one Alert.alert in the app lives here: the NATIVE media-permission
 // branch (Platform.OS !== "web"), never reached on the web build (plan ⚠ R8
-// counts it). The upload's try/finally is unchanged. No verify-* driver presses
-// Upload or Sign Out — L4-H hand-checks both (plan ⚠ R5).
+// counts it). verify-app-coach-settings presses both Upload and Sign Out.
 import { useState, useCallback } from "react";
 import { Alert, Platform, Linking } from "react-native";
 import { router } from "expo-router";
@@ -56,27 +56,39 @@ export function useCoachSettings() {
   // NOBODY at that business can be paid. Hiding it is one typo away from an
   // outage; a disclosure is not.
   const [showQrUpload, setShowQrUpload] = useState(false);
+  // False until loadCoach has settled. canEditQr starts false, so a press
+  // before the load lands would tell a private coach "your school manages the
+  // QR" — and open no picker (the nightly's coach-settings red, 2026-11-14).
+  // The upload button is disabled until this flips.
+  const [qrReady, setQrReady] = useState(false);
 
   const loadCoach = useCallback(async () => {
     if (!session) return;
-    const { data } = await fetchCoach(session);
-    if (!data) return;
+    try {
+      const { data } = await fetchCoach(session);
+      if (!data) return;
 
-    setCoachId(data.id);
-    setTenantId(data.tenant_id);
+      setCoachId(data.id);
+      setTenantId(data.tenant_id);
 
-    const [{ data: tenant }, { data: profile }, { data: mayBill }] = await Promise.all([
-      fetchTenantPaynow(data.tenant_id),
-      fetchProfileRole(session),
-      fetchCanEditBilling(data.tenant_id),
-    ]);
+      const [{ data: tenant }, { data: profile }, { data: mayBill }] = await Promise.all([
+        fetchTenantPaynow(data.tenant_id),
+        fetchProfileRole(session),
+        fetchCanEditBilling(data.tenant_id),
+      ]);
 
-    setPaynowUrl(tenant?.paynow_qr_url ?? null);
-    setHasPaynowId(
-      Boolean(tenant?.paynow_uen?.trim() || tenant?.paynow_mobile?.trim())
-    );
-    setIsAdmin(profile?.role === "tenant_admin");
-    setCanEditQr(mayBill === true);
+      setPaynowUrl(tenant?.paynow_qr_url ?? null);
+      setHasPaynowId(
+        Boolean(tenant?.paynow_uen?.trim() || tenant?.paynow_mobile?.trim())
+      );
+      setIsAdmin(profile?.role === "tenant_admin");
+      setCanEditQr(mayBill === true);
+    } finally {
+      // Settled, even on a failed load: the handler's own guards then give
+      // the honest message ("Could not find your business account") instead
+      // of a button that never enables.
+      setQrReady(true);
+    }
   }, [session]);
 
   function openAdminPanel() {
@@ -90,16 +102,19 @@ export function useCoachSettings() {
   }
 
   async function handleUploadQR() {
-    if (uploading) return;
+    if (uploading || !qrReady) return;
+    // tenantId first: after a FAILED load canEditQr is false too, and "your
+    // school manages it" would be the wrong reason. With a tenant loaded the
+    // order changes nothing.
+    if (!tenantId) {
+      showToast("Could not find your business account.", "error");
+      return;
+    }
     if (!canEditQr) {
       showToast(
         "Your school manages the payment QR code. Ask your admin to update it.",
         "error"
       );
-      return;
-    }
-    if (!tenantId) {
-      showToast("Could not find your business account.", "error");
       return;
     }
 
@@ -172,6 +187,7 @@ export function useCoachSettings() {
     session,
     paynowUrl,
     uploading,
+    qrReady,
     canEditQr,
     isAdmin,
     hasPaynowId,
