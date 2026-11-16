@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice). Earlier: 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
+_Last updated: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1119,6 +1119,44 @@ whether the email may name the child when the link may not. Needs `supabase func
 **Why:** dead UI branches read as a feature to the next person who touches the Packages page. **Notes:** read
 `value_remaining` directly and drop the RPC call where it was only used for the live figure; keep the RPC itself
 (contract: the RETURNS TABLE shape) until no bundle calls it, then drop it in its own migration.
+
+### Large-month invoice emails: send them outside the Generate request — **M** — _filed 2026-11-17, follow-up of Billing engine speed_
+Today one Generate press creates every invoice (seconds) and then emails each parent **inside the same request**, at
+`RESEND_MAX_PER_SECOND` (default 2/s). Move the emails out of that request, so the press returns as soon as the
+invoices exist and the sends drain separately. While doing it, show the admin how many of a month's emails are
+still unsent.
+
+**Why:** at hundreds of invoices the email step, not billing, decides whether a press succeeds. Three ceilings apply,
+and each one is reached before the engine itself slows:
+- **Supabase Free cuts a request at 150 s** (idle timeout and wall clock). At 2/s that is about 280 emails per press.
+  Past it the admin sees an error although every invoice was created.
+- **Resend Free sends 100 a day** (Usage page, 2026-11-17). Every send past that is refused with a 429, and the
+  refused sends still pass through the 2/s gate, so they also use up the 150 s.
+- **The admin cannot see unsent emails.** The Billing months card lists only MAY_HAVE_SENT. An email the engine
+  released after a refusal is UNSENT, appears nowhere in the UI, and goes out only when someone presses Generate
+  again. Prod has no cron (pg_cron is not installed, DEPLOYMENT #104), and the engine's rule
+  `shouldRetryTenantEmails` skips an `auto_disabled` tenant on a cron run anyway.
+
+Nothing is lost or doubled today; `INVOICE_RUNBOOK.md` → *A big month* is the manual workaround. This item exists
+to stop that workaround from being needed.
+
+**Notes:**
+- **Do not change claim → send → settle, or the Idempotency-Key reuse** (CRASH_SAFE_EMAIL_CLAIM_PLAN). Both are
+  why a killed press is already safe: at most 5 in-flight claims are stranded for their 15-minute lease, and the
+  next run retries them under the same key.
+- **Options, cheapest first:**
+  1. **Stop early (S).** End the email loop on Resend's first daily-quota 429 instead of gating every remaining
+     send. Read the error `name` from the body, as `outcomeForStatus` already does for 409.
+  2. **Background sends (M).** Return the response after generation and run the emails under
+     `EdgeRuntime.waitUntil`. This does not escape the wall-clock limit, so it needs option 3 behind it.
+  3. **Scheduled drain (M).** A pg_cron call to the existing retry path for every tenant with UNSENT rows, including
+     `auto_disabled` tenants. That changes `shouldRetryTenantEmails`'s rule: decide it explicitly, and note that
+     pg_cron is not installed on prod (DEPLOYMENT #104).
+- **"N not yet emailed" on the Billing months card (S on its own).** The admin's existing reads cover it: count
+  `invoice_email_sent_at IS NULL` for the month.
+- **The rate gate works per isolate** (plan §7). Fold any rate change into this item rather than a separate one.
+- `billing_runs.duration_ms` measures generation only, by design. Emails are timed in `run_timings_ms` and the
+  `[generate-invoices] timings` log line.
 
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT

@@ -1,6 +1,7 @@
 # Billing engine speed — measured, fixed, proven equivalent (2026-11-16)
 
-**Status:** engine + migration built and tested locally; **not deployed** (held for the user's review of these numbers).
+**Status:** **DEPLOYED 2026-11-17.** Migration `20261116000100` is on prod and `generate-invoices` is v40
+(DEPLOYMENT #106). The first live `duration_ms` comes from the next tenant's October run (§8).
 Harness: `supabase/functions/generate-invoices/bench/` (`bench.sh`, `run.ts`, `seed.ts`, `compare.py`).
 
 ## 1. The problem
@@ -110,6 +111,11 @@ Deno suite 320/320 **twice**; pgTAP 2153 green; CI guards (test dates, SG date, 
   inside the window lands on next month's invoice — never lost, never doubled).
 - **The rate gate is per isolate** — two simultaneous Generate presses could each send at the cap.
 - **At cap 2/s a large month's emails are slower than uncapped** sequential sends would be — uncapped would hit 429s.
+- **Emails are now the ceiling on a big month, not the engine.** Prod is on Resend Free (**100/day**, Usage page,
+  2026-11-17) and Supabase Free (**150 s** per request ≈ 280 sends at 2/s). Past either limit, nothing is lost or
+  doubled: the send is released or its claim lapses, and the next press for the month sends it. The operator steps
+  are in `INVOICE_RUNBOOK.md` → *A big month*. The real fix, sends outside the request, is in `BACKLOG.md` →
+  *Large-month invoice emails*. `RESEND_MAX_PER_SECOND` stays unset (2/s) on Free.
 
 ## 8. Proof on prod (after deploy)
 

@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.164** | 2026-11-12 | Invoice due dates + Overdue live: migration, public-invoice v3, engine v39, both apps | OVERDUE_INVOICES_PLAN, §7.386, DEPLOYMENT #104 |
 | **8.163** | 2026-11-12 | CI CDN flakes fixed: Edge Functions on `npm:` supabase-js, Deno cache, `deno check` on every `index.ts` | §7.385, DEPLOYMENT #103 |
 | **8.162** | 2026-11-12 | Owner's reply on prod: genders complete, Little Orcas one-child only; Ang PKG-2026-0002 open | DEPLOYMENT #102 |
 | **8.161** | 2026-11-12 | Prod data tidy: 4 Epic Swim test children deleted, Anya gender set | DEPLOYMENT #101 |

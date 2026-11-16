@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-16 (latest) — **The 2026-11-14 nightly red was a product race, fixed and live** (§8.165): the
-coach QR upload waits for its load (`a3d2fd6`). New `scripts/watch-deploy.sh` reports a push's deploy before CI. Next:
-**bill October, one tenant first.** Ang S$350 still waits on the owner._
+_Last updated: 2026-11-17 (latest) — **The billing engine is fast and live** (§8.166): engine v40 and `duration_ms` are
+on prod; Vercel runs in `sin1`. October modelled 39.6 s → 5.8 s, every amount byte-identical. Next: **bill October for
+Little Orcas + Epic Swim** (the first live `duration_ms`). Big months: `INVOICE_RUNBOOK.md` → *A big month*._
 
-_Previously (§8.164, 2026-11-12) — Invoice due dates + Overdue live: migration, public-invoice v3, engine v39, both apps._
+_Previously (§8.165, 2026-11-16) — The 11-14 nightly red was a product race (coach QR upload); fixed, live; `watch-deploy.sh`._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.166 (2026-11-16 → 17) — Billing engine: measured, batched, proven byte-identical, deployed
+
+**Shipped** (`0b09b09`, `47996d2`; DEPLOYMENT #106; `docs/plans/BILLING_ENGINE_SPEED.md`). First measured: October's
+30 s was round trips × ~300 ms, because Vercel ran in `iad1` (§7.392). The user moved both projects to `sin1`. The
+engine now reads one query per table per tenant-month (chunked `.in()`, keyset paging, §7.391). Emails run 5 at a time,
+gated to `RESEND_MAX_PER_SECOND` (default 2). `billing_runs.duration_ms` and `run_timings_ms` record each run.
+Byte-identical against `main` at 4 seed sizes plus 9 more runs. Deno 320 ×2, pgTAP green.
+
+- **Found:** prod is on Resend Free (100/day) and Supabase Free (150 s per request). Emails, not billing, now bound a
+  big month → runbook *A big month* + BACKLOG *Large-month invoice emails* (M).
+- **Not done:** no live `duration_ms` yet (Coach Kah Hang's October ran on v39). The Supabase functions refactor stays
+  a separate job. Nightly not dispatched.
+
 ## 8.165 (2026-11-16) — The 11-14 nightly red was a race in the PRODUCT; fixed, live; deploy watching scripted
 
 **Shipped** (`a3d2fd6`, `93f4cd8`; DEPLOYMENT #105): `verify-app-coach-settings` timed out on a file chooser once, the
@@ -364,18 +377,6 @@ after two hand-written post-push watchers failed silently.
   S-item check, 340 promoted to a CLAUDE.md line. `run-all-drivers.sh --only`'s preflight demands admin + edge functions
   even for a driver that needs neither; the two drivers were run directly instead (no DB reset).
 - **Not done:** October still unbilled; nightly not dispatched (none needed — the next scheduled run covers `a3d2fd6`).
-
-## 8.164 (2026-11-12) — Invoice due dates + Overdue, live end to end (UI restyle's last leftover)
-
-**Shipped** (`87c280a`…`047ab42`; DEPLOYMENT #104; PRD → invoice generation; ARCHITECTURE §6ah): the user's rule —
-due = SGT generated date + Days to pay (default 14), Overdue from the day after, Claimed beats it — stored at insert,
-decided in SQL, shown on every invoice surface and in the email/WhatsApp text; *Change due date* (later only, audited).
-Planned with `/plan-with-confidence` + `/plan-review` (`docs/plans/OVERDUE_INVOICES_PLAN.md`, 10 ranked risks inlined).
-
-- **Found:** the plan as first drafted would have shipped *Days to pay* unsaveable (§7.386) and a column-grant fix
-  `table_grants` forbids; review caught both. Due labels first hand-built months ("Sep"); now `formatSgDate` ("Sept").
-- **Not done:** no live "Please pay by" email yet (October's first tenant is the proof, plan §3 step 4); no prod
-  Days-to-pay save (no admin login here). Due-date history screen filed (BACKLOG).
 
 ## 9. Next steps (pick with the user)
 
@@ -394,8 +395,9 @@ Everything below is the monthly loop from here on:
    WhatsApp queue (Invoices → *WhatsApp reminders*, with the **Claimed** filter) is the
    chasing tool when a future month needs it.
 2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) and **Little Orcas September is SEALED**
-   (2026-10-12, 0 invoices — all package-funded or settled). **October is due now** (NEXT BUILD item 1 — one tenant first; the coach's
-   **NEEDS MARKING** list is the tracker). **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
+   (2026-10-12, 0 invoices — all package-funded or settled). **October: Coach Kah Hang BILLED + SEALED** (2026-11-16, 7 invoices, on v39).
+   **Little Orcas and Epic Swim October are next**: the first runs on engine v40, so read `billing_runs.duration_ms` afterwards
+   (plan §8; the coach's **NEEDS MARKING** list is the tracker). **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
    > apart from students**, so the head-count finally agrees with the number of marks the
    > lesson actually needs, and the **Classes tab lands on the class list** rather than
@@ -430,10 +432,10 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — Wave 9 (BACKLOG Build order)
 
-1. **Bill October — ONE tenant first** (`INVOICE_RUNBOOK.md`; first run on engine v39 with due dates). Then, by a bare
-   `scripts/prod-query-ro.sh`, check each new invoice's `due_date = (generated_at AT TIME ZONE 'Asia/Singapore')::date +
-   invoice_payment_days` and open one received email for **"Please pay by"** before generating the rest
-   (`docs/plans/OVERDUE_INVOICES_PLAN.md` §3 step 4). Save *Days to pay* once on prod and re-read it — not yet tried live.
+1. **Bill October for Little Orcas + Epic Swim** (`INVOICE_RUNBOOK.md`). Coach Kah Hang's October is done:
+   7 invoices, all 7 `due_date`s correct (generated + 14), all 7 emailed (prod read 2026-11-17). These are the first runs
+   on engine v40, so read `duration_ms` afterwards (plan §8; under ~1 s expected). Still untried live: a *Days to pay*
+   save on prod, and opening a received email to check for **"Please pay by"** (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
 2. **Read the next nightly before the next APP unit merges** — `a3d2fd6` (coach QR load) is the unit it must cover;
    its driver is `verify-app-coach-settings`. Never dispatch it unasked. Red → replay with
    `run-all-drivers.sh --only <driver> --now '<day> <time>+08'` (TESTING §5).

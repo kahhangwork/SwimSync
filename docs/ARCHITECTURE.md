@@ -732,6 +732,7 @@ the shape of the system changes:_
 | `…/20260711000100_credit_applications.sql` | Credit-note allocation ledger (fixes partial-application drift) |
 | `supabase/functions/generate-invoices/core.ts` | Billing engine logic (exported, tested) |
 | `supabase/functions/generate-invoices/index.ts` | Thin HTTP handler (auth + client + call core) |
+| `supabase/functions/generate-invoices/speed.test.ts` · `bench/` | Pins on the engine's batched reads, paging and email rate gate (`speed.test.ts`, in `test.sh`). `bench/` is a MANUAL harness, not in CI: it seeds a month, models latency and compares two engines byte for byte (`docs/plans/BILLING_ENGINE_SPEED.md`). |
 | `supabase/functions/generate-invoices/email.ts` | Invoice-email builders + Resend sender + `emailCreatedInvoices()` orchestration (§8c) |
 | `supabase/functions/public-package/` | The tokenised renewal-offer pay page's data source (core.ts + index.ts), the package mirror of `public-invoice`; `verify_jwt=false`, the 128-bit `public_token` is the access control. Refuses a SUSPENDED business (an offer is prepayment, unlike an invoice) — §8.60 |
 | `supabase/functions/credit-note-emails/email.ts` | Credit-note email builders + the PURE deciders (`authorizeCreditNoteEmail`, `isSendableNote`, `canEmailForTenant`, `shouldResetClaim`) + Resend sender. Scalars only — a builder cannot be handed a `students` row, so a live name is unreachable (§7.155) |

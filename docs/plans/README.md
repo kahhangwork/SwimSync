@@ -17,7 +17,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 
 | Plan | Status | What it is |
 |---|---|---|
-| BILLING_ENGINE_SPEED.md | IN PROGRESS — built + proven locally; deploy held for user review | Measured the 30 s October run (≈300 ms/round trip, iad1 ↔ SG), batched engine reads, Resend rate cap, `billing_runs.duration_ms`; byte-identical proof |
+| BILLING_ENGINE_SPEED.md | DONE — deployed 2026-11-17 (engine v40, DEPLOYMENT #106) | Measured the 30 s October run (≈300 ms/round trip, iad1 ↔ SG), batched engine reads, Resend rate cap, `billing_runs.duration_ms`; byte-identical proof |
 | ROLES_PERMISSIONS_PLAN.md | DONE (§8.131, deploy #58; P5 half — see BACKLOG) | Wave 1 lane 1 — owner-defined roles × 8 areas × None/View/Edit |
 | ROLES_ENFORCEMENT_MAP.md | CURRENT | Step 0 of the roles plan — every admin-gated policy/function/route → area + level |
 | CRASH_SAFE_EMAIL_CLAIM_PLAN.md | DONE (§8.131, deploy #57) | Wave 1 lane 2 — claim lease + Resend idempotency key; no auto-retry after 24 h |

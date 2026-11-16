@@ -35,13 +35,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338, 355, 356, 357, 360, 374 |
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
-| PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349 |
+| PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349, 391 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380, 386 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383, 390 |
-| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389 |
+| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389, 392 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387 |
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359, 384 |
 
@@ -3228,3 +3228,19 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     then, and the "load failed" guard ordered before the "not permitted" guard. `useCoachSettings.ts`, `a3d2fd6`.
     A timing-only red on an unchanged sha is a race in the PRODUCT until shown otherwise, not a flake to re-run.
 
+
+391. **A long `.in()` list fails on the URL, not the database: PostgREST answers HTTP 414.** supabase-js puts
+    `.in("id", ids)` in the query string. Locally 200 uuids pass and 300 fail; prod's limit is unknown. A caller that
+    ignores `error` reads the 414 as "no rows". The bench teardown did, and it leaked 2 tenants and 181 users in
+    silence. **Chunk at 100** (`readAllIn` in `generate-invoices/core.ts`). Pair it with §7.70: page a chunk
+    by **keyset** (`.gt(key, last).order(key).limit(n)`) against `count: "exact"`, never "stop at a short page". A
+    lower `max_rows` returns a short page that looks like the end, and offset paging skips a row inserted mid-read.
+    (2026-11-16, §8.166.)
+
+392. **Vercel runs API routes in `iad1` (Washington) unless told otherwise. The DB is in Singapore, so every
+    Supabase call from a route costs ~300 ms.** An Edge Function runs in the region nearest its caller, so the
+    billing engine inherited the same distance: October's 7 invoices took 30+ s. Both projects are now **`sin1`**.
+    **This is a dashboard-only setting** (Project → Settings → Functions → Region). No file in git records it, and a
+    new or re-created project falls back to the default. Check it with `curl -sI https://admin.swimsync.sg/api/<route>
+    | grep x-vercel-id`, which must read `sin1::sin1::…` (the first hop is the edge, the second is the function).
+    (2026-11-16, §8.166, DEPLOYMENT #106.)

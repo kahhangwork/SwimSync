@@ -166,6 +166,47 @@ Billing is based on **actual attendance**, so make sure last month is complete:
   **Change due date** (later only; recorded; the family is not messaged). Changing
   Days to pay never moves an invoice already generated.
 
+### A big month (hundreds of invoices) *(2026-11-17)*
+
+**Billing is fast. Emails are not.** One press creates every invoice in a few seconds (a modelled 179 invoices took
+under 5 s of generation). The parent emails then go out in the same press, **2 per second**. Two limits decide what
+happens next:
+
+| Limit | Value | What happens past it |
+|---|---|---|
+| Resend Free, emails per day | **100** (Resend → Settings → Usage) | Resend refuses the rest. Each one waits, unsent. |
+| Supabase Free, one request | **150 s** ≈ 280 emails at 2/s | The page shows an error, but every invoice was still created. |
+
+**Neither limit loses or doubles anything.** An unsent email is sent on a later press, under the same idempotency
+key. The rule is simply: *press Generate again for the same month.* It creates no new invoices; it sends the ones
+still unsent.
+
+**Before the run:**
+1. Count the invoices you expect, roughly one per family with billable lessons.
+2. If that count exceeds the emails you have left today on Resend → Usage, choose one:
+   - **Upgrade Resend** for that month. A paid plan has no daily cap (check resend.com/pricing). After upgrading, if
+     Resend's dashboard shows your rate limit is higher than 2 per second, also run
+     `supabase secrets set RESEND_MAX_PER_SECOND=<that number>`. No deploy is needed for the secret.
+   - **Or spread the emails over several days.** Bill now; each day, press Generate again for that month until
+     every email is out.
+
+**During and after:**
+1. Press **Generate** once. If the page errors after a long wait, **do not panic and do not delete anything.** The
+   invoices exist; check the Invoices page.
+2. **Wait 15 minutes, then press Generate again** for the same month. The wait releases the few emails that were
+   mid-send when the request was cut, so they are included. Repeat until everything is sent.
+3. **Check what is still unsent.** The admin shows no count yet (a backlog item). Run this in the SQL editor:
+   ```sql
+   SELECT count(*) FROM invoices
+   WHERE billing_month = '2026-10' AND tenant_id = '<the business>' AND invoice_email_sent_at IS NULL;
+   ```
+   When it reads 0, every family has its email.
+4. **Ignore Billing months → "may not have arrived" unless it lists something.** That list shows only emails whose
+   result is unknown after 24 hours. Use its **Resend** button for those.
+
+Fixing this properly (sends in the background, plus an unsent count on the card) is in `BACKLOG.md` →
+*Large-month invoice emails*.
+
 ---
 
 ## Good to know / gotchas
