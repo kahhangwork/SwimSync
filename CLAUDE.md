@@ -133,6 +133,10 @@ touching an unfamiliar subsystem.
 - A previous screen stays mounted and can physically overlay the current one, so
   `click({force:true})` presses the wrong element. (§7.10, §7.58)
 
+**Shell (the session shell is zsh)**
+- **`$CMD` with spaces runs as ONE command name, and `for x in $LIST` does not split** — put multi-word commands in a
+  `bash` script or spell them out. (§7.340 — bitten twice.)
+
 ## Conventions
 
 - **The nightly runs only when the user explicitly asks for it.** Never dispatch or re-run the CI nightly

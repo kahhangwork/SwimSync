@@ -40,8 +40,8 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388 |
-| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383 |
-| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383, 390 |
+| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387 |
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359, 384 |
 
@@ -2847,12 +2847,19 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     producer takes SIGPIPE (141), and the pipeline's status is the failure. G1's first draft called 2 of 82 dated
     pgTAP files date-free that way. Use `grep -q PAT <(cmd)`, `grep -m1`, or let awk limit. (Wave 7 lane2,
     2026-10-06, §8.140; `scripts/lib/pgtap-pin.sh`.)
+    - **Hit again (2026-11-16, §8.165):** `scripts/watch-deploy.sh`'s first draft did `curl "$js" | grep -qF` and
+      reported a 2 MB bundle that DID carry the string as "not this build". Found only because the string had been
+      grepped by hand minutes earlier. Fix: download into a variable, then grep a here-string. **Promotion filed** as a
+      BACKLOG S-item (a CI grep for `| grep -q` in pipefail scripts) — bitten twice, the note alone has failed.
 
 340. **The session shell is zsh: `for x in $LIST` does NOT word-split, and `echo` eats backslash escapes.** A loop
     over a space-separated variable ran ONCE with the whole string as `x` (three times in one session — a census,
     a file map, a migration builder), and `echo "\echo …"` became `cho …` (zsh `echo` turns `\e` into ESC), which
     aborted a psql rehearsal mid-transaction. Put multi-step shell in a `bash` script file, or use `${=LIST}` /
     `printf '%s\n'`. (Wave 7, 2026-10-06, §8.140.)
+    - **Hit again (2026-11-16, §8.165):** `P="docker exec … psql …"; $P < fixture.sql` — zsh ran the whole string as
+      ONE command name (`command not found`), so the fixture never applied and the driver's first check failed on
+      setup, not product. **Promoted** to a CLAUDE.md *Rules that bite* line (a habit no check can see).
 
 341. **`name::text` carries collation `"C"` — `results_eq` against a literal `VALUES` raises "could not determine which
     collation to use".** Catalog columns (`pg_proc.proname`) are type `name`. Emit `proname::text COLLATE "default"`
@@ -3205,4 +3212,19 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     driver's "a claimed invoice never reads Overdue" failed on a correct page because the fixture business is named
     "Overdue Driver Swim". Assert the absence of the rendered phrase (`was due`), and name fixture rows so they cannot
     contain the words under test. Costs one 100-second run each time; §7.140 is the opposite failure (a false PASS).
+
+389. **`gh run list --commit <SHORT sha>` matches NOTHING — `[]`, exit 0.** It needs the full 40-char sha. A post-push
+    watcher looping "until the CI run completes" therefore never fires, and from outside it looks exactly like a slow
+    CI run. Pass `"$(git rev-parse <sha>)"`. More generally: **a watcher must treat "query found nothing" as a failure
+    after a short grace, never as "not done yet"** — `scripts/watch-deploy.sh` does both (it is what `/deploy` Step 4
+    and `/commit-review` Step 5 run). The same session's other watcher gated the Vercel report behind CI, so the user
+    heard "deployed" long after the apps were live. (2026-11-16, §8.165.)
+
+390. **A button whose handler checks a permission loaded in an effect must be disabled until that load settles.**
+    `canEditQr` started `false`, the coach Settings upload was pressable at once, and an early press refused with the
+    WRONG reason ("Your school manages the payment QR code") to a private coach — opening no picker. Invisible on a fast
+    machine; the nightly hit it once (run 43533390943, a `filechooser` timeout, same sha green the nights around it).
+    Fix pattern: a `ready` flag set in the load's `finally` (also on failure), the button disabled + "Loading…" until
+    then, and the "load failed" guard ordered before the "not permitted" guard. `useCoachSettings.ts`, `a3d2fd6`.
+    A timing-only red on an unchanged sha is a race in the PRODUCT until shown otherwise, not a flake to re-run.
 

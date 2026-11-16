@@ -655,6 +655,7 @@ the shape of the system changes:_
 | Path | What |
 |------|------|
 | `DESIGN.md` · `docs/plans/UI_RESTYLE_PLAN.md` | The visual system (final) and the restyle's step-by-step plan; §3 of the plan is the landing state |
+| `scripts/watch-deploy.sh <sha> [--expect <url> <string>]… [--no-ci]` | After a push to `main`: prints DEPLOY / LIVE / CI / FAIL as each is known (run under Monitor); "found nothing" is a FAIL, every phase has a deadline (§7.389). `/deploy` Step 4, `/commit-review` Step 5. |
 | `scripts/check-visual-only.sh <base> <head>` | Advisory: is a range a VISUAL-ONLY restyle (the relaxed gate, plan §6)? Its never-visual list overrides the path list (§7.363) |
 | `brand/` (+ `brand/render.mjs`) | Logo 2a sources; `render.mjs` rasterises every PNG/ICO through the drivers' playwright-core — regenerate, never hand-edit a raster |
 | `{SwimSyncAdmin,SwimSyncApp}/lib/designTokens.drift.test.ts` | Twins: `DESIGN.md`'s colours, radii and font sizes equal each Tailwind config |

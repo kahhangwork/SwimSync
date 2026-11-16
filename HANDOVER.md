@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-12 (latest) — **Invoice due dates + Overdue live** (§8.164): migration, public-invoice v3,
-generate-invoices v39 and both apps, in order; *Change due date* and *Days to pay* in admin. Next: **bill October, one
-tenant first** (check due dates + one email), then read the nightly. Ang S$350 still waits on the owner._
+_Last updated: 2026-11-16 (latest) — **The 2026-11-14 nightly red was a product race, fixed and live** (§8.165): the
+coach QR upload waits for its load (`a3d2fd6`). New `scripts/watch-deploy.sh` reports a push's deploy before CI. Next:
+**bill October, one tenant first.** Ang S$350 still waits on the owner._
 
-_Previously (§8.163, 2026-11-12) — CI's CDN flakes fixed: Edge Functions on `npm:` supabase-js, Deno cache, every `index.ts` type-checked._
+_Previously (§8.164, 2026-11-12) — Invoice due dates + Overdue live: migration, public-invoice v3, engine v39, both apps._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.165 (2026-11-16) — The 11-14 nightly red was a race in the PRODUCT; fixed, live; deploy watching scripted
+
+**Shipped** (`a3d2fd6`, `93f4cd8`; DEPLOYMENT #105): `verify-app-coach-settings` timed out on a file chooser once, the
+same sha green around it. Cause: coach Settings' upload was pressable before its permission load, so an early press
+refused a private coach with "your school manages the QR" (§7.390). Now disabled + "Loading…" until loaded; 4 hook
+tests + 1 card test, each mutation-proven; the driver saves a FAIL screenshot. Then `scripts/watch-deploy.sh` (§7.389),
+after two hand-written post-push watchers failed silently.
+
+- **Found:** §7.339 (`| grep -q` + pipefail) and §7.340 (zsh `$CMD`) each bit a second time — 339 filed as a BACKLOG
+  S-item check, 340 promoted to a CLAUDE.md line. `run-all-drivers.sh --only`'s preflight demands admin + edge functions
+  even for a driver that needs neither; the two drivers were run directly instead (no DB reset).
+- **Not done:** October still unbilled; nightly not dispatched (none needed — the next scheduled run covers `a3d2fd6`).
+
 ## 8.164 (2026-11-12) — Invoice due dates + Overdue, live end to end (UI restyle's last leftover)
 
 **Shipped** (`87c280a`…`047ab42`; DEPLOYMENT #104; PRD → invoice generation; ARCHITECTURE §6ah): the user's rule —
@@ -363,16 +376,6 @@ Planned with `/plan-with-confidence` + `/plan-review` (`docs/plans/OVERDUE_INVOI
   `table_grants` forbids; review caught both. Due labels first hand-built months ("Sep"); now `formatSgDate` ("Sept").
 - **Not done:** no live "Please pay by" email yet (October's first tenant is the proof, plan §3 step 4); no prod
   Days-to-pay save (no admin login here). Due-date history screen filed (BACKLOG).
-
-## 8.163 (2026-11-12) — CI's CDN flakes fixed; Edge Function entry points type-checked
-
-**Shipped** (`a4bf508`, `197c7da`; DEPLOYMENT #103): the two red CI runs (`3adfced`, `03256d8`) were CDN bytes failing
-`deno.lock`, not code. Fix: Edge Functions import `npm:@supabase/supabase-js@2.110.2` (all 5 redeployed) and CI caches
-Deno modules — the next run was a cache hit (§7.385). A new CI `deno check` over every `index.ts` caught, and the fix
-cleared, 10 latent type errors in `package-emails` (§7.106).
-
-- **Not done:** package-emails / credit-note-emails not exercised live (DEPLOYMENT #103); `197c7da` not deployed
-  (type-only). Vendoring refused (BACKLOG *Deliberately not doing*). October still unbilled.
 
 ## 9. Next steps (pick with the user)
 
@@ -414,8 +417,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-12:** latest `43135062308` GREEN on `03256d8` — it covers all five §8.160 app units and `3d1626d`'s
-runtime wait, so the §9 gate is clear. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-16:** latest `43774448116` GREEN on `74ef34a` (covers `047ab42`, Overdue). The one red between,
+`43533390943` (11-14, `verify-app-coach-settings`), was a product race — fixed in `a3d2fd6` (§7.390), not a flake. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -431,8 +434,8 @@ which mutate shared seed state — are in the same section.
    `scripts/prod-query-ro.sh`, check each new invoice's `due_date = (generated_at AT TIME ZONE 'Asia/Singapore')::date +
    invoice_payment_days` and open one received email for **"Please pay by"** before generating the rest
    (`docs/plans/OVERDUE_INVOICES_PLAN.md` §3 step 4). Save *Days to pay* once on prod and re-read it — not yet tried live.
-2. **Read the next nightly before the next APP unit merges** — `047ab42` (Overdue) is the unit it must cover; its own
-   driver is `verify-invoice-overdue` (TESTING §5). Never dispatch it unasked. Red → replay with
+2. **Read the next nightly before the next APP unit merges** — `a3d2fd6` (coach QR load) is the unit it must cover;
+   its driver is `verify-app-coach-settings`. Never dispatch it unasked. Red → replay with
    `run-all-drivers.sh --only <driver> --now '<day> <time>+08'` (TESTING §5).
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).

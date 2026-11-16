@@ -1352,3 +1352,11 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     Apps `047ab42` (from `1b5d3c8`, `56ca854`): live admin `invoices/page-*.js` carries "Change due date", the app
     `entry-*.js` "was due"; CI green. **Not done:** a prod Days-to-pay save (no admin login here; proven locally through
     the real PATCH by `verify-invoice-overdue`).
+
+105. **Deploy record (2026-11-16): coach QR upload waits for its load (app only) + `scripts/watch-deploy.sh`.**
+    `a3d2fd6` fixes the 2026-11-14 nightly red (§7.390): the Settings upload is disabled and reads "Loading…" until the
+    coach's billing permission loads. No backend piece. Live `entry-*.js` on swimsync.sg carries
+    `disabled:!j,label:j?…"Upload QR Code"` (it had no `disabled` before); Vercel both `success`; CI 43872162611 green.
+    `93f4cd8` (tooling only — no deployed behaviour) is the first push watched by `scripts/watch-deploy.sh` under
+    Monitor, which is now how `/deploy` Step 4 and `/commit-review` Step 5 confirm a push (§7.389).
+

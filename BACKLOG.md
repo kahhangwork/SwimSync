@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-11-12 — **Overdue shipped** (*UI restyle leftovers*' last item: due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`, plan `docs/plans/OVERDUE_INVOICES_PLAN.md`); *Show an invoice's due-date change history* (S) filed. Earlier 2026-11-12 — *Refuse a missing gender in the database too* shipped (`20261111000100`, on prod); *UI restyle leftovers*: Join tab, reset-password account, public package link and Packages settings shipped — Overdue left, parked (user, 2026-11-11). 2026-11-11 — *Cancelling a package request has no confirmation* shipped. 2026-10-16 — admins now record gender (`20261016000100`); *Refuse a missing gender in the database too* (S) filed. Earlier: *UI restyle leftovers*: Toast, the money formatter and the gender default shipped. 2026-10-14 — **UI restyle COMPLETE (Phase 7)** — *UI/UX improvements* replaced by *UI restyle leftovers* (two 7.2 audit findings + the verified-open fold-ins). **UI restyle Phase 6 shipped** (every email; nothing filed). **UI restyle Phase 5 shipped** (admin panel: S4 — reason shown, Generate not disabled —, S8, S9, most of S10 and the admin fold-ins closed; *Admin tables still carrying several inline row actions*, *Deleting a role has no confirmation step* and *The admin Modal's close (X) button has no accessible name* filed). **UI restyle Phase 4 shipped** (auth + public screens; public `S$` and bad-token fold-ins closed; *Superadmin access only* copy filed). 2026-10-13 — **UI restyle Phase 3 shipped** (S3, S6 and the parent fold-ins; follow-up *Cancelling a package request has no confirmation* filed). **Legacy package matcher removed** (Wave 9 item 9; follow-up *Simplify the admin's live-balance display* filed). **UI restyle Phases 1–2 shipped** (primitives, status scale — S7 Overdue still open —, admin shell S5, all eight coach screens); 1.5 capture fold-ins filed. 2026-10-12 — **Legacy matcher un-gated** (Little Orcas sealed September). **UI restyle under way** (Wave 9 item 8): logo, tokens, S1 *Coach Schedule*, Geist and S2 *tab bars* shipped (Geist open question removed — answered); the work follows `docs/plans/UI_RESTYLE_PLAN.md`. 2026-10-11 — **Single-child packages shipped** (Wave 9 item 7; follow-up *Name the child in package emails* filed). 2026-10-10 — **Wave 9 ranked:** *Single-child packages* (L, Little Orcas' request; plan `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`) then *UI/UX improvements* (M, audit first); *Remove the legacy package matcher* (M) waits for Little Orcas' September seal. Earlier the same day: the three Foundations S-items from §8.144 shipped. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice). Earlier: 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1727,6 +1727,16 @@ real tenant asks — that is the one honest reason, and nobody has.
 
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
+
+### A CI grep for `| grep -q` in pipefail scripts — **S** — _filed 2026-11-16 (§7.339 promotion)_
+Fail `repo-invariants` when a `.sh` file that sets `pipefail` pipes into `grep -q` (or `grep -qF`/`-qE`).
+
+**Why:** §7.339 has bitten twice — G1's first draft (2026-10-06) and `scripts/watch-deploy.sh`'s first draft
+(2026-11-16) — each time a MATCH reported as a miss, which a check reads as "not there" and passes or fails wrongly.
+The note did not stop the second; a grep that fires without anyone reading would.
+
+**Notes:** the safe forms are `grep -q PAT <(cmd)`, a here-string of a captured variable, or `grep -m1`. Scope it to
+`scripts/` and `.claude/skills/**/drivers/*.sh`; prove it red on a planted line before wiring it in (§7.25).
 
 ### `pressByText` should press a link itself, not its wrapper — **S** — _filed 2026-11-12 (§7.382)_
 `drivers/lib.mjs` `pressByText` dispatches on the matched leaf's `parentElement`. An expo-router `<Link>` IS the leaf

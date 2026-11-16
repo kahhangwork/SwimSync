@@ -1506,7 +1506,7 @@ with its own fixture + teardown (UUID prefix `ac{1,2,3}00000-…`, emails `app-{
 | `verify-app-auth` | `fixtures-app-auth` | 29 | ONE-SHOT login ×2 roles (§7.263), change password, forgot → Mailpit, reset + accept-invite through real `generateLink` links, parent Sign Out. Steps 4 and 5 HOLD the layout's `profiles` read 4 s and assert the typed form survives the late session restore (§7.274 — proven red without `showAuthScreen`, 7 checks). **Needs Expo on exactly :8081** (§7.268) |
 | `verify-app-home-writes` | `fixtures-app-home-writes` | 10 | dismiss a declined claim; register WITH a join code → the first Home load joins once |
 | `verify-app-money` | `fixtures-app-money` (its OWN tenant) | 33 | Invoice Detail's *I've paid*; referral Copy; `/package/<token>` in and out, request-header NAMES only (§7.264); that page's own *I've paid* logged OUT (one bare POST, `paid_claimed_at` stamped, stays `pending`, survives reload); C3 that page's *different package?* link (signed out → Sign In, signed in → Billing on Packages, real link clicks §7.382); cancel a package request, which asks first (exactly one *Discard* confirm) |
-| `verify-app-coach-settings` | none (restores the seed PayNow QR in `finally`) | 6 | coach QR upload; coach Sign Out |
+| `verify-app-coach-settings` | none (restores the seed PayNow QR in `finally`) | 6 | coach QR upload (waits for the button to leave "Loading…", §7.390); coach Sign Out; a throw saves `app-coach-settings-FAIL.png` |
 
 Mutation-proven (§7.25) except auth's "old password no longer works" (needs a GoTrue change); the package page's
 *I've paid* was proven red by sending `action: "claimX"` (5 checks fail). The source scripts stay in `docs/refactor/` as
