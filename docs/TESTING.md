@@ -1750,6 +1750,13 @@ until a reset, so this caution stands.
   throws and leaves the invoice, the tenant delete cascades the log (§7.258). Red under each of RISK 1/3/5.
 - **vitest `lib/billingMonths.test.ts`** (27) — the month states, the D2 cap (an open month is never hidden, even
   behind 20 closed), the D6 run-day flip, RISK 6/7/8, the fail-safe raw status. 8 deliberate mutations, each caught.
+- **Added 2026-11-16 (billing engine speed, `docs/plans/BILLING_ENGINE_SPEED.md`):** `billing_runs.test.sql` +4
+  (`duration_ms` exists, integer, nullable, negative refused — red with the column dropped); `runLog.test.ts` +1 and
+  the RISK 1 read-back now checks `duration_ms` (scoped = handler time, cron = each tenant's own); **Deno
+  `speed.test.ts`** (6, in `test.sh`) — engine reads do not grow with classes/parents (counted per table, 1 vs 4
+  classes), Resend starts spaced to the cap, five workers on one invoice send once, `readPaged` complete under a
+  server row cap and fail-closed on error/missing count, keyset paging against real PostgREST. Byte-identical
+  before/after is the **manual** harness `generate-invoices/bench/` (`bench.sh` + `compare.py`), not part of CI.
 - **No driver covers the Dashboard alert or "Show all"** — hand-checked (tenant admin sees the alert, platform
   admin does not; 4 → 7 → 4 rows). Plan: `docs/plans/BILLING_MONTHS_PLAN.md` §11.
 

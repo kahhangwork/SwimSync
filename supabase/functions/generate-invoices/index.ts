@@ -30,6 +30,23 @@ import {
   shouldRetryTenantEmails,
 } from "./email.ts";
 
+/** One line per run in the Edge Function log — the timing record that also
+ *  covers emails, which the run row cannot (it is written before them). */
+function logTimings(
+  result: { billing_month: string; tenant_id?: string; invoices_created?: number; timings_ms?: unknown; per_tenant?: unknown[] },
+  timings: Record<string, number>
+) {
+  console.log(
+    `[generate-invoices] timings ${JSON.stringify({
+      billing_month: result.billing_month,
+      tenant_id: result.tenant_id ?? null,
+      invoices_created: result.invoices_created ?? 0,
+      run_ms: timings,
+      engine_ms: result.per_tenant ? undefined : result.timings_ms,
+    })}`
+  );
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
@@ -73,6 +90,13 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // Run timing (BILLING ENGINE SPEED, 2026-11-16): generation is stored on the
+  // run row (billing_runs.duration_ms); the email steps run AFTER that row is
+  // written, so their times — and the total — are in the response and the log.
+  const t0 = performance.now();
+  const ms = (from: number) => Math.round(performance.now() - from);
+  const emailMaxPerSecond = Number(Deno.env.get("RESEND_MAX_PER_SECOND")) || undefined;
+
   let blockedAlerts = 0;
   // Set once the run's own rows are written, so a failure LATER in the handler
   // (an alert or email step) cannot add an "error" row for a run that billed.
@@ -83,12 +107,13 @@ Deno.serve(async (req: Request) => {
     // Inside the try so a failure records an error run for a scoped run.
     opts = await withDbNow(opts, supabase, { supabaseUrl: Deno.env.get("SUPABASE_URL") });
     const result = await generateInvoices(supabase, opts);
+    const generateMs = ms(t0);
 
     // Record the attempt BEFORE any email: billing has committed, and a slow or
     // failing email step must not lose the record of what the run did. This is
     // also what lets the admin's Billing months card show the truth after a
     // client-side timeout. Best-effort — never throws (runLog.ts).
-    await recordRuns(supabase, toRunRows(result, opts));
+    await recordRuns(supabase, toRunRows(result, opts, generateMs));
     runRecorded = true;
 
     // Generation refused: unmarked attendance. Nobody would otherwise find out
@@ -121,7 +146,9 @@ Deno.serve(async (req: Request) => {
       // there is nothing to email; a multi-tenant run may still have billed
       // other tenants successfully and falls through to the email step below.
       if (!result.per_tenant) {
-        return json({ ...result, emails_sent: 0, blocked_alerts_sent: alerts });
+        const timings = { generate: generateMs, emails: 0, retry: 0, total: ms(t0) };
+        logTimings(result, timings);
+        return json({ ...result, emails_sent: 0, blocked_alerts_sent: alerts, run_timings_ms: timings });
       }
       blockedAlerts = alerts;
     }
@@ -132,7 +159,9 @@ Deno.serve(async (req: Request) => {
     const emailEnv = {
       apiKey: Deno.env.get("RESEND_API_KEY"),
       appUrl: Deno.env.get("APP_URL"),
+      maxPerSecond: emailMaxPerSecond,
     };
+    const tEmails = performance.now();
     const { emailsSent } = await emailCreatedInvoices(
       supabase,
       result.created ?? [],
@@ -146,6 +175,8 @@ Deno.serve(async (req: Request) => {
     //
     // ⚠ RISK 3: never email on behalf of a SUSPENDED tenant, nor an AUTO-DISABLED
     // tenant on an automatic run (a manual run for it is an explicit instruction).
+    const emailsMs = ms(tEmails);
+    const tRetry = performance.now();
     const isManual = opts.mode === "manual";
     let emailsRetried = 0;
     for (const run of result.per_tenant ?? [result]) {
@@ -162,17 +193,20 @@ Deno.serve(async (req: Request) => {
       emailsRetried += n;
     }
 
+    const timings = { generate: generateMs, emails: emailsMs, retry: ms(tRetry), total: ms(t0) };
+    logTimings(result, timings);
     return json({
       ...result,
       emails_sent: emailsSent,
       emails_retried: emailsRetried,
       blocked_alerts_sent: blockedAlerts,
+      run_timings_ms: timings,
     });
   } catch (e) {
     // A scoped run that threw is still an attempt the admin must be able to
     // see ("last run failed: …"). recordRuns never throws, so this cannot mask
     // the original error.
-    if (!runRecorded) await recordRuns(supabase, toErrorRows(opts, e));
+    if (!runRecorded) await recordRuns(supabase, toErrorRows(opts, e, ms(t0)));
     return json({ error: (e as Error).message }, 500);
   }
 });

@@ -466,11 +466,52 @@ export type InvoiceSendResult = {
   outcome?: SendOutcome;
 };
 
+/** Delivery options shared by every invoice-email path. */
+export type EmailSendOpts = {
+  apiKey?: string;
+  appUrl?: string;
+  /** Resend sends per second, at most. Default RESEND_DEFAULT_MAX_PER_SECOND. */
+  maxPerSecond?: number;
+};
+
+/** How many invoices are in claim → send → settle at the same time. */
+export const EMAIL_CONCURRENCY = 5;
+
+/** Resend's documented default team limit has read 2, 5 and 10 req/s on
+ *  different pages of its docs; a send over it gets a 429, which outcomeForStatus
+ *  maps to "rejected" — the claim is released and the email waits for the next
+ *  run. 2 is the strictest figure, so it is the default; raise it with the
+ *  RESEND_MAX_PER_SECOND secret once the team's real limit is confirmed on
+ *  Resend's Usage page. Sequential sends from the same region as the DB could
+ *  already exceed 2/s, so this gate matters even without concurrency. */
+export const RESEND_DEFAULT_MAX_PER_SECOND = 2;
+
+// Start time of the most recent Resend call in this isolate. Module-level so
+// the created-invoice pass and the retry pass of one invocation share it.
+let lastResendStart = 0;
+let gateChain: Promise<void> = Promise.resolve();
+
+/** Wait until starting a Resend call keeps this isolate under `maxPerSecond`.
+ *  Calls are serialised through a promise chain so concurrent workers queue
+ *  instead of all reading the same `lastResendStart`. */
+export function resendGate(maxPerSecond?: number): Promise<void> {
+  const rate = maxPerSecond && maxPerSecond > 0 ? maxPerSecond : RESEND_DEFAULT_MAX_PER_SECOND;
+  const spacing = 1000 / rate;
+  const turn = gateChain.then(async () => {
+    const wait = lastResendStart + spacing - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastResendStart = Date.now();
+  });
+  gateChain = turn.catch(() => {});
+  return turn;
+}
+
 // Claim, send and settle one email per invoice in the batch. Resolves
 // recipients and branding ONCE for the batch, then per invoice: claim → send
 // with its Idempotency-Key → settle from the outcome. The claim is taken per
-// invoice, immediately before its send, so a crash strands at most the ONE
-// in-flight invoice — and even that only for its 15-minute lease.
+// invoice, immediately before its send, so a crash strands at most the
+// in-flight invoices (EMAIL_CONCURRENCY of them, since 2026-11-16) — and even
+// those only for their 15-minute lease.
 // NEVER throws — any failure is logged and swallowed, and one invoice's failure
 // never blocks the rest (a try/catch per invoice). A no-op when there are no
 // invoices; without an apiKey each claim is released again (no_api_key).
@@ -483,12 +524,12 @@ export type InvoiceSendResult = {
 async function emailInvoices(
   supabase: SupabaseClient,
   invoices: CreatedInvoice[],
-  opts: { apiKey?: string; appUrl?: string; manual?: boolean } = {}
+  opts: EmailSendOpts & { manual?: boolean } = {}
 ): Promise<{ emailsSent: number; results: InvoiceSendResult[] }> {
   if (!invoices.length) return { emailsSent: 0, results: [] };
   const appUrl = opts.appUrl ?? DEFAULT_APP_URL;
   let emailsSent = 0;
-  const results: InvoiceSendResult[] = [];
+  const results: InvoiceSendResult[] = new Array(invoices.length);
 
   try {
     const parentIds = [...new Set(invoices.map((c) => c.parent_id))];
@@ -533,16 +574,25 @@ async function emailInvoices(
       studentName[row.id] = row.full_name ?? "";
     }
 
-    for (const inv of invoices) {
+    // Up to EMAIL_CONCURRENCY invoices go through claim → send → settle at
+    // once (BILLING ENGINE SPEED, 2026-11-16). Each invoice's own sequence is
+    // unchanged — it claims before it sends and settles after — and the claim
+    // row-locks, so two workers can never send one invoice. Only the waiting
+    // overlaps. Results keep the INPUT order (resendInvoiceEmail reads [0]).
+    const sendOne = async (inv: CreatedInvoice, idx: number): Promise<void> => {
       try {
         const claim = await claimInvoiceEmail(supabase, inv.invoice_id, opts.manual ?? false);
         if (!claim) {
-          results.push({ invoiceId: inv.invoice_id, claimed: false, sent: false });
-          continue;
+          results[idx] = { invoiceId: inv.invoice_id, claimed: false, sent: false };
+          return;
         }
 
         const info = parentInfo[inv.parent_id];
         const brand = tenantInfo[inv.tenant_id];
+        // Hold to Resend's per-second limit before the call that counts
+        // against it. Skipped when nothing will be sent (no key / no address):
+        // sendInvoiceEmail returns before any network call then.
+        if (opts.apiKey && info?.email) await resendGate(opts.maxPerSecond);
         // sendInvoiceEmail never throws, so the settle below always runs.
         const r = await sendInvoiceEmail({
           apiKey: opts.apiKey,
@@ -569,15 +619,26 @@ async function emailInvoices(
         const action = settleActionFor(r.outcome);
         await settleInvoiceEmail(supabase, inv.invoice_id, claim.claimedAt, action);
 
-        results.push({ invoiceId: inv.invoice_id, claimed: true, sent: action === "sent", outcome: r.outcome });
+        results[idx] = { invoiceId: inv.invoice_id, claimed: true, sent: action === "sent", outcome: r.outcome };
         if (action === "sent") emailsSent++;
         else console.log(`invoice email not sent (${inv.invoice_id}): ${r.reason} [claim ${action}]`);
       } catch (e) {
         // A throw here leaves any claim to its lease — it heals in 15 minutes.
         console.log(`invoice email threw (${inv.invoice_id}): ${(e as Error).message}`);
-        results.push({ invoiceId: inv.invoice_id, claimed: false, sent: false });
+        results[idx] = { invoiceId: inv.invoice_id, claimed: false, sent: false };
       }
-    }
+    };
+
+    let next = 0;
+    const worker = async () => {
+      while (next < invoices.length) {
+        const idx = next++;
+        await sendOne(invoices[idx], idx);
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(EMAIL_CONCURRENCY, invoices.length) }, worker)
+    );
   } catch (e) {
     // Never let the email step fail the caller — invoices are already committed.
     console.log(`invoice email step error: ${(e as Error).message}`);
@@ -595,7 +656,7 @@ async function emailInvoices(
 export async function emailCreatedInvoices(
   supabase: SupabaseClient,
   created: CreatedInvoice[],
-  opts: { apiKey?: string; appUrl?: string } = {}
+  opts: EmailSendOpts = {}
 ): Promise<{ emailsSent: number }> {
   if (!created.length) return { emailsSent: 0 };
   const { emailsSent } = await emailInvoices(supabase, created, opts);
@@ -692,7 +753,7 @@ export async function retryUnsentInvoiceEmails(
   supabase: SupabaseClient,
   tenantId: string,
   billingMonth: string,
-  opts: { apiKey?: string; appUrl?: string; excludeIds?: string[] } = {}
+  opts: EmailSendOpts & { excludeIds?: string[] } = {}
 ): Promise<{ emailsRetried: number }> {
   try {
     let discover = supabase
@@ -753,7 +814,7 @@ export type ResendInvoiceResult = {
 export async function resendInvoiceEmail(
   supabase: SupabaseClient,
   invoiceId: string,
-  opts: { apiKey?: string; appUrl?: string } = {}
+  opts: EmailSendOpts = {}
 ): Promise<ResendInvoiceResult> {
   try {
     const { data: row, error } = await supabase

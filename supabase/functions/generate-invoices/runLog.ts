@@ -56,6 +56,9 @@ export type RunRow = {
   unclaimed_students: unknown[] | null;
   message: string | null;
   error: string | null;
+  /** Generation ms for this tenant, emails EXCLUDED (20261116000100). NULL when
+   *  not measured. */
+  duration_ms: number | null;
 };
 
 /** Who pressed Generate. Only a well-formed UUID is kept: a malformed value
@@ -71,7 +74,13 @@ function ranBy(opts: GenerateOptions): string | null {
  * its own tenant's result; a cron run carries `per_tenant`. Entries with no
  * tenant_id, and every non-attempt status, produce nothing.
  */
-export function toRunRows(result: GenerateResult, opts: GenerateOptions): RunRow[] {
+export function toRunRows(
+  result: GenerateResult,
+  opts: GenerateOptions,
+  /** A scoped (admin) run's whole generation time, clock read included. A cron
+   *  run's rows each carry their own tenant's engine time instead. */
+  scopedDurationMs?: number
+): RunRow[] {
   const runs = result.per_tenant ?? [result];
   return runs
     .filter((r) => !!r.tenant_id && !NON_ATTEMPT_STATUSES.has(r.status))
@@ -90,7 +99,13 @@ export function toRunRows(result: GenerateResult, opts: GenerateOptions): RunRow
       unclaimed_students: r.unclaimed_students?.length ? r.unclaimed_students : null,
       message: r.message ?? null,
       error: null,
+      duration_ms: durationFor(result.per_tenant ? undefined : scopedDurationMs, r),
     }));
+}
+
+function durationFor(scopedMs: number | undefined, r: GenerateResult): number | null {
+  const ms = scopedMs ?? r.timings_ms?.total;
+  return typeof ms === "number" && Number.isFinite(ms) && ms >= 0 ? Math.round(ms) : null;
 }
 
 /**
@@ -98,7 +113,7 @@ export function toRunRows(result: GenerateResult, opts: GenerateOptions): RunRow
  * cron-wide crash has no tenant to file it under (the function log covers it,
  * and cron is off). Returns [] when it cannot be attributed.
  */
-export function toErrorRows(opts: GenerateOptions, e: unknown): RunRow[] {
+export function toErrorRows(opts: GenerateOptions, e: unknown, durationMs?: number): RunRow[] {
   if (!opts.tenant_id || !opts.billing_month) return [];
   const msg = e instanceof Error ? e.message : String(e);
   return [
@@ -118,6 +133,10 @@ export function toErrorRows(opts: GenerateOptions, e: unknown): RunRow[] {
       message: null,
       // ⚠ RISK 11: the message only — never a stack, never the raw object.
       error: msg.slice(0, ERROR_MAX_CHARS),
+      duration_ms:
+        typeof durationMs === "number" && Number.isFinite(durationMs) && durationMs >= 0
+          ? Math.round(durationMs)
+          : null,
     },
   ];
 }

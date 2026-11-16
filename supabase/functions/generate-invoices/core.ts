@@ -48,6 +48,104 @@ import { earliestBlockingEarlierMonth } from "./orderingGuard.ts";
 // Per PRD 5.4: only Present and Paid Trial are billable.
 export const BILLABLE = new Set(["present", "trial_paid"]);
 
+// ── Batched reads (BILLING ENGINE SPEED, 2026-11-16) ───────────────────────
+// The engine used to ask one question per CLASS (six queries each) and two per
+// PARENT. Every question is a network round trip, and on prod a round trip
+// cost ~300 ms (admin API in Vercel iad1, DB in ap-southeast-1), so October's
+// run took 30+ s for 7 invoices. Each table is now read ONCE per tenant-month
+// and grouped in memory; the per-class loop below receives the same rows it
+// used to fetch, so nothing it computes can change.
+//
+// ⚠ IN_CHUNK — an .in() list rides the URL. Locally 200 uuids pass and 300 are
+// refused with 414; prod's limit is not known, so 100 leaves room.
+// ⚠ PAGING BY COUNT, NOT BY A SHORT PAGE. PostgREST silently caps a response
+//   at max_rows. Stopping at "fewer rows than I asked for" would truncate if a
+//   project's cap were ever set below the page size — a missing attendance row
+//   is a missing line on an invoice. Every batched read asks for an exact count
+//   and keeps reading until a page holds every remaining row.
+// ⚠ KEYSET, NOT OFFSET. Pages continue from the last key (`key > last`), so a
+//   row inserted mid-read (a coach marking while the run reads) can at most be
+//   NOT SEEN YET — it can never shift an existing row off a page boundary, which
+//   offset paging could.
+// ⚠ A READ ERROR THROWS. The per-class reads these replace swallowed errors
+//   into empty data, which in the worst case let a class with an unreadable
+//   session list fall out of the gate and the month seal over it. Every batched
+//   read happens before any invoice is written, so a throw costs a retry and
+//   nothing else (index.ts records it as an error run).
+const IN_CHUNK = 100;
+const PAGE = 1000;
+
+// deno-lint-ignore no-explicit-any
+type CountedQuery = any; // a supabase-js select built with { count: "exact" }
+
+/** Every row of a counted query, keyset-paged by `orderKey` — a column that
+ *  is unique within the query AND selected (the next page starts after it). */
+export async function readPaged<T>(
+  build: () => CountedQuery,
+  orderKey: string,
+  what: string,
+  /** Rows per request. Tests only — production uses PAGE. */
+  pageSize: number = PAGE
+): Promise<T[]> {
+  const out: T[] = [];
+  let last: string | null = null;
+  for (;;) {
+    let q = build();
+    if (last !== null) q = q.gt(orderKey, last);
+    const { data, error, count } = await q.order(orderKey).limit(pageSize);
+    if (error) throw new Error(`${what}: ${error.message}`);
+    // `count` is how many rows remain past `last`, so a page that holds that
+    // many is the final one.
+    if (count === null || count === undefined) {
+      throw new Error(`${what}: no row count returned`);
+    }
+    const rows = (data ?? []) as Record<string, unknown>[];
+    out.push(...(rows as T[]));
+    if (rows.length >= count) return out;
+    if (rows.length === 0) throw new Error(`${what}: ${count} rows reported but none returned`);
+    const key = rows[rows.length - 1][orderKey];
+    if (typeof key !== "string") throw new Error(`${what}: page key ${orderKey} not selected`);
+    last = key;
+  }
+}
+
+/** Every row matching an .in() over `ids`, chunked and paged. Empty ids → no request. */
+async function readAllIn<T>(
+  ids: readonly string[],
+  build: (chunk: string[]) => CountedQuery,
+  what: string
+): Promise<T[]> {
+  const unique = [...new Set(ids)];
+  const out: T[] = [];
+  for (let i = 0; i < unique.length; i += IN_CHUNK) {
+    const chunk = unique.slice(i, i + IN_CHUNK);
+    out.push(...(await readPaged<T>(() => build(chunk), "id", what)));
+  }
+  return out;
+}
+
+function groupBy<T>(rows: readonly T[], key: (r: T) => string): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = key(r);
+    const list = m.get(k);
+    if (list) list.push(r);
+    else m.set(k, [r]);
+  }
+  return m;
+}
+
+/** Wall-clock milliseconds spent in each part of one tenant's run. */
+export type RunTimings = {
+  /** Settings, seal, ordering guard, run day. */
+  guards: number;
+  /** Phase 1: the batched reads, the class loop, settlements, drawn lessons. */
+  tally: number;
+  /** Phase 2: invoice writes and credit, plus the seal. */
+  invoices: number;
+  total: number;
+};
+
 export type GenerateOptions = {
   mode?: string;
   force?: boolean;
@@ -159,6 +257,9 @@ export type GenerateResult = {
   message?: string;
   results?: unknown[];
   created?: CreatedInvoice[];
+  /** Per-tenant timing, on every run that ATTEMPTED to bill (absent on the
+   *  early-return refusals, which write no run row either — runLog.ts). */
+  timings_ms?: RunTimings;
 };
 
 /**
@@ -224,6 +325,7 @@ async function generateForTenant(
   tenantId: string,
   opts: GenerateOptions = {}
 ): Promise<GenerateResult> {
+  const tStart = performance.now();
   const mode = opts.mode === "manual" ? "manual" : "auto";
   const force = opts.force === true;
   // Guarded so a stray `now` in a JSON body can never shift billing.
@@ -439,6 +541,11 @@ async function generateForTenant(
   // rather than fixed here: it is a cost, not a correctness bug, and the shape
   // that would fix it (a `deactivated_at` cut-off in the scan) is one more place
   // for the RISK 1 deadlock to hide.
+  //
+  // (2026-11-16: those per-class queries are now batched — one read per table
+  // for the whole tenant-month — so a retired class no longer costs a round
+  // trip. Only its in-memory pass remains, which is trivial.)
+  const tGuards = performance.now();
   const { data: classes, error: clsErr } = await supabase
     .from("classes")
     .select(
@@ -563,15 +670,118 @@ async function generateForTenant(
   // previous day in SGT before 08:00 (gotcha §7.7).
   const todayDate = dateInTimeZone(now, APP_TIMEZONE);
 
+  // ── Batched phase-1 reads: one query per table for the whole tenant-month ──
+  // Each replaces a query that used to run once per class inside the loop
+  // below (see "Batched reads" at the top of this file). The loop body then
+  // takes its class's slice from these maps, so it sees exactly the rows it
+  // used to fetch. Same filters, same columns; the class_id filter became an
+  // .in() over this tenant's classes, which is still the isolation (RLS does
+  // not apply to service_role).
+  type SessionRow = { id: string; class_id: string; session_date: string; cancelled_at: string | null };
+  type BookingRow = { class_id: string; student_id: string; session_date: string; category_id: string };
+  type EnrolmentRow = {
+    class_id: string;
+    student_id: string;
+    enrolled_at: string;
+    unenrolled_at: string | null;
+    is_active: boolean;
+  };
+  type AttendanceRow = { lesson_session_id: string; student_id: string; status: string };
+  type ParentStudentRow = { parent_id: string; student_id: string };
+  type StudentNameRow = { id: string; full_name: string };
+
+  const classIds = (classes ?? []).map((c) => c.id as string);
+  const [allSessions, allBookings, allEnrolments] = await Promise.all([
+    readAllIn<SessionRow>(
+      classIds,
+      (ids) =>
+        supabase
+          .from("lesson_sessions")
+          .select("id, class_id, session_date, cancelled_at", { count: "exact" })
+          .in("class_id", ids)
+          .gte("session_date", monthStart)
+          .lte("session_date", monthEnd),
+      "lesson_sessions"
+    ),
+    readAllIn<BookingRow>(
+      classIds,
+      (ids) =>
+        supabase
+          .from("trial_bookings")
+          .select("id, class_id, student_id, session_date, category_id", { count: "exact" })
+          .in("class_id", ids)
+          .is("cancelled_at", null)
+          .gte("session_date", monthStart)
+          .lte("session_date", monthEnd),
+      "trial_bookings"
+    ),
+    readAllIn<EnrolmentRow>(
+      classIds,
+      (ids) =>
+        supabase
+          .from("student_class_enrolments")
+          .select("id, class_id, student_id, enrolled_at, unenrolled_at, is_active", { count: "exact" })
+          .in("class_id", ids),
+      "student_class_enrolments"
+    ),
+  ]);
+
+  // Per class, sessions in date order — what `.order("session_date")` gave the
+  // per-class query. (class_id, session_date) is UNIQUE, so the order is total.
+  const sessionsByClass = groupBy(allSessions, (s) => s.class_id);
+  for (const list of sessionsByClass.values()) {
+    list.sort((a, b) => a.session_date.localeCompare(b.session_date));
+  }
+  const bookingsByClass = groupBy(allBookings, (b) => b.class_id);
+  const enrolmentsByClass = groupBy(allEnrolments, (e) => e.class_id);
+
+  const attendanceBySession = groupBy(
+    await readAllIn<AttendanceRow>(
+      allSessions.map((s) => s.id),
+      (ids) =>
+        supabase
+          .from("attendance")
+          .select("id, lesson_session_id, student_id, status", { count: "exact" })
+          .in("lesson_session_id", ids),
+      "attendance"
+    ),
+    (a) => a.lesson_session_id
+  );
+
+  // Every student any class could bill: the per-class `billableStudentIds`
+  // (enrolled ∪ attended) unioned across classes. Each class later takes only
+  // the parent links of its OWN billable set, so reading the union changes no
+  // class's rows — it only fetches them in one trip instead of one per class.
+  const tenantBillableStudentIds = [
+    ...new Set([
+      ...allEnrolments.map((e) => e.student_id),
+      ...[...attendanceBySession.values()].flat().map((a) => a.student_id),
+    ]),
+  ];
+  const [allParentStudents, allBilledStudents] = await Promise.all([
+    readAllIn<ParentStudentRow>(
+      tenantBillableStudentIds,
+      (ids) =>
+        supabase
+          .from("parent_students")
+          .select("id, parent_id, student_id", { count: "exact" })
+          .in("student_id", ids),
+      "parent_students"
+    ),
+    readAllIn<StudentNameRow>(
+      tenantBillableStudentIds,
+      (ids) =>
+        supabase.from("students").select("id, full_name", { count: "exact" }).in("id", ids),
+      "students"
+    ),
+  ]);
+  const parentStudentsByStudent = groupBy(allParentStudents, (ps) => ps.student_id);
+  // Names to snapshot onto each line (see InvoiceItem.student_name).
+  const studentNameById = new Map(allBilledStudents.map((s) => [s.id, s.full_name]));
+
   for (const cls of classes ?? []) {
-    // Sessions for this class within the billing month
-    const { data: sessions } = await supabase
-      .from("lesson_sessions")
-      .select("id, session_date, cancelled_at")
-      .eq("class_id", cls.id)
-      .gte("session_date", monthStart)
-      .lte("session_date", monthEnd)
-      .order("session_date");
+    // Sessions for this class within the billing month (batched above).
+    const sessions = sessionsByClass.get(cls.id as string) ?? [];
 
     const sessionIds = (sessions ?? []).map((s) => s.id);
     const sessionDateMap: Record<string, string> = Object.fromEntries(
@@ -601,13 +811,8 @@ async function generateForTenant(
     // category_id comes from the BOOKING, never from classes.category_id: that
     // column is mutable, and re-tagging a class must not reprice a trial
     // already taught (see trial_bookings.category_id).
-    const { data: bookings } = await supabase
-      .from("trial_bookings")
-      .select("student_id, session_date, category_id")
-      .eq("class_id", cls.id)
-      .is("cancelled_at", null)
-      .gte("session_date", monthStart)
-      .lte("session_date", monthEnd);
+    // (batched above — this class's live bookings in the month)
+    const bookings = bookingsByClass.get(cls.id as string) ?? [];
 
     const bookedByDate = new Map<string, string[]>();
     /** (student, date) → the category the trial was SOLD under. */
@@ -659,10 +864,8 @@ async function generateForTenant(
     // there, and blocked the whole month — with no override (§8a) and no way to
     // clear it except marking them at a lesson they were not enrolled for. See
     // attendanceCompleteness.ts and enrolmentSpans.test.ts.
-    const { data: enrolments } = await supabase
-      .from("student_class_enrolments")
-      .select("student_id, enrolled_at, unenrolled_at, is_active")
-      .eq("class_id", cls.id);
+    // (batched above — every enrolment of this class, any status)
+    const enrolments = enrolmentsByClass.get(cls.id as string) ?? [];
 
     // Dates are Singapore-local. enrolled_at/unenrolled_at are TIMESTAMPTZ, so
     // slicing the ISO string would take the UTC date — a day early for anything
@@ -801,13 +1004,8 @@ async function generateForTenant(
       continue;
     }
 
-    // All attendance rows for these sessions
-    const { data: attRows } = sessionIds.length
-      ? await supabase
-          .from("attendance")
-          .select("lesson_session_id, student_id, status")
-          .in("lesson_session_id", sessionIds)
-      : { data: [] as { lesson_session_id: string; student_id: string; status: string }[] };
+    // All attendance rows for these sessions (batched above)
+    const attRows = sessionIds.flatMap((id) => attendanceBySession.get(id) ?? []);
 
     // Who gets BILLED is a different question from who must be marked. Billing
     // follows the attendance rows that actually exist, NOT the current
@@ -888,33 +1086,19 @@ async function generateForTenant(
     // the incomplete branch needs it to record who must be deferred. Covers
     // the billable set, which is wider than the enrolled set (see above).
     //
-    // ⚠ BOTH QUERIES ARE SKIPPED ON AN EMPTY SET, AND THAT IS NEW. Until
-    // 20260810 the guard above guaranteed `billableStudentIds` was non-empty by
-    // the time execution reached here. A guest-only class — nobody enrolled,
-    // nobody marked, one booked guest — now reaches this point with an EMPTY
-    // set, and `.in("student_id", [])` renders as PostgREST `in.()`, which is
-    // not a filter that matches nothing: it is a request the server rejects.
-    // supabase-js surfaces that as `data: null`, which the `?? []` below would
-    // quietly swallow — so the class would go on to block correctly and the
-    // failure would never surface. Skipped explicitly instead, in the same
-    // shape the `attRows` fetch above already uses for `sessionIds`.
-    const { data: parentStudents } = billableStudentIds.length
-      ? await supabase
-          .from("parent_students")
-          .select("parent_id, student_id")
-          .in("student_id", billableStudentIds)
-      : { data: [] as { parent_id: string; student_id: string }[] };
-
-    // Names to snapshot onto each line (see InvoiceItem.student_name). Scoped
-    // to the billable set, which is the same set the items are built from.
-    const { data: billedStudents } = billableStudentIds.length
-      ? await supabase
-          .from("students")
-          .select("id, full_name")
-          .in("id", billableStudentIds)
-      : { data: [] as { id: string; full_name: string }[] };
-    const studentNameById = new Map(
-      (billedStudents ?? []).map((s) => [s.id as string, s.full_name as string])
+    // ⚠ AN EMPTY SET STILL MATTERS. Until 20260810 the guard above guaranteed
+    // `billableStudentIds` was non-empty by here; a guest-only class — nobody
+    // enrolled, nobody marked, one booked guest — now reaches this point with
+    // an EMPTY set. The per-class query this replaced had to skip itself then,
+    // because `.in("student_id", [])` renders as PostgREST `in.()`, a request
+    // the server REJECTS (and `?? []` would have swallowed). The batched read
+    // above sends no request for an empty id list (readAllIn), and the lookup
+    // below yields [] for an empty set — same result, nothing to skip.
+    //
+    // Rows are this class's billable students' parent links, taken from the
+    // tenant-wide batch — exactly the rows the per-class `.in()` returned.
+    const parentStudents = billableStudentIds.flatMap(
+      (id) => parentStudentsByStudent.get(id) ?? []
     );
 
     // Deferral applies only to parents of ACTIVELY enrolled children: a parent
@@ -1185,6 +1369,7 @@ async function generateForTenant(
       message:
         `Cannot generate invoices for ${billingMonth}: ${blocking.length} lesson(s) still have unmarked attendance. Mark them — or mark them cancelled if the lesson did not run — then generate again.`,
       results: log,
+      timings_ms: timingsSince(tStart, tGuards, performance.now(), null),
     };
   }
 
@@ -1246,7 +1431,55 @@ async function generateForTenant(
     };
   }
 
+  const tTally = performance.now();
+
   // ── Phase 2: create ONE invoice per parent, across all their classes ──────
+  // Two READS that used to run per parent are batched here, once for the
+  // tenant-month: which parents already have an invoice, and every balance.
+  // The WRITES stay per parent and in the same order — insert, items, credit —
+  // so one parent's failed write still skips only that parent (and holds the
+  // seal), exactly as before.
+  //
+  // What batching moves: these rows are read just before the loop instead of
+  // just before each parent's insert — a window of one run (~ms on a
+  // same-region call). Both reads were already only advisory:
+  //   • "already has an invoice" — UNIQUE (parent_id, tenant_id, billing_month)
+  //     is the real guard. A concurrent run that bills a parent inside the
+  //     window makes THIS run's insert fail (logged, month not sealed by this
+  //     run) instead of skipping it. No double bill either way.
+  //   • the balance — an ESTIMATE; apply_credit_to_invoice locks and draws from
+  //     the real rows. A credit note issued inside the window may be left for
+  //     next month's invoice instead of this one (it is never lost or doubled).
+  // ⚠ FAIL CLOSED: an unreadable existing-invoice set would bill duplicates
+  // into the UNIQUE guard, and an unreadable balance would skip credit; both
+  // throw (readPaged) before anything is written.
+  type BalanceRow = { parent_id: string; credit_balance: number | string | null; debit_balance: number | string | null };
+  const billingAny = [...parentItems.values()].some((items) => items.length > 0);
+  const [existingInvoices, balanceRows] = billingAny
+    ? await Promise.all([
+        readPaged<{ id: string; parent_id: string }>(
+          () =>
+            supabase
+              .from("invoices")
+              .select("id, parent_id", { count: "exact" })
+              .eq("tenant_id", tenantId)
+              .eq("billing_month", billingMonth),
+          "id",
+          "invoices (already billed)"
+        ),
+        readPaged<BalanceRow>(
+          () =>
+            supabase
+              .from("parent_tenant_balances")
+              .select("parent_id, credit_balance, debit_balance", { count: "exact" })
+              .eq("tenant_id", tenantId),
+          "parent_id",
+          "parent_tenant_balances"
+        ),
+      ])
+    : [[], []];
+  const alreadyInvoiced = new Set(existingInvoices.map((i) => i.parent_id));
+  const balanceByParent = new Map(balanceRows.map((b) => [b.parent_id, b]));
   // Note: deferredParents can no longer be populated on a run that reaches
   // here (the hard stop above returns first). The check below is kept as an
   // inner guard — it is correct, it costs nothing, and it is the right
@@ -1281,15 +1514,8 @@ async function generateForTenant(
     // Cannot fire within a run any more (each parent is visited exactly
     // once) — this guards RE-RUNS: the daily cron on an unsealed month, or
     // a manual run after an auto one. Removing it reopens double-billing.
-    const { data: existing } = await supabase
-      .from("invoices")
-      .select("id")
-      .eq("parent_id", parentId)
-      .eq("tenant_id", tenantId)
-      .eq("billing_month", billingMonth)
-      .maybeSingle();
-
-    if (existing) {
+    // (batched above — one read for the tenant-month)
+    if (alreadyInvoiced.has(parentId)) {
       log.push({
         parent_id: parentId,
         billing_month: billingMonth,
@@ -1302,12 +1528,8 @@ async function generateForTenant(
     // school is not spendable against a private coach's invoice, or one
     // business ends up paying another's bill. Pools freely across this parent's
     // children WITHIN the tenant.
-    const { data: balanceRow } = await supabase
-      .from("parent_tenant_balances")
-      .select("credit_balance, debit_balance")
-      .eq("parent_id", parentId)
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
+    // (batched above; no row = no balance, as maybeSingle() returned null)
+    const balanceRow = balanceByParent.get(parentId);
 
     const available = Number(balanceRow?.credit_balance ?? 0);
     // A DEBIT (parent owes us, from a voided-then-paid credit — 20260822000100)
@@ -1560,5 +1782,22 @@ async function generateForTenant(
       : {}),
     results: log,
     created,
+    timings_ms: timingsSince(tStart, tGuards, tTally, performance.now()),
+  };
+}
+
+/** Whole milliseconds per part of a run; `tInvoices` null when phase 2 never ran. */
+function timingsSince(
+  tStart: number,
+  tGuards: number,
+  tTally: number,
+  tInvoices: number | null
+): RunTimings {
+  const end = tInvoices ?? tTally;
+  return {
+    guards: Math.round(tGuards - tStart),
+    tally: Math.round(tTally - tGuards),
+    invoices: tInvoices === null ? 0 : Math.round(tInvoices - tTally),
+    total: Math.round(end - tStart),
   };
 }

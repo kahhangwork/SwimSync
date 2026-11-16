@@ -127,6 +127,33 @@ Deno.test("an unattributable crash (cron-wide, no tenant) writes nothing", () =>
   assertEquals(toErrorRows({ tenant_id: T }, new Error("boom")).length, 0, "no month either");
 });
 
+Deno.test("duration_ms: a scoped run stores its whole generation time; a cron run each tenant's own", () => {
+  const timings = (total: number) => ({ guards: 1, tally: 2, invoices: 3, total });
+  // Scoped (admin button): the handler's measured time, clock read included.
+  const [scoped] = toRunRows(
+    { tenant_id: T, billing_month: "2026-08", status: "nothing_to_bill", timings_ms: timings(40) },
+    { tenant_id: T }, 123.6,
+  );
+  assertEquals(scoped.duration_ms, 124, "the handler's figure, rounded — not the engine's 40");
+  // Cron: one shared handler time would be every tenant's sum; each row gets its own.
+  const cron = toRunRows({
+    billing_month: "2026-08", status: "processed 2 tenant(s)",
+    per_tenant: [
+      { tenant_id: T, billing_month: "2026-08", status: "nothing_to_bill", timings_ms: timings(11) },
+      { tenant_id: T2, billing_month: "2026-08", status: "nothing_to_bill", timings_ms: timings(22) },
+    ],
+  }, { mode: "auto" }, 999);
+  assertEquals(cron.map((r) => r.duration_ms), [11, 22]);
+  // Unmeasured or nonsense → NULL, never a value the CHECK (>= 0) would refuse
+  // (a refused row loses the whole run record — recordRuns is one insert).
+  const [none] = toRunRows({ tenant_id: T, billing_month: "2026-08", status: "nothing_to_bill" }, {});
+  assertEquals(none.duration_ms, null);
+  const [neg] = toRunRows({ tenant_id: T, billing_month: "2026-08", status: "nothing_to_bill" }, {}, -5);
+  assertEquals(neg.duration_ms, null);
+  const [err] = toErrorRows({ tenant_id: T, billing_month: "2026-08" }, new Error("x"), 77.2);
+  assertEquals(err.duration_ms, 77);
+});
+
 // ── Integration ───────────────────────────────────────────────────────────────
 
 Deno.test("RISK 1: an unclaimed-open run is WRITTEN and names the child", async () => {
@@ -141,18 +168,19 @@ Deno.test("RISK 1: an unclaimed-open run is WRITTEN and names the child", async 
 
     const opts = { tenant_id: s.tenantId, mode: "manual", billing_month: "2027-06", now: s.now };
     const res = await generateInvoices(s.db, opts);
-    const { recorded } = await recordRuns(s.db, toRunRows(res, opts));
+    const { recorded } = await recordRuns(s.db, toRunRows(res, opts, 321));
     assertEquals(recorded, 1, "the write must SUCCEED — a 0 here is RISK 1");
 
     const { data: rows, error } = await s.db
       .from("billing_runs")
-      .select("status, sealed, invoices_created, unclaimed_billable, unclaimed_students")
+      .select("status, sealed, invoices_created, unclaimed_billable, unclaimed_students, duration_ms")
       .eq("tenant_id", s.tenantId);
     assertEquals(error, null);
     assertEquals(rows!.length, 1, "the row is really in the table");
     assertEquals(rows![0].sealed, false);
     assertEquals(rows![0].invoices_created, 1);
     assertEquals(rows![0].unclaimed_billable, 1);
+    assertEquals(rows![0].duration_ms, 321, "the run's duration is stored (20261116000100)");
     const names = (rows![0].unclaimed_students as { student_name: string }[])
       .map((u) => u.student_name);
     assertEquals(names, ["Walk In"]);
