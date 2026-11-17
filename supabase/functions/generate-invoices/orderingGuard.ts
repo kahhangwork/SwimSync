@@ -41,7 +41,7 @@ import {
   type EnrolmentSpan,
   expectedStudentsOn,
 } from "./attendanceCompleteness.ts";
-import { BILLABLE } from "./core.ts";
+import { BILLABLE } from "./constants.ts";
 
 /** "YYYY-MM" → "YYYY-MM-01". */
 function firstOfMonth(month: string): string {
