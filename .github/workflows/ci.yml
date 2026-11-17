@@ -129,15 +129,21 @@ jobs:
           deno-version: v2.x
           cache: true
 
-      # Type-check every Edge Function ENTRY point. The Deno suite only checks
-      # what its tests import, and no test imports an index.ts — so
-      # package-emails/index.ts carried 10 type errors unseen (a `+`-joined
-      # .select() string widened to `string`, typing the row GenericStringError).
-      # The glob picks up a new function without editing this step. Runs before
-      # the stack boots: it needs no database, so it fails fast.
-      - name: Edge Function entry points type-check (deno check)
+      # Type-check EVERY non-test Edge Function module, recursively — not only the
+      # entry points. The Deno suite only checks what its tests import, and no test
+      # imports an index.ts — so package-emails/index.ts carried 10 type errors
+      # unseen (a `+`-joined .select() string widened to `string`, typing the row
+      # GenericStringError). The find picks up a new function and the dao/ and
+      # domain/ folders of the tier refactor without editing this step
+      # (EDGE_FUNCTIONS_REFACTOR_PLAN.md A4), and prints how many files it checked.
+      # Runs before the stack boots: it needs no database, so it fails fast.
+      - name: Edge Function modules type-check (deno check)
         working-directory: supabase/functions/generate-invoices
-        run: deno check ../*/index.ts
+        run: |
+          files=(); while IFS= read -r f; do files+=("$f"); done < <(find .. -name '*.ts' ! -name '*.test.ts' ! -path '*/bench/*' | sort)
+          echo "deno check: ${#files[@]} non-test .ts files under supabase/functions"
+          ((${#files[@]} > 0)) || { echo "found no files — the step is broken"; exit 2; }
+          deno check "${files[@]}"
 
       # `supabase start` boots the Docker stack (Postgres/Auth/REST/Storage),
       # applies supabase/migrations/*, and seeds supabase/seed.sql.
