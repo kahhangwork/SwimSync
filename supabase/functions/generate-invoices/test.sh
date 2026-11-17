@@ -18,6 +18,7 @@ TESTS=(
   ../package-emails/email.test.ts
   ../credit-note-emails/email.test.ts ../credit-note-emails/core.test.ts
   ../public-invoice/core.test.ts ../public-package/core.test.ts
+  ../tierBoundaries.test.ts
 )
 
 listed=$(for t in "${TESTS[@]}"; do (cd "$(dirname "$t")" && echo "$(pwd)/$(basename "$t")"); done | sort)
@@ -36,4 +37,5 @@ export SERVICE_ROLE_KEY
 # A stale clock pin (a killed run-all-drivers.sh --now) would run the engine on a fake day. Read-only check.
 "$ROOT/scripts/clock-unpin.sh" --check || exit 2
 
-exec deno test --allow-net --allow-env "${TESTS[@]}"
+# --allow-read=.. is for tierBoundaries.test.ts, which reads supabase/functions source. Nothing else.
+exec deno test --allow-net --allow-env --allow-read=.. "${TESTS[@]}"
