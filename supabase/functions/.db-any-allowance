@@ -4,4 +4,3 @@ credit-note-emails/core.ts 2
 generate-invoices/core.ts 1
 generate-invoices/email.ts 8
 package-emails/index.ts 6
-public-package/core.ts 2

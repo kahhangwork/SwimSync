@@ -112,21 +112,16 @@ export async function lookupPackage(
   const { data, error } = await db
     .from("parent_packages")
     .select(
-      "reference_number, total_value, amount_payable, discount_amount, name, " +
-        "lesson_count, rate_per_lesson, start_date, validity_weeks, status, " +
-        "paid_claimed_at, " +
-        "tenants(display_name, paynow_uen, paynow_mobile, suspended_at)",
+      // ONE literal, never `+`-joined: a concatenation widens to `string` and loses the row type (§7.106).
+      "reference_number, total_value, amount_payable, discount_amount, name, lesson_count, rate_per_lesson, start_date, validity_weeks, status, paid_claimed_at, tenants(display_name, paynow_uen, paynow_mobile, suspended_at)",
     )
     .eq("public_token", token)
     .maybeSingle();
 
   if (error || !data) return null;
 
-  // supabase-js cannot type embedded selects from a string; normalize the
-  // shape (incl. array-vs-object embed drift) ourselves.
-  const row = data as unknown as
-    & Parameters<typeof serializePublicPackage>[0]
-    & { tenants: unknown };
+  // Normalize the embed shape (incl. array-vs-object drift) ourselves.
+  const row = data;
   const tenantRaw = Array.isArray(row.tenants) ? row.tenants[0] : row.tenants;
   if ((tenantRaw as { suspended_at?: string | null })?.suspended_at) return null;
 
@@ -150,12 +145,7 @@ export async function claimPackage(
     .maybeSingle();
 
   if (error || !data) return null;
-  const row = data as unknown as {
-    id: string;
-    status: string;
-    paid_claimed_at: string | null;
-    tenants: unknown;
-  };
+  const row = data;
   const tenantRaw = Array.isArray(row.tenants) ? row.tenants[0] : row.tenants;
   if ((tenantRaw as { suspended_at?: string | null })?.suspended_at) return null;
   if (row.paid_claimed_at) return { paid_claimed_at: row.paid_claimed_at };
