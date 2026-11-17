@@ -1,4 +1,3 @@
 # G6 allowance (scripts/check-db-any.sh): `any`-family casts per file, outside comments.
 # Only ever LOWERED — regenerate with `scripts/check-db-any.sh --update`. Absent = 0.
 generate-invoices/core.ts 1
-generate-invoices/email.ts 8

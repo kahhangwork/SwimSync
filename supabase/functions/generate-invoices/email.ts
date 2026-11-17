@@ -544,7 +544,7 @@ async function emailInvoices(
       .select("id, profiles(email, full_name)")
       .in("id", parentIds);
     const parentInfo: Record<string, { email: string | null; name: string }> = {};
-    for (const row of (parentRows ?? []) as any[]) {
+    for (const row of parentRows ?? []) {
       const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
       parentInfo[row.id] = {
         email: prof?.email ?? null,
@@ -561,7 +561,7 @@ async function emailInvoices(
           .in("id", tenantIds)
       : { data: [] as { id: string; display_name: string; logo_url: string | null }[] };
     const tenantInfo: Record<string, { name: string; logo: string | null }> = {};
-    for (const row of (tenantRows ?? []) as any[]) {
+    for (const row of tenantRows ?? []) {
       tenantInfo[row.id] = { name: row.display_name, logo: row.logo_url ?? null };
     }
 
@@ -571,7 +571,7 @@ async function emailInvoices(
       .select("id, full_name")
       .in("id", studentIds);
     const studentName: Record<string, string> = {};
-    for (const row of (studentRows ?? []) as any[]) {
+    for (const row of studentRows ?? []) {
       studentName[row.id] = row.full_name ?? "";
     }
 
@@ -686,13 +686,27 @@ export function shouldRetryTenantEmails(
 const INVOICE_EMAIL_SELECT =
   "id, parent_id, tenant_id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, due_date";
 
+/** One invoices row as INVOICE_EMAIL_SELECT reads it. */
+type InvoiceEmailRow = {
+  id: string;
+  parent_id: string;
+  tenant_id: string;
+  billing_month: string;
+  gross_amount: number;
+  package_applied: number;
+  credit_applied: number;
+  balance_adjustment: number | null;
+  net_amount: number;
+  due_date: string;
+};
+
 // Rebuild CreatedInvoice shapes from stored rows. The itemised lines come from
 // invoice_items. `ok: false` on an item-fetch error — the caller sends NOTHING
 // then (a line-item-less email would still settle as sent and never retry, ⚠ #2).
 // An invoice that resolves zero items is a partial fetch and is left out.
 async function rebuildInvoices(
   supabase: SupabaseClient<Database>,
-  rows: any[]
+  rows: InvoiceEmailRow[]
 ): Promise<{ ok: true; invoices: CreatedInvoice[] } | { ok: false; reason: string }> {
   const { data: itemRows, error } = await supabase
     .from("invoice_items")
@@ -700,7 +714,7 @@ async function rebuildInvoices(
     .in("invoice_id", rows.map((r) => r.id as string));
   if (error) return { ok: false, reason: error.message };
   const itemsByInvoice: Record<string, CreatedInvoiceItem[]> = {};
-  for (const it of (itemRows ?? []) as any[]) {
+  for (const it of itemRows ?? []) {
     (itemsByInvoice[it.invoice_id] ??= []).push({
       student_id: it.student_id,
       session_date: it.session_date,
@@ -771,7 +785,7 @@ export async function retryUnsentInvoiceEmails(
       console.log(`invoice email retry discovery failed (${tenantId}/${billingMonth}): ${discoverErr.message}`);
       return { emailsRetried: 0 };
     }
-    const rows = (candidates ?? []) as any[];
+    const rows = candidates ?? [];
     if (!rows.length) return { emailsRetried: 0 };
 
     const rebuilt = await rebuildInvoices(supabase, rows);
@@ -820,7 +834,8 @@ export async function resendInvoiceEmail(
   try {
     const { data: row, error } = await supabase
       .from("invoices")
-      .select(`${INVOICE_EMAIL_SELECT}, invoice_email_state`)
+      // `as const` keeps the joined column list a literal TYPE, so the row infers (erased at build).
+      .select(`${INVOICE_EMAIL_SELECT}, invoice_email_state` as const)
       .eq("id", invoiceId)
       .maybeSingle();
     if (error) {
@@ -828,7 +843,7 @@ export async function resendInvoiceEmail(
       return { sent: false, reason: "lookup failed" };
     }
     if (!row) return { sent: false, reason: "not found" };
-    const state = (row as any).invoice_email_state as string;
+    const state = row.invoice_email_state;
     if (state === "SENT") return { sent: false, reason: "nothing to send" };
     if (state === "SENDING") return { sent: false, reason: "sending" };
 
@@ -837,7 +852,7 @@ export async function resendInvoiceEmail(
     const { data: tenant, error: tErr } = await supabase
       .from("tenants")
       .select("suspended_at")
-      .eq("id", (row as any).tenant_id)
+      .eq("id", row.tenant_id)
       .maybeSingle();
     if (tErr || !tenant) return { sent: false, reason: "tenant check failed" };
     if ((tenant as { suspended_at: string | null }).suspended_at !== null) {
