@@ -528,6 +528,9 @@ overridden by D4; follow its ordering and verification.
   O2 prediction for that tenant/month and reconcile per parent after; read `billing_runs.duration_ms`. A zero-write
   live smoke on the user's own account: Generate for Coach Kah Hang **October** → `already_complete` (sealed; every
   email already sent, so the retry pass sends nothing).
+  **Smoke DONE (2026-11-18, user):** Generate on Coach Kah Hang October → "Oct 2026 is already complete and closed —
+  no invoices were generated." Prod after (read-only): still 7 Oct invoices, all 7 emailed, still 1 Oct run row,
+  latest billing run anywhere still 2026-11-16 — v42's sealed-month guard answered live and wrote nothing.
 - **O3 — bill the SMALLER tenant first**, per `INVOICE_RUNBOOK.md`: scoped, manual, billing month `2026-10`.
   - **Do NOT use `force`.**
   - **Do NOT bill any other month.**
