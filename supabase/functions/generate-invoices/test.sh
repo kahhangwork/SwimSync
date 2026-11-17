@@ -15,7 +15,7 @@ TESTS=(
   packages.test.ts unclaimed.test.ts trials.test.ts makeups.test.ts enrolmentSpans.test.ts
   classDeactivation.test.ts guestOnlyClass.test.ts cancelledLessons.test.ts runLog.test.ts wave6.test.ts
   speed.test.ts
-  ../package-emails/email.test.ts
+  ../package-emails/email.test.ts ../package-emails/domain/packageEmailMapping.test.ts
   ../credit-note-emails/email.test.ts ../credit-note-emails/core.test.ts
   ../public-invoice/core.test.ts ../public-package/core.test.ts
   ../tierBoundaries.test.ts

@@ -70,7 +70,7 @@ const ALLOWED_DATA_ACCESS: Entry[] = [
 
 // ── Check 4 ledger: index.ts imports beyond the allowed set ──────────────────
 const ALLOWED_INDEX_IMPORTS: Entry[] = [
-  { file: "package-emails/index.ts", snippet: "import { authorizePackageEmail, buildConfirmedHtml, buildConfirmedSubject, buildOfferedHtml, buildOfferedSubject, buildReferralRewardHtml, buildReferralRewardSubject, buildRequestedHtml, buildRequestedSubject, sgDateOfStamp, type ReferralRewardEmailData, sendPackageEmail, type PackageEmailData, } from \"./email.ts\";", count: 1, why: "B11 — index.ts imports its tiers" },
+  { file: "package-emails/index.ts", snippet: "from \"./email.ts\";", count: 1, why: "B11 — index.ts imports its tiers (B11c moves email.ts to domain/)" },
   { file: "credit-note-emails/index.ts", snippet: "import { fetchBalances, fetchTenantSuspended, findEmailedInvoiceItemIds, findSpentNoteIds, findUnsentById, findUnsentBySession, resendSender, sendNotes, } from \"./core.ts\";", count: 1, why: "B12 — index.ts imports its tiers" },
   { file: "credit-note-emails/index.ts", snippet: "import { authorizeCreditNoteEmail, canEmailForTenant } from \"./email.ts\";", count: 1, why: "B12 — index.ts imports its tiers" },
 ];

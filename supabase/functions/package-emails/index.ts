@@ -27,19 +27,16 @@ import { getCallerUser } from "./dao/packageEmails.rpc.ts";
 import { packagesAdmin } from "./domain/packagesAdmin.ts";
 import {
   authorizePackageEmail,
-  buildConfirmedHtml,
-  buildConfirmedSubject,
-  buildOfferedHtml,
-  buildOfferedSubject,
   buildReferralRewardHtml,
   buildReferralRewardSubject,
-  buildRequestedHtml,
-  buildRequestedSubject,
-  sgDateOfStamp,
-  type ReferralRewardEmailData,
   sendPackageEmail,
-  type PackageEmailData,
 } from "./email.ts";
+import {
+  packageEmailContent,
+  packageEmailData,
+  packageEmailParties,
+  referralRewardEmail,
+} from "./domain/packageEmailMapping.ts";
 
 // packagesAdmin (the caller's packages:edit check): domain/packagesAdmin.ts (B11).
 
@@ -102,27 +99,11 @@ Deno.serve(async (req) => {
         return respond({ sent: false, reason: "not allowed" }, 403);
       }
 
-      const rParent = Array.isArray(reward.parents)
-        ? reward.parents[0] : reward.parents;
-      const rProfile = Array.isArray(rParent?.profiles)
-        ? rParent?.profiles?.[0] : rParent?.profiles;
-      const rTenant = Array.isArray(reward.tenants)
-        ? reward.tenants[0] : reward.tenants;
-
-      const rData: ReferralRewardEmailData = {
-        businessName: rTenant?.display_name ?? "Your coach",
-        logoUrl: rTenant?.logo_url ?? null,
-        discountType: (rTenant?.referral_discount_type as
-          "percent" | "amount" | null) ?? null,
-        discountValue: rTenant?.referral_discount_value != null
-          ? Number(rTenant.referral_discount_value) : null,
-        // The SGT date, never a raw UTC slice (§7.7) — see sgDateOfStamp.
-        expiresOn: reward.expires_at
-          ? sgDateOfStamp(String(reward.expires_at)) : null,
-      };
+      // Recipient + data: domain/packageEmailMapping.ts (B11).
+      const { to: rTo, data: rData } = referralRewardEmail(reward);
       const result = await sendPackageEmail({
         apiKey: Deno.env.get("RESEND_API_KEY"),
-        to: rProfile?.email as string | undefined,
+        to: rTo,
         subject: buildReferralRewardSubject(rData),
         html: buildReferralRewardHtml(rData),
         fromName: rData.businessName,
@@ -134,11 +115,8 @@ Deno.serve(async (req) => {
     const { data: pkg } = await repo.readPackage(svc, package_id);
     if (!pkg) return respond({ sent: false, reason: "not found" }, 404);
 
-    const parent = Array.isArray(pkg.parents) ? pkg.parents[0] : pkg.parents;
-    const tenant = Array.isArray(pkg.tenants) ? pkg.tenants[0] : pkg.tenants;
-    const parentProfile = Array.isArray(parent?.profiles)
-      ? parent?.profiles?.[0]
-      : parent?.profiles;
+    // Normalised embeds + recipient: domain/packageEmailMapping.ts (B11).
+    const { parent, tenant, parentProfile, to } = packageEmailParties(pkg);
 
     // Gather the authz inputs, then let the pure decider rule (RISK 6). Only
     // the input each type needs is fetched: the can_admin_tenant RPC (as the
@@ -168,39 +146,12 @@ Deno.serve(async (req) => {
       return respond({ sent: false, reason: "not allowed" }, 403);
     }
 
-    const data: PackageEmailData = {
-      parentName: parentProfile?.full_name ?? "there",
-      businessName: tenant?.display_name ?? "Your coach",
-      logoUrl: tenant?.logo_url ?? null,
-      packageName: pkg.name as string,
-      lessonCount: Number(pkg.lesson_count),
-      ratePerLesson: Number(pkg.rate_per_lesson),
-      totalValue: Number(pkg.total_value),
-      amountPayable: pkg.amount_payable != null ? Number(pkg.amount_payable) : undefined,
-      discountAmount: pkg.discount_amount != null ? Number(pkg.discount_amount) : undefined,
-      expiresOn: (pkg.expires_on as string | null) ?? null,
-      startDate: (pkg.start_date as string | null) ?? null,
-      payUrl: pkg.public_token
-        ? `${APP_URL}/package/${pkg.public_token}`
-        : null,
-    };
-
-    const subject =
-      type === "requested"
-        ? buildRequestedSubject(data)
-        : type === "offered"
-        ? buildOfferedSubject(data)
-        : buildConfirmedSubject(data);
-    const html =
-      type === "requested"
-        ? buildRequestedHtml(data)
-        : type === "offered"
-        ? buildOfferedHtml(data)
-        : buildConfirmedHtml(data);
+    const data = packageEmailData(pkg, parentProfile, tenant, APP_URL);
+    const { subject, html } = packageEmailContent(type, data);
 
     const result = await sendPackageEmail({
       apiKey: Deno.env.get("RESEND_API_KEY"),
-      to: parentProfile?.email as string | undefined,
+      to,
       subject,
       html,
       fromName: data.businessName,
