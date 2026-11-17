@@ -33,6 +33,8 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.110.2";
 import type { Database } from "../_shared/database.overrides.ts";
+import type { CallerDb, ServiceDb } from "../_shared/clientBrands.ts";
+import * as rpc from "./dao/creditNotes.rpc.ts";
 import {
   fetchBalances,
   fetchTenantSuspended,
@@ -70,22 +72,20 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: userRes } = await anon.auth.getUser();
+    ) as CallerDb;
+    const { data: userRes } = await rpc.getCallerUser(anon);
     if (!userRes?.user) return respond({ sent: 0, reason: "unauthorized" }, 401);
 
     const svc = createClient<Database>(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    ) as ServiceDb;
 
     let tenantId: string;
     let candidates;
 
     if (mode === "session") {
-      const { data: sessionTenant } = await anon.rpc("session_tenant", {
-        p_session_id: lesson_session_id,
-      });
+      const { data: sessionTenant } = await rpc.sessionTenant(anon, lesson_session_id);
       if (typeof sessionTenant !== "string") {
         return respond({ sent: 0, reason: "not found" }, 404);
       }
@@ -97,9 +97,9 @@ Deno.serve(async (req) => {
       // from can_admin_tenant; this path sends only for a session the caller
       // could have marked).
       const [{ data: isMain }, { data: isPlatform }, { data: hasOps }] = await Promise.all([
-        anon.rpc("coach_is_main_on_session", { p_session_id: lesson_session_id }),
-        anon.rpc("is_platform_admin"),
-        anon.rpc("has_admin_area", { p_tenant: tenantId, p_area: "operations", p_level: "edit" }),
+        rpc.coachIsMainOnSession(anon, lesson_session_id),
+        rpc.isPlatformAdmin(anon),
+        rpc.hasOperationsEdit(anon, tenantId),
       ]);
       const isAdmin = isPlatform === true || hasOps === true;
       if (
@@ -137,11 +137,7 @@ Deno.serve(async (req) => {
       // Roles (20260927000600 era): the admin must hold billing:edit — sending a
       // credit note is a billing act. has_admin_area is false for a platform
       // admin exactly as is_tenant_admin was, so RISK 4 above still holds.
-      const { data: isTenantAdmin } = await anon.rpc("has_admin_area", {
-        p_tenant: tenantId,
-        p_area: "billing",
-        p_level: "edit",
-      });
+      const { data: isTenantAdmin } = await rpc.hasBillingEdit(anon, tenantId);
       if (
         !authorizeCreditNoteEmail("note", {
           isMainOnSession: false,

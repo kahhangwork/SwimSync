@@ -22,18 +22,11 @@ import {
   type SettleAction,
   settleActionFor,
 } from "./email.ts";
+import * as repo from "./dao/creditNotes.repo.ts";
+import { claimNoteRpc } from "./dao/creditNotes.rpc.ts";
 
-// ⚠ RISK 6 — snapshot fields ONLY. credit_notes.student_name is the note's own
-// snapshot; class_title and session_date come from invoice_items, snapshotted at
-// invoicing. §7.155: a resend weeks later must render what the invoice said, not what
-// the records say now.
-// PROHIBITION: this string must NOT grow students(full_name), classes(title), or
-// lesson_sessions(session_date).
-// ONE literal, never `+`-joined: a concatenation widens to `string` and loses the row
-// type (§7.106). credit_note_email_state is a PostgREST computed column (20260927000100):
-// the email state, computed in SQL so no lease maths happens in Deno.
-export const NOTE_SELECT =
-  "id, reference_number, amount, reason, status, applied_to_invoice_id, tenant_id, parent_id, invoice_item_id, lesson_session_id, student_name, invoice_items(class_title, session_date), parents(profiles(full_name, email)), tenants(display_name, logo_url), credit_note_email_state";
+// NOTE_SELECT (snapshot fields ONLY, RISK 6): dao/noteSelect.ts (B12).
+export { NOTE_SELECT } from "./dao/noteSelect.ts";
 
 export type NoteRow = {
   id: string;
@@ -85,12 +78,7 @@ export async function findUnsentBySession(
   lessonSessionId: string,
   tenantId: string,
 ): Promise<Candidates> {
-  const { data, error } = await svc
-    .from("credit_notes")
-    .select(NOTE_SELECT)
-    .eq("lesson_session_id", lessonSessionId)
-    .eq("tenant_id", tenantId) // ⚠ RISK 3
-    .in("credit_note_email_state", ["UNSENT", "RETRYABLE"]);
+  const { data, error } = await repo.readUnsentBySession(svc, lessonSessionId, tenantId);
   if (error) return { ok: false, reason: `discovery failed: ${error.message}` };
   return { ok: true, notes: data ?? [] };
 }
@@ -104,12 +92,7 @@ export async function findUnsentById(
   svc: SupabaseClient<Database>,
   creditNoteId: string,
 ): Promise<Candidates> {
-  const { data, error } = await svc
-    .from("credit_notes")
-    .select(NOTE_SELECT)
-    .eq("id", creditNoteId)
-    .is("email_sent_at", null)
-    .maybeSingle();
+  const { data, error } = await repo.readUnsentById(svc, creditNoteId);
   if (error) return { ok: false, reason: `lookup failed: ${error.message}` };
   // No row means "no such note" OR "already emailed". Both are nothing-to-do, and
   // the second is what stops a double press re-sending.
@@ -137,11 +120,7 @@ export async function findSpentNoteIds(
   noteIds: string[],
 ): Promise<{ ok: true; spent: Set<string> } | { ok: false; reason: string }> {
   if (!noteIds.length) return { ok: true, spent: new Set() };
-  const { data, error } = await svc
-    .from("credit_applications")
-    .select("credit_note_id")
-    .is("reversed_at", null)
-    .in("credit_note_id", noteIds);
+  const { data, error } = await repo.readLiveApplications(svc, noteIds);
   if (error) return { ok: false, reason: `applications check failed: ${error.message}` };
   const spent = new Set<string>();
   for (const r of (data ?? []) as { credit_note_id: string }[]) {
@@ -164,11 +143,7 @@ export async function findEmailedInvoiceItemIds(
   invoiceItemIds: string[],
 ): Promise<{ ok: true; items: Set<string> } | { ok: false; reason: string }> {
   if (!invoiceItemIds.length) return { ok: true, items: new Set() };
-  const { data, error } = await svc
-    .from("credit_notes")
-    .select("invoice_item_id")
-    .in("invoice_item_id", invoiceItemIds)
-    .not("email_sent_at", "is", null);
+  const { data, error } = await repo.readEmailedSiblings(svc, invoiceItemIds);
   if (error) return { ok: false, reason: `sibling check failed: ${error.message}` };
   const items = new Set<string>();
   for (const r of (data ?? []) as { invoice_item_id: string }[]) {
@@ -205,11 +180,7 @@ export async function fetchTenantSuspended(
   svc: SupabaseClient<Database>,
   tenantId: string,
 ): Promise<boolean | null> {
-  const { data, error } = await svc
-    .from("tenants")
-    .select("suspended_at")
-    .eq("id", tenantId)
-    .maybeSingle();
+  const { data, error } = await repo.readTenantSuspendedAt(svc, tenantId);
   if (error || !data) {
     console.log(
       `credit-note email tenant check failed (${tenantId}): ${error?.message ?? "no row"}`,
@@ -229,11 +200,7 @@ export async function fetchBalances(
 ): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (!parentIds.length) return out;
-  const { data } = await svc
-    .from("parent_tenant_balances")
-    .select("parent_id, credit_balance")
-    .eq("tenant_id", tenantId)
-    .in("parent_id", parentIds);
+  const { data } = await repo.readCreditBalances(svc, tenantId, parentIds);
   for (const b of (data ?? []) as { parent_id: string; credit_balance: number | string }[]) {
     out.set(b.parent_id, Number(b.credit_balance));
   }
@@ -259,10 +226,7 @@ export async function claimNote(
   noteId: string,
   manual = false,
 ): Promise<{ ok: true; claim: NoteClaim | null } | { ok: false; reason: string }> {
-  const { data, error } = await svc.rpc("claim_credit_note_email", {
-    p_credit_note_id: noteId,
-    p_manual: manual,
-  });
+  const { data, error } = await claimNoteRpc(svc, noteId, manual);
   if (error) return { ok: false, reason: `claim failed: ${error.message}` };
   const row = (data as { claimed_at: string; prior_state: string; issued_at: string }[] | null)?.[0];
   return {
@@ -289,11 +253,7 @@ export async function settleNote(
     ? { email_sent_at: new Date().toISOString(), email_claimed_at: null }
     : { email_claimed_at: null };
   try {
-    const { error } = await svc
-      .from("credit_notes")
-      .update(patch)
-      .eq("id", noteId)
-      .eq("email_claimed_at", claimedAt);
+    const { error } = await repo.settleNoteRow(svc, patch, noteId, claimedAt);
     if (error) console.log(`credit-note email settle (${action}) failed (${noteId}): ${error.message}`);
   } catch (e) {
     console.log(`credit-note email settle (${action}) threw (${noteId}): ${(e as Error).message}`);

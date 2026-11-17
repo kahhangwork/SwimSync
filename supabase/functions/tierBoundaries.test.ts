@@ -54,18 +54,6 @@ type Entry = { file: string; snippet: string; count: number; why: string };
 const ALLOWED_DATA_ACCESS: Entry[] = [
   { file: "generate-invoices/clock.ts", snippet: "let res = await client.rpc(\"app_now\");", count: 1, why: "STAYS — clock.ts is not moved (plan §5); dbNow takes its client as an argument" },
   { file: "generate-invoices/clock.ts", snippet: "res = await client.rpc(\"app_now\");", count: 1, why: "STAYS — clock.ts is not moved (plan §5); dbNow takes its client as an argument" },
-  { file: "credit-note-emails/core.ts", snippet: ".from(\"credit_notes\")", count: 4, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/core.ts", snippet: ".from(\"credit_applications\")", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/core.ts", snippet: ".from(\"tenants\")", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/core.ts", snippet: ".from(\"parent_tenant_balances\")", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/core.ts", snippet: "const { data, error } = await svc.rpc(\"claim_credit_note_email\", {", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/email.ts", snippet: "const res = await fetch(\"https://api.resend.com/emails\", {", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/index.ts", snippet: "const { data: userRes } = await anon.auth.getUser();", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/index.ts", snippet: "const { data: sessionTenant } = await anon.rpc(\"session_tenant\", {", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/index.ts", snippet: "anon.rpc(\"coach_is_main_on_session\", { p_session_id: lesson_session_id }),", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/index.ts", snippet: "anon.rpc(\"is_platform_admin\"),", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/index.ts", snippet: "anon.rpc(\"has_admin_area\", { p_tenant: tenantId, p_area: \"operations\", p_level: \"edit\" }),", count: 1, why: "B12 moves it to dao/" },
-  { file: "credit-note-emails/index.ts", snippet: "const { data: isTenantAdmin } = await anon.rpc(\"has_admin_area\", {", count: 1, why: "B12 moves it to dao/" },
 ];
 
 // ── Check 4 ledger: index.ts imports beyond the allowed set ──────────────────

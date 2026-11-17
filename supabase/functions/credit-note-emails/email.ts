@@ -29,6 +29,8 @@
 // object involved. There is deliberately no issue date in the email at all: the
 // parent cares which LESSON was credited, so the unsafe field is never read.
 
+import { postResendEmail } from "./dao/resend.ts";
+
 export type CreditNoteEmailData = {
   parentName: string;
   businessName: string;
@@ -391,7 +393,7 @@ export async function sendCreditNoteEmail(opts: {
   }
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await postResendEmail({
       method: "POST",
       headers: {
         Authorization: `Bearer ${opts.apiKey}`,

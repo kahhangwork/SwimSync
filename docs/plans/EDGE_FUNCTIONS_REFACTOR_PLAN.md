@@ -548,8 +548,9 @@ billed lessons, seal or recipients (§1), and fixed after Part B ships. BLOCKERs
 |---|---|---|---|
 | 1 | P gate, 2026-11-17 | `speed.test.ts` "invoice emails are spaced to the Resend per-second limit" failed once in a full run (`send 2 started 163 ms after the previous`, needs ≥ 190), then passed 8/8 alone and in the next full run. Pre-existing (`47996d2`); no engine code had changed. Cause (reading, not proven): `resendGate` spaces when each worker PASSES the gate, the test measures when each `fetch` STARTS; a worker resumed late after its gate pass shrinks the gap to the next. Prod cap is 2/s (500 ms spacing), so the real-world effect is a tighter gap, not a burst. Fix later: either measure the gap at the gate, or set `lastResendStart` at the fetch. | No |
 
-**`db-any-ok` census** (A2/A3 escape hatch):
-- `generate-invoices/core.ts:79` `CountedQuery = any` — the builder `readPaged` / `readAllIn` page over, for every
+**`db-any-ok` census** (A2/A3 escape hatch): **EMPTY since `types(edge): CountedQuery typed structurally`
+(2026-11-18)** — the entry below is history.
+- ~~`generate-invoices/core.ts:79` `CountedQuery = any`~~ — the builder `readPaged` / `readAllIn` page over, for every
   table. Typing it means threading supabase-js's PostgrestFilterBuilder generics through the §7.391 speed fix, which
   B2 keeps byte-for-byte. **Consequence, accepted:** rows read through `readPaged<T>` are typed by the hand-written
   `T`, not inferred from their select — the generated types do not check those reads (the engine's phase-1 batch).
