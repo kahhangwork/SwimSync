@@ -100,19 +100,15 @@ export async function lookupInvoice(
     .select(
       // is_overdue needs EXECUTE for service_role (20261112000100) — any select
       // error here is the shared 404 on EVERY family's payment link.
-      "net_amount, billing_month, status, paid_claimed_at, reference_number, due_date, is_overdue, " +
-        "tenants(display_name, paynow_uen, paynow_mobile), " +
-        "invoice_items(student_name)",
+      // ONE literal, never `+`-joined: a concatenation widens to `string` and loses the row type (§7.106).
+      "net_amount, billing_month, status, paid_claimed_at, reference_number, due_date, is_overdue, tenants(display_name, paynow_uen, paynow_mobile), invoice_items(student_name)",
     )
     .eq("public_token", token)
     .maybeSingle();
 
   if (error || !data) return null;
-  // supabase-js cannot type embedded selects from a string; the serializer
-  // normalizes the shape (incl. array-vs-object embed drift) itself.
-  return serializePublicInvoice(
-    data as unknown as Parameters<typeof serializePublicInvoice>[0],
-  );
+  // The serializer normalizes the embed shape (incl. array-vs-object drift) itself.
+  return serializePublicInvoice(data);
 }
 
 /** The sessionless "I've paid" claim. Idempotent: an existing claim is
