@@ -32,6 +32,7 @@
 // look failed because an email was.
 
 import { createClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 import {
   fetchBalances,
   fetchTenantSuspended,
@@ -65,7 +66,7 @@ Deno.serve(async (req) => {
     if (!mode) return respond({ sent: 0, reason: "bad request" }, 400);
 
     const authHeader = req.headers.get("Authorization") ?? "";
-    const anon = createClient(
+    const anon = createClient<Database>(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
@@ -73,7 +74,7 @@ Deno.serve(async (req) => {
     const { data: userRes } = await anon.auth.getUser();
     if (!userRes?.user) return respond({ sent: 0, reason: "unauthorized" }, 401);
 
-    const svc = createClient(
+    const svc = createClient<Database>(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );

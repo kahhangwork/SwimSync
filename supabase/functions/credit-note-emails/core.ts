@@ -12,6 +12,7 @@
 // handle_attendance_update TRIGGER and throws if it produced no row.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 import {
   buildCreditNoteHtml,
   buildCreditNoteSubject,
@@ -83,7 +84,7 @@ export type Candidates =
  * (MAY_HAVE_SENT — the Idempotency-Key has lapsed; that is a human decision).
  */
 export async function findUnsentBySession(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   lessonSessionId: string,
   tenantId: string,
 ): Promise<Candidates> {
@@ -103,7 +104,7 @@ export async function findUnsentBySession(
  * back as `sending`, with no notes.
  */
 export async function findUnsentById(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   creditNoteId: string,
 ): Promise<Candidates> {
   const { data, error } = await svc
@@ -135,7 +136,7 @@ export async function findUnsentById(
  * send. Mirrors the trigger's own spend-signal and apply_credit_to_invoice.
  */
 export async function findSpentNoteIds(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   noteIds: string[],
 ): Promise<{ ok: true; spent: Set<string> } | { ok: false; reason: string }> {
   if (!noteIds.length) return { ok: true, spent: new Set() };
@@ -162,7 +163,7 @@ export async function findSpentNoteIds(
  * EMAIL from making it worse.
  */
 export async function findEmailedInvoiceItemIds(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   invoiceItemIds: string[],
 ): Promise<{ ok: true; items: Set<string> } | { ok: false; reason: string }> {
   if (!invoiceItemIds.length) return { ok: true, items: new Set() };
@@ -204,7 +205,7 @@ export async function findEmailedInvoiceItemIds(
  * credit they cannot find in the app is the harm being prevented.
  */
 export async function fetchTenantSuspended(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   tenantId: string,
 ): Promise<boolean | null> {
   const { data, error } = await svc
@@ -225,7 +226,7 @@ export async function fetchTenantSuspended(
 
 /** The parent's current credit with ONE business, keyed by parent. */
 export async function fetchBalances(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   tenantId: string,
   parentIds: string[],
 ): Promise<Map<string, number>> {
@@ -257,7 +258,7 @@ export type NoteClaim = { claimedAt: string; priorState: string; issuedAt: strin
  * email_sent_at is stamped only after a confirmed send (settleNote).
  */
 export async function claimNote(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   noteId: string,
   manual = false,
 ): Promise<{ ok: true; claim: NoteClaim | null } | { ok: false; reason: string }> {
@@ -279,7 +280,7 @@ export async function claimNote(
  * lease expired is no longer ours, and is left alone. Never throws.
  */
 export async function settleNote(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   noteId: string,
   claimedAt: string,
   action: SettleAction,
@@ -400,7 +401,7 @@ export function buildEmailData(
  * `send` is injected so a test can make it throw, 5xx, or refuse without a network.
  */
 export async function sendNotes(
-  svc: SupabaseClient,
+  svc: SupabaseClient<Database>,
   notes: NoteRow[],
   ctx: { spent: Set<string>; emailedItems: Set<string> },
   deps: {
