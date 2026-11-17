@@ -516,6 +516,12 @@ overridden by D4; follow its ordering and verification.
   - ⚠ RISK 1 MITIGATION: Count the expected invoices for both tenants and compare with Resend → Usage's remaining
     daily quota (100/day). If expected > remaining, follow INVOICE_RUNBOOK "A big month" (spread over days or
     upgrade). The user decides.
+- **D-1/D-2 DONE (2026-11-18):** `2833602` on `main`; credit-note-emails v9, package-emails v10, **generate-invoices
+  v42**, probes PASS, v42's download holds every Part B file. DEPLOYMENT #108. **O1:** no §9 BLOCKER (row 1 is a
+  test-timing flake). **O2 DONE:** the prediction SQL (scratchpad `o2predict.sql`) matched the engine's real output
+  for all 59 parents of a local 12×5 bench tenant. Prod, read-only: **Epic Swim 0 invoices** (nothing billable after
+  package draws), **Little Orcas 1 invoice, 5 lines** (parent `79539438…`); neither had an October invoice. Resend:
+  ≤ 1 email, far under 100/day.
 - **O3 — bill the SMALLER tenant first**, per `INVOICE_RUNBOOK.md`: scoped, manual, billing month `2026-10`.
   - **Do NOT use `force`.**
   - **Do NOT bill any other month.**

@@ -1391,3 +1391,15 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     construction (§7.187); the proof is the per-commit runtime-identity check, the bench and the probes. **Rollback:**
     a worktree at `47996d2` and `supabase functions deploy <fn> --workdir <it> --project-ref cdmjeyauhxcgulhbxmsb`.
     Nightly not dispatched.
+108. **Deploy record (2026-11-18): Edge Functions refactor Part B — generate-invoices, package-emails and
+    credit-note-emails tiered into dao/ + domain/; no behaviour change.** (`docs/plans/EDGE_FUNCTIONS_REFACTOR_PLAN.md`
+    §5.) 19 commits `dbc0997`…`2833602`, each stage gated: census vs the Part A sha (every query chain as a multiset,
+    shape counts, `readPaged` text), the tier fence, suite ×2, and — on every engine stage — the bench vs `47996d2` at
+    4 sizes (to 181 invoices / 179 emails, Resend payloads included), all IDENTICAL; guard / hard-stop / drawn-set /
+    seal mutants proven red. Drivers with functions served from the checkout: money-admin 44/44, unmarked-lessons
+    12/12, package-renewal 7/7, referrals 13/13, coach-marking 31/31. CI's repo checks run locally first, all green.
+    **Then** `2833602` → `main`, and from the clean root at that sha: credit-note-emails v8 → v9, package-emails v9 →
+    v10, **generate-invoices v41 → v42**; `verify_jwt` unchanged (true, true, false); boot probes PASS (400, 400, 401).
+    `public-*` not redeployed (their import graph is unchanged since Part A). **Download-proven:** the v42 source
+    holds all 8 `dao/` and 12 `domain/` files. **Rollback:** a worktree at `ff70ac0` and `supabase functions deploy
+    <fn> --workdir <it> --project-ref cdmjeyauhxcgulhbxmsb`. Nightly not dispatched.
