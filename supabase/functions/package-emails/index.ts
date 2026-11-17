@@ -119,11 +119,11 @@ Deno.serve(async (req) => {
         return respond({ sent: false, reason: "not allowed" }, 403);
       }
 
-      const rParent: any = Array.isArray(reward.parents)
+      const rParent = Array.isArray(reward.parents)
         ? reward.parents[0] : reward.parents;
-      const rProfile: any = Array.isArray(rParent?.profiles)
+      const rProfile = Array.isArray(rParent?.profiles)
         ? rParent?.profiles?.[0] : rParent?.profiles;
-      const rTenant: any = Array.isArray(reward.tenants)
+      const rTenant = Array.isArray(reward.tenants)
         ? reward.tenants[0] : reward.tenants;
 
       const rData: ReferralRewardEmailData = {
@@ -157,9 +157,9 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!pkg) return respond({ sent: false, reason: "not found" }, 404);
 
-    const parent: any = Array.isArray(pkg.parents) ? pkg.parents[0] : pkg.parents;
-    const tenant: any = Array.isArray(pkg.tenants) ? pkg.tenants[0] : pkg.tenants;
-    const parentProfile: any = Array.isArray(parent?.profiles)
+    const parent = Array.isArray(pkg.parents) ? pkg.parents[0] : pkg.parents;
+    const tenant = Array.isArray(pkg.tenants) ? pkg.tenants[0] : pkg.tenants;
+    const parentProfile = Array.isArray(parent?.profiles)
       ? parent?.profiles?.[0]
       : parent?.profiles;
 
