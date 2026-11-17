@@ -42,6 +42,7 @@ import {
   studentsEnrolledOn,
 } from "./attendanceCompleteness.ts";
 import { runGuards } from "./domain/guards.ts";
+import { readPhase1 } from "./domain/phase1.ts";
 import { BILLABLE } from "./constants.ts";
 import * as repo from "./dao/billing.repo.ts";
 import * as rpc from "./dao/billing.rpc.ts";
@@ -66,16 +67,6 @@ export type {
   UnclaimedStudent,
 } from "./types.ts";
 
-function groupBy<T>(rows: readonly T[], key: (r: T) => string): Map<string, T[]> {
-  const m = new Map<string, T[]>();
-  for (const r of rows) {
-    const k = key(r);
-    const list = m.get(k);
-    if (list) list.push(r);
-    else m.set(k, [r]);
-  }
-  return m;
-}
 
 
 /**
@@ -173,54 +164,19 @@ async function generateForTenant(
   // for the whole tenant-month — so a retired class no longer costs a round
   // trip. Only its in-memory pass remains, which is trivial.)
   const tGuards = performance.now();
-  // isolation: RLS does not apply to service_role — the tenant filter is in the dao.
-  const { data: classes, error: clsErr } = await repo.readClasses(supabase, tenantId);
-
-  if (clsErr) throw new Error(clsErr.message);
-
-  // ── Make-up bookings: a child guests into ONE lesson of another class ─────
-  // Loaded ONCE for the tenant, not per class like trials, because a booking
-  // is resolved against its HOME class as well as its host.
-  const { data: makeupRows, error: makeupErr } = await repo.readMakeups(supabase, tenantId, monthStart, monthEnd);
-
-  if (makeupErr) throw new Error(makeupErr.message);
-
-  // Effective-dated terms for those classes, fetched once rather than per
-  // lesson. Scoped transitively by class_id — the classes query above is
-  // already tenant-filtered, and RLS does not apply to service_role, so this
-  // filter is the isolation.
-  //
-  // ⚠ IF YOU EVER RE-NARROW THE CLASSES SCAN ABOVE, RESTORE THE UNION HERE.
-  // Until 2026-08-09 this `.in()` also carried
-  // `...(makeupRows ?? []).map((m) => m.home_class_id)`, because the scan
-  // filtered `.eq("is_active", true)`: a retired home class fell out of it, and
-  // rateOn() (rates.ts — a hard throw, no fallback) then killed the whole run
-  // for that tenant. The scan is no longer filtered, and book_makeup() derives
-  // home_class_id from the child's own active enrolment — same tenant, by
-  // construction — so every home class is already in `classes` and the arm was
-  // unreachable.
-  //
-  // Removed rather than kept, and the reasoning is worth carrying: the arm's
-  // guard was `makeups.test.ts:370`, which went VACUOUS the moment the scan
-  // widened — measured, not predicted (with the arm deleted the makeups file
-  // still passed 12/12, WAVE_1_PLAN.md's RISK 1 vacuity step). Dead code with
-  // no test behind it, sitting in the money engine, reads as load-bearing to
-  // the next person and is not. Its failure mode also argues for deletion:
-  // a missing rate THROWS and stops the run — loud, and never a silent
-  // underbill, which is the failure this whole change exists to prevent.
-  const { data: classRates, error: rateErr } = await repo.readClassRates(supabase, classes);
-
-  if (rateErr) throw new Error(rateErr.message);
-
-  // ── Trial rates, per class category, effective-dated ──────────────────────
-  // Loaded once for the tenant and resolved in memory, exactly like classRates.
-  // A category with no rate is a REAL answer — "this business has not priced
-  // trials" — and the caller falls back to the class rate. That is deliberately
-  // unlike a missing CLASS rate, which is a hard failure (§6), because there the
-  // only alternative would be silently charging 0.
-  const { data: trialRates, error: trialRateErr } = await repo.readTrialRates(supabase, tenantId);
-
-  if (trialRateErr) throw new Error(trialRateErr.message);
+  // ── Phase 1 reads: domain/phase1.ts (B5) ─────────────────────────────────
+  const {
+    classes,
+    makeupRows,
+    classRates,
+    trialRates,
+    sessionsByClass,
+    bookingsByClass,
+    enrolmentsByClass,
+    attendanceBySession,
+    parentStudentsByStudent,
+    studentNameById,
+  } = await readPhase1(supabase, tenantId, monthStart, monthEnd);
 
   /** The rate in force for a category on a date, or null. */
   const trialRateFor = (categoryId: string, on: string): number | null => {
@@ -277,54 +233,6 @@ async function generateForTenant(
   // lesson counts as "should already have happened", and the UTC date is the
   // previous day in SGT before 08:00 (gotcha §7.7).
   const todayDate = dateInTimeZone(now, APP_TIMEZONE);
-
-  // ── Batched phase-1 reads: one query per table for the whole tenant-month ──
-  // Each replaces a query that used to run once per class inside the loop
-  // below (see "Batched reads" at the top of this file). The loop body then
-  // takes its class's slice from these maps, so it sees exactly the rows it
-  // used to fetch. Same filters, same columns; the class_id filter became an
-  // .in() over this tenant's classes, which is still the isolation (RLS does
-  // not apply to service_role).
-  // (Row types: types.ts — SessionRow … StudentNameRow.)
-
-  const classIds = (classes ?? []).map((c) => c.id as string);
-  const [allSessions, allBookings, allEnrolments] = await Promise.all([
-    repo.readSessionsIn(supabase, classIds, monthStart, monthEnd),
-    repo.readBookingsIn(supabase, classIds, monthStart, monthEnd),
-    repo.readEnrolmentsIn(supabase, classIds),
-  ]);
-
-  // Per class, sessions in date order — what `.order("session_date")` gave the
-  // per-class query. (class_id, session_date) is UNIQUE, so the order is total.
-  const sessionsByClass = groupBy(allSessions, (s) => s.class_id);
-  for (const list of sessionsByClass.values()) {
-    list.sort((a, b) => a.session_date.localeCompare(b.session_date));
-  }
-  const bookingsByClass = groupBy(allBookings, (b) => b.class_id);
-  const enrolmentsByClass = groupBy(allEnrolments, (e) => e.class_id);
-
-  const attendanceBySession = groupBy(
-    await repo.readAttendanceIn(supabase, allSessions.map((s) => s.id)),
-    (a) => a.lesson_session_id
-  );
-
-  // Every student any class could bill: the per-class `billableStudentIds`
-  // (enrolled ∪ attended) unioned across classes. Each class later takes only
-  // the parent links of its OWN billable set, so reading the union changes no
-  // class's rows — it only fetches them in one trip instead of one per class.
-  const tenantBillableStudentIds = [
-    ...new Set([
-      ...allEnrolments.map((e) => e.student_id),
-      ...[...attendanceBySession.values()].flat().map((a) => a.student_id),
-    ]),
-  ];
-  const [allParentStudents, allBilledStudents] = await Promise.all([
-    repo.readParentStudentsIn(supabase, tenantBillableStudentIds),
-    repo.readStudentNamesIn(supabase, tenantBillableStudentIds),
-  ]);
-  const parentStudentsByStudent = groupBy(allParentStudents, (ps) => ps.student_id);
-  // Names to snapshot onto each line (see InvoiceItem.student_name).
-  const studentNameById = new Map(allBilledStudents.map((s) => [s.id, s.full_name]));
 
   for (const cls of classes ?? []) {
     // Sessions for this class within the billing month (batched above).
