@@ -22,6 +22,7 @@
 // sell a prepayment, so a suspended tenant is the uniform not-found here.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 
 const TOKEN_RE = /^[0-9a-f]{32}$/;
 
@@ -103,7 +104,7 @@ export function serializePublicPackage(row: {
 /** null = not found, for EVERY failure reason (uniform 404 upstream), INCLUDING
  *  a suspended business (RISK 9). */
 export async function lookupPackage(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   token: string,
 ): Promise<PublicPackage | null> {
   if (!TOKEN_RE.test(token)) return null;
@@ -137,7 +138,7 @@ export async function lookupPackage(
  *  (cancelled, active, already-claimed) is null → uniform 404, so a stale link
  *  can never re-arm a payment (RISK 5). A suspended business is null (RISK 9). */
 export async function claimPackage(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   token: string,
 ): Promise<{ paid_claimed_at: string } | null> {
   if (!TOKEN_RE.test(token)) return null;
