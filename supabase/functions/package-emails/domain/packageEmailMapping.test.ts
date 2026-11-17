@@ -17,7 +17,7 @@ import {
   buildRequestedHtml,
   buildRequestedSubject,
   type PackageEmailData,
-} from "../email.ts";
+} from "./email.ts";
 import {
   packageEmailContent,
   packageEmailData,

@@ -30,7 +30,7 @@ import {
   buildReferralRewardHtml,
   buildReferralRewardSubject,
   sendPackageEmail,
-} from "./email.ts";
+} from "./domain/email.ts";
 import {
   packageEmailContent,
   packageEmailData,

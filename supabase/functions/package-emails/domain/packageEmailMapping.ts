@@ -17,7 +17,7 @@ import {
   sgDateOfStamp,
   type PackageEmailData,
   type ReferralRewardEmailData,
-} from "../email.ts";
+} from "./email.ts";
 import type { readPackage, readReferralReward } from "../dao/packageEmails.repo.ts";
 
 export type RewardRow = NonNullable<Awaited<ReturnType<typeof readReferralReward>>["data"]>;
