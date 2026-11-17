@@ -28,6 +28,10 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import type { Database } from "../_shared/database.overrides.ts";
 import type { CreatedInvoice, CreatedInvoiceItem } from "./core.ts";
+import * as repo from "./dao/email.repo.ts";
+import type { InvoiceEmailRow } from "./dao/email.repo.ts";
+import { claimInvoiceEmailRpc } from "./dao/email.rpc.ts";
+import { postResendEmail } from "./dao/resend.ts";
 
 const MONTHS_LONG = [
   "January", "February", "March", "April", "May", "June",
@@ -368,7 +372,7 @@ export async function sendInvoiceEmail(
   const html = buildInvoiceEmailHtml(opts);
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await postResendEmail({
       method: "POST",
       headers: {
         "Authorization": `Bearer ${opts.apiKey}`,
@@ -416,10 +420,7 @@ export async function claimInvoiceEmail(
   invoiceId: string,
   manual = false
 ): Promise<InvoiceEmailClaim | null> {
-  const { data, error } = await supabase.rpc("claim_invoice_email", {
-    p_invoice_id: invoiceId,
-    p_manual: manual,
-  });
+  const { data, error } = await claimInvoiceEmailRpc(supabase, invoiceId, manual);
   if (error) {
     // If the claim committed and only its response was lost, the row reads
     // SENDING for 15 minutes and then RETRYABLE — it heals, it does not strand.
@@ -447,11 +448,7 @@ export async function settleInvoiceEmail(
       ? { invoice_email_sent_at: new Date().toISOString(), invoice_email_claimed_at: null }
       : { invoice_email_claimed_at: null };
   try {
-    const { error } = await supabase
-      .from("invoices")
-      .update(patch)
-      .eq("id", invoiceId)
-      .eq("invoice_email_claimed_at", claimedAt);
+    const { error } = await repo.settleInvoiceEmailRow(supabase, patch, invoiceId, claimedAt);
     if (error) console.log(`invoice email settle (${action}) failed (${invoiceId}): ${error.message}`);
   } catch (e) {
     console.log(`invoice email settle (${action}) threw (${invoiceId}): ${(e as Error).message}`);
@@ -539,10 +536,7 @@ async function emailInvoices(
     ];
 
     // parent_id → { email, name } (profiles is a to-one embed)
-    const { data: parentRows } = await supabase
-      .from("parents")
-      .select("id, profiles(email, full_name)")
-      .in("id", parentIds);
+    const { data: parentRows } = await repo.readParentContacts(supabase, parentIds);
     const parentInfo: Record<string, { email: string | null; name: string }> = {};
     for (const row of parentRows ?? []) {
       const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -555,10 +549,7 @@ async function emailInvoices(
     // tenant_id → branding. One query for the whole run, not one per invoice.
     const tenantIds = [...new Set(invoices.map((c) => c.tenant_id).filter(Boolean))];
     const { data: tenantRows } = tenantIds.length
-      ? await supabase
-          .from("tenants")
-          .select("id, display_name, logo_url")
-          .in("id", tenantIds)
+      ? await repo.readTenantBranding(supabase, tenantIds)
       : { data: [] as { id: string; display_name: string; logo_url: string | null }[] };
     const tenantInfo: Record<string, { name: string; logo: string | null }> = {};
     for (const row of tenantRows ?? []) {
@@ -566,10 +557,7 @@ async function emailInvoices(
     }
 
     // student_id → full_name (for itemised lines)
-    const { data: studentRows } = await supabase
-      .from("students")
-      .select("id, full_name")
-      .in("id", studentIds);
+    const { data: studentRows } = await repo.readStudentNames(supabase, studentIds);
     const studentName: Record<string, string> = {};
     for (const row of studentRows ?? []) {
       studentName[row.id] = row.full_name ?? "";
@@ -683,22 +671,7 @@ export function shouldRetryTenantEmails(
   return true;
 }
 
-const INVOICE_EMAIL_SELECT =
-  "id, parent_id, tenant_id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, due_date";
-
-/** One invoices row as INVOICE_EMAIL_SELECT reads it. */
-type InvoiceEmailRow = {
-  id: string;
-  parent_id: string;
-  tenant_id: string;
-  billing_month: string;
-  gross_amount: number;
-  package_applied: number;
-  credit_applied: number;
-  balance_adjustment: number | null;
-  net_amount: number;
-  due_date: string;
-};
+// INVOICE_EMAIL_SELECT and InvoiceEmailRow: dao/email.repo.ts (B3).
 
 // Rebuild CreatedInvoice shapes from stored rows. The itemised lines come from
 // invoice_items. `ok: false` on an item-fetch error — the caller sends NOTHING
@@ -708,10 +681,7 @@ async function rebuildInvoices(
   supabase: SupabaseClient<Database>,
   rows: InvoiceEmailRow[]
 ): Promise<{ ok: true; invoices: CreatedInvoice[] } | { ok: false; reason: string }> {
-  const { data: itemRows, error } = await supabase
-    .from("invoice_items")
-    .select("invoice_id, student_id, session_date, class_title, amount")
-    .in("invoice_id", rows.map((r) => r.id as string));
+  const { data: itemRows, error } = await repo.readInvoiceItemsFor(supabase, rows);
   if (error) return { ok: false, reason: error.message };
   const itemsByInvoice: Record<string, CreatedInvoiceItem[]> = {};
   for (const it of itemRows ?? []) {
@@ -771,12 +741,7 @@ export async function retryUnsentInvoiceEmails(
   opts: EmailSendOpts & { excludeIds?: string[] } = {}
 ): Promise<{ emailsRetried: number }> {
   try {
-    let discover = supabase
-      .from("invoices")
-      .select(INVOICE_EMAIL_SELECT)
-      .eq("tenant_id", tenantId)
-      .eq("billing_month", billingMonth)
-      .in("invoice_email_state", ["UNSENT", "RETRYABLE"]);
+    let discover = repo.discoverUnsentInvoices(supabase, tenantId, billingMonth);
     if (opts.excludeIds && opts.excludeIds.length) {
       discover = discover.not("id", "in", `(${opts.excludeIds.join(",")})`);
     }
@@ -832,12 +797,7 @@ export async function resendInvoiceEmail(
   opts: EmailSendOpts = {}
 ): Promise<ResendInvoiceResult> {
   try {
-    const { data: row, error } = await supabase
-      .from("invoices")
-      // `as const` keeps the joined column list a literal TYPE, so the row infers (erased at build).
-      .select(`${INVOICE_EMAIL_SELECT}, invoice_email_state` as const)
-      .eq("id", invoiceId)
-      .maybeSingle();
+    const { data: row, error } = await repo.readInvoiceForResend(supabase, invoiceId);
     if (error) {
       console.log(`invoice email resend lookup failed (${invoiceId}): ${error.message}`);
       return { sent: false, reason: "lookup failed" };
@@ -849,11 +809,7 @@ export async function resendInvoiceEmail(
 
     // ⚠ RISK 3 — never email in a suspended business's name. Read as a column,
     // the same way core.ts does; unreadable fails closed.
-    const { data: tenant, error: tErr } = await supabase
-      .from("tenants")
-      .select("suspended_at")
-      .eq("id", row.tenant_id)
-      .maybeSingle();
+    const { data: tenant, error: tErr } = await repo.readTenantSuspendedAt(supabase, row);
     if (tErr || !tenant) return { sent: false, reason: "tenant check failed" };
     if ((tenant as { suspended_at: string | null }).suspended_at !== null) {
       return { sent: false, reason: "tenant suspended" };
@@ -885,7 +841,7 @@ export async function resendInvoiceEmail(
 // it is fixed, which trains the recipient to filter it. State lives in
 // app_settings under a per-month key, so no schema change is needed.
 
-const BLOCKED_NOTICE_KEY = "invoice_block_notified";
+// BLOCKED_NOTICE_KEY ("invoice_block_notified"): constants.ts (B3).
 
 export type BlockingLessonSummary = {
   class_title: string;
@@ -979,11 +935,7 @@ export async function notifyGenerationBlocked(
       .sort()
       .join(";");
 
-    const { data: prior } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", BLOCKED_NOTICE_KEY)
-      .maybeSingle();
+    const { data: prior } = await repo.readBlockedNoticeState(supabase);
 
     // Keyed by tenant AND month, so one business's alert state cannot suppress
     // another's — with a single key, the first tenant to be blocked in a month
@@ -995,16 +947,15 @@ export async function notifyGenerationBlocked(
     // This tenant's coaches and the admins who can fix the marking, plus the
     // platform admin (who has no tenant and is the fallback when something is
     // stuck). Which admins: blockedNoticeRecipients (X4, roles 2026-09-27).
-    const q = supabase.from("profiles").select("id, email, role, tenant_id, admin_role_id");
+    const q = repo.profilesQuery(supabase);
     const { data: candidates } = opts.tenantId
       ? await q.or(`tenant_id.eq.${opts.tenantId},role.eq.platform_admin`)
       : await q.in("role", ["coach", "tenant_admin", "platform_admin"]);
-    let ownersQ = supabase.from("tenants").select("owner_profile_id");
+    let ownersQ = repo.ownersQuery(supabase);
     if (opts.tenantId) ownersQ = ownersQ.eq("id", opts.tenantId);
     const [{ data: owners }, { data: opsEditRoles }] = await Promise.all([
       ownersQ,
-      supabase.from("tenant_role_permissions").select("role_id")
-        .eq("area", "operations").eq("level", "edit"),
+      repo.readOpsEditRoles(supabase),
     ]);
     const recipients = blockedNoticeRecipients(
       (candidates ?? []) as BlockedNoticeCandidate[],
@@ -1019,7 +970,7 @@ export async function notifyGenerationBlocked(
 
     let notified = 0;
     for (const r of recipients) {
-      const res = await fetch("https://api.resend.com/emails", {
+      const res = await postResendEmail({
         method: "POST",
         headers: {
           "Authorization": `Bearer ${opts.apiKey}`,
@@ -1038,13 +989,7 @@ export async function notifyGenerationBlocked(
     // Only record the fingerprint once something actually went out, so a
     // total delivery failure retries tomorrow instead of going quiet.
     if (notified > 0) {
-      await supabase
-        .from("app_settings")
-        .update({
-          value: { ...seen, [seenKey]: fingerprint },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("key", BLOCKED_NOTICE_KEY);
+      await repo.recordBlockedNotice(supabase, seen, seenKey, fingerprint);
     }
 
     return { notified };

@@ -9,3 +9,7 @@ export const BILLABLE = new Set(["present", "trial_paid"]);
 // beside readPaged (core.ts until B2, then dao/).
 export const IN_CHUNK = 100;
 export const PAGE = 1000;
+
+// app_settings key of the blocked-generation notice's throttle state (email.ts
+// notifyGenerationBlocked). Moved from email.ts (B3) — the dao reads and writes it.
+export const BLOCKED_NOTICE_KEY = "invoice_block_notified";
