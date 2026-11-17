@@ -29,6 +29,7 @@
 // verdict. If you change the window clamps in core.ts, change them here too.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 import {
   APP_TIMEZONE,
   dateInTimeZone,
@@ -120,7 +121,7 @@ export function computeMarkableFloor(
  * skippable. Any thrown query bubbles to the caller, which fails skippable.
  */
 async function monthHasUnbilledLessons(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   classes: ReadonlyArray<{
     id: string;
     day_of_week: string;
@@ -293,7 +294,7 @@ async function monthHasUnbilledLessons(
  * skipping the check.
  */
 export async function earliestBlockingEarlierMonth(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   tenantId: string,
   billingMonth: string,
   now: Date

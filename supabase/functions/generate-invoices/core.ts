@@ -25,6 +25,7 @@
 // Both modes apply available credit FIFO via the credit_applications ledger.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 import {
   APP_TIMEZONE,
   clampRunDay,
@@ -275,7 +276,7 @@ export type GenerateResult = {
  * and one business finishing a month must never seal it for anyone else.
  */
 export async function generateInvoices(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   opts: GenerateOptions = {}
 ): Promise<GenerateResult> {
   const billingMonthForResult =
@@ -321,7 +322,7 @@ export async function generateInvoices(
 }
 
 async function generateForTenant(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   tenantId: string,
   opts: GenerateOptions = {}
 ): Promise<GenerateResult> {
@@ -630,7 +631,7 @@ async function generateForTenant(
   type InvoiceItem = {
     student_id: string;
     lesson_session_id: string;
-    attendance_status: string;
+    attendance_status: Database["public"]["Enums"]["attendance_status"];
     amount: number;
     class_title: string;
     session_date: string;
@@ -686,7 +687,7 @@ async function generateForTenant(
     unenrolled_at: string | null;
     is_active: boolean;
   };
-  type AttendanceRow = { lesson_session_id: string; student_id: string; status: string };
+  type AttendanceRow = { lesson_session_id: string; student_id: string; status: Database["public"]["Enums"]["attendance_status"] };
   type ParentStudentRow = { parent_id: string; student_id: string };
   type StudentNameRow = { id: string; full_name: string };
 
@@ -1195,7 +1196,7 @@ async function generateForTenant(
     };
 
     // ── Tally this class's billable items into the cross-class map ──────────
-    const attByKey: Record<string, string> = Object.fromEntries(
+    const attByKey: Record<string, Database["public"]["Enums"]["attendance_status"]> = Object.fromEntries(
       (attRows ?? []).map((a) => [
         `${a.lesson_session_id}:${a.student_id}`,
         a.status,

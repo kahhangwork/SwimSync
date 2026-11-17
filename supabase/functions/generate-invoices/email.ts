@@ -26,6 +26,7 @@
 //    Date (no UTC drift — the same discipline the apps use for SG-local dates).
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 import type { CreatedInvoice, CreatedInvoiceItem } from "./core.ts";
 
 const MONTHS_LONG = [
@@ -411,7 +412,7 @@ export type InvoiceEmailClaim = { claimedAt: string; priorState: string };
  * concurrent claimer waits on the lock, then sees SENDING and gets no row.
  */
 export async function claimInvoiceEmail(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   invoiceId: string,
   manual = false
 ): Promise<InvoiceEmailClaim | null> {
@@ -435,7 +436,7 @@ export async function claimInvoiceEmail(
  * Never throws; a failed settle leaves the claim, which the lease expires.
  */
 export async function settleInvoiceEmail(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   invoiceId: string,
   claimedAt: string,
   action: SettleAction
@@ -522,7 +523,7 @@ export function resendGate(maxPerSecond?: number): Promise<void> {
 // attempts changes the payload under the same key; Resend then answers 409
 // invalid_idempotent_request, which settleActionFor reads as SENT.
 async function emailInvoices(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   invoices: CreatedInvoice[],
   opts: EmailSendOpts & { manual?: boolean } = {}
 ): Promise<{ emailsSent: number; results: InvoiceSendResult[] }> {
@@ -654,7 +655,7 @@ async function emailInvoices(
 // just-created invoice while this one was mid-send — two emails to one parent.
 // NEVER throws — any failure is logged and swallowed; returns how many sent.
 export async function emailCreatedInvoices(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   created: CreatedInvoice[],
   opts: EmailSendOpts = {}
 ): Promise<{ emailsSent: number }> {
@@ -690,7 +691,7 @@ const INVOICE_EMAIL_SELECT =
 // then (a line-item-less email would still settle as sent and never retry, ⚠ #2).
 // An invoice that resolves zero items is a partial fetch and is left out.
 async function rebuildInvoices(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   rows: any[]
 ): Promise<{ ok: true; invoices: CreatedInvoice[] } | { ok: false; reason: string }> {
   const { data: itemRows, error } = await supabase
@@ -750,7 +751,7 @@ async function rebuildInvoices(
 // so a first send that was released (no key, no recipient, a 4xx) is not
 // re-attempted in the SAME invocation.
 export async function retryUnsentInvoiceEmails(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   tenantId: string,
   billingMonth: string,
   opts: EmailSendOpts & { excludeIds?: string[] } = {}
@@ -812,7 +813,7 @@ export type ResendInvoiceResult = {
 // and returns "sending".
 // NEVER throws.
 export async function resendInvoiceEmail(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   invoiceId: string,
   opts: EmailSendOpts = {}
 ): Promise<ResendInvoiceResult> {
@@ -948,7 +949,7 @@ export function blockedNoticeRecipients(
  * blocked class's title and dates across a business boundary.
  */
 export async function notifyGenerationBlocked(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   billingMonth: string,
   blocking: BlockingLessonSummary[],
   opts: { apiKey?: string; tenantId?: string } = {}

@@ -19,6 +19,7 @@
 //                                      app timezone / SGT — see dates.ts)
 
 import { createClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 import { generateInvoices, type GenerateOptions } from "./core.ts";
 import { recordRuns, toErrorRows, toRunRows } from "./runLog.ts";
 import { withDbNow } from "./clock.ts";
@@ -61,7 +62,7 @@ Deno.serve(async (req: Request) => {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const supabase = createClient(
+  const supabase = createClient<Database>(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { autoRefreshToken: false, persistSession: false } }

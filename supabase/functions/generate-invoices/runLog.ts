@@ -18,6 +18,7 @@
 //     EXISTS, not merely that billing returned.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database, Json } from "../_shared/database.overrides.ts";
 import type { GenerateOptions, GenerateResult } from "./core.ts";
 
 /** Engine statuses that mean "did not attempt this month". Exported as the ONE
@@ -52,8 +53,8 @@ export type RunRow = {
   classes_still_incomplete: number | null;
   unclaimed_billable: number | null;
   earlier_unbilled_month: string | null;
-  blocking: unknown[] | null;
-  unclaimed_students: unknown[] | null;
+  blocking: Json[] | null;
+  unclaimed_students: Json[] | null;
   message: string | null;
   error: string | null;
   /** Generation ms for this tenant, emails EXCLUDED (20261116000100). NULL when
@@ -144,7 +145,7 @@ export function toErrorRows(opts: GenerateOptions, e: unknown, durationMs?: numb
 /** Write the rows. Best-effort: NEVER throws; returns how many were written so
  *  a test can assert the write actually happened. */
 export async function recordRuns(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   rows: RunRow[]
 ): Promise<{ recorded: number }> {
   if (!rows.length) return { recorded: 0 };
