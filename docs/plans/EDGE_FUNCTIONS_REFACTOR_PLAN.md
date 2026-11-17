@@ -1,6 +1,6 @@
 # Edge Functions refactor — generated types, then tiers
 
-_Drafted 2026-11-17. Plan-reviewed 2026-11-17 (mitigations inlined as ⚠ RISK n). Status: IN PROGRESS — preflight (P) started 2026-11-17._
+_Drafted 2026-11-17. Plan-reviewed 2026-11-17 (mitigations inlined as ⚠ RISK n). Status: IN PROGRESS — Part A LIVE 2026-11-17 (v41); Part B next._
 
 Two refactors, applied to `supabase/functions/` the way they were applied to the apps:
 
@@ -284,6 +284,12 @@ Tooling and test-infrastructure only. No function source changes.
     `functions download` returns type-stripped source, which is identical by construction (§7.187). The proof is P3's
     runtime identity + the version bump + the boot probes.
   - Gate (prod): open one public invoice and one public package link (read-only).
+
+- **A6 DONE (2026-11-17):** `ff70ac0` on `main`; deployed one at a time: public-package v4, public-invoice v5,
+  credit-note-emails v8, package-emails v9, **generate-invoices v41**. Every probe PASS, `verify_jwt` unchanged, real
+  package + invoice reads 200. DEPLOYMENT #107. **Part B's bench baseline is now the Part A deploy sha `ff70ac0`**
+  (runtime-identical to `47996d2`; benching against `47996d2` stays valid and is what B uses — its archive is already
+  extracted).
 
 ## 5. Part B — tiers (~3–4 days)
 

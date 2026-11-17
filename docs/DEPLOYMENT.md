@@ -1374,3 +1374,20 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `RESEND_MAX_PER_SECOND` is unset (default 2/s). **Not done:** no live `duration_ms` yet. Coach Kah Hang's
     October was billed on v39 (7 invoices, sealed 2026-11-16). The first v40 run is Little Orcas or Epic Swim
     October. Nightly not dispatched.
+107. **Deploy record (2026-11-17): Edge Functions refactor Part A — all 5 functions typed with the generated
+    `Database`; no behaviour change.** (`docs/plans/EDGE_FUNCTIONS_REFACTOR_PLAN.md` §3–§4.) Preflight `966f53a` (tooling:
+    test.sh list check, bench sees Resend payloads, runtime-identity + G6 cover `supabase/functions`, `config.toml`
+    declares `verify_jwt = true` for the two email functions). Part A `ff5c337`…`ff70ac0`: a third generated
+    `database.types.ts` in `supabase/functions/_shared/` (G5), every client `<Database>`, G6 20 → 1. **Probe first:**
+    public-invoice v3 → v4 from `a9611eb` proved a `../_shared/` import bundles. **Before:** A5 bench IDENTICAL vs
+    `47996d2` at 4 sizes (to 181 invoices / 179 emails, Resend payloads included); suite 320/320 ×2; both apps' tests +
+    typecheck green; G5 local. **Then** `ff70ac0` → `main` and, from the clean root at that sha, one at a time:
+    public-package v3 → v4, public-invoice v4 → v5, credit-note-emails v7 → v8, package-emails v8 → v9,
+    **generate-invoices v40 → v41**. After each: version +1, `verify_jwt` as before (false, false, true, true, false),
+    and a boot probe that writes and sends nothing — public-* bogus token → `{"error":"not_found"}` 404,
+    generate-invoices no auth → 401, the two email functions `POST {}` with the **legacy anon JWT** (the gateway refuses
+    the publishable key, #103) → 400 `bad request`. Live reads: a real package (PKG-2026-0001) and invoice
+    (INV-2026-0032) → 200. **Not download-provable:** `functions download` returns type-stripped source, identical by
+    construction (§7.187); the proof is the per-commit runtime-identity check, the bench and the probes. **Rollback:**
+    a worktree at `47996d2` and `supabase functions deploy <fn> --workdir <it> --project-ref cdmjeyauhxcgulhbxmsb`.
+    Nightly not dispatched.
