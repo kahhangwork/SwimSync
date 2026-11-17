@@ -29,15 +29,11 @@ import {
 // the records say now.
 // PROHIBITION: this string must NOT grow students(full_name), classes(title), or
 // lesson_sessions(session_date).
+// ONE literal, never `+`-joined: a concatenation widens to `string` and loses the row
+// type (§7.106). credit_note_email_state is a PostgREST computed column (20260927000100):
+// the email state, computed in SQL so no lease maths happens in Deno.
 export const NOTE_SELECT =
-  "id, reference_number, amount, reason, status, applied_to_invoice_id, " +
-  "tenant_id, parent_id, invoice_item_id, lesson_session_id, student_name, " +
-  "invoice_items(class_title, session_date), " +
-  "parents(profiles(full_name, email)), " +
-  "tenants(display_name, logo_url), " +
-  // PostgREST computed column (20260927000100): the email state, computed in SQL
-  // so no lease maths happens in Deno.
-  "credit_note_email_state";
+  "id, reference_number, amount, reason, status, applied_to_invoice_id, tenant_id, parent_id, invoice_item_id, lesson_session_id, student_name, invoice_items(class_title, session_date), parents(profiles(full_name, email)), tenants(display_name, logo_url), credit_note_email_state";
 
 export type NoteRow = {
   id: string;
@@ -54,8 +50,9 @@ export type NoteRow = {
   invoice_items: unknown;
   parents: unknown;
   tenants: unknown;
-  /** SENT / UNSENT / SENDING / RETRYABLE / MAY_HAVE_SENT (email_delivery_state). */
-  credit_note_email_state: string;
+  /** SENT / UNSENT / SENDING / RETRYABLE / MAY_HAVE_SENT (email_delivery_state).
+   *  Typed nullable because the generated type of a computed column is (widen only). */
+  credit_note_email_state: string | null;
 };
 
 /** PostgREST returns an embedded row as an object or a 1-element array. */
@@ -95,7 +92,7 @@ export async function findUnsentBySession(
     .eq("tenant_id", tenantId) // ⚠ RISK 3
     .in("credit_note_email_state", ["UNSENT", "RETRYABLE"]);
   if (error) return { ok: false, reason: `discovery failed: ${error.message}` };
-  return { ok: true, notes: (data ?? []) as unknown as NoteRow[] };
+  return { ok: true, notes: data ?? [] };
 }
 
 /**
@@ -117,7 +114,7 @@ export async function findUnsentById(
   // No row means "no such note" OR "already emailed". Both are nothing-to-do, and
   // the second is what stops a double press re-sending.
   if (!data) return { ok: true, notes: [] };
-  const note = data as unknown as NoteRow;
+  const note: NoteRow = data;
   if (note.credit_note_email_state === "SENDING") return { ok: true, notes: [], sending: true };
   return { ok: true, notes: [note] };
 }
