@@ -77,7 +77,7 @@ const IN_CHUNK = 100;
 const PAGE = 1000;
 
 // deno-lint-ignore no-explicit-any
-type CountedQuery = any; // a supabase-js select built with { count: "exact" }
+type CountedQuery = any; // db-any-ok: a supabase-js select built with { count: "exact" }; generic over every table, rows typed by readPaged<T>
 
 /** Every row of a counted query, keyset-paged by `orderKey` — a column that
  *  is unique within the query AND selected (the next page starts after it). */
