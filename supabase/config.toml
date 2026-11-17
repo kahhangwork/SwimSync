@@ -495,3 +495,15 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# package-emails and credit-note-emails are called by a SIGNED-IN admin/coach and
+# authorise on the caller's JWT, so the platform JWT check stays ON. Declared here
+# (2026-11-17, EDGE_FUNCTIONS_REFACTOR_PLAN.md P5) because until now they had no
+# entry and got `true` only from the CLI default — one habitual `--no-verify-jwt`
+# on a redeploy would have opened them. Live value confirmed `true` for both
+# (`supabase functions list -o json`, 2026-11-17: v8 and v7).
+[functions.package-emails]
+verify_jwt = true
+
+[functions.credit-note-emails]
+verify_jwt = true

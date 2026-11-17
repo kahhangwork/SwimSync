@@ -2,7 +2,7 @@
 //
 //   node runtime-identical.mjs <root> <base> <head> <path>...
 //
-// Each <path> is a .ts/.tsx file under SwimSyncApp/ or SwimSyncAdmin/ that exists at
+// Each <path> is a .ts/.tsx file under SwimSyncApp/, SwimSyncAdmin/ or supabase/functions/ that exists at
 // both <base> and <head>. Both versions are transpiled with the app's OWN TypeScript
 // (`transpileModule`: removeComments, jsx Preserve, target/module ESNext — the same
 // erasure Babel/SWC perform), re-parsed, and compared as SYNTAX TREES: whitespace and
@@ -35,10 +35,19 @@ if (!root || !base || !head) {
   process.exit(2);
 }
 
+// A "unit" is an app (SwimSyncApp, SwimSyncAdmin) or supabase/functions. The functions have
+// no node_modules of their own: they are transpiled with SwimSyncAdmin's TypeScript, and
+// their overrides live at _shared/ (EDGE_FUNCTIONS_REFACTOR_PLAN.md P3).
+const FUNCTIONS = "supabase/functions";
+const unitOf = (path) => (path.startsWith(FUNCTIONS + "/") ? FUNCTIONS : path.split("/")[0]);
+const tsHome = (app) => (app === FUNCTIONS ? "SwimSyncAdmin" : app);
+const overridesOf = (app) =>
+  app === FUNCTIONS ? `${FUNCTIONS}/_shared/database.overrides` : `${app}/lib/database.overrides`;
+
 const tsByApp = new Map();
 function tsFor(app) {
   if (!tsByApp.has(app)) {
-    const req = createRequire(join(root, app, "package.json"));
+    const req = createRequire(join(root, tsHome(app), "package.json"));
     try {
       tsByApp.set(app, req("typescript"));
     } catch {
@@ -80,12 +89,12 @@ const identityByApp = new Map();
 function fromJsonIsIdentity(app) {
   if (identityByApp.has(app)) return identityByApp.get(app);
   const ts = tsFor(app);
-  const p = `${app}/lib/database.overrides.ts`;
+  const p = `${overridesOf(app)}.ts`;
   const text = show(head, p);
   let ok = false;
   // Metro resolves a platform variant FIRST on that platform; only the .ts is proven.
   const variant = ["web", "native", "ios", "android"].some((pl) =>
-    ["ts", "tsx", "js"].some((ext) => show(head, `${app}/lib/database.overrides.${pl}.${ext}`) != null));
+    ["ts", "tsx", "js"].some((ext) => show(head, `${overridesOf(app)}.${pl}.${ext}`) != null));
   if (variant) {
     identityByApp.set(app, false);
     return false;
@@ -118,7 +127,7 @@ function serialise(ts, js, path, app) {
   const fromJsonNames = new Set();
   // The specifier must RESOLVE to this app's lib/database.overrides — not merely end
   // in that name (a sibling `./database.overrides` would carry its own fromJson).
-  const target = `${app}/lib/database.overrides`;
+  const target = overridesOf(app);
   const isOverrides = (s) => {
     if (!ts.isStringLiteral(s)) return false;
     const spec = s.text.replace(/\.tsx?$/, "");
@@ -204,7 +213,7 @@ let differ = 0;
 const work = mkdtempSync(join(tmpdir(), "runtime-identical-"));
 try {
   for (const path of paths) {
-    const app = path.split("/")[0];
+    const app = unitOf(path);
     const ts = tsFor(app);
     const a = show(base, path), b = show(head, path);
     if (a == null || b == null) {

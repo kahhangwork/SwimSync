@@ -19,6 +19,7 @@
 // emailCreatedInvoices → retryUnsentInvoiceEmails) with an instrumented client.
 import { createClient } from "npm:@supabase/supabase-js@2.110.2";
 import { MONTH, seedMonth } from "./seed.ts";
+import { createHash } from "node:crypto";
 
 const REPO = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const ENGINE_DIR = (Deno.env.get("ENGINE_DIR") ?? REPO).replace(/\/$/, "");
@@ -34,11 +35,13 @@ const email = await import(`file://${ENGINE_DIR}/email.ts`);
 const runLog = await import(`file://${ENGINE_DIR}/runLog.ts`);
 const seedCore = await import(`file://${SEED_ENGINE_DIR}/core.ts`);
 
+const sha256 = (t: string) => createHash("sha256").update(t).digest("hex");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ── Instrumentation ─────────────────────────────────────────────────────────
 type Req = { phase: string; method: string; target: string; t0: number; ms: number };
 const reqs: Req[] = [];
+const sent: { url: string; idempotencyKey: string | null; body: string }[] = [];
 let phase = "idle";
 let measuring = false;
 const realFetch = globalThis.fetch.bind(globalThis);
@@ -64,6 +67,11 @@ async function instrumented(input: RequestInfo | URL, init?: RequestInit): Promi
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   if (!measuring) return realFetch(input, init);
   if (url.startsWith("https://api.resend.com")) {
+    // Captured for the dump (EDGE_FUNCTIONS_REFACTOR_PLAN.md P2): the equivalence check must
+    // see WHAT was sent — recipient, subject, body, idempotency key — not only the DB rows.
+    const h = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    const body = typeof init?.body === "string" ? init.body : "";
+    sent.push({ url, idempotencyKey: h.get("Idempotency-Key"), body });
     const t0 = performance.now();
     await sleep(RESEND_MS);
     reqs.push({ phase, method, target: "RESEND", t0, ms: performance.now() - t0 });
@@ -181,6 +189,15 @@ try {
     const bals = (await db.from("parent_tenant_balances").select("*").eq("tenant_id", tid)).data ?? [];
     const periods = (await db.from("billing_periods").select("*").eq("tenant_id", tid)).data ?? [];
 
+    // Replace every uuid and invoice public_token inside free text (subject, HTML, keys) by its label.
+    const tokens = new Map<string, string>();
+    for (const i of invs) if (i.public_token) tokens.set(String(i.public_token), `TOKEN:${labels.get(i.id)}`);
+    const relabel = (t: string) => {
+      let out = t.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, (u) => labels.get(u) ?? "UNMAPPED_UUID");
+      for (const [tok, lab] of tokens) out = out.split(tok).join(lab);
+      // The seed's random 8-hex tag (tenant name, parent emails) differs every run.
+      return out.split(seeded.s.tag).join("TAG");
+    };
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const DROP = new Set(["id", "public_token"]);
     // deno-lint-ignore no-explicit-any
@@ -201,6 +218,22 @@ try {
       parent_tenant_balances: norm(bals), billing_periods: norm(periods),
       created_result: (result.created ?? []).map((c: Record<string, unknown>) => JSON.stringify({ ...c, invoice_id: labels.get(c.invoice_id as string), parent_id: labels.get(c.parent_id as string), tenant_id: "TENANT", items: (c.items as Record<string, unknown>[]).map((i) => ({ ...i, student_id: labels.get(i.student_id as string) })) })).sort(),
       result_status: result.status, sealed: result.sealed,
+      // P2: what reached Resend, and how many round trips each phase made. A refactor that
+      // changes a recipient, a subject, a byte of HTML, an idempotency key, or turns a
+      // Promise.all sequential now reads DIFFERENT, not IDENTICAL.
+      resend: sent.map((m) => {
+        // deno-lint-ignore no-explicit-any
+        const b: Record<string, any> = m.body ? JSON.parse(m.body) : {};
+        return JSON.stringify({
+          url: m.url,
+          to: relabel(String(b.to ?? "")), from: b.from,
+          subject: relabel(String(b.subject ?? "")),
+          html_sha256: sha256(relabel(String(b.html ?? ""))),
+          idempotency_key: m.idempotencyKey === null ? null : relabel(m.idempotencyKey),
+        });
+      }).sort(),
+      emails: { emails_sent: emailsSent, emails_retried: retried },
+      requests: rows.map((r) => JSON.stringify({ phase: r.phase, requests: r.requests, byTarget: Object.fromEntries(Object.entries(r.byTarget).sort()) })),
     };
     await Deno.writeTextFile(OUT, JSON.stringify(dump, null, 1));
     console.error(`dump → ${OUT}: ${invs.length} invoices, ${items.length} items, ${capps.length} credit apps, ${papps.length} package apps, ${cns.length} credit notes`);

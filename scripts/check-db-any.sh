@@ -5,13 +5,14 @@
 # the compiler still cannot see a renamed column (§7.76). Wave 8 removes those casts
 # folder by folder; without a ratchet they grow back.
 #
-# THE RULE, over every tracked-or-new non-test .ts/.tsx under SwimSyncApp/ and
-# SwimSyncAdmin/ (not lib/database.types.ts; tests = *.test.ts[x] and */testing/*):
+# THE RULE, over every tracked-or-new non-test .ts/.tsx under SwimSyncApp/, SwimSyncAdmin/
+# and supabase/functions/ (not lib/ or _shared/database.types.ts; tests = *.test.ts[x],
+# */testing/*, and in the functions test-helpers.ts and generate-invoices/bench/):
 #   1. Count, outside comments and string contents: `as any`, `: any`, `any[]`,
 #      `any` as a generic or union member (`<any>`, `Map<string, any>`, `| any`),
 #      `type X = any`, `Record<string, any>`, `as unknown as`, `@ts-ignore`,
 #      `@ts-expect-error`, `@ts-nocheck`.
-#      EXEMPT: one line per lib/database.overrides.ts carrying `// g6-exempt: fromJson`
+#      EXEMPT: one line per lib/ (or _shared/) database.overrides.ts carrying `// g6-exempt: fromJson`
 #      (the single permitted cast, RISK 8). A second marked line in a file fails.
 #   2. Each file's count must EQUAL its line in <app>/.db-any-allowance (`path count`,
 #      path relative to the app; absent = 0). Above it: you added an `any`. Below it:
@@ -34,7 +35,9 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-APPS=(SwimSyncApp SwimSyncAdmin)
+# supabase/functions joined 2026-11-17 (EDGE_FUNCTIONS_REFACTOR_PLAN.md P4): its tests,
+# test-helpers.ts, generate-invoices/bench/ and _shared/database.types.ts are not counted.
+APPS=(SwimSyncApp SwimSyncAdmin supabase/functions)
 BASE=${G6_BASE:-HEAD~1}
 UPDATE=0
 [[ "${1:-}" == "--update" ]] && UPDATE=1
@@ -43,13 +46,13 @@ UPDATE=0
 count_app() {
   local app=$1
   (cd "$app" && git ls-files --cached --others --exclude-standard -- '*.ts' '*.tsx') |
-    grep -vE '\.test\.tsx?$|(^|/)testing/|^lib/database\.types\.ts$' |
+    grep -vE '\.test\.tsx?$|(^|/)testing/|^lib/database\.types\.ts$|^_shared/database\.types\.ts$|^generate-invoices/test-helpers\.ts$|^generate-invoices/bench/' |
     while IFS= read -r f; do [[ -f "$app/$f" ]] && printf '%s\n' "$f"; done |
     (cd "$app" && perl -ne '
       chomp; my $f = $_;
       open(my $h, "<", $f) or die "cannot read $f\n";
       local $/; my $src = <$h>; close $h;
-      my $is_ov = ($f eq "lib/database.overrides.ts");
+      my $is_ov = ($f eq "lib/database.overrides.ts" || $f eq "_shared/database.overrides.ts");
       my ($n, $ex) = (0, 0);
       # The single fromJson cast: one marked line, in the overrides file only.
       if ($is_ov) { $ex++ while $src =~ s{^[^\n]*//\s*g6-exempt:\s*fromJson\b[^\n]*$}{}m; }

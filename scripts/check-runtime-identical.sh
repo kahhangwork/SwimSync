@@ -16,7 +16,11 @@
 #   - a DELETED non-test file there, any other changed source there (.js, .json,
 #     package files, assets…), an ADDED file under an app's `app/` (a route — no
 #     importer needed) or at an app's root (config, middleware), and any change under
-#     supabase/migrations/ or supabase/functions/ are runtime changes outright;
+#     supabase/migrations/ or supabase/config.toml are runtime changes outright;
+#   - supabase/functions/ follows the same rules as an app (SwimSyncAdmin's TypeScript;
+#     _shared/database.types.ts ignored, _shared/database.overrides.ts allow-listed; a new
+#     <fn>/index.ts is a runtime change), EXCEPT generate-invoices/bench/ and every non-.ts
+#     file there (deno.lock, deno.jsonc), which are runtime changes outright;
 #   - an ADDED non-test .ts/.tsx is a runtime change too (a `.web.ts` silently replaces
 #     its sibling on RN-web; `x.ts` beside `x/index.ts` changes what `./x` means),
 #     EXCEPT: lib/database.overrides.ts (allow-listed), or a pure-type module — it
@@ -43,21 +47,28 @@ is_test() { [[ "$1" =~ \.test\.tsx?$ ]]; }
 compare=(); runtime=(); added=(); added_check=()
 while IFS=$'\t' read -r status path; do
   case "$path" in
-    SwimSyncApp/*|SwimSyncAdmin/*) ;;
-    supabase/migrations/*|supabase/functions/*)
-      [[ "$path" =~ \.test\.ts$ || "$path" == */test.sh ]] || runtime+=("$status $path")
-      continue ;;
+    SwimSyncApp/*|SwimSyncAdmin/*)
+      app=${path%%/*}; rel=${path#*/}; types_file=lib/database.types.ts; overrides_file=lib/database.overrides.ts ;;
+    # config.toml carries each function's verify_jwt (P5): a deploy reads it.
+    supabase/migrations/*|supabase/config.toml) runtime+=("$status $path"); continue ;;
+    supabase/functions/*)
+      # Edge Functions (EDGE_FUNCTIONS_REFACTOR_PLAN.md P3): the same transpile proof as the
+      # apps, with SwimSyncAdmin's TypeScript. bench/ and every non-.ts file (deno.lock,
+      # deno.jsonc) stay runtime changes outright; test.sh is test tooling.
+      [[ "$path" == */test.sh ]] && continue
+      [[ "$path" == supabase/functions/generate-invoices/bench/* ]] && { runtime+=("$status $path"); continue; }
+      app=supabase/functions; rel=${path#supabase/functions/}
+      types_file=_shared/database.types.ts; overrides_file=_shared/database.overrides.ts ;;
     *) continue ;;
   esac
-  app=${path%%/*}; rel=${path#*/}
   # *.d.ts declares types only and is never emitted.
-  if is_test "$path" || [[ "$path" == *.md || "$path" == *.d.ts || "$rel" == .db-any-allowance || "$rel" == lib/database.types.ts ]]; then
+  if is_test "$path" || [[ "$path" == *.md || "$path" == *.d.ts || "$rel" == .db-any-allowance || "$rel" == "$types_file" ]]; then
     continue
   fi
   if [[ "$path" =~ \.tsx?$ ]]; then
     case "$status" in
       M) compare+=("$path") ;;
-      A) if [[ "$rel" == lib/database.overrides.ts ]]; then added+=("$path (allow-listed)")
+      A) if [[ "$rel" == "$overrides_file" ]]; then added+=("$path (allow-listed)")
          else added_check+=("$path"); fi ;;
       *) runtime+=("$status $path") ;;
     esac
@@ -68,9 +79,16 @@ done < <(git -C "$ROOT" diff --no-renames --name-status "$BASE" "$HEAD_REV")
 
 # An added file passes only as a pure-type module that cannot shadow anything.
 for a in ${added_check[@]+"${added_check[@]}"}; do
-  app=${a%%/*}; rel=${a#*/}; stem=${a%.*}
+  stem=${a%.*}
   why=""
-  [[ "$rel" == app/* || "$rel" != */* ]] && why="route or app-root file"
+  if [[ "$a" == supabase/functions/* ]]; then
+    app=supabase/functions; ts_home=SwimSyncAdmin; rel=${a#supabase/functions/}
+    # A function's index.ts is its entry point: a new one is a new deployable function.
+    [[ "$rel" == */index.ts || "$rel" != */* ]] && why="function entry point or functions-root file"
+  else
+    app=${a%%/*}; ts_home=$app; rel=${a#*/}
+    [[ "$rel" == app/* || "$rel" != */* ]] && why="route or app-root file"
+  fi
   [[ -z "$why" && "$stem" =~ \.(web|native|ios|android)$ ]] && why="platform extension (replaces its sibling)"
   if [[ -z "$why" ]]; then
     for sib in "$stem.ts" "$stem.tsx" "$stem.js" "$stem/index.ts" "$stem/index.tsx" "$stem/index.js"; do
@@ -84,7 +102,7 @@ for a in ${added_check[@]+"${added_check[@]}"}; do
         const js = ts.transpileModule(src, { fileName: process.argv[3], compilerOptions: { removeComments: true,
           jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
         process.stdout.write(js.replace(/^\s*export\s*\{\s*\}\s*;?\s*$/m, "").trim());
-      });' "$ROOT" "$app" "$a") || exit 2
+      });' "$ROOT" "$ts_home" "$a") || exit 2
     [[ -n "$emitted" ]] && why="new module with runtime code"
   fi
   if [[ -n "$why" ]]; then runtime+=("A $a ($why)"); else added+=("$a (pure types)"); fi
@@ -98,7 +116,7 @@ if ((${#compare[@]})); then
   node "$ROOT/scripts/lib/runtime-identical.mjs" "$ROOT" "$BASE" "$HEAD_REV" "${compare[@]}" || rc=$?
   ((rc == 2)) && exit 2
 else
-  echo "✓ no modified app .ts/.tsx files"
+  echo "✓ no modified app or function .ts/.tsx files"
 fi
 if ((${#runtime[@]})); then
   for r in "${runtime[@]}"; do echo "✗ RUNTIME CHANGE (not a transpilable type edit): $r"; done
