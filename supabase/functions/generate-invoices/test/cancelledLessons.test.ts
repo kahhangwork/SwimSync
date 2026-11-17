@@ -28,13 +28,13 @@
 // Run the suite TWICE (§7.15): a completing run seals its month.
 
 import { assert, assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { generateInvoices } from "./core.ts";
+import { generateInvoices } from "../core.ts";
 import {
   newScenario,
   monthEnded,
   getInvoice,
   type Scenario,
-} from "./test-helpers.ts";
+} from "./helpers.ts";
 
 const MONTH = "2029-02";
 const SATS = ["2029-02-03", "2029-02-10", "2029-02-17"] as const;

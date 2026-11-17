@@ -29,14 +29,14 @@ import {
   sendNotes,
   settleNote,
   skipReasonFor,
-} from "./core.ts";
-import type { SendResult } from "./email.ts";
-import { generateInvoices } from "../generate-invoices/core.ts";
+} from "../domain/notes.ts";
+import type { SendResult } from "../domain/email.ts";
+import { generateInvoices } from "../../generate-invoices/core.ts";
 import {
   monthEnded,
   newScenario,
   type Scenario,
-} from "../generate-invoices/test-helpers.ts";
+} from "../../generate-invoices/test-helpers.ts";
 
 /**
  * Bill a month, then correct one invoiced lesson to absent so the trigger issues a

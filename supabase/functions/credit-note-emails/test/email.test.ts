@@ -19,7 +19,7 @@ import {
   outcomeForStatus,
   settleActionFor,
   type SendOutcome,
-} from "./email.ts";
+} from "../domain/email.ts";
 
 const base: CreditNoteEmailData = {
   parentName: "Mrs Tan",

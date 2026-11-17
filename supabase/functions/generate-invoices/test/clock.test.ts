@@ -20,7 +20,7 @@ import {
   MAX_PROD_SKEW_MS,
   parseDbNow,
   withDbNow,
-} from "./clock.ts";
+} from "../clock.ts";
 
 const LOCAL = "http://127.0.0.1:54321";
 const PROD = "https://abcdefghijklmnop.supabase.co";

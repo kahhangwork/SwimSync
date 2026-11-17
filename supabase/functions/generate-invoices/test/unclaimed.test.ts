@@ -20,8 +20,8 @@
 // already gives each its own tenant.
 
 import { assertEquals, assert } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { generateInvoices } from "./core.ts";
-import { newScenario, monthEnded, getInvoice } from "./test-helpers.ts";
+import { generateInvoices } from "../core.ts";
+import { newScenario, monthEnded, getInvoice } from "./helpers.ts";
 
 // ── TRIPWIRE ──────────────────────────────────────────────────────────────────
 // The most important test here. RISK 1: the new unclaimed logic is a REPORT and

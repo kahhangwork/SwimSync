@@ -17,9 +17,9 @@
 
 import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
-import { generateInvoices, readPaged } from "./core.ts";
-import { emailCreatedInvoices } from "./email.ts";
-import { getInvoice, monthEnded, newScenario, type Scenario } from "./test-helpers.ts";
+import { generateInvoices, readPaged } from "../core.ts";
+import { emailCreatedInvoices } from "../email.ts";
+import { getInvoice, monthEnded, newScenario, type Scenario } from "./helpers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "http://127.0.0.1:54321";
 const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY") ?? "";

@@ -22,14 +22,14 @@
 // after today are never "unmarked", so the guard stays out of these tests.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { generateInvoices } from "./core.ts";
+import { generateInvoices } from "../core.ts";
 import {
   newScenario,
   monthEnded,
   getInvoice,
   checkInvariants,
   type Scenario,
-} from "./test-helpers.ts";
+} from "./helpers.ts";
 
 // ── Package fixtures (service client — bypasses RLS like the engine) ────────
 

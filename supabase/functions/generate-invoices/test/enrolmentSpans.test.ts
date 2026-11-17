@@ -22,8 +22,8 @@
 // disagree about what "marked" means.
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { generateInvoices } from "./core.ts";
-import { getInvoice, monthEnded, newScenario, type Scenario } from "./test-helpers.ts";
+import { generateInvoices } from "../core.ts";
+import { getInvoice, monthEnded, newScenario, type Scenario } from "./helpers.ts";
 
 /**
  * A second child of the SAME parent, enrolled on a given date.

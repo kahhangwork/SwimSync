@@ -76,7 +76,9 @@ function walk(dir: string): string[] {
   for (const e of Deno.readDirSync(dir)) {
     const p = `${dir}/${e.name}`;
     if (e.isDirectory) {
-      if (e.name === "bench" || e.name === "node_modules") continue;
+      // test/ is test infrastructure (helpers, fixtures), not a tier — B13 moved the
+      // shared helpers there.
+      if (e.name === "bench" || e.name === "node_modules" || e.name === "test") continue;
       out.push(...walk(p));
     } else if (e.name.endsWith(".ts") && !e.name.endsWith(".test.ts") && e.name !== "test-helpers.ts") {
       out.push(p);

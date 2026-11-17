@@ -12,15 +12,15 @@
 // Pure tests first (no database), then integration against the local stack.
 
 import { assert, assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { generateInvoices, type GenerateResult } from "./core.ts";
+import { generateInvoices, type GenerateResult } from "../core.ts";
 import {
   ERROR_MAX_CHARS,
   NON_ATTEMPT_STATUSES,
   recordRuns,
   toErrorRows,
   toRunRows,
-} from "./runLog.ts";
-import { getInvoice, monthEnded, newScenario, svc } from "./test-helpers.ts";
+} from "../runLog.ts";
+import { getInvoice, monthEnded, newScenario, svc } from "./helpers.ts";
 
 const T = "11111111-1111-4111-8111-111111111111";
 const T2 = "22222222-2222-4222-8222-222222222222";

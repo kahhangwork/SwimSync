@@ -17,7 +17,7 @@ import {
   buildRequestedHtml,
   buildRequestedSubject,
   type PackageEmailData,
-} from "./email.ts";
+} from "../domain/email.ts";
 import {
   packageEmailContent,
   packageEmailData,
@@ -25,7 +25,7 @@ import {
   type PackageRow,
   referralRewardEmail,
   type RewardRow,
-} from "./packageEmailMapping.ts";
+} from "../domain/packageEmailMapping.ts";
 
 const reward = (over: Record<string, unknown> = {}) =>
   ({

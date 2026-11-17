@@ -11,13 +11,39 @@ ROOT="$(cd ../../.. && pwd)"
 # or new test file can never be silently skipped while the suite stays green
 # (EDGE_FUNCTIONS_REFACTOR_PLAN.md P1).
 TESTS=(
-  core.test.ts clock.test.ts orderingGuard.test.ts email.test.ts emailClaim.test.ts dates.test.ts
-  packages.test.ts unclaimed.test.ts trials.test.ts makeups.test.ts enrolmentSpans.test.ts
-  classDeactivation.test.ts guestOnlyClass.test.ts cancelledLessons.test.ts runLog.test.ts wave6.test.ts
-  speed.test.ts
-  ../package-emails/email.test.ts ../package-emails/domain/packageEmailMapping.test.ts
-  ../credit-note-emails/email.test.ts ../credit-note-emails/core.test.ts
-  ../public-invoice/core.test.ts ../public-package/core.test.ts
+  test/billing.test.ts
+  test/cancelledLessons.test.ts
+  test/classDeactivation.test.ts
+  test/clock.test.ts
+  test/completeness.test.ts
+  test/createdEmails.test.ts
+  test/credit.test.ts
+  test/dates.test.ts
+  test/email.test.ts
+  test/emailClaim.test.ts
+  test/emailRetry.test.ts
+  test/enrolmentSpans.test.ts
+  test/fixtureGuard.test.ts
+  test/guards.test.ts
+  test/guestOnlyClass.test.ts
+  test/isolation.test.ts
+  test/makeups.test.ts
+  test/multiClass.test.ts
+  test/orderingGuard.test.ts
+  test/packages.test.ts
+  test/rates.test.ts
+  test/runLog.test.ts
+  test/seal.test.ts
+  test/speed.test.ts
+  test/trials.test.ts
+  test/unclaimed.test.ts
+  test/wave6.test.ts
+  ../credit-note-emails/test/core.test.ts
+  ../credit-note-emails/test/email.test.ts
+  ../package-emails/test/email.test.ts
+  ../package-emails/test/packageEmailMapping.test.ts
+  ../public-invoice/core.test.ts
+  ../public-package/core.test.ts
   ../tierBoundaries.test.ts
 )
 

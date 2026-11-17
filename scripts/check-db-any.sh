@@ -7,7 +7,7 @@
 #
 # THE RULE, over every tracked-or-new non-test .ts/.tsx under SwimSyncApp/, SwimSyncAdmin/
 # and supabase/functions/ (not lib/ or _shared/database.types.ts; tests = *.test.ts[x],
-# */testing/*, and in the functions test-helpers.ts and generate-invoices/bench/):
+# */testing/*, and in the functions test-helpers.ts, each function's test/ and generate-invoices/bench/):
 #   1. Count, outside comments and string contents: `as any`, `: any`, `any[]`,
 #      `any` as a generic or union member (`<any>`, `Map<string, any>`, `| any`),
 #      `type X = any`, `Record<string, any>`, `as unknown as`, `@ts-ignore`,
@@ -46,7 +46,7 @@ UPDATE=0
 count_app() {
   local app=$1
   (cd "$app" && git ls-files --cached --others --exclude-standard -- '*.ts' '*.tsx') |
-    grep -vE '\.test\.tsx?$|(^|/)testing/|^lib/database\.types\.ts$|^_shared/database\.types\.ts$|^generate-invoices/test-helpers\.ts$|^generate-invoices/bench/' |
+    grep -vE '\.test\.tsx?$|(^|/)testing/|^lib/database\.types\.ts$|^_shared/database\.types\.ts$|^generate-invoices/test-helpers\.ts$|^(generate-invoices|package-emails|credit-note-emails)/test/|^generate-invoices/bench/' |
     while IFS= read -r f; do [[ -f "$app/$f" ]] && printf '%s\n' "$f"; done |
     (cd "$app" && perl -ne '
       chomp; my $f = $_;

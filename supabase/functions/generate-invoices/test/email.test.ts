@@ -19,7 +19,7 @@ import {
   outcomeForStatus,
   invoiceIdempotencyKey,
   type SendOutcome,
-} from "./email.ts";
+} from "../email.ts";
 
 const sample: InvoiceEmailData = {
   parentName: "Jane Tan",

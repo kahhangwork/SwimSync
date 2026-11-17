@@ -14,7 +14,7 @@ import {
   DEFAULT_INVOICE_RUN_DAY,
   earliestEnrolmentDate,
   previousBillingMonth,
-} from "./dates.ts";
+} from "../dates.ts";
 
 Deno.test("previousBillingMonth: 1 Aug 00:30 SGT bills July, not June (the bug)", () => {
   // 2026-08-01T00:30:00+08:00 === 2026-07-31T16:30:00Z. The old UTC derivation

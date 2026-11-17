@@ -26,13 +26,13 @@
 // ============================================================
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { generateInvoices } from "./core.ts";
+import { generateInvoices } from "../core.ts";
 import {
   getInvoice,
   monthEnded,
   newScenario,
   type Scenario,
-} from "./test-helpers.ts";
+} from "./helpers.ts";
 
 /** Retire a class the way deactivate_class() does — both columns together.
  *  Writing `is_active` alone is the PRE-RPC shape and means something

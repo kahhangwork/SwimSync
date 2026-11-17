@@ -17,7 +17,7 @@ import {
   type ReferralRewardEmailData,
   sendPackageEmail,
   type PackageEmailData,
-} from "./email.ts";
+} from "../domain/email.ts";
 
 const base: PackageEmailData = {
   parentName: "Mrs Tan",

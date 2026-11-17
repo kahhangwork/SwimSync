@@ -11,14 +11,14 @@
 // Run twice (§7.15): every scenario is its own tenant and tears itself down.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { generateInvoices } from "./core.ts";
+import { generateInvoices } from "../core.ts";
 import {
   emailCreatedInvoices,
   resendInvoiceEmail,
   retryUnsentInvoiceEmails,
   settleInvoiceEmail,
-} from "./email.ts";
-import { getInvoice, monthEnded, newScenario, type Scenario } from "./test-helpers.ts";
+} from "../email.ts";
+import { getInvoice, monthEnded, newScenario, type Scenario } from "./helpers.ts";
 
 type ResendCall = { body: Record<string, string>; key: string | undefined };
 

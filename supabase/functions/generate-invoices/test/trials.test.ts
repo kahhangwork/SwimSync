@@ -16,8 +16,8 @@
 // The class weekday defaults to SATURDAY, so every date below is a Saturday.
 
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { generateInvoices } from "./core.ts";
-import { newScenario, monthEnded, getInvoice } from "./test-helpers.ts";
+import { generateInvoices } from "../core.ts";
+import { newScenario, monthEnded, getInvoice } from "./helpers.ts";
 
 // ── BLOCKING ────────────────────────────────────────────────────────────────
 

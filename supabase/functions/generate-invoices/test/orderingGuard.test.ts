@@ -15,9 +15,9 @@ import {
   assert,
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { generateInvoices } from "./core.ts";
-import { computeMarkableFloor } from "./orderingGuard.ts";
-import { newScenario, type Scenario } from "./test-helpers.ts";
+import { generateInvoices } from "../core.ts";
+import { computeMarkableFloor } from "../orderingGuard.ts";
+import { newScenario, type Scenario } from "./helpers.ts";
 
 // One clock for the whole file (§7.33): 10:08 SGT on 8 Apr 2027, so
 // previousBillingMonth(CLOCK) = 2027-03 and months 2027-01..2027-03 are all

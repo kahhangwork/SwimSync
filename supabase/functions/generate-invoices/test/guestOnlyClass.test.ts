@@ -46,8 +46,8 @@
 // ============================================================
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { generateInvoices } from "./core.ts";
-import { getInvoice, monthEnded, newScenario, type Scenario } from "./test-helpers.ts";
+import { generateInvoices } from "../core.ts";
+import { getInvoice, monthEnded, newScenario, type Scenario } from "./helpers.ts";
 
 /** Close the primary child's enrolment before the billing month opens, leaving
  *  the class with NO active enrolments. Deliberately a SPAN that ends before

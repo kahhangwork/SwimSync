@@ -18,14 +18,14 @@
 // Saturdays; the second class runs SUNDAY.
 
 import { assert, assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { generateInvoices } from "./core.ts";
+import { generateInvoices } from "../core.ts";
 import {
   newScenario,
   monthEnded,
   getInvoice,
   checkInvariants,
   type Scenario,
-} from "./test-helpers.ts";
+} from "./helpers.ts";
 
 // ── Local fixtures ──────────────────────────────────────────────────────────
 
