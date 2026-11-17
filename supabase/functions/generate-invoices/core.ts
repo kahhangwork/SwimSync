@@ -37,6 +37,7 @@ import { tallyClasses } from "./domain/tally.ts";
 import { reduceUnclaimed } from "./domain/unclaimed.ts";
 import { incompleteAttendanceStop } from "./domain/hardStop.ts";
 import { timingsSince } from "./domain/timings.ts";
+import { dropDrawnLessons } from "./domain/drawn.ts";
 import * as repo from "./dao/billing.repo.ts";
 import * as rpc from "./dao/billing.rpc.ts";
 import type {
@@ -200,59 +201,11 @@ async function generateForTenant(
     });
   }
 
-  // ── Lessons a package ALREADY paid for at marking ─────────────────────────
-  // docs/plans/WAVE6_PACKAGE_DRAW_AT_MARKING_PLAN.md. Attendance triggers draw
-  // the package the moment a lesson is marked (package_candidates_for is the one
-  // matching rule), so a drawn lesson is PAID and must never reach an invoice
-  // line (the DB backstop on invoice_items would refuse it — PK002 — and fail
-  // the run's write). The engine matches no package itself: the pay-at-the-run
-  // matcher and its tenants.package_draw_at_marking switch were removed
-  // (BACKLOG Wave 9 item 9). Every remaining item is ad-hoc at its class price.
-  //
-  // ⚠ FAIL CLOSED (RISK 1, §7.325): an unreadable drawn set returns
-  // package_mode_unreadable — no invoice, no seal, never a throw (§7.265). Do NOT
-  // default the drawn set to empty: that bills a lesson the family already paid
-  // for.
-  const itemSessionIds = [
-    ...new Set([...parentItems.values()].flat().map((i) => i.lesson_session_id)),
-  ];
-  const drawnKeys = new Set<string>();
-  // Chunked: an .in() list rides the URL, and a month of sessions can be long.
-  for (let i = 0; i < itemSessionIds.length; i += 200) {
-    const { data: drawnRows, error: drawnErr } = await repo.readDrawnChunk(supabase, itemSessionIds, i);
-    if (drawnErr || !drawnRows) {
-      return packageModeUnreadable(
-        drawnErr ? drawnErr.message : "the package draws could not be read"
-      );
-    }
-    for (const r of drawnRows) {
-      drawnKeys.add(`${r.lesson_session_id}:${r.student_id}`);
-    }
-  }
-  if (drawnKeys.size) {
-    for (const [parentId, items] of parentItems) {
-      parentItems.set(
-        parentId,
-        items.filter((i) => !drawnKeys.has(`${i.lesson_session_id}:${i.student_id}`))
-      );
-    }
-  }
-
-  function packageModeUnreadable(reason: string): GenerateResult {
-    return {
-      tenant_id: tenantId,
-      billing_month: billingMonth,
-      mode,
-      forced: force,
-      status: "package_mode_unreadable",
-      invoices_created: 0,
-      sealed: false,
-      message:
-        `Could not read which lessons a package has already paid for (${reason}). ` +
-        `No invoices were generated and the month was left open — generate again.`,
-      results: log,
-    };
-  }
+  // ── Lessons a package already paid for: domain/drawn.ts (B8) ──────────────
+  const drawn = await dropDrawnLessons(supabase, parentItems, {
+    tenantId, billingMonth, mode, force, log,
+  });
+  if ("stop" in drawn) return drawn.stop;
 
   const tTally = performance.now();
 
