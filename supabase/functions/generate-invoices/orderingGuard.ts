@@ -42,6 +42,7 @@ import {
   expectedStudentsOn,
 } from "./attendanceCompleteness.ts";
 import { BILLABLE } from "./constants.ts";
+import * as repo from "./dao/orderingGuard.repo.ts";
 
 /** "YYYY-MM" → "YYYY-MM-01". */
 function firstOfMonth(month: string): string {
@@ -140,13 +141,7 @@ async function monthHasUnbilledLessons(
 
   for (const cls of classes) {
     // ── Sessions for this class in the month ────────────────────────────────
-    const { data: sessions, error: sErr } = await supabase
-      .from("lesson_sessions")
-      .select("id, session_date")
-      .eq("class_id", cls.id)
-      .gte("session_date", monthStart)
-      .lte("session_date", monthEnd)
-      .order("session_date");
+    const { data: sessions, error: sErr } = await repo.readGuardSessions(supabase, cls, monthStart, monthEnd);
     if (sErr) throw new Error(sErr.message);
 
     const sessionIds = (sessions ?? []).map((s) => s.id as string);
@@ -155,22 +150,10 @@ async function monthHasUnbilledLessons(
     );
 
     // ── Bookings (trial + make-up) for this class, merged like the engine ────
-    const { data: trialRows, error: tErr } = await supabase
-      .from("trial_bookings")
-      .select("student_id, session_date")
-      .eq("class_id", cls.id)
-      .is("cancelled_at", null)
-      .gte("session_date", monthStart)
-      .lte("session_date", monthEnd);
+    const { data: trialRows, error: tErr } = await repo.readGuardTrials(supabase, cls, monthStart, monthEnd);
     if (tErr) throw new Error(tErr.message);
 
-    const { data: makeupRows, error: mErr } = await supabase
-      .from("makeup_bookings")
-      .select("student_id, session_date")
-      .eq("class_id", cls.id)
-      .is("cancelled_at", null)
-      .gte("session_date", monthStart)
-      .lte("session_date", monthEnd);
+    const { data: makeupRows, error: mErr } = await repo.readGuardMakeups(supabase, cls, monthStart, monthEnd);
     if (mErr) throw new Error(mErr.message);
 
     const bookingsByDate = new Map<string, string[]>();
@@ -214,10 +197,7 @@ async function monthHasUnbilledLessons(
 
     // ── Attendance rows for these sessions ──────────────────────────────────
     const { data: attRows, error: aErr } = sessionIds.length
-      ? await supabase
-          .from("attendance")
-          .select("lesson_session_id, student_id, status")
-          .in("lesson_session_id", sessionIds)
+      ? await repo.readGuardAttendance(supabase, sessionIds)
       : {
           data: [] as {
             lesson_session_id: string;
@@ -243,11 +223,7 @@ async function monthHasUnbilledLessons(
     // throws → caught below → fail skippable, like every other read here.
     const billableRows = (attRows ?? []).filter((a) => BILLABLE.has(a.status as string));
     if (billableRows.length) {
-      const { data: drawnRows, error: dErr } = await supabase
-        .from("package_applications")
-        .select("lesson_session_id, student_id")
-        .in("lesson_session_id", sessionIds)
-        .is("reversed_at", null);
+      const { data: drawnRows, error: dErr } = await repo.readGuardDrawn(supabase, sessionIds);
       if (dErr || !drawnRows) throw new Error(dErr?.message ?? "package draws unreadable");
       const drawn = new Set(drawnRows.map((r) => `${r.lesson_session_id}:${r.student_id}`));
       if (billableRows.some((a) => !drawn.has(`${a.lesson_session_id}:${a.student_id}`))) {
@@ -303,20 +279,13 @@ export async function earliestBlockingEarlierMonth(
     const todayDate = dateInTimeZone(now, APP_TIMEZONE);
 
     // Sealed months for this tenant (all of them — the floor needs the max).
-    const { data: sealedRows, error: bpErr } = await supabase
-      .from("billing_periods")
-      .select("billing_month")
-      .eq("tenant_id", tenantId);
+    const { data: sealedRows, error: bpErr } = await repo.readSealedMonths(supabase, tenantId);
     if (bpErr) throw new Error(bpErr.message);
     const sealed = new Set((sealedRows ?? []).map((r) => r.billing_month as string));
 
     // Tenant creation, Singapore-local — the lower bound on months that can hold
     // any lesson, and the floor's fallback when nothing is sealed.
-    const { data: tenantRow, error: tErr } = await supabase
-      .from("tenants")
-      .select("created_at")
-      .eq("id", tenantId)
-      .maybeSingle();
+    const { data: tenantRow, error: tErr } = await repo.readTenantCreatedAt(supabase, tenantId);
     if (tErr) throw new Error(tErr.message);
     if (!tenantRow?.created_at) return null; // unknown tenant → cannot block
     const createdAtSg = dateInTimeZone(
@@ -327,11 +296,7 @@ export async function earliestBlockingEarlierMonth(
     const floor = computeMarkableFloor(now, [...sealed], createdAtSg);
 
     // Class ids first — every scan below is scoped through them.
-    const { data: classes, error: cErr } = await supabase
-      .from("classes")
-      .select("id, day_of_week, is_active, deactivated_at")
-      .eq("tenant_id", tenantId)
-      .order("id");
+    const { data: classes, error: cErr } = await repo.readGuardClasses(supabase, tenantId);
     if (cErr) throw new Error(cErr.message);
     if (!classes || !classes.length) return null;
     const classIds = classes.map((c) => c.id as string);
@@ -341,13 +306,7 @@ export async function earliestBlockingEarlierMonth(
     // predate the tenant's created_at. The lower bound is therefore the earlier
     // of the floor's month (below which arm 2 cannot fire) and the earliest
     // recorded session's month (below which arm 1 has nothing).
-    const { data: firstSession, error: fsErr } = await supabase
-      .from("lesson_sessions")
-      .select("session_date")
-      .in("class_id", classIds)
-      .order("session_date", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    const { data: firstSession, error: fsErr } = await repo.readFirstSession(supabase, classIds);
     if (fsErr) throw new Error(fsErr.message);
     const floorMonth = floor.slice(0, 7);
     const earliestSessionMonth = firstSession?.session_date
@@ -366,10 +325,7 @@ export async function earliestBlockingEarlierMonth(
     if (!candidates.length) return null;
 
     // ── Hoisted, month-independent data: enrolment spans per class ───────────
-    const { data: enrolments, error: eErr } = await supabase
-      .from("student_class_enrolments")
-      .select("student_id, class_id, enrolled_at, unenrolled_at, is_active")
-      .in("class_id", classIds);
+    const { data: enrolments, error: eErr } = await repo.readGuardEnrolments(supabase, classIds);
     if (eErr) throw new Error(eErr.message);
 
     const enrolmentsByClass = new Map<string, EnrolmentSpan[]>();

@@ -1,6 +1,8 @@
 // The billing engine's public types, moved verbatim out of core.ts
 // (EDGE_FUNCTIONS_REFACTOR_PLAN.md B1). core.ts re-exports them.
 
+import type { Database } from "../_shared/database.overrides.ts";
+
 /** Wall-clock milliseconds spent in each part of one tenant's run. */
 export type RunTimings = {
   /** Settings, seal, ordering guard, run day. */
@@ -127,3 +129,19 @@ export type GenerateResult = {
    *  early-return refusals, which write no run row either — runLog.ts). */
   timings_ms?: RunTimings;
 };
+
+// Row types of the batched reads (dao/billing.repo.ts), moved verbatim out of
+// generateForTenant (B2). Hand-written: readPaged<T> asserts them (CountedQuery).
+export type SessionRow = { id: string; class_id: string; session_date: string; cancelled_at: string | null };
+export type BookingRow = { class_id: string; student_id: string; session_date: string; category_id: string };
+export type EnrolmentRow = {
+  class_id: string;
+  student_id: string;
+  enrolled_at: string;
+  unenrolled_at: string | null;
+  is_active: boolean;
+};
+export type AttendanceRow = { lesson_session_id: string; student_id: string; status: Database["public"]["Enums"]["attendance_status"] };
+export type ParentStudentRow = { parent_id: string; student_id: string };
+export type StudentNameRow = { id: string; full_name: string };
+export type BalanceRow = { parent_id: string; credit_balance: number | string | null; debit_balance: number | string | null };

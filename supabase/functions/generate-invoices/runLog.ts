@@ -19,6 +19,7 @@
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import type { Database, Json } from "../_shared/database.overrides.ts";
+import { insertRunRows } from "./dao/runLog.repo.ts";
 import type { GenerateOptions, GenerateResult } from "./core.ts";
 
 /** Engine statuses that mean "did not attempt this month". Exported as the ONE
@@ -150,7 +151,7 @@ export async function recordRuns(
 ): Promise<{ recorded: number }> {
   if (!rows.length) return { recorded: 0 };
   try {
-    const { error } = await supabase.from("billing_runs").insert(rows);
+    const { error } = await insertRunRows(supabase, rows);
     if (error) {
       console.error("[runLog] billing_runs insert failed:", error.message);
       return { recorded: 0 };
