@@ -9,7 +9,16 @@
 #       versions, so a mismatch is a diff with no schema change.
 # Never fork these; both scripts must refuse on the same conditions.
 
-DB_TYPES_TARGETS=(SwimSyncApp/lib/database.types.ts SwimSyncAdmin/lib/database.types.ts)
+# supabase/functions/_shared/ joined 2026-11-17 (EDGE_FUNCTIONS_REFACTOR_PLAN.md A0): the Edge
+# Functions import the same generated file, byte-identical.
+DB_TYPES_TARGETS=(SwimSyncApp/lib/database.types.ts SwimSyncAdmin/lib/database.types.ts supabase/functions/_shared/database.types.ts)
+
+# The functions' overrides are the admin's file with ONE line changed: Deno needs the
+# `.ts` extension on the relative import. G5 checks they agree on everything else.
+DB_OVERRIDES_SOURCE=SwimSyncAdmin/lib/database.overrides.ts
+DB_OVERRIDES_FUNCTIONS=supabase/functions/_shared/database.overrides.ts
+DB_OVERRIDES_IMPORT_FROM='from "./database.types";'
+DB_OVERRIDES_IMPORT_TO='from "./database.types.ts";'
 
 # The version pinned in ci.yml's `supabase/setup-cli` step (and ui-drivers.yml must agree).
 db_types_pinned_cli() {

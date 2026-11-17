@@ -2,8 +2,8 @@
 # Regenerate the Supabase `Database` types for BOTH apps from the LOCAL DB. Wave 8
 # (docs/plans/WAVE8_GENERATED_TYPES_PLAN.md, F0 step 1).
 #
-# Writes SwimSyncApp/lib/database.types.ts and SwimSyncAdmin/lib/database.types.ts,
-# byte-identical (the apps share no package; CI `cmp`s them).
+# Writes every DB_TYPES_TARGETS copy (scripts/lib/db-types.sh): both apps' lib/ and
+# supabase/functions/_shared/, byte-identical (they share no package; G5 diffs each).
 #
 # REFUSES (exit 1) when:
 #   - run from a worktree — only the root checkout regenerates (§7.347);
