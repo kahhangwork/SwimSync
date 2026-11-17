@@ -419,8 +419,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-16:** latest `43774448116` GREEN on `74ef34a` (covers `047ab42`, Overdue). The one red between,
-`43533390943` (11-14, `verify-app-coach-settings`), was a product race — fixed in `a3d2fd6` (§7.390), not a flake. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-17:** latest `44003140474` GREEN on `78902ee` (covers `a3d2fd6`, coach QR load, and `47996d2`, engine).
+The last red, `43533390943` (11-14), was a product race fixed in `a3d2fd6` (§7.390). A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -436,10 +436,7 @@ which mutate shared seed state — are in the same section.
    7 invoices, all 7 `due_date`s correct (generated + 14), all 7 emailed (prod read 2026-11-17). These are the first runs
    on engine v40, so read `duration_ms` afterwards (plan §8; under ~1 s expected). Still untried live: a *Days to pay*
    save on prod, and opening a received email to check for **"Please pay by"** (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Read the next nightly before the next APP unit merges** — `a3d2fd6` (coach QR load) is the unit it must cover;
-   its driver is `verify-app-coach-settings`. Never dispatch it unasked. Red → replay with
-   `run-all-drivers.sh --only <driver> --now '<day> <time>+08'` (TESTING §5).
-3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
+2. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
 The UI restyle leftovers are DONE except the *not re-verified* list in that BACKLOG item (check before building).
