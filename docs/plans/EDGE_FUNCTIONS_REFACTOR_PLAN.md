@@ -1,6 +1,6 @@
 # Edge Functions refactor — generated types, then tiers
 
-_Drafted 2026-11-17. Plan-reviewed 2026-11-17 (mitigations inlined as ⚠ RISK n). Status: Part A LIVE 2026-11-17 (v41); Part B BUILT 2026-11-18 (B0–B14 green) — deploy + October next._
+_Drafted 2026-11-17. Plan-reviewed 2026-11-17 (mitigations inlined as ⚠ RISK n). Status: DONE — Part A live 2026-11-17 (v41), Part B live 2026-11-18 (v42). October billing for the two test tenants dropped (owned by others); first live run = Coach Kah Hang's November._
 
 Two refactors, applied to `supabase/functions/` the way they were applied to the apps:
 
@@ -522,6 +522,12 @@ overridden by D4; follow its ordering and verification.
   for all 59 parents of a local 12×5 bench tenant. Prod, read-only: **Epic Swim 0 invoices** (nothing billable after
   package draws), **Little Orcas 1 invoice, 5 lines** (parent `79539438…`); neither had an October invoice. Resend:
   ≤ 1 email, far under 100/day.
+- **O3/O4 NOT RUN — decision (user, 2026-11-18):** Little Orcas and Epic Swim belong to other people; their admins
+  generate, not us, and both hold test data only. October stays unbilled for them until their owners bill it. **The
+  refactored engine's first real billing run is Coach Kah Hang's November (early December)** — before it, rerun the
+  O2 prediction for that tenant/month and reconcile per parent after; read `billing_runs.duration_ms`. A zero-write
+  live smoke on the user's own account: Generate for Coach Kah Hang **October** → `already_complete` (sealed; every
+  email already sent, so the retry pass sends nothing).
 - **O3 — bill the SMALLER tenant first**, per `INVOICE_RUNBOOK.md`: scoped, manual, billing month `2026-10`.
   - **Do NOT use `force`.**
   - **Do NOT bill any other month.**
