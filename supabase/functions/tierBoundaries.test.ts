@@ -26,8 +26,10 @@
 // snippet AND how many lines match it; the hygiene test fails when the count
 // is wrong in EITHER direction, so a moved call forces its entry down and a new
 // one cannot hide behind an old entry. The ledgers only shrink. Never add an
-// entry after B0 — a new violation is a new violation. Entries marked STAYS are
-// permanent, with the reason.
+// entry after B0 — a new violation is a new violation — with ONE exception: when a
+// slice MOVES a pre-existing line into domain/ (check 6), its entry is added in that
+// slice's commit and the B-gate census must prove the count unchanged. Entries
+// marked STAYS are permanent, with the reason.
 //
 // Print the current violations as ledger entries: FENCE_PRINT=1 deno test --allow-read=.. <this file>
 //
@@ -82,6 +84,11 @@ const ALLOWED_INDEX_IMPORTS: Entry[] = [
 
 // ── Check 6 ledger: clock reads in domain/ ───────────────────────────────────
 const ALLOWED_CLOCK: Entry[] = [
+  // All three MOVED into domain/ at B10 with email.ts — pre-existing reads, not new
+  // ones; the B-gate census proves the function's clock-read count unchanged.
+  { file: "generate-invoices/domain/emailDelivery.ts", snippet: "? { invoice_email_sent_at: new Date().toISOString(), invoice_email_claimed_at: null }", count: 1, why: "STAYS — the settle's own sent-at stamp (moved at B10)" },
+  { file: "generate-invoices/domain/emailDelivery.ts", snippet: "const wait = lastResendStart + spacing - Date.now();", count: 1, why: "STAYS — resendGate's rate clock (plan §5: allow-listed; moved at B10)" },
+  { file: "generate-invoices/domain/emailDelivery.ts", snippet: "lastResendStart = Date.now();", count: 1, why: "STAYS — resendGate's rate clock (plan §5: allow-listed; moved at B10)" },
 ];
 
 function walk(dir: string): string[] {
