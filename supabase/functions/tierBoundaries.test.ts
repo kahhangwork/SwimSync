@@ -58,8 +58,6 @@ const ALLOWED_DATA_ACCESS: Entry[] = [
 
 // ── Check 4 ledger: index.ts imports beyond the allowed set ──────────────────
 const ALLOWED_INDEX_IMPORTS: Entry[] = [
-  { file: "credit-note-emails/index.ts", snippet: "import { fetchBalances, fetchTenantSuspended, findEmailedInvoiceItemIds, findSpentNoteIds, findUnsentById, findUnsentBySession, resendSender, sendNotes, } from \"./core.ts\";", count: 1, why: "B12 — index.ts imports its tiers" },
-  { file: "credit-note-emails/index.ts", snippet: "import { authorizeCreditNoteEmail, canEmailForTenant } from \"./email.ts\";", count: 1, why: "B12 — index.ts imports its tiers" },
 ];
 
 // ── Check 6 ledger: clock reads in domain/ ───────────────────────────────────
@@ -69,6 +67,8 @@ const ALLOWED_CLOCK: Entry[] = [
   { file: "generate-invoices/domain/emailDelivery.ts", snippet: "? { invoice_email_sent_at: new Date().toISOString(), invoice_email_claimed_at: null }", count: 1, why: "STAYS — the settle's own sent-at stamp (moved at B10)" },
   { file: "generate-invoices/domain/emailDelivery.ts", snippet: "const wait = lastResendStart + spacing - Date.now();", count: 1, why: "STAYS — resendGate's rate clock (plan §5: allow-listed; moved at B10)" },
   { file: "generate-invoices/domain/emailDelivery.ts", snippet: "lastResendStart = Date.now();", count: 1, why: "STAYS — resendGate's rate clock (plan §5: allow-listed; moved at B10)" },
+  // MOVED into domain/ at B12 with credit-note-emails/core.ts — pre-existing; census count unchanged.
+  { file: "credit-note-emails/domain/notes.ts", snippet: "? { email_sent_at: new Date().toISOString(), email_claimed_at: null }", count: 1, why: "STAYS — the settle's own sent-at stamp (moved at B12)" },
 ];
 
 function walk(dir: string): string[] {

@@ -44,8 +44,8 @@ import {
   findUnsentBySession,
   resendSender,
   sendNotes,
-} from "./core.ts";
-import { authorizeCreditNoteEmail, canEmailForTenant } from "./email.ts";
+} from "./domain/notes.ts";
+import { authorizeCreditNoteEmail, canEmailForTenant } from "./domain/email.ts";
 
 Deno.serve(async (req) => {
   const respond = (body: unknown, status = 200) =>
