@@ -19,8 +19,12 @@
 // Best-effort by contract: every failure returns 200 with {sent:false} —
 // a purchase or confirmation must never look failed because an email was.
 
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import { createClient } from "npm:@supabase/supabase-js@2.110.2";
 import type { Database } from "../_shared/database.overrides.ts";
+import type { CallerDb, ServiceDb } from "../_shared/clientBrands.ts";
+import * as repo from "./dao/packageEmails.repo.ts";
+import { getCallerUser } from "./dao/packageEmails.rpc.ts";
+import { packagesAdmin } from "./domain/packagesAdmin.ts";
 import {
   authorizePackageEmail,
   buildConfirmedHtml,
@@ -37,19 +41,7 @@ import {
   type PackageEmailData,
 } from "./email.ts";
 
-// Roles (20260927000500): offering a package or granting a referral reward is
-// a packages:edit act. The platform admin keeps the arm can_admin_tenant gave
-// it (P7). Asked AS THE CALLER, via their own JWT.
-async function packagesAdmin(
-  anon: SupabaseClient<Database>,
-  tenantId: string,
-): Promise<boolean> {
-  const [{ data: isPlatform }, { data: hasArea }] = await Promise.all([
-    anon.rpc("is_platform_admin"),
-    anon.rpc("has_admin_area", { p_tenant: tenantId, p_area: "packages", p_level: "edit" }),
-  ]);
-  return isPlatform === true || hasArea === true;
-}
+// packagesAdmin (the caller's packages:edit check): domain/packagesAdmin.ts (B11).
 
 const APP_URL = Deno.env.get("APP_URL") ?? "https://swimsync.sg";
 
@@ -80,31 +72,22 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: userRes } = await anon.auth.getUser();
+    ) as CallerDb;
+    const { data: userRes } = await getCallerUser(anon);
     const caller = userRes?.user;
     if (!caller) return respond({ sent: false, reason: "unauthorized" }, 401);
 
     const svc = createClient<Database>(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    ) as ServiceDb;
 
     // ── referral_reward — its OWN recipient path (RISK 3). The recipient is the
     // REFERRER (the reward's own parent), never a package's parent; the data
     // carries no field from the referee's package. Caller must admin the
     // reward's tenant.
     if (type === "referral_reward") {
-      const { data: reward } = await svc
-        .from("referral_rewards")
-        // ONE string literal, never `+`-joined: a concatenation widens to `string`,
-        // supabase-js can no longer parse the column list, and the row is typed
-        // GenericStringError — every field access below fails `deno check`.
-        .select(
-          "id, tenant_id, parent_id, expires_at, parents(profiles(full_name, email)), tenants(display_name, logo_url, referral_discount_type, referral_discount_value)"
-        )
-        .eq("id", reward_id)
-        .maybeSingle();
+      const { data: reward } = await repo.readReferralReward(svc, reward_id);
       if (!reward) return respond({ sent: false, reason: "not found" }, 404);
 
       const isAdmin = await packagesAdmin(anon, reward.tenant_id as string);
@@ -148,13 +131,7 @@ Deno.serve(async (req) => {
       return respond(result);
     }
 
-    const { data: pkg } = await svc
-      .from("parent_packages")
-      .select(
-        "id, status, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, expires_on, start_date, validity_weeks, public_token, offered_by, tenant_id, parents(profile_id, profiles(full_name, email)), tenants(display_name, logo_url)"
-      )
-      .eq("id", package_id)
-      .maybeSingle();
+    const { data: pkg } = await repo.readPackage(svc, package_id);
     if (!pkg) return respond({ sent: false, reason: "not found" }, 404);
 
     const parent = Array.isArray(pkg.parents) ? pkg.parents[0] : pkg.parents;
@@ -173,11 +150,7 @@ Deno.serve(async (req) => {
       const isAdmin = await packagesAdmin(anon, pkg.tenant_id as string);
       isAdminOfTenant = isAdmin === true;
     } else if (type === "confirmed") {
-      const { data: callerProfile } = await svc
-        .from("profiles")
-        .select("tenant_id")
-        .eq("id", caller.id)
-        .maybeSingle();
+      const { data: callerProfile } = await repo.readCallerTenant(svc, caller);
       profileTenantId = callerProfile?.tenant_id ?? null;
     }
     if (

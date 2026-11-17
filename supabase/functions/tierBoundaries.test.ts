@@ -54,13 +54,6 @@ type Entry = { file: string; snippet: string; count: number; why: string };
 const ALLOWED_DATA_ACCESS: Entry[] = [
   { file: "generate-invoices/clock.ts", snippet: "let res = await client.rpc(\"app_now\");", count: 1, why: "STAYS — clock.ts is not moved (plan §5); dbNow takes its client as an argument" },
   { file: "generate-invoices/clock.ts", snippet: "res = await client.rpc(\"app_now\");", count: 1, why: "STAYS — clock.ts is not moved (plan §5); dbNow takes its client as an argument" },
-  { file: "package-emails/email.ts", snippet: "const res = await fetch(\"https://api.resend.com/emails\", {", count: 1, why: "B11 moves it to dao/" },
-  { file: "package-emails/index.ts", snippet: "anon.rpc(\"is_platform_admin\"),", count: 1, why: "B11 moves it to dao/" },
-  { file: "package-emails/index.ts", snippet: "anon.rpc(\"has_admin_area\", { p_tenant: tenantId, p_area: \"packages\", p_level: \"edit\" }),", count: 1, why: "B11 moves it to dao/" },
-  { file: "package-emails/index.ts", snippet: "const { data: userRes } = await anon.auth.getUser();", count: 1, why: "B11 moves it to dao/" },
-  { file: "package-emails/index.ts", snippet: ".from(\"referral_rewards\")", count: 1, why: "B11 moves it to dao/" },
-  { file: "package-emails/index.ts", snippet: ".from(\"parent_packages\")", count: 1, why: "B11 moves it to dao/" },
-  { file: "package-emails/index.ts", snippet: ".from(\"profiles\")", count: 1, why: "B11 moves it to dao/" },
   { file: "credit-note-emails/core.ts", snippet: ".from(\"credit_notes\")", count: 4, why: "B12 moves it to dao/" },
   { file: "credit-note-emails/core.ts", snippet: ".from(\"credit_applications\")", count: 1, why: "B12 moves it to dao/" },
   { file: "credit-note-emails/core.ts", snippet: ".from(\"tenants\")", count: 1, why: "B12 moves it to dao/" },

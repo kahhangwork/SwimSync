@@ -8,6 +8,7 @@
 //   • Builders are pure and unit-tested; all interpolated values are escaped.
 
 import { dateInTimeZone } from "../generate-invoices/dates.ts";
+import { postResendEmail } from "./dao/resend.ts";
 
 export type PackageEmailData = {
   parentName: string;
@@ -325,7 +326,7 @@ export async function sendPackageEmail(opts: {
   if (!opts.to) return { sent: false, reason: "no recipient" };
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await postResendEmail({
       method: "POST",
       headers: {
         Authorization: `Bearer ${opts.apiKey}`,
