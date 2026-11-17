@@ -19,6 +19,7 @@
 //     response. The page needs none of them.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 
 const TOKEN_RE = /^[0-9a-f]{32}$/;
 
@@ -89,7 +90,7 @@ export function serializePublicInvoice(row: {
 
 /** null = not found, for EVERY failure reason (uniform 404 upstream). */
 export async function lookupInvoice(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   token: string,
 ): Promise<PublicInvoice | null> {
   if (!TOKEN_RE.test(token)) return null;
@@ -118,7 +119,7 @@ export async function lookupInvoice(
  *  returned as-is. Claiming a non-outstanding invoice is null → uniform 404
  *  (the page never offers the button on a paid invoice anyway). */
 export async function claimInvoice(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   token: string,
 ): Promise<{ paid_claimed_at: string } | null> {
   if (!TOKEN_RE.test(token)) return null;

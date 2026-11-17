@@ -9,6 +9,7 @@
 //   POST {"token": "...", "action": "claim"} → parent's "I've paid" stamp
 
 import { createClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 import { claimInvoice, lookupInvoice } from "./core.ts";
 
 const ALLOWED_ORIGINS = new Set([
@@ -71,7 +72,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "rate_limited" }, 429, cors);
   }
 
-  const db = createClient(
+  const db = createClient<Database>(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { autoRefreshToken: false, persistSession: false } },
