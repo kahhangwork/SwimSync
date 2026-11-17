@@ -29,8 +29,15 @@ import { IN_CHUNK, PAGE } from "../constants.ts";
 //   read happens before any invoice is written, so a throw costs a retry and
 //   nothing else (index.ts records it as an error run).
 
-// deno-lint-ignore no-explicit-any
-type CountedQuery = any; // db-any-ok: a supabase-js select built with { count: "exact" }; generic over every table, rows typed by readPaged<T>
+// A supabase-js select built with { count: "exact" }, as readPaged uses it: keyset
+// `.gt()`, then `.order()`, then `.limit()`, awaited for { data, error, count }. Typed
+// STRUCTURALLY so every table's builder fits without an `any` (rows are still typed
+// by readPaged<T>, which the caller asserts). Type-only: replaces `CountedQuery = any`.
+type PageResult = { data: unknown[] | null; error: { message: string } | null; count: number | null };
+type CountedQuery = {
+  gt(column: string, value: string): CountedQuery;
+  order(column: string): { limit(count: number): PromiseLike<PageResult> };
+};
 
 /** Every row of a counted query, keyset-paged by `orderKey` — a column that
  *  is unique within the query AND selected (the next page starts after it). */
