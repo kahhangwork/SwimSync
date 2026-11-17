@@ -207,6 +207,14 @@ Tooling and test-infrastructure only. No function source changes.
     - One real public invoice link loads. **Do NOT press "I've paid".**
     - Any failure triggers the rollback command at once.
   - Gate: the live public invoice page loads.
+- **A1 DONE (2026-11-17):** `a9611eb` typed public-invoice (core + index) against `../_shared/database.overrides.ts`;
+  runtime-identical. Local serve boots it; bogus token → shared 404. **Prod: public-invoice v3 → v4**, `verify_jwt`
+  false, bogus token → `{"error":"not_found"}` 404, a real Oct invoice → 200 with the 11 public fields (read-only GET).
+  `_shared/` imports bundle on deploy. Rollback staged: worktree at `47996d2` (`<scratchpad>/rollback-47996d2`),
+  `supabase functions deploy public-invoice --workdir <it> --project-ref cdmjeyauhxcgulhbxmsb`.
+- **Wave 8 precedent adopted for A2/A3:** a `+`-joined select widens to `string` and loses the row type (§7.106).
+  The fix is ONE literal whose evaluated string is proven byte-identical (`deno eval` printing old and new); P3
+  flags the textual change, so that commit is labelled `fix(edge): … (select byte-identical)` and carries the proof.
 - **A2 — type the clients.** Type every `createClient(...)` as `createClient<Database>(...)` and every
   `SupabaseClient` parameter as `SupabaseClient<Database>`, using **the overrides `Database`**, never `Generated`. One
   function per commit, in this order: `public-*`, credit-note-emails, package-emails, generate-invoices. Fix what
@@ -241,6 +249,14 @@ Tooling and test-infrastructure only. No function source changes.
     because the new engine resolves `../_shared/`. Leave `SEED_ENGINE_DIR` unset so each side bills its own September
     (speed plan §5 method).
   - Gate: `compare.py` IDENTICAL at all 4 sizes, including the `resend`, `emails` and `requests` keys.
+- **A2–A5 DONE (2026-11-17):** every client typed (`types(edge)` ×7, each runtime-identical). The types surfaced
+  three trigger-filled `invoices` columns (`due_date`, `reference_number`, `public_token`) → `d0ab953` adds them to
+  `TRIGGER_FILLED_COLUMNS` (proven against the live triggers). Three `+`-joined selects became one literal (`fix(edge)`
+  ×3, each evaluated string proven byte-identical). G6 20 → **1** (`CountedQuery`, §9 census). A4: CI `deno check` over
+  21 files, proven red. **A5: IDENTICAL vs `47996d2` at 4×2 (9 invoices), 6×2 (13), 12×5 (61), 30×6 (181 invoices,
+  179 emails)**, `resend`/`emails`/`requests` included. Suite 320/320 ×2; admin vitest 1,351, app jest 862, both
+  typecheck green. (A first A5 attempt was void: zsh `set -- $sz` did not split, so every size ran the default seed —
+  §7.340 — rerun via a bash script.)
 - **A6 — deploy Part A (D4).** Deploy all 5 functions, one at a time, each confirmed in `supabase functions list`. App
   types are unchanged, so no app change ships. Record the engine version in DEPLOYMENT §11.
   - ⚠ RISK 1 MITIGATION: re-run P0's October query first. Expect no rows for the two tenants.
@@ -526,7 +542,12 @@ billed lessons, seal or recipients (§1), and fixed after Part B ships. BLOCKERs
 |---|---|---|---|
 | 1 | P gate, 2026-11-17 | `speed.test.ts` "invoice emails are spaced to the Resend per-second limit" failed once in a full run (`send 2 started 163 ms after the previous`, needs ≥ 190), then passed 8/8 alone and in the next full run. Pre-existing (`47996d2`); no engine code had changed. Cause (reading, not proven): `resendGate` spaces when each worker PASSES the gate, the test measures when each `fetch` STARTS; a worker resumed late after its gate pass shrinks the gap to the next. Prod cap is 2/s (500 ms spacing), so the real-world effect is a tighter gap, not a burst. Fix later: either measure the gap at the gate, or set `lastResendStart` at the fetch. | No |
 
-**`db-any-ok` census** (A2/A3 escape hatch): _(empty: file:line, reason)_
+**`db-any-ok` census** (A2/A3 escape hatch):
+- `generate-invoices/core.ts:79` `CountedQuery = any` — the builder `readPaged` / `readAllIn` page over, for every
+  table. Typing it means threading supabase-js's PostgrestFilterBuilder generics through the §7.391 speed fix, which
+  B2 keeps byte-for-byte. **Consequence, accepted:** rows read through `readPaged<T>` are typed by the hand-written
+  `T`, not inferred from their select — the generated types do not check those reads (the engine's phase-1 batch).
+  A later item could type `T` from each select; not in this plan.
 
 ## 10. Pre-commit gate
 
