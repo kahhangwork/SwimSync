@@ -34,6 +34,9 @@ import {
 import { runGuards } from "./domain/guards.ts";
 import { readPhase1 } from "./domain/phase1.ts";
 import { tallyClasses } from "./domain/tally.ts";
+import { reduceUnclaimed } from "./domain/unclaimed.ts";
+import { incompleteAttendanceStop } from "./domain/hardStop.ts";
+import { timingsSince } from "./domain/timings.ts";
 import * as repo from "./dao/billing.repo.ts";
 import * as rpc from "./dao/billing.rpc.ts";
 import type {
@@ -177,72 +180,10 @@ async function generateForTenant(
     unclaimedAttendance,
   } = tallyClasses({ ...phase1, tenantId, monthStart, monthEnd, todayDate, log });
 
-  // ── Reduce unclaimed attendance against settlements ───────────────────────
-  // A settlement says money for this student was received outside SwimSync, or
-  // written off. It is EFFECTIVE-DATED: it covers attendance on or before
-  // settled_through and nothing after, so settling once cannot blanket-
-  // authorise every future lesson. A reversed settlement covers nothing —
-  // reversal exists because a parent who turns up two months after a write-off
-  // must be recoverable.
-  const unclaimedStudentIds = [
-    ...new Set(unclaimedAttendance.map((u) => u.student_id)),
-  ];
-
-  let unclaimedStudents: UnclaimedStudent[] = [];
-  if (unclaimedStudentIds.length) {
-    const { data: settlements } = await repo.readSettlements(supabase, unclaimedStudentIds);
-
-    // Latest live settlement per student — the furthest date any of them covers.
-    const coveredThrough = new Map<string, string>();
-    for (const st of settlements ?? []) {
-      const prev = coveredThrough.get(st.student_id as string);
-      const through = st.settled_through as string;
-      if (!prev || through > prev) {
-        coveredThrough.set(st.student_id as string, through);
-      }
-    }
-
-    // String comparison is correct and deliberate: both sides are YYYY-MM-DD,
-    // which sorts lexicographically. No Date object is constructed, so there is
-    // no timezone to get wrong (§7.7).
-    const unsettled = unclaimedAttendance.filter((u) => {
-      const through = coveredThrough.get(u.student_id);
-      return !through || u.session_date > through;
-    });
-
-    if (unsettled.length) {
-      const { data: names } = await repo.readUnsettledNames(supabase, unsettled);
-      const nameById = new Map(
-        (names ?? []).map((n) => [n.id as string, n.full_name as string])
-      );
-
-      const byStudent = new Map<string, string[]>();
-      for (const u of unsettled) {
-        const dates = byStudent.get(u.student_id) ?? [];
-        dates.push(u.session_date);
-        byStudent.set(u.student_id, dates);
-      }
-
-      unclaimedStudents = [...byStudent.entries()]
-        .map(([student_id, dates]) => {
-          const sorted = [...dates].sort();
-          return {
-            student_id,
-            student_name: nameById.get(student_id) ?? null,
-            lessons: sorted.length,
-            earliest_session_date: sorted[0],
-            latest_session_date: sorted[sorted.length - 1],
-          };
-        })
-        .sort((a, b) =>
-          a.earliest_session_date.localeCompare(b.earliest_session_date)
-        );
-    }
-  }
-
-  const unclaimedBillable = unclaimedStudents.reduce(
-    (sum, u) => sum + u.lessons,
-    0
+  // ── Unclaimed attendance, reduced against settlements: domain/unclaimed.ts (B7) ──
+  const { unclaimedStudents, unclaimedBillable } = await reduceUnclaimed(
+    supabase,
+    unclaimedAttendance
   );
 
   // ── Hard stop: nothing generates while any lesson is unmarked ─────────────
@@ -251,33 +192,12 @@ async function generateForTenant(
   // then permanently block the unmarked lessons from ever reaching one — so a
   // partial run converts a fixable gap into lost money. Returning before phase
   // 2 means no invoice, no credit drawn, no email, nothing to unwind.
+  // The result: domain/hardStop.ts (B7). The decision stays HERE.
   if (blocking.length) {
-    blocking.sort(
-      (a, b) =>
-        a.session_date.localeCompare(b.session_date) ||
-        a.class_title.localeCompare(b.class_title)
-    );
-    return {
-      tenant_id: tenantId,
-      billing_month: billingMonth,
-      mode,
-      forced: force,
-      status: "incomplete_attendance",
-      invoices_created: 0,
-      classes_still_incomplete: classesIncomplete,
-      parents_deferred: deferredParents.size,
-      // Reported even on the blocked path: an admin fixing unmarked lessons
-      // should learn about the unclaimed ones in the same trip, not discover
-      // them on the next run.
-      unclaimed_billable: unclaimedBillable,
-      ...(unclaimedStudents.length ? { unclaimed_students: unclaimedStudents } : {}),
-      sealed: false,
-      blocking,
-      message:
-        `Cannot generate invoices for ${billingMonth}: ${blocking.length} lesson(s) still have unmarked attendance. Mark them — or mark them cancelled if the lesson did not run — then generate again.`,
-      results: log,
-      timings_ms: timingsSince(tStart, tGuards, performance.now(), null),
-    };
+    return incompleteAttendanceStop({
+      tenantId, billingMonth, mode, force, blocking, classesIncomplete, deferredParents,
+      unclaimedBillable, unclaimedStudents, log, tStart, tGuards,
+    });
   }
 
   // ── Lessons a package ALREADY paid for at marking ─────────────────────────
@@ -638,21 +558,5 @@ async function generateForTenant(
     results: log,
     created,
     timings_ms: timingsSince(tStart, tGuards, tTally, performance.now()),
-  };
-}
-
-/** Whole milliseconds per part of a run; `tInvoices` null when phase 2 never ran. */
-function timingsSince(
-  tStart: number,
-  tGuards: number,
-  tTally: number,
-  tInvoices: number | null
-): RunTimings {
-  const end = tInvoices ?? tTally;
-  return {
-    guards: Math.round(tGuards - tStart),
-    tally: Math.round(tTally - tGuards),
-    invoices: tInvoices === null ? 0 : Math.round(tInvoices - tTally),
-    total: Math.round(end - tStart),
   };
 }
