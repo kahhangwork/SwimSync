@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-17 (latest) — **The billing engine is fast and live** (§8.166): engine v40 and `duration_ms` are
-on prod; Vercel runs in `sin1`. October modelled 39.6 s → 5.8 s, every amount byte-identical. Next: **bill October for
-Little Orcas + Epic Swim** (the first live `duration_ms`). Big months: `INVOICE_RUNBOOK.md` → *A big month*._
+_Last updated: 2026-11-18 (latest) — **The Edge Functions are typed and tiered, live** (§8.167): generate-invoices v42,
+package-emails v10, credit-note-emails v9, public-* v4/v5 — every query in `dao/`, logic in `domain/`, output proven
+byte-identical. Little Orcas + Epic Swim are not ours to bill. Next: Coach Kah Hang's **November** (first live run)._
 
-_Previously (§8.165, 2026-11-16) — The 11-14 nightly red was a product race (coach QR upload); fixed, live; `watch-deploy.sh`._
+_Previously (§8.166, 2026-11-17) — Billing engine batched (v40), Vercel in `sin1`; October modelled 39.6 s → 5.8 s._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.167 (2026-11-17 → 18) — Edge Functions: generated types, then tiers; live; proven byte-identical
+
+**Shipped** (`docs/plans/EDGE_FUNCTIONS_REFACTOR_PLAN.md`, plan-reviewed; DEPLOYMENT #107, #108). **Part A**: every
+function's client typed with the generated `Database` (a third copy in `supabase/functions/_shared/`, G5), G6 now covers
+the functions and reads **0**. **Part B**: generate-invoices, package-emails and credit-note-emails split into `dao/` +
+`domain/`; `generateForTenant` is composition; caller-JWT clients branded `CallerDb` (ARCHITECTURE §6). Tests live in
+each function's `test/` (TESTING §5). Gates per stage: query-chain census, tier fence (`tierBoundaries.test.ts`), suite
+×2, the bench vs v40 at 4 sizes incl. every Resend payload — all IDENTICAL; guard/seal mutants proven red; 5 drivers.
+
+- **Found:** G6 was red B2→B12a behind a gate that printed instead of exiting (§7.393); path-keyed tools misread moved
+  files (§7.394); a midnight-straddling bench pair (§7.395); §7.340 a third time. Follow-ups: BACKLOG *Foundations* ×3.
+- **Not done:** October not billed for Little Orcas / Epic Swim — owned by others, test data (user). A zero-write live
+  smoke on Coach Kah Hang's sealed October passed on v42. Nightly not dispatched.
+
 ## 8.166 (2026-11-16 → 17) — Billing engine: measured, batched, proven byte-identical, deployed
 
 **Shipped** (`0b09b09`, `47996d2`; DEPLOYMENT #106; `docs/plans/BILLING_ENGINE_SPEED.md`). First measured: October's
@@ -364,19 +378,6 @@ Byte-identical against `main` at 4 seed sizes plus 9 more runs. Deno 320 ×2, pg
   big month → runbook *A big month* + BACKLOG *Large-month invoice emails* (M).
 - **Not done:** no live `duration_ms` yet (Coach Kah Hang's October ran on v39). The Supabase functions refactor stays
   a separate job. Nightly not dispatched.
-
-## 8.165 (2026-11-16) — The 11-14 nightly red was a race in the PRODUCT; fixed, live; deploy watching scripted
-
-**Shipped** (`a3d2fd6`, `93f4cd8`; DEPLOYMENT #105): `verify-app-coach-settings` timed out on a file chooser once, the
-same sha green around it. Cause: coach Settings' upload was pressable before its permission load, so an early press
-refused a private coach with "your school manages the QR" (§7.390). Now disabled + "Loading…" until loaded; 4 hook
-tests + 1 card test, each mutation-proven; the driver saves a FAIL screenshot. Then `scripts/watch-deploy.sh` (§7.389),
-after two hand-written post-push watchers failed silently.
-
-- **Found:** §7.339 (`| grep -q` + pipefail) and §7.340 (zsh `$CMD`) each bit a second time — 339 filed as a BACKLOG
-  S-item check, 340 promoted to a CLAUDE.md line. `run-all-drivers.sh --only`'s preflight demands admin + edge functions
-  even for a driver that needs neither; the two drivers were run directly instead (no DB reset).
-- **Not done:** October still unbilled; nightly not dispatched (none needed — the next scheduled run covers `a3d2fd6`).
 
 ## 9. Next steps (pick with the user)
 
@@ -396,8 +397,9 @@ Everything below is the monthly loop from here on:
    chasing tool when a future month needs it.
 2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) and **Little Orcas September is SEALED**
    (2026-10-12, 0 invoices — all package-funded or settled). **October: Coach Kah Hang BILLED + SEALED** (2026-11-16, 7 invoices, on v39).
-   **Little Orcas and Epic Swim October are next**: the first runs on engine v40, so read `billing_runs.duration_ms` afterwards
-   (plan §8; the coach's **NEEDS MARKING** list is the tracker). **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
+   **Little Orcas and Epic Swim are NOT ours to bill** — test data, owned by other people; their admins generate. The
+   next real run is **Coach Kah Hang's November** (early December), the first on engine v42 — see THE NEXT BUILD.
+   **Invoices → Billing months is the scoreboard**: every open month, why, and its last runs.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
    > apart from students**, so the head-count finally agrees with the number of marks the
    > lesson actually needs, and the **Classes tab lands on the class list** rather than
@@ -419,8 +421,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-17:** latest `44003140474` GREEN on `78902ee` (covers `a3d2fd6`, coach QR load, and `47996d2`, engine).
-The last red, `43533390943` (11-14), was a product race fixed in `a3d2fd6` (§7.390). A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-18:** latest scheduled run `44003140474` GREEN on `78902ee`. **The next one must cover `2833602`** (the
+Edge refactor, §8.167) — its drivers money-admin, unmarked-lessons, package-renewal, referrals and coach-marking passed
+locally against the served functions. The last red, `43533390943` (11-14), was a product race fixed in `a3d2fd6`. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -432,11 +435,13 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — Wave 9 (BACKLOG Build order)
 
-1. **Bill October for Little Orcas + Epic Swim** (`INVOICE_RUNBOOK.md`). Coach Kah Hang's October is done:
-   7 invoices, all 7 `due_date`s correct (generated + 14), all 7 emailed (prod read 2026-11-17). These are the first runs
-   on engine v40, so read `duration_ms` afterwards (plan §8; under ~1 s expected). Still untried live: a *Days to pay*
-   save on prod, and opening a received email to check for **"Please pay by"** (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
+1. **Bill Coach Kah Hang's November on engine v42** (early December, `INVOICE_RUNBOOK.md`) — the refactored engine's
+   first real run. BEFORE pressing Generate, run the O2 prediction (`EDGE_FUNCTIONS_REFACTOR_PLAN.md` §6 — per parent,
+   billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
+   (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
+   in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
+2. **Read the next nightly** before the next APP unit merges — it must cover `2833602`. Never dispatch it unasked.
+3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
 The UI restyle leftovers are DONE except the *not re-verified* list in that BACKLOG item (check before building).

@@ -37,13 +37,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349, 391 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380, 386 |
-| Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379 |
+| Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326, 395 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379, 393 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383, 390 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389, 392 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387 |
-| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359, 384 |
+| Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359, 384, 394 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
 `supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` + `scripts/check-sept.sh` + `sg_date_label.test.sql` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` · driver/fixture clock reads → `drivers/check-driver-clock.sh` ·
@@ -2860,6 +2860,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - **Hit again (2026-11-16, §8.165):** `P="docker exec … psql …"; $P < fixture.sql` — zsh ran the whole string as
       ONE command name (`command not found`), so the fixture never applied and the driver's first check failed on
       setup, not product. **Promoted** to a CLAUDE.md *Rules that bite* line (a habit no check can see).
+    - **Hit again (2026-11-17, §8.167):** a bench loop `for sz in "4 2" …; do set -- $sz` — zsh did not split
+      `$sz`, so `CLASSES="4 2"` and all four "sizes" ran the default seed and compared IDENTICAL. Caught only because
+      every size reported the same 1 invoice. The CLAUDE.md line did not stop it in a scratch script: anything that
+      loops goes in a `bash` file, written before it is run.
 
 341. **`name::text` carries collation `"C"` — `results_eq` against a literal `VALUES` raises "could not determine which
     collation to use".** Catalog columns (`pg_proc.proname`) are type `name`. Emit `proname::text COLLATE "default"`
@@ -3244,3 +3248,24 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     new or re-created project falls back to the default. Check it with `curl -sI https://admin.swimsync.sg/api/<route>
     | grep x-vercel-id`, which must read `sin1::sin1::…` (the first hop is the edge, the second is the function).
     (2026-11-16, §8.166, DEPLOYMENT #106.)
+
+393. **A check's printed summary is not its verdict — read the EXIT CODE.** A stage-gate script printed
+    `scripts/check-db-any.sh | tail -1`; G6 failed from B2 to B12a of the Edge refactor while every stage reported
+    GREEN, because G6's last line is a per-app count, not its `✓`/`✗`. The same shape, inverted: a mutant
+    (`if (false) return …`) that broke TypeScript narrowing made `deno test` fail to COMPILE, its summary line was
+    empty, and the script reported "NOTHING CAUGHT IT" — a type error read as an uncaught mutant. Gate on `$?`
+    (`cmd >log && echo ok || { echo ✗; rc=1; }`), and run behaviour mutants with `deno test --no-check`.
+    (2026-11-18, §8.167.)
+
+394. **Path-keyed tooling misreads a MOVED file.** G6's allowance is per path, so moving the one `any` from
+    `core.ts` to `dao/paging.ts` read as "core.ts below allowance, paging.ts ABOVE" — and rule 3 (never higher than
+    the push base) would have failed CI however the allowance was edited. Every tool that excluded test helpers by
+    the name `test-helpers.ts` (the tier fence, G6, the B-gate census) silently started counting
+    `test/helpers.ts` as source the moment B13 moved it. Before a move, grep `scripts/` and the tests for the old
+    path; for G6, remove the cast instead of moving it. (Edge refactor, 2026-11-18, §8.167.)
+
+395. **A before/after bench pair must run on ONE SGT date.** `invoices.due_date` is the generation date + the
+    tenant's days-to-pay, and the email prints it, so a pair straddling midnight reads DIFFERENT on every invoice and
+    every Resend payload with no code change. Normalise `due_date` to check (every row matched), then rerun on one
+    date; `bench4.sh`-style loops should rerun a pair whose date changed. (2026-11-18, §8.167.)
+

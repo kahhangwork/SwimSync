@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
+_Last updated: 2026-11-18 — three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1765,6 +1765,38 @@ real tenant asks — that is the one honest reason, and nobody has.
 
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
+
+### Type the engine's batched reads from their selects — **S/M** — _filed 2026-11-18 (Edge refactor Part A)_
+`readPaged<T>` / `readAllIn<T>` rows are typed by a hand-written `T` (`SessionRow` … `BalanceRow` in
+`generate-invoices/types.ts`) that the caller asserts; the generated `Database` types never check them.
+
+**Why:** these are phase 1's reads — every line on every invoice comes through them. A renamed or retyped column
+there compiles clean and fails at runtime, the exact §7.76 lie Wave 8 removed everywhere else.
+
+**Notes:** `CountedQuery` is now a structural type (no `any`, G6 0), so the plumbing is the only obstacle: infer
+`T` from each dao function's builder (`Awaited<ReturnType<…>>`) rather than restating it. Keep `readPaged` /
+`readAllIn` byte-for-byte (§7.391) — the bench (`bench/`) proves it; type-only, so `types(edge)` + P3.
+
+### Delete generate-invoices' re-export facades — **S** — _filed 2026-11-18 (Edge refactor B14)_
+`core.ts`, `email.ts`, `runLog.ts` and `test-helpers.ts` are re-export facades over `domain/` / `dao/` / `test/`.
+
+**Why:** two paths to one module invite a second import path and, for `email.ts`, two module instances of
+`resendGate`'s state if anything ever imports the domain file by a different URL (fence 5 guards declarations,
+not instances).
+
+**Notes:** kept deliberately because `bench/run.ts` loads `${ENGINE_DIR}/core.ts|email.ts|runLog.ts` to compare
+an OLD engine against the new one — repoint the bench first (and accept it can no longer bench pre-refactor
+engines), then index.ts, then other functions' tests (`../generate-invoices/test-helpers.ts`).
+
+### `speed.test.ts` spacing test can flake — **S** — _filed 2026-11-18 (Edge refactor §9 row 1)_
+"invoice emails are spaced to the Resend per-second limit" failed once in a full run (163 ms gap, needs ≥ 190),
+then passed 8/8 alone and in the next run.
+
+**Why:** a flake in the Deno suite reads as an engine regression and costs a re-run (CI runs the suite twice).
+
+**Notes:** `resendGate` spaces when each worker PASSES the gate; the test measures when each `fetch` STARTS, so a
+worker resumed late shrinks the next gap. Either assert the spacing at the gate, or stamp `lastResendStart` at the
+send — the latter changes behaviour, so it needs a bench run (P2 dumps request counts, not timing).
 
 ### A CI grep for `| grep -q` in pipefail scripts — **S** — _filed 2026-11-16 (§7.339 promotion)_
 Fail `repo-invariants` when a `.sh` file that sets `pipefail` pipes into `grep -q` (or `grep -qF`/`-qE`).
