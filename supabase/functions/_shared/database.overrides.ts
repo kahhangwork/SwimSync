@@ -95,6 +95,13 @@ export const TRIGGER_FILLED_COLUMNS = {
   // enforce_parent_package_lifecycle L19/L30 (every INSERT: tenant and price from the
   // product); assign_parent_package_reference L23 `NEW.reference_number := next_package_ref(…)`.
   parent_packages: ["tenant_id", "amount_payable", "reference_number"],
+  // set_invoice_due_date L8–9 `IF NEW.due_date IS NULL THEN NEW.due_date :=
+  // invoice_due_date_for(NEW.generated_at, NEW.tenant_id)` (read 2026-11-17). The billing
+  // engine's invoice insert omits due_date on purpose — the tenant's days-to-pay decides it.
+  // assign_invoice_public_fields L8–10 `IF NEW.reference_number IS NULL THEN
+  // NEW.reference_number := next_invoice_ref(…)` and L11–12 `IF NEW.public_token IS NULL
+  // THEN NEW.public_token := encode(gen_random_bytes(16), 'hex')` (read 2026-11-17).
+  invoices: ["due_date", "reference_number", "public_token"],
 } as const;
 
 type GeneratedFns = Generated["public"]["Functions"];
