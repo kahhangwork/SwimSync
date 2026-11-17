@@ -19,7 +19,8 @@
 // Best-effort by contract: every failure returns 200 with {sent:false} —
 // a purchase or confirmation must never look failed because an email was.
 
-import { createClient } from "npm:@supabase/supabase-js@2.110.2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
+import type { Database } from "../_shared/database.overrides.ts";
 import {
   authorizePackageEmail,
   buildConfirmedHtml,
@@ -40,7 +41,7 @@ import {
 // a packages:edit act. The platform admin keeps the arm can_admin_tenant gave
 // it (P7). Asked AS THE CALLER, via their own JWT.
 async function packagesAdmin(
-  anon: { rpc: (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown }> },
+  anon: SupabaseClient<Database>,
   tenantId: string,
 ): Promise<boolean> {
   const [{ data: isPlatform }, { data: hasArea }] = await Promise.all([
@@ -75,7 +76,7 @@ Deno.serve(async (req) => {
     // Who is calling? The JWT is already verified by the platform; this
     // resolves it to a user id.
     const authHeader = req.headers.get("Authorization") ?? "";
-    const anon = createClient(
+    const anon = createClient<Database>(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
@@ -84,7 +85,7 @@ Deno.serve(async (req) => {
     const caller = userRes?.user;
     if (!caller) return respond({ sent: false, reason: "unauthorized" }, 401);
 
-    const svc = createClient(
+    const svc = createClient<Database>(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
