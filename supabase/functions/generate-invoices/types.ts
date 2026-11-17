@@ -145,3 +145,19 @@ export type AttendanceRow = { lesson_session_id: string; student_id: string; sta
 export type ParentStudentRow = { parent_id: string; student_id: string };
 export type StudentNameRow = { id: string; full_name: string };
 export type BalanceRow = { parent_id: string; credit_balance: number | string | null; debit_balance: number | string | null };
+
+// One billable line, as the tally builds it and phase 2 inserts it. Moved verbatim
+// out of generateForTenant (B6).
+export type InvoiceItem = {
+  student_id: string;
+  lesson_session_id: string;
+  attendance_status: Database["public"]["Enums"]["attendance_status"];
+  amount: number;
+  class_title: string;
+  session_date: string;
+  // The name AS INVOICED. Snapshotted for the same reason class_title is:
+  // an invoice is a document that gets sent, and it must not rewrite itself
+  // when a child is renamed later. Reading it live is the same mistake as
+  // reading classes.price_per_lesson at generation time.
+  student_name: string | null;
+};
