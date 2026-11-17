@@ -122,6 +122,14 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
+> **Layout since 2026-11-18 (EDGE_FUNCTIONS_REFACTOR_PLAN.md B13):** every Deno test lives in its
+> function's `test/` folder. `generate-invoices/core.test.ts` was split VERBATIM by subject into
+> `test/{billing, credit, createdEmails, multiClass, guards, seal, completeness, isolation, rates,
+> emailRetry, fixtureGuard}.test.ts`; `test-helpers.ts` is now `test/helpers.ts` (the old path
+> re-exports it). Below, a bare `core.test.ts` / `email.test.ts` means the file it was in before
+> the move. `test.sh` refuses to run if its list ≠ the test files on disk (P1), and
+> `supabase/functions/tierBoundaries.test.ts` is the tier fence.
+
 _Deno tests (run by `generate-invoices/test.sh`, which also carries
 `../package-emails/email.test.ts`, `../public-invoice/core.test.ts` and (added 2026-08-15)
 `../public-package/core.test.ts` — the invoice one pins the public serializer's EXACT key

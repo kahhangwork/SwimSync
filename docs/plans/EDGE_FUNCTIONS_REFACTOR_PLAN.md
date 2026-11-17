@@ -1,6 +1,6 @@
 # Edge Functions refactor — generated types, then tiers
 
-_Drafted 2026-11-17. Plan-reviewed 2026-11-17 (mitigations inlined as ⚠ RISK n). Status: IN PROGRESS — Part A LIVE 2026-11-17 (v41); Part B next._
+_Drafted 2026-11-17. Plan-reviewed 2026-11-17 (mitigations inlined as ⚠ RISK n). Status: Part A LIVE 2026-11-17 (v41); Part B BUILT 2026-11-18 (B0–B14 green) — deploy + October next._
 
 Two refactors, applied to `supabase/functions/` the way they were applied to the apps:
 
@@ -443,6 +443,18 @@ it. Assertion at every stage: `git diff <Part A sha> -- supabase/functions/gener
   - after B12: `example-credit-note-flow`, `verify-coach-marking`.
 
   **Do NOT start the full sweep** (user-requested only).
+- **B0–B12 DONE (2026-11-17/18)**, one commit each (`dbc0997` … `1466966`), every stage gate GREEN (census vs
+  `ff70ac0`, fence, suite ×2, and the bench at 4 sizes on every stage touching generate-invoices). Mutation proofs:
+  B4 all 7 guards, B7 hard stop (18 tests), B8 fail-open drawn set, B9 vacuous seal, B11 recipient + normaliser.
+  **Deviations, each recorded in its commit:** B5–B9 cut along the code's own sections (reads / class loop / unclaimed
+  + hard stop / drawn / phase 2 + seal), not the plan's (6) "make-ups + trial rates" label; mode/force/now and the
+  `if (blocking.length)` decision stay in generateForTenant; the fence's clock ledger gained 4 STAYS entries when
+  pre-existing stamps MOVED into domain/ (census count unchanged); B11/B12 split into a/b(/c); service-side daos take
+  the plain client (tests call them), caller-side take CallerDb only. **G6 was red B2→B12a unseen** (the gate printed
+  its last line); fixed by typing CountedQuery structurally — functions G6 now **0**. **Drivers after B12** (functions
+  served from this checkout): money-admin 44/44, unmarked-lessons 12/12, package-renewal 7/7, referrals 13/13,
+  coach-marking 31/31. `example-credit-note-flow` is a TEMPLATE needing a hand seed, not a runnable driver — the
+  credit-note path is covered by its 50 Deno tests + coach-marking.
 - **B13 — tests (D5), in their own commits after the code is done, never in the same commit as a code move.** Split
   `core.test.ts` / `test-helpers.ts` into `test/` along the new modules. Before/after parity: the sorted list of
   `Deno.test` names is identical and the runner's passed count is unchanged.
@@ -464,6 +476,13 @@ it. Assertion at every stage: `git diff <Part A sha> -- supabase/functions/gener
 - **B14 — close-out.** Fence ledgers at zero. **Keep the facades** (above). Update CLAUDE.md's "`core.ts` is pure"
   line, `docs/ARCHITECTURE.md` §6, and `docs/TESTING.md` §5's Deno file list. Docs are edited from `main`, never from
   a worktree. Final B-gate including the bench.
+
+- **B13 DONE (2026-11-18, `cdd0f7c`):** see its commit — bodies IDENTICAL (335), engine frozen vs `1466966`, suite ×2,
+  no tenant leak, every mutant still red. **B14 DONE:** package-emails / credit-note-emails facades deleted (nothing
+  imports them); generate-invoices facades kept; CLAUDE.md, ARCHITECTURE §6 + file map, TESTING §5 updated. Final
+  gate: census IDENTICAL, fence 8/8, G6 0, suite 335/335 ×2, bench IDENTICAL at 4 sizes. (The census tool, like the
+  fence and G6 before it, keyed on the old `test-helpers.ts` path and briefly counted `test/helpers.ts` as engine
+  source; fixed to skip `test/`.)
 
 ## 6. Deploy Part B, then bill October (D4, then D3)
 

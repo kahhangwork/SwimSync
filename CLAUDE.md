@@ -14,7 +14,7 @@ backend on Supabase, email via Resend.
 | `SwimSyncApp/` | Expo / React Native — parent + coach. Runs on web too (RN-web). |
 | `SwimSyncAdmin/` | Next.js admin panel — tenant admin + platform admin |
 | `supabase/migrations/` | **The schema's source of truth.** Never edit an applied migration. |
-| `supabase/functions/generate-invoices/` | The billing engine. `core.ts` is pure; `index.ts` is the handler. |
+| `supabase/functions/generate-invoices/` | The billing engine, tiered (2026-11-18): `dao/` holds every query, `domain/` the logic (pure but for the injected client), `core.ts` composes them; `index.ts` is the handler. |
 | `.claude/skills/run-ui-playwright/drivers/` | End-to-end UI drivers |
 
 ## Commands

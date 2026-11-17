@@ -33,9 +33,20 @@ the shape of the system changes:_
   `20260309000100`→`001000` (schema, auth trigger, credit-note trigger, RLS,
   storage, grants, session/audit, app_settings) plus `20260711000100_credit_applications`.
   Never edit the historical `Database_*` files.
-- **Invoice engine split for testability:** `generate-invoices/core.ts` holds the
-  billing logic (exported `generateInvoices(supabase, opts)`); `index.ts` is a thin
-  Deno.serve handler (auth + client + call). Behaviour is identical either way.
+- **Invoice engine split for testability:** `generate-invoices/core.ts` exports
+  `generateInvoices(supabase, opts)`; `index.ts` is a thin Deno.serve handler (auth +
+  client + call). **Tiered 2026-11-18** (`docs/plans/EDGE_FUNCTIONS_REFACTOR_PLAN.md`
+  Part B), the apps' shape on the functions: `dao/` holds every `.from()` / `.rpc()` /
+  Resend `fetch` as the original chain (tenant isolation lives in those chains — the
+  service role bypasses RLS); `domain/` holds the logic and touches the network only
+  through `dao/`; `generateForTenant` in `core.ts` is ~50 lines of composition (guards →
+  phase-1 reads → tally → unclaimed → hard stop → drawn → phase 2 → seal), each guard
+  returning `{ stop } | { go }`. `core.ts`, `email.ts`, `runLog.ts` stay as re-export
+  facades (index.ts, the bench and the tests import them). package-emails and
+  credit-note-emails have the same `dao/` + `domain/` split, and their caller-JWT
+  client is a `CallerDb` brand (`_shared/clientBrands.ts`): authorisation calls take
+  only it, so swapping in the service client does not compile. The fence is
+  `supabase/functions/tierBoundaries.test.ts`.
 - **Invoice emails live in `email.ts`, deliberately OUT of `core.ts`** (§8c). The engine
   stays pure and returns a typed `created[]`; `index.ts` calls `emailCreatedInvoices()`
   *after* generation commits, so a delivery failure can never touch billing. Sends go via
@@ -730,13 +741,13 @@ the shape of the system changes:_
 | `supabase/migrations/` | Schema, RLS, triggers, grants (ordered, source of truth) |
 | `…/20260309000500_credit_note_trigger.sql` | Auto-issues a credit note on billable→non-billable edit of an invoiced lesson |
 | `…/20260711000100_credit_applications.sql` | Credit-note allocation ledger (fixes partial-application drift) |
-| `supabase/functions/generate-invoices/core.ts` | Billing engine logic (exported, tested) |
+| `supabase/functions/generate-invoices/core.ts` | `generateInvoices` + `generateForTenant` composition; re-exports the engine's types (logic in `domain/`, queries in `dao/`, 2026-11-18) |
 | `supabase/functions/generate-invoices/index.ts` | Thin HTTP handler (auth + client + call core) |
 | `supabase/functions/generate-invoices/speed.test.ts` · `bench/` | Pins on the engine's batched reads, paging and email rate gate (`speed.test.ts`, in `test.sh`). `bench/` is a MANUAL harness, not in CI: it seeds a month, models latency and compares two engines byte for byte (`docs/plans/BILLING_ENGINE_SPEED.md`). |
-| `supabase/functions/generate-invoices/email.ts` | Invoice-email builders + Resend sender + `emailCreatedInvoices()` orchestration (§8c) |
+| `supabase/functions/generate-invoices/email.ts` | Facade over `domain/emailTemplates.ts` (builders, pure) + `domain/emailDelivery.ts` (send, claim/settle, `resendGate`, `emailCreatedInvoices()`, §8c) |
 | `supabase/functions/public-package/` | The tokenised renewal-offer pay page's data source (core.ts + index.ts), the package mirror of `public-invoice`; `verify_jwt=false`, the 128-bit `public_token` is the access control. Refuses a SUSPENDED business (an offer is prepayment, unlike an invoice) — §8.60 |
-| `supabase/functions/credit-note-emails/email.ts` | Credit-note email builders + the PURE deciders (`authorizeCreditNoteEmail`, `isSendableNote`, `canEmailForTenant`, `shouldResetClaim`) + Resend sender. Scalars only — a builder cannot be handed a `students` row, so a live name is unreachable (§7.155) |
-| `supabase/functions/credit-note-emails/core.ts` | The DB-facing pipeline: candidate discovery (tenant-filtered), spent/sibling checks, `fetchTenantSuspended` (a COLUMN read, not the RPC — §7.172), the atomic claim, and the per-note claim→send→release loop. Split out of the handler **so a test can call it** |
+| `supabase/functions/credit-note-emails/domain/email.ts` | Credit-note email builders + the PURE deciders (`authorizeCreditNoteEmail`, `isSendableNote`, `canEmailForTenant`, `shouldResetClaim`) + Resend sender. Scalars only — a builder cannot be handed a `students` row, so a live name is unreachable (§7.155) |
+| `supabase/functions/credit-note-emails/domain/notes.ts` (+ `dao/`) | The DB-facing pipeline: candidate discovery (tenant-filtered), spent/sibling checks, `fetchTenantSuspended` (a COLUMN read, not the RPC — §7.172), the atomic claim, and the per-note claim→send→release loop. Split out of the handler **so a test can call it** |
 | `supabase/functions/credit-note-emails/index.ts` | Thin handler: parse, authorize as the caller, delegate. `verify_jwt` ON; the NOTE path uses `is_tenant_admin`, NOT `can_admin_tenant` (§7.173) |
 | `SwimSyncApp/lib/creditNoteEmail.ts` | The coach app's bounded, awaited call after an attendance save, plus `mayHaveIssuedCreditNote` — the guard that skips it unless a lesson left `present`/`trial_paid` |
 | `SwimSyncAdmin/app/(admin)/credit-notes/domain/creditNoteEmailState.ts` | The Credit Notes page's Resend gate; mirrors `is_tenant_admin()` term for term |
