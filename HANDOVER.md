@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-18 (latest) — **Four BACKLOG S-items shipped, one closed as not-doing** (§8.172): a CI guard for
-`| grep -q` under pipefail, the Resend spacing flake, the engine's re-export facades deleted (prod stays v42), Calendar
-columns fill the grid (VISUAL-ONLY). Next: read nightly `44316261362`, then the NEXT one; Coach Kah Hang's November._
+_Last updated: 2026-11-19 (latest) — **Referred families can't be brought in; Void referral; `public-package` v5**
+(§8.173): migration `20261118000400` + admin live; Mark Attendance highlight closed as not-doing. Nightly gate SKIPPED
+on the user's word — read tonight's nightly first. Next: Coach Kah Hang's November._
 
-_Previously (§8.171, 2026-11-18) — Role delete asks first; five small admin/UI fixes live in one push._
+_Previously (§8.172, 2026-11-18) — Four BACKLOG S-items shipped (grep -q guard, spacing test, facades, Calendar fill)._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,18 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.173 (2026-11-18 → 19) — Referred families can't be brought in; Void referral; `public-package` v5; live
+
+**Shipped** the user's picks from a fresh BACKLOG list: `73a9448` (Mark Attendance tab highlight → *Deliberately not
+doing*, after a local check showed every exit returns where the coach came in), `5613a40` (`public-package` v5 —
+DEPLOYMENT #116), and the plan-reviewed `CARRIED_OVER_REFERRAL_BLOCK_PLAN` → `b053cf5` (migration `20261118000400`)
++ `bb2af88` (admin **Void referral**) — DEPLOYMENT #117, PRD §7.16, TESTING §5 "2026-11-19". Each proven red first.
+
+- **Decisions (user):** refuse the bring-in rather than auto-void (*"a lot of bugs could happen"*); a Void referral
+  action as the exit; a brought-in family can still refer. **Skipped:** the §9 nightly gate, on the user's word.
+- **Found:** /plan-review caught a missing `'referral'` audit arm (§7.297 hit again) and carried tests 20–23 pinning
+  the opposite. New: §7.402 (irreversible exit ⇒ last check), §7.403 (`throws_ok` atomicity), §7.404 (`db query -f`).
+
 ## 8.172 (2026-11-18) — Four BACKLOG S-items shipped; one closed as deliberately not doing; live
 
 **Shipped** the user's picks 1–5 of a fresh BACKLOG list, one branch each: `2c497ab` (CI `check-grep-q-pipefail.sh`,
@@ -366,21 +378,6 @@ facades deleted; ARCHITECTURE §6 + file map). TESTING §5 "2026-11-18 (later)".
   IDENTICAL), and `/deploy` says no behaviour change ⇒ no deploy; November bills on v42 as planned.
 - **Found:** a sibling session in the SAME checkout switched it to `main` mid-commit (`a7d3384`, `watch-run.sh` + a §7.340 hit-again, was theirs); no
   loss — both commits stayed separate, mine rebased. Shared-checkout work is what `docs/WORKTREES.md` exists for.
-
-## 8.171 (2026-11-18) — Role delete asks first; five small admin/UI fixes in one push; live
-
-**Shipped** BACKLOG S-items, the user's picks: `b715ff7` (role delete confirm, DEPLOYMENT #113), then one push of 8
-commits `f99052d..ae4ba05` (DEPLOYMENT #114) — modal X "Dismiss", the due-date trail, Packages on the stored balance
-(ARCHITECTURE package rule, amended), one inline action per row on Levels/Invoices/Packages/Platform, Register "e.g."
-placeholders. PRD updated per commit; TESTING §5 "2026-11-18". Each unit: vitest proven red, its drivers green
-(Platform's four before AND after).
-
-- **Found:** §7.399 (sr-only header → page scrolls sideways), §7.400 (cell sub-line breaks exact `getByText`), §7.401
-  (actions in a closed menu make "busy" tests vacuous). A fixture round-trip failed once, passed 49/49 on rerun —
-  the failing fixture was not captured.
-- **Not done:** the nightly gate was **skipped on the user's word** — no nightly covered `b715ff7` before the push.
-  Two restyle leftovers stay in BACKLOG (Mark Attendance tab highlight — needs a plan; Calendar Week blank band — new).
-  Make-ups' RPC read left as is (no live/stored split there). CI for `ae4ba05` was pending at close.
 
 ## 9. Next steps (pick with the user)
 
@@ -424,9 +421,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-18 (late):** dispatched run `44316261362` (on `d5f987a`) was **in progress** at close — it is the
-first to cover §8.171's nine gate-skipped commits; **read it before the next APP unit merges**. It does NOT cover
-§8.172's `3aa6c56` (Calendar, landed VISUAL-ONLY under D3 — 1 of the 3 allowed) — the next nightly after it does. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-19:** `44316261362` (on `d5f987a`, §8.171's nine commits) is **green**. Nothing since is covered:
+`3aa6c56` (Calendar, VISUAL-ONLY under D3) and `b053cf5`/`bb2af88` (§8.173, gate skipped on the user's word) — **read
+tonight's scheduled run before the next APP unit merges**. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -443,9 +440,10 @@ which mutate shared seed state — are in the same section.
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
    in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Read nightly `44316261362`** (§8.171's nine commits), then the next one (§8.172's Calendar). A red names its
-   driver; replay it `--only`. Drivers touched: TESTING §5 "2026-11-18" and "2026-11-18 (later)". Also unobserved
-   since `package-emails` v11 (§8.170): a real one-child package email naming the child — check the next confirm.
+2. **Read tonight's nightly** — the first to cover `3aa6c56` (Calendar) and `bb2af88` (Void referral), both landed
+   with the gate skipped on the user's word (`44316261362`, §8.171's, was green). A red names its driver; replay it
+   `--only` (TESTING §5 "2026-11-19"). Also unobserved since `package-emails` v11 (§8.170): a real one-child package
+   email naming the child — check the next confirm.
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
@@ -469,8 +467,8 @@ explained by one line in the commit message), its screen's `--only` drivers pass
 a P4 / Phase 4 step. At most three unverified landings in a row; **a red nightly freezes restyle landings**, and a red
 attributed to one is reverted (`git revert <sha>` → push) in the same session unless the fix is a one-line string.
 
-**No migration is HELD or in flight.** Latest applied is `20261118000300` (credit-note amount check), on prod, 0 pending
-(2026-11-18). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
+**No migration is HELD or in flight.** Latest applied is `20261118000400` (referred-family bring-in refusal + `void_referral`), on prod, 0 pending
+(2026-11-19). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

@@ -1451,3 +1451,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     string — a flex value). CI `44321611448` green. Same day, no deploy needed: `2c497abb` (CI), `f6c16a33` (test),
     `3662ed92` (engine import paths only, bench IDENTICAL — prod stays **v42** by `/deploy`'s no-behaviour rule).
     **Rollback:** revert `3aa6c56b`.
+
+116. **Deploy record (2026-11-18 late): `public-package` v5 — a brought-in package's page counts from its ORIGINAL
+    start.** `5613a402`: `valid_until_preview` and `start_date` anchor on `carried_over_start` (no surface links a
+    carried token today). `supabase functions deploy public-package` v4 → v5, `verify_jwt` still false, unknown
+    token → 404 `not_found`. Then `main` (docs + source only; no app change, bundle not grepped). CI `44340646411`
+    green. **Rollback:** redeploy `public-package` from `5613a402~1`.
+
+117. **Deploy record (2026-11-19): a referred family cannot be brought in; Void referral.** Prod before: 0 pending
+    referrals, 0 carried packages. `b053cf5f` → `main` → `supabase db push` (`20261118000400`, 0 pending); prod ACL
+    of `void_referral` = postgres + authenticated only (no anon/PUBLIC); prod bodies carry the refusal and the
+    `'referral'` audit arm. Then `bb2af88b` (admin) → `main`: LIVE — `/referrals` serves "Reason for voiding this
+    referral?". CI `44348346933` green. **HANDOVER §9 nightly gate SKIPPED on the user's word** — no nightly covers
+    `3aa6c56`/`bb2af88` yet. **Rollback:** revert `bb2af88b` first (apps), then
+    `supabase/rollback/20261118000400_carried_over_referral_block_DOWN.sql` via psql (rehearsed).

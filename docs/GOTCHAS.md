@@ -36,13 +36,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349, 391 |
-| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380, 386 |
+| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380, 386, 402 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326, 395 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379, 393, 401 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379, 393, 401, 403 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388, 397, 399, 400 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383, 390 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389, 392, 398 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387, 404 |
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359, 384, 394 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
@@ -2528,6 +2528,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       correct arm already existed: **`'ParentTenant'`** — entity_id is the parent, the RPC supplies the tenant
       (a parent spans businesses, so it is not derivable). That is the one sanctioned "passing a tenant" case. The
       raise IS the check (any pgTAP that calls the RPC goes red), so no further promotion is needed.
+    - **Hit again (2026-11-19, §8.173 — caught at /plan-review, before any code):** the plan said "copy the audit
+      shape of `record_carried_over_package`" for `void_referral` under a NEW type `'referral'`. Copying an audit
+      INSERT never carries the arm. A plan that names a new `entity_type` must name the arm in the same migration
+      (`20261118000400` added `'referral'`). If it bites a fourth time, promote: a repo-invariants grep comparing
+      `entity_type` literals in new migrations with the arms in the live body.
 
 298. **`accounting_summary` used to repeat its revenue expression inside `RETURN QUERY`'s `net` CASE** — a new
     revenue component added to one copy only gives a silently wrong Net. Every component now flows through ONE
@@ -3313,3 +3318,22 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     buttons still inline — or none — and stays green. When an action moves into a menu, open the menu in the test
     AND assert the count it loops over (`HeldTable` / `PendingPanel` "busy" tests; drivers use `rowActionCount`).
     (2026-11-18, §8.171.)
+
+402. **A refusal that sends the admin to an IRREVERSIBLE action must be the LAST check — after the INSERT when
+    other refusals fire inside it.** `record_carried_over_package` refuses a referred family and tells the admin
+    to *Void referral* (cannot be undone). Placed early, an expired start or a missing child would still have
+    failed after the admin destroyed a real entitlement. Refusals raised by the INSERT's own triggers (which child,
+    already brought in) answer only at INSERT time, so the check sits AFTER it — the raise rolls the INSERT and its
+    trigger work back (safe there: all in-database, and the `PKG-` counter is a row, not a sequence). Pin the order
+    with a pgTAP case where the refused family also fails a later check and gets THAT message
+    (`carried_over_referral_block.test.sql` 5–7, mutation M2). (2026-11-19, §8.173.)
+
+403. **After `throws_ok`, "state unchanged" is true by construction** — pgTAP runs the call in a subtransaction
+    that rolls back, so asserting the row is still `pending` proves nothing about atomicity. Prove "X is never done
+    while Y survives" by a MUTATION that swallows the inner exception (`BEGIN … EXCEPTION WHEN OTHERS THEN NULL`)
+    and turns the `throws_ok` red (`carried_over_referral_block.test.sql` 30, M4). (2026-11-19, §8.173.)
+
+404. **`supabase db query -f <file>` runs ONE statement** — a multi-statement file (a DOWN, a fixture) fails with
+    `cannot insert multiple commands into a prepared statement` and changes nothing, which a rollback rehearsal
+    reads as "DOWN broken". Run such files through psql:
+    `docker exec -i supabase_db_SwimSync psql -U postgres -d postgres -v ON_ERROR_STOP=1 < file.sql`. (2026-11-19, §8.173.)

@@ -1826,6 +1826,9 @@ until a reset, so this caution stands.
 
 ### 2026-11-19 — a referred family cannot be brought in; Void referral (CARRIED_OVER_REFERRAL_BLOCK_PLAN)
 
+- **Deno** `public-package/core.test.ts` +1 (2026-11-18 late, §8.173): a carried package's `start_date` and
+  `valid_until_preview` count from `carried_over_start`; red before the fix. Suite 342/342 ×2.
+
 - **pgTAP** new `carried_over_referral_block.test.sql` (36): the bring-in refusal and that it is the LAST check
   (expired / lessons / which-child answer first); converted / void / referrer-only families allowed; `void_referral`
   authorization (parent, coach, packages:view staff, other business, anon), pending-only, voids the referral + its
