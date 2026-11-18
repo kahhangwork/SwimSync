@@ -26,7 +26,7 @@
 
 import os from "node:os";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, appLoginDies as appLoginDiesOn, loginVerdictDetail, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, appLoginDies as appLoginDiesOn, loginVerdictDetail, rowAction, rowActionCount, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => `${SHOT}/tenant-suspension-${n}`;
@@ -80,10 +80,12 @@ try {
   await page.goto(`${ADMIN}/platform`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
 
+  // Suspend / Unsuspend sit in the row's "…" menu (one inline action per row,
+  // 2026-11-18) — counted and pressed through rowAction, never by row text.
   check("the fixture business is listed with a Suspend action",
-    (await row("SuspendCov School").innerText()).includes("Suspend"));
+    (await rowActionCount(row("SuspendCov School"), "Suspend")) === 1);
 
-  await row("SuspendCov School").getByText("Suspend", { exact: true }).click();
+  await (await rowAction(row("SuspendCov School"), "Suspend")).click();
   await page.waitForTimeout(800);
   body = await page.evaluate(() => document.body.innerText);
   check("the dialog carries the accepted-consequence copy (dark app, links keep working)",
@@ -109,7 +111,7 @@ try {
   await page.waitForTimeout(800);
   check("the row now shows the suspended badge and an Unsuspend action",
     (await row("SuspendCov School").innerText()).includes("suspended") &&
-    (await row("SuspendCov School").innerText()).includes("Unsuspend"));
+    (await rowActionCount(row("SuspendCov School"), "Unsuspend")) === 1);
   await page.screenshot({ path: shot("03-suspended.png"), fullPage: true });
 
   // ── 4. The ban half: staff login dies ─────────────────────────────────────
@@ -136,7 +138,7 @@ try {
   await loginAdmin(page, "superadmin@swimsync.test");
   await page.goto(`${ADMIN}/platform`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
-  await row("SuspendCov School").getByText("Unsuspend", { exact: true }).click();
+  await (await rowAction(row("SuspendCov School"), "Unsuspend")).click();
   await page.waitForTimeout(800);
   // Same de-flake as the suspend path: wait for the /api/unsuspend-tenant
   // response (the confirm button re-labels to "Unsuspending…" and would race a

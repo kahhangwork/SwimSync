@@ -47,7 +47,7 @@
 // plan's named timing risk, and a promise-gated check that could not redden would be the vacuous kind.
 
 import { execFileSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, rowAction, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API = "http://127.0.0.1:54321";
@@ -212,7 +212,7 @@ try {
   };
   await page.route(isAdminsRpc, holdAlpha);
 
-  await bizRow(ALPHA_NAME).getByRole("button", { name: "Change owner" }).click();
+  await (await rowAction(bizRow(ALPHA_NAME), "Change owner")).click(); // in the row's "…" menu
   await ownerModal(ALPHA_NAME).waitFor();
   // Wait until the handler HOLDS Alpha's answer — never a sleep.
   await Promise.race([alphaHeld, new Promise((r) => setTimeout(r, 10000))]);
@@ -271,7 +271,7 @@ try {
 
   // ══ 5. Change owner — the write ═══════════════════════════════════════════
   check("PRECONDITION: the cancelled Alpha modal changed nothing", ownerOf(ALPHA) === A_OWNER, ownerOf(ALPHA));
-  await bizRow(ALPHA_NAME).getByRole("button", { name: "Change owner" }).click();
+  await (await rowAction(bizRow(ALPHA_NAME), "Change owner")).click(); // in the row's "…" menu
   const alphaModal = ownerModal(ALPHA_NAME);
   await alphaModal.locator("option", { hasText: "PlatCtl Alpha Coadmin" }).waitFor({ state: "attached" });
   const ownerOpt = alphaModal.locator("option", { hasText: "PlatCtl Alpha Owner" });

@@ -3019,8 +3019,10 @@ directly, and no gateway takes a percentage. What the product supplies is
   chat. The stamp deliberately reads **"chat opened"**, never "reminded" — opening a
   chat is not proof a message was sent, so rows never leave the queue until paid. A
   parent with no usable phone number is a **visible "no number" state** (with the
-  advisory from `lib/sgPhone.ts`), never a broken link. A **Link** button copies the
-  invoice's public URL for any other channel.
+  advisory from `lib/sgPhone.ts`), never a broken link. A **Copy link** action copies the
+  invoice's public URL for any other channel (a "link copied" line confirms it). *(since
+  2026-11-18 WhatsApp and Copy link sit in the row's "…" menu; Mark Paid is the row's one
+  inline action.)*
 
 - **"I've paid" → confirm** *(Phase 3, implemented 2026-08-02; the in-app LIST surface
   added 2026-08-08)*. The parent taps **I've paid** — on the tokenized page (sessionless,
@@ -3772,8 +3774,9 @@ The following section provides a screen-by-screen reference for each SwimSync us
 *(implemented 2026-10-14, UI restyle Phase 5 — every admin screen on the DESIGN.md tokens. What an admin can see
 differently: **a table row carries at most one inline action** (the one its state calls for); the rest sit in a row
 **"…" menu** on Credit notes, Classes, Parents, Coaches, Locations, Admins and Roles — destructive items in red, still
-behind their confirmations (Packages, Invoices, Levels and Platform keep several inline actions for now — in BACKLOG;
-deleting a role gained its confirmation on 2026-11-18). **Lessons:** a past lesson still unmarked is tagged **Blocks billing**
+behind their confirmations. *(2026-11-18: Packages, Invoices, Levels and Platform followed — inline stays Extend /
+Record refund / Payment received, Mark Paid, Edit, and Resend or Set owner respectively; deleting a role gained its
+confirmation the same day.)* **Lessons:** a past lesson still unmarked is tagged **Blocks billing**
 (red; today's reads *Not marked* / *Partly marked*, amber), and the week tab's count is the same number as the sidebar badge (both read
 `tenant_unmarked_lesson_count`). **Invoices:** billing settings moved to their own card at the foot of the page, and
 when the last Generate was refused the page says why beside the button — the button itself is disabled only while a

@@ -1638,28 +1638,6 @@ day after), a stored due date, the red tag on every surface, and Change due date
 Schedule; Admin Calendar Week hiding Sunday at 1440px; more than one primary per section (Referrals, Packages,
 Platform, parent Buy-a-package); Register's phone/address placeholders without "e.g.".
 
-### Admin tables still carrying several inline row actions — **S** — _filed 2026-10-14_
-UI restyle Phase 5 moved row actions into the shared "…" menu (`components/ui/RowMenu.tsx`, DESIGN.md → Tables: at
-most one inline action per row) on Credit notes, Classes, Parents, Coaches, Locations, Admins and Roles. Four screens
-were left with their inline actions, on purpose:
-- **Packages** (Held + Pending tables) — 2–4 per row (Extend, Cancel, Check marked lessons, Change child; Payment
-  received, Decline, Change child; Record refund / Reverse). Not on the audit's Tables fold-in list; ~15 driver presses
-  in `verify-packages-admin` (several `count()` checks) would move to `rowAction` / `rowActionCount`.
-- **Invoices** — Mark Paid + WhatsApp + Link. DESIGN.md's own example is this table (Due → *Mark paid*, Claimed →
-  *Confirm payment*). Drivers press WhatsApp / Link (`payment-collection`).
-- **Levels** — Edit + Remove inline; `verify-grading-admin` presses Edit directly.
-- **Platform** (`/platform` Businesses table) — Suspend/Unsuspend, Set owner / Change owner, Resend sit as inline links.
-  Left alone because plan 5.29 ⚠ RISK 4 forbids moving the cross-tenant suspend handlers; moving them into a menu is a
-  handler move, so it needs its own step with `--only platform-admin`, `platform-admin-scope`, `platform-controls`,
-  `tenant-suspension` before and after.
-
-**Why:** DESIGN.md's one-inline-action rule is unmet on these four; the restyle chose not to churn drivers or touch
-cross-tenant handlers inside a visual change.
-
-**Fix:** per screen, keep the row's STATE action inline and move the rest into `RowMenu` (destructive ones as
-`RowMenuItem destructive`); route each driver press through `lib.mjs` `rowAction` and each "no button any more" check
-through `rowActionCount` (so it counts inside the menu, never vacuously). Not visual-only.
-
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
 

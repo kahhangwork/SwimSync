@@ -3,10 +3,19 @@
 //
 // ⚠ DRIVER CONTRACT — verify-tenant-suspension and verify-tenant-provisioning
 // both find a business with `page.locator("tr", { hasText })` and then read the
-// row's TEXT. So the name, the admin email, the invited/active badge, `Resend`
-// and `Suspend`/`Unsuspend` must all stay INSIDE that one <Tr>. Splitting any of
-// them into a second row, or into a detail panel, breaks both drivers even
-// though every element still exists on the page.
+// row's TEXT. So the name, the admin email, the invited/active badge and
+// `Resend` must all stay INSIDE that one <Tr>, and so must the "…" menu: its
+// items (Change owner, Suspend/Unsuspend) render inside the row once open, and
+// the drivers press and count them through lib.mjs rowAction / rowActionCount.
+// Splitting any of them into a second row, or into a detail panel, breaks both
+// drivers even though every element still exists on the page.
+//
+// ONE INLINE ACTION PER ROW (DESIGN.md → Tables; 2026-11-18): the admin
+// state's own remedy stays inline — Resend while invited, Set owner while
+// there is no admin (exclusive states). Change owner and Suspend/Unsuspend
+// moved into the row menu; their HANDLERS are the page's, unchanged (plan
+// 5.29 ⚠ RISK 4 — the cross-tenant suspend path is not touched, only the
+// element that calls it).
 //
 // ⚠ The sort lives HERE, with the table it sorts. Its `admin_status` accessor
 // puts "no admin" FIRST when ascending: a business with no admin is joinable by
@@ -24,6 +33,7 @@ import {
   useTableSort,
 } from "@/components/Table";
 import { formatSgDate } from "@/lib/lessonDates";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import type { TenantRow } from "../types";
 
 type Props = {
@@ -72,6 +82,7 @@ export function TenantsTable({
               <Th sort={tenantSort} sortKey="last_attendance_date" firstDir="desc">Last attendance</Th>
               <Th sort={tenantSort} sortKey="sessions_this_month" firstDir="desc">Sessions this month</Th>
               <Th sort={tenantSort} sortKey="last_month_billing">Last month&apos;s billing</Th>
+              <Th><span className="sr-only">Actions</span></Th>
             </Thead>
             <Tbody>
               {tenants.length === 0 && !loadError && (
@@ -87,22 +98,6 @@ export function TenantsTable({
                       {t.suspended_at && (
                         <Tag tone="danger">suspended</Tag>
                       )}
-                      <button
-                        onClick={() =>
-                          onSuspend({
-                            tenantId: t.tenant_id,
-                            tenantName: t.display_name,
-                            suspended: t.suspended_at !== null,
-                          })
-                        }
-                        className={
-                          t.suspended_at
-                            ? "text-label font-medium text-primary underline-offset-2 hover:underline"
-                            : "text-label font-medium text-status-danger-text underline-offset-2 hover:underline"
-                        }
-                      >
-                        {t.suspended_at ? "Unsuspend" : "Suspend"}
-                      </button>
                     </div>
                   </Td>
                   <Td>
@@ -143,12 +138,6 @@ export function TenantsTable({
                         ) : (
                           <Tag tone="success">active</Tag>
                         )}
-                        <button
-                          onClick={() => onChangeOwner(t)}
-                          className="text-label font-medium text-primary underline-offset-2 hover:underline"
-                        >
-                          Change owner
-                        </button>
                       </div>
                     )}
                   </Td>
@@ -219,6 +208,25 @@ export function TenantsTable({
                     {t.last_month_billing === "never run" && (
                       <span className="text-ink-muted">never run</span>
                     )}
+                  </Td>
+                  <Td>
+                    <RowMenu>
+                      {t.admin_status !== "none" && (
+                        <RowMenuItem onClick={() => onChangeOwner(t)}>Change owner</RowMenuItem>
+                      )}
+                      <RowMenuItem
+                        destructive={!t.suspended_at}
+                        onClick={() =>
+                          onSuspend({
+                            tenantId: t.tenant_id,
+                            tenantName: t.display_name,
+                            suspended: t.suspended_at !== null,
+                          })
+                        }
+                      >
+                        {t.suspended_at ? "Unsuspend" : "Suspend"}
+                      </RowMenuItem>
+                    </RowMenu>
                   </Td>
                 </Tr>
               ))}
