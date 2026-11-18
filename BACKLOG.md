@@ -1727,16 +1727,6 @@ not instances).
 an OLD engine against the new one — repoint the bench first (and accept it can no longer bench pre-refactor
 engines), then index.ts, then other functions' tests (`../generate-invoices/test-helpers.ts`).
 
-### `speed.test.ts` spacing test can flake — **S** — _filed 2026-11-18 (Edge refactor §9 row 1)_
-"invoice emails are spaced to the Resend per-second limit" failed once in a full run (163 ms gap, needs ≥ 190),
-then passed 8/8 alone and in the next run.
-
-**Why:** a flake in the Deno suite reads as an engine regression and costs a re-run (CI runs the suite twice).
-
-**Notes:** `resendGate` spaces when each worker PASSES the gate; the test measures when each `fetch` STARTS, so a
-worker resumed late shrinks the next gap. Either assert the spacing at the gate, or stamp `lastResendStart` at the
-send — the latter changes behaviour, so it needs a bench run (P2 dumps request counts, not timing).
-
 ### `pressByText` should press a link itself, not its wrapper — **S** — _filed 2026-11-12 (§7.382)_
 `drivers/lib.mjs` `pressByText` dispatches on the matched leaf's `parentElement`. An expo-router `<Link>` IS the leaf
 (its text is its own), so the click lands on the wrapper and nothing navigates.

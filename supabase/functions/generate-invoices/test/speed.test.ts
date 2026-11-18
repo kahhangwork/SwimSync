@@ -163,21 +163,34 @@ function resendRecorder(starts: number[], keys: string[]): typeof fetch {
 }
 
 Deno.test("speed: invoice emails are spaced to the Resend per-second limit", async () => {
-  const fx = [await billedOne("2026-06"), await billedOne("2026-06"), await billedOne("2026-06")];
+  const fx = [];
+  for (let i = 0; i < 4; i++) fx.push(await billedOne("2026-06"));
   const orig = globalThis.fetch;
   const starts: number[] = [];
   const keys: string[] = [];
   globalThis.fetch = resendRecorder(starts, keys);
   try {
+    // What the gate GUARANTEES is a schedule, not a gap. It stamps each turn as the
+    // worker passes it, ≥ `spacing` after the previous stamp; the first stamp is at
+    // or after t0; a send starts after its own stamp. So the i-th send (0-based)
+    // starts ≥ t0 + (i − 1) × spacing — four sends make the last floor 400 ms, which
+    // an ungated batch (all claims in a few ms) cannot reach. The gap between two
+    // fetch STARTS is NOT guaranteed: a worker resumed late after its turn shrinks
+    // the next gap (163 ms once, BACKLOG 2026-11-18) with the gate working as built.
+    const spacing = 200; // maxPerSecond: 5
+    const t0 = Date.now();
     const out = await emailCreatedInvoices(
       fx[0].s.db,
       fx.flatMap((f) => f.created),
-      { apiKey: "re_test", maxPerSecond: 5 } // ≥ 200 ms between starts
+      { apiKey: "re_test", maxPerSecond: 1000 / spacing }
     );
-    assertEquals(out.emailsSent, 3);
-    assertEquals(starts.length, 3);
+    assertEquals(out.emailsSent, 4);
+    assertEquals(starts.length, 4);
+    starts.sort((a, b) => a - b);
     for (let i = 1; i < starts.length; i++) {
-      assert(starts[i] - starts[i - 1] >= 190, `send ${i} started ${starts[i] - starts[i - 1]} ms after the previous`);
+      // −5 ms: Date.now() granularity between the two clocks reads, not slack for the gate.
+      const floor = (i - 1) * spacing;
+      assert(starts[i] - t0 >= floor - 5, `send ${i} started ${starts[i] - t0} ms after t0 (needs ≥ ${floor})`);
     }
   } finally {
     globalThis.fetch = orig;
