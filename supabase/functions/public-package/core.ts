@@ -70,11 +70,17 @@ export function serializePublicPackage(row: {
   lesson_count: number;
   rate_per_lesson: number;
   start_date: string | null;
+  carried_over_start: string | null;
   validity_weeks: number | null;
   status: string;
   paid_claimed_at: string | null;
   tenants: unknown;
 }): PublicPackage {
+  // A package brought in from before SwimSync (PRD §7.16) keeps start_date = the bring-in
+  // day — coverage starts there — but runs from its ORIGINAL start: expiry is
+  // carried_over_start + weeks. Anchor on it so the preview is never LATER than expires_on
+  // (an Extend can still make the real expiry later — the page says "at least").
+  const anchor = row.carried_over_start ?? row.start_date;
   // PostgREST embeds drift between object and one-element array — normalize.
   const tenantRaw = Array.isArray(row.tenants) ? row.tenants[0] : row.tenants;
   const tenant = (tenantRaw ?? {}) as {
@@ -94,8 +100,8 @@ export function serializePublicPackage(row: {
     package_name: row.name,
     lesson_count: row.lesson_count,
     rate: row.rate_per_lesson,
-    start_date: row.start_date,
-    valid_until_preview: validUntilPreview(row.start_date, row.validity_weeks),
+    start_date: anchor,
+    valid_until_preview: validUntilPreview(anchor, row.validity_weeks),
     status: row.status,
     paid_claimed_at: row.paid_claimed_at,
   };
@@ -113,7 +119,7 @@ export async function lookupPackage(
     .from("parent_packages")
     .select(
       // ONE literal, never `+`-joined: a concatenation widens to `string` and loses the row type (§7.106).
-      "reference_number, total_value, amount_payable, discount_amount, name, lesson_count, rate_per_lesson, start_date, validity_weeks, status, paid_claimed_at, tenants(display_name, paynow_uen, paynow_mobile, suspended_at)",
+      "reference_number, total_value, amount_payable, discount_amount, name, lesson_count, rate_per_lesson, start_date, carried_over_start, validity_weeks, status, paid_claimed_at, tenants(display_name, paynow_uen, paynow_mobile, suspended_at)",
     )
     .eq("public_token", token)
     .maybeSingle();

@@ -32,6 +32,7 @@ const ROW = {
   lesson_count: 8,
   rate_per_lesson: 40,
   start_date: "2026-09-01",
+  carried_over_start: null,
   validity_weeks: 4,
   status: "pending",
   paid_claimed_at: null,
@@ -70,6 +71,21 @@ Deno.test("preview: null start or weeks yields null (a parent's own request)", (
   assertEquals(validUntilPreview(null, 4), null);
   assertEquals(validUntilPreview("2026-09-01", null), null);
   assertEquals(validUntilPreview("2026-09-01", 0), null);
+});
+
+// A package brought in from before SwimSync stores start_date = the bring-in day (coverage
+// starts there) but EXPIRES from carried_over_start + weeks (PRD §7.16). Counting from
+// start_date would show a later expiry than the real one — BACKLOG "Carried-over packages".
+Deno.test("serializer: a carried-over package counts from its ORIGINAL start", () => {
+  const p = serializePublicPackage({
+    ...ROW,
+    status: "active",
+    start_date: "2026-11-18", // brought in today
+    carried_over_start: "2026-10-21", // bought 4 weeks earlier
+    validity_weeks: 10,
+  });
+  assertEquals(p.start_date, "2026-10-21");
+  assertEquals(p.valid_until_preview, "2026-12-30"); // 2026-10-21 + 10 weeks, not 2027-01-27
 });
 
 Deno.test("serializer: survives the PostgREST array-embed shape", () => {
