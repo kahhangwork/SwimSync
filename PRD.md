@@ -2230,7 +2230,11 @@ cash paid always equals value granted — nothing to reconcile.
     from it** (a reversed draw still counts); otherwise *"A lesson has already drawn from this package — refund it
     instead."* Holiday/cancel extensions are recomputed for the new child, and the change is audited.
   - **Limits.** A child holding one cannot be moved to another
-    business until it is reassigned, refunded or cancelled. Package emails do not name the child yet (BACKLOG).
+    business until it is reassigned, refunded or cancelled.
+  - **Emails name the child** *(implemented 2026-11-18)*: a one-child package's requested / offered / confirmed
+    emails say whose it is in the subject and body ("…package for Ava Tan is active"); a shared package's emails are
+    unchanged. The `/package/[token]` page stays child-free — it is an unauthenticated link; the email goes to the
+    parent's own inbox. An email already sent keeps the child it named, even after *Change child*.
 - **Scoped by class category** — the business's own grouping of classes ("Group",
   "Private"), spendable at every class in the category including ones added later; a
   package with no category covers all the business's classes (the private-coach shape).

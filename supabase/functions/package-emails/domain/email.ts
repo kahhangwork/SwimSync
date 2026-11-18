@@ -27,7 +27,21 @@ export type PackageEmailData = {
   /** offered only — the admin-set start date and the tokenised pay link */
   startDate?: string | null;
   payUrl?: string | null;
+  /** A ONE-CHILD package's child, so a parent of two knows whose it is; null/absent for
+   *  a shared package, whose email is unchanged. The email goes to the parent's own
+   *  inbox, unlike /package/[token], which stays child-free (unauthenticated link). */
+  childName?: string | null;
 };
+
+/** " for Ava Tan" — plain text, for a subject line. Empty for a shared package. */
+function forChild(d: PackageEmailData): string {
+  return d.childName ? ` for ${d.childName}` : "";
+}
+
+/** " for <strong>Ava Tan</strong>" — escaped, for the body. Empty for a shared package. */
+function forChildHtml(d: PackageEmailData): string {
+  return d.childName ? ` for <strong>${escapeHtml(d.childName)}</strong>` : "";
+}
 
 /** What the family pays — the discounted price, or the full value if none. */
 export function payable(d: PackageEmailData): number {
@@ -164,7 +178,7 @@ function shell(businessName: string, logoUrl: string | null | undefined, body: s
 }
 
 export function buildRequestedSubject(d: PackageEmailData): string {
-  return `Your ${d.businessName} package request — pay ${money(payable(d))} by PayNow`;
+  return `Your ${d.businessName} package request${forChild(d)} — pay ${money(payable(d))} by PayNow`;
 }
 
 export function buildRequestedHtml(d: PackageEmailData): string {
@@ -174,7 +188,7 @@ export function buildRequestedHtml(d: PackageEmailData): string {
     `<h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Almost there — pay by PayNow</h1>
      <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Hi ${escapeHtml(d.parentName)}, you've requested
-       <strong>${escapeHtml(d.packageName)}</strong> from
+       <strong>${escapeHtml(d.packageName)}</strong>${forChildHtml(d)} from
        ${escapeHtml(d.businessName)} — ${d.lessonCount} lessons at
        ${escapeHtml(money(d.ratePerLesson))} each.
      </p>
@@ -190,7 +204,7 @@ export function buildRequestedHtml(d: PackageEmailData): string {
 }
 
 export function buildConfirmedSubject(d: PackageEmailData): string {
-  return `Your ${d.businessName} package is active — ${d.lessonCount} lessons`;
+  return `Your ${d.businessName} package${forChild(d)} is active — ${d.lessonCount} lessons`;
 }
 
 export function buildConfirmedHtml(d: PackageEmailData): string {
@@ -200,7 +214,7 @@ export function buildConfirmedHtml(d: PackageEmailData): string {
     `<h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Your package is active</h1>
      <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Hi ${escapeHtml(d.parentName)}, ${escapeHtml(d.businessName)} has
-       confirmed your payment. <strong>${escapeHtml(d.packageName)}</strong>
+       confirmed your payment. <strong>${escapeHtml(d.packageName)}</strong>${forChildHtml(d)}
        is now active:
      </p>
      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
@@ -241,7 +255,7 @@ export function buildConfirmedHtml(d: PackageEmailData): string {
 }
 
 export function buildOfferedSubject(d: PackageEmailData): string {
-  return `Your next ${d.businessName} swim package is ready to pay`;
+  return `Your next ${d.businessName} swim package${forChild(d)} is ready to pay`;
 }
 
 export function buildOfferedHtml(d: PackageEmailData): string {
@@ -252,7 +266,7 @@ export function buildOfferedHtml(d: PackageEmailData): string {
     `<h1 style="margin:0 0 12px;font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;color:#0a0a0a;">Your next package is ready</h1>
      <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#525252;">
        Hi ${escapeHtml(d.parentName)}, ${escapeHtml(d.businessName)} has
-       prepared your next package — <strong>${escapeHtml(d.packageName)}</strong>,
+       prepared your next package — <strong>${escapeHtml(d.packageName)}</strong>${forChildHtml(d)},
        ${d.lessonCount} lessons at ${escapeHtml(money(d.ratePerLesson))} each.
      </p>
      <p style="margin:0 0 16px;font-size:24px;font-weight:600;color:#0a0a0a;font-variant-numeric:tabular-nums;">${escapeHtml(money(payable(d)))}</p>

@@ -138,6 +138,7 @@ Deno.test("package: the email data — numbers coerced, pay URL from the token, 
     expiresOn: "2027-03-01",
     startDate: "2026-12-01",
     payUrl: "https://swimsync.sg/package/0123456789abcdef0123456789abcdef",
+    childName: null, // a shared package (no student embed) names no child
   });
   const bare = pkg({ public_token: null, amount_payable: null, discount_amount: null, expires_on: null, start_date: null });
   const d = packageEmailData(bare, undefined, undefined, "https://swimsync.sg");
@@ -153,4 +154,22 @@ Deno.test("package: each type gets its own subject and HTML builder; anything el
   assertEquals(packageEmailContent("requested", data), { subject: buildRequestedSubject(data), html: buildRequestedHtml(data) });
   assertEquals(packageEmailContent("offered", data), { subject: buildOfferedSubject(data), html: buildOfferedHtml(data) });
   assertEquals(packageEmailContent("confirmed", data), { subject: buildConfirmedSubject(data), html: buildConfirmedHtml(data) });
+});
+
+// Name the child in package emails (BACKLOG, 2026-11-18). A one-child package embeds its
+// student via students!student_id (RISK 13 form); a shared one has student_id NULL.
+Deno.test("package: a ONE-CHILD package names its child; object and array embeds agree", () => {
+  const { parentProfile, tenant } = packageEmailParties(pkg());
+  const obj = packageEmailData(pkg({ students: { full_name: "Ava Tan" } }), parentProfile, tenant, "https://swimsync.sg");
+  const arr = packageEmailData(pkg({ students: [{ full_name: "Ava Tan" }] }), parentProfile, tenant, "https://swimsync.sg");
+  assertEquals(obj.childName, "Ava Tan");
+  assertEquals(arr.childName, "Ava Tan");
+});
+
+Deno.test("package: a shared package (null embed) or a blank name names NO child", () => {
+  const { parentProfile, tenant } = packageEmailParties(pkg());
+  for (const students of [null, undefined, [], { full_name: null }, { full_name: "   " }]) {
+    const d = packageEmailData(pkg({ students }), parentProfile, tenant, "https://swimsync.sg");
+    assertEquals(d.childName, null, JSON.stringify(students));
+  }
 });

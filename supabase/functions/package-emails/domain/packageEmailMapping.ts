@@ -64,6 +64,13 @@ export function packageEmailParties(pkg: PackageRow) {
 
 type Parties = ReturnType<typeof packageEmailParties>;
 
+/** A one-child package's child (PRD §7.16 single-child packages), or null for a shared
+ *  one (student_id NULL → no embed). Same object-or-array normalising as the parties. */
+export function packageChildName(pkg: PackageRow): string | null {
+  const student = Array.isArray(pkg.students) ? pkg.students[0] : pkg.students;
+  return student?.full_name?.trim() || null;
+}
+
 export function packageEmailData(
   pkg: PackageRow,
   parentProfile: Parties["parentProfile"],
@@ -85,6 +92,7 @@ export function packageEmailData(
       payUrl: pkg.public_token
         ? `${APP_URL}/package/${pkg.public_token}`
         : null,
+      childName: packageChildName(pkg),
     };
   return data;
 }

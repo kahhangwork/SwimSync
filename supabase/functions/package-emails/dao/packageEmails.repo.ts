@@ -21,7 +21,7 @@ export function readPackage(svc: ServiceDb, package_id: string) {
   return svc
       .from("parent_packages")
       .select(
-        "id, status, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, expires_on, start_date, validity_weeks, public_token, offered_by, tenant_id, parents(profile_id, profiles(full_name, email)), tenants(display_name, logo_url)"
+        "id, status, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, expires_on, start_date, validity_weeks, public_token, offered_by, tenant_id, parents(profile_id, profiles(full_name, email)), tenants(display_name, logo_url), students!student_id(full_name)"
       )
       .eq("id", package_id)
       .maybeSingle();

@@ -268,3 +268,44 @@ Deno.test("package emails: every variant is email-safe and complete", () => {
     assertEmailSafe(html, [...amounts, 'href="https://swimsync.sg"', "Coastal Swim School"]);
   }
 });
+
+// ── Name the child in package emails (BACKLOG, 2026-11-18) ───────────────────────
+// A parent with two children must be able to tell whose one-child package an email is
+// about. A SHARED package's email stays byte-for-byte as before (the exact-subject
+// tests above pin that, since `base` carries no childName).
+const forAva: PackageEmailData = { ...base, childName: "Ava Tan" };
+
+Deno.test("one-child package: every subject names the child", () => {
+  assertEquals(
+    buildRequestedSubject(forAva),
+    "Your Coastal Swim School package request for Ava Tan — pay S$400.00 by PayNow",
+  );
+  assertEquals(
+    buildConfirmedSubject(forAva),
+    "Your Coastal Swim School package for Ava Tan is active — 10 lessons",
+  );
+  assertEquals(
+    buildOfferedSubject(forAva),
+    "Your next Coastal Swim School swim package for Ava Tan is ready to pay",
+  );
+});
+
+Deno.test("one-child package: every body names the child after the package name", () => {
+  for (const html of [buildRequestedHtml(forAva), buildConfirmedHtml(forAva), buildOfferedHtml(forAva)]) {
+    assertStringIncludes(html, "<strong>10 Group Lessons</strong> for <strong>Ava Tan</strong>");
+  }
+});
+
+Deno.test("shared package: no body says 'for' a child", () => {
+  for (const d of [base, { ...base, childName: null }]) {
+    for (const html of [buildRequestedHtml(d), buildConfirmedHtml(d), buildOfferedHtml(d)]) {
+      assert(!html.includes("</strong> for <strong>"), "a shared package named a child");
+    }
+  }
+});
+
+Deno.test("the child's name is escaped in the body", () => {
+  const html = buildConfirmedHtml({ ...base, childName: "<b>Ava</b> & co" });
+  assertStringIncludes(html, "&lt;b&gt;Ava&lt;/b&gt; &amp; co");
+  assert(!html.includes("<b>Ava</b>"));
+});

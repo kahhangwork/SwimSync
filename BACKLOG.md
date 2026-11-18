@@ -295,7 +295,7 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 #### Wave 9 — set 2026-10-10 with the user
 
 7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
-   user added D11 — one kind per family — during the build). Follow-up filed: *Name the child in package emails* (S).
+   user added D11 — one kind per family — during the build). Follow-up ~~*Name the child in package emails*~~ shipped 2026-11-18.
 8. ~~*UI/UX improvements*~~ — **shipped 2026-10-14** (UI restyle Phases 0–7; DESIGN.md adopted). What it left open:
    *UI restyle leftovers* (S each).
 9. ~~*Remove the legacy package matcher*~~ — **shipped 2026-10-13** (engine v36 + `20261013000100`; the D9 guard went
@@ -1118,17 +1118,10 @@ activation trigger and update that case.
   never shared today (no offer, no email, no pay link for an active row); if any surface ever links one, anchor that
   preview on `carried_over_start` first (an Edge Function deploy). Plan: `docs/plans/CARRIED_OVER_PACKAGES_PLAN.md` Step 4.
 
-### Name the child in package emails — **S** — _filed 2026-10-11, follow-up of Single-child packages_
-The `package-emails` Edge Function (requested / offered / confirmed) names the family, never the child. For a
-one-child package the email should say whose it is ("5 lessons for Ava"), the way the app and admin now do.
-
-**Why:** single-child packages (PRD §7.16) deliberately left the emails alone — a git push does not deploy an Edge
-Function, and that build deployed none (plan RISK 8). A parent with two children who receives "your package is
-confirmed" cannot tell which child it covers.
-
-**Notes:** read `parent_packages.student_id` → `students.full_name` in the function (service role; no new grant).
-The `/package/[token]` public page stays child-free by rule (no child names to an unauthenticated link) — decide
-whether the email may name the child when the link may not. Needs `supabase functions deploy package-emails`.
+### ~~Name the child in package emails~~ — **S** — **DONE 2026-11-18** (PRD §7.16)
+`package-emails` reads `students!student_id(full_name)`; a one-child package's requested / offered / confirmed email
+names the child in subject and body, a shared one is unchanged. Decided: the EMAIL may name the child (it goes to the
+parent's own inbox); `/package/[token]` stays child-free. Deployed with `supabase functions deploy package-emails`.
 
 ### Simplify the admin's live-balance display — **S** — _filed 2026-10-13, follow-up of Remove the legacy package matcher_
 `package_live_balances()` now returns the stored balance as its "live" one (`20261013000100`), so the admin's
