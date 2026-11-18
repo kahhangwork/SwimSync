@@ -1,10 +1,20 @@
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Button } from "@/components/Button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatSgStamp } from "@/lib/lessonDates";
 import { DMY } from "../constants";
+import { canVoidReferral } from "../domain/referralRows";
 import type { Referral } from "../types";
 
-export function ReferralsSection({ referrals }: { referrals: Referral[] }) {
+export function ReferralsSection({
+  referrals,
+  busy,
+  onVoid,
+}: {
+  referrals: Referral[];
+  busy: boolean;
+  onVoid: (id: string) => void;
+}) {
   return (
     <section className="mb-8">
       <h2 className="text-headline font-semibold text-ink mb-2">Referrals</h2>
@@ -13,7 +23,7 @@ export function ReferralsSection({ referrals }: { referrals: Referral[] }) {
       ) : (
         <Table>
           <Thead>
-            <Th>Referrer</Th><Th>Friend</Th><Th>Joined</Th><Th>Status</Th><Th>Converted</Th>
+            <Th>Referrer</Th><Th>Friend</Th><Th>Joined</Th><Th>Status</Th><Th>Converted</Th><Th>{""}</Th>
           </Thead>
           <Tbody>
             {referrals.map((r) => (
@@ -27,6 +37,15 @@ export function ReferralsSection({ referrals }: { referrals: Referral[] }) {
                     : "Pending"} />
                 </Td>
                 <Td>{r.converted_at ? formatSgStamp(r.converted_at, DMY) : "—"}</Td>
+                <Td>
+                  {/* "Void referral", never bare "Void": the Rewards table's Void voids only a
+                      reward and leaves the referral pending (plan RISK 7). */}
+                  {canVoidReferral(r) && (
+                    <Button variant="danger" size="sm" onClick={() => onVoid(r.id)} disabled={busy}>
+                      Void referral
+                    </Button>
+                  )}
+                </Td>
               </Tr>
             ))}
           </Tbody>

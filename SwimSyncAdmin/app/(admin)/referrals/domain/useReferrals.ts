@@ -107,11 +107,27 @@ export function useReferrals() {
     else load();
   }
 
+  // Void a PENDING referral — the exit from the Packages page's "Bring in package"
+  // refusal (CARRIED_OVER_REFERRAL_BLOCK_PLAN). The prompt names both consequences:
+  // the family's unused first-package discount goes with it, and it cannot be undone.
+  async function voidReferral(id: string) {
+    const reason = window.prompt(
+      "Reason for voiding this referral? This also voids their unused first-package discount and cannot be undone.",
+    );
+    if (reason === null) return; // cancelled — send nothing
+    setBusy(true);
+    setError(null);
+    const { error } = await rpc.voidReferral({ p_referral_id: id, p_reason: reason.trim() });
+    setBusy(false);
+    if (error) setError(error.message);
+    else load();
+  }
+
   return {
     loading, error,
     settings, setSettings, saving, saveSettings,
     memberships, referrals, rewards,
     grantModal, setGrantModal, grantParent, setGrantParent, grantReason, setGrantReason,
-    busy, toggleCode, grant, voidReward,
+    busy, toggleCode, grant, voidReward, voidReferral,
   };
 }

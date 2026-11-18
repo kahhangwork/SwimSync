@@ -1,7 +1,8 @@
 // Postgres function calls for the Referrals page. ⚠ ORCHESTRATE, NEVER REPLACE:
 // each wrapper passes its argument object THROUGH to supabase.rpc and computes
 // nothing. The RPCs enforce the real rules (admin-gating; void refused on a
-// claimed package — RISK 6); this layer must not pre-empt, default, or reshape
+// claimed package — RISK 6; void_referral voids a pending referral + its
+// unused first-package discount, atomically); this layer must not pre-empt, default, or reshape
 // them. Every args type is hand-written with all keys REQUIRED, and asserted
 // against the generated Args so a renamed param is a compile error (§7.345).
 import { supabase } from "@/lib/supabase";
@@ -26,4 +27,10 @@ export type VoidReferralRewardArgs = { p_reward_id: string; p_reason: string };
 type _CheckVoidReward = Assert<Extends<VoidReferralRewardArgs, Rpc<"void_referral_reward">["Args"]>>;
 export function voidReferralReward(args: VoidReferralRewardArgs) {
   return supabase.rpc("void_referral_reward", args);
+}
+
+export type VoidReferralArgs = { p_referral_id: string; p_reason: string };
+type _CheckVoidReferral = Assert<Extends<VoidReferralArgs, Rpc<"void_referral">["Args"]>>;
+export function voidReferral(args: VoidReferralArgs) {
+  return supabase.rpc("void_referral", args);
 }

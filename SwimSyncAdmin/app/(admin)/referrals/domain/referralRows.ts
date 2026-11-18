@@ -47,3 +47,9 @@ export function displayStatus(r: Reward): string {
   }
   return r.status;
 }
+
+/** Only a PENDING referral can be voided (void_referral refuses the rest). The
+ *  UI reads only this — CARRIED_OVER_REFERRAL_BLOCK_PLAN Step 2. */
+export function canVoidReferral(r: Pick<Referral, "status">): boolean {
+  return r.status === "pending";
+}

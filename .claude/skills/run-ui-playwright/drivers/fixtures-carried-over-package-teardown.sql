@@ -4,7 +4,7 @@
 --     < .claude/skills/run-ui-playwright/drivers/fixtures-carried-over-package-teardown.sql
 --
 -- Everything lives in ONE business (c0a00000-…0001). ATTENDANCE FIRST (a delete returns its draw to the package,
--- which must still exist); refunds before packages; parent_packages before students. The fixture runs this block.
+-- which must still exist); refunds before packages; referral rows before packages (a reserved reward points at one); parent_packages before students. The fixture runs this block.
 
 \set ON_ERROR_STOP on
 BEGIN;
@@ -17,6 +17,8 @@ DELETE FROM package_cancel_extensions  WHERE parent_package_id IN (SELECT id FRO
 DELETE FROM package_extension_events   WHERE parent_package_id IN (SELECT id FROM parent_packages WHERE tenant_id::text LIKE 'c0a00000-%');
 DELETE FROM lesson_sessions       WHERE class_id::text LIKE 'c0a00000-%';
 DELETE FROM student_class_enrolments WHERE student_id::text LIKE 'c0a00000-%';
+DELETE FROM referral_rewards      WHERE tenant_id::text LIKE 'c0a00000-%';
+DELETE FROM referrals             WHERE tenant_id::text LIKE 'c0a00000-%';
 DELETE FROM parent_packages       WHERE tenant_id::text LIKE 'c0a00000-%';
 UPDATE tenants SET owner_profile_id = NULL, default_package_product_id = NULL WHERE id::text LIKE 'c0a00000-%';
 DELETE FROM package_products      WHERE tenant_id::text LIKE 'c0a00000-%';

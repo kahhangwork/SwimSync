@@ -2,7 +2,7 @@
 // the derived "expired" status as they were inline on referrals/page.tsx. They
 // pin existing behaviour, so §7.25's prove-it-red rule does not apply.
 import { describe, it, expect } from "vitest";
-import { displayStatus, toMemberships, toReferrals, toRewards } from "./referralRows";
+import { canVoidReferral, displayStatus, toMemberships, toReferrals, toRewards } from "./referralRows";
 import type { Reward } from "../types";
 
 describe("toMemberships", () => {
@@ -56,5 +56,15 @@ describe("displayStatus (RISK 14 — derived, no write)", () => {
   });
   it("a non-available reward is never relabelled, even past expiry", () => {
     expect(displayStatus({ ...base, status: "used", expires_at: "2000-01-01T00:00:00Z" })).toBe("used");
+  });
+});
+
+// canVoidReferral — NEW (CARRIED_OVER_REFERRAL_BLOCK_PLAN Step 2), so §7.25 applies:
+// proven red by flipping it to `r.status !== "converted"` (the "void" case fails).
+describe("canVoidReferral", () => {
+  it("only a PENDING referral can be voided", () => {
+    expect(canVoidReferral({ status: "pending" })).toBe(true);
+    expect(canVoidReferral({ status: "converted" })).toBe(false);
+    expect(canVoidReferral({ status: "void" })).toBe(false);
   });
 });

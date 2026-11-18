@@ -10,6 +10,10 @@
 //   • a lesson marked TODAY draws from it (6 → 5);
 //   • Parent app → Billing → Packages: "5 lessons remaining", "S$150.00 of S$300.00" — an ordinary card (D4);
 //   • Admin cancels it → Refund is offered (RISK 6), the ceiling is the value left, and a S$150 refund records.
+//   • A family that joined with a REF- code (COP Referred, PENDING referral) is REFUSED, inline in the modal; the admin
+//     voids the referral on /referrals (prompt answered explicitly: dismiss = nothing, accept = void + its discount);
+//     the bring-in then succeeds (CARRIED_OVER_REFERRAL_BLOCK_PLAN, 20261118000400). COP Parent — the REFERRER — was
+//     brought in above without a refusal (decision 3).
 //
 // Setup:
 //   cd SwimSyncAdmin && npm run dev            # :3000
@@ -117,6 +121,60 @@ try {
   check("the S$150 refund recorded",
     sql(`SELECT count(*) || '|' || COALESCE(sum(amount), 0) FROM package_refunds WHERE tenant_id = '${TENANT}' AND reversed_at IS NULL`) === "1|150.00");
   await page.screenshot({ path: `${SHOT}/cop-admin.png`, fullPage: true });
+
+  // ── A referred family is refused, the admin voids the referral, the bring-in then succeeds ──────────────────────
+  const REF = "c0a00000-0000-0000-0000-0000000004e1";
+  const refState = () =>
+    sql(`SELECT r.status || '|' || COALESCE(r.void_reason, '') || '|' || rr.status
+           FROM referrals r JOIN referral_rewards rr ON rr.referral_id = r.id WHERE r.id = '${REF}'`);
+  const bringIn = async (family) => {
+    await page.goto(`${ADMIN}/packages`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(2000);
+    await tap(page.getByRole("button", { name: "Record a sale", exact: true }), "Record a sale");
+    await tap(modal.getByTestId("sale-carried-toggle"), "Existing package toggle");
+    await modal.locator("select").first().selectOption({ label: family });
+    await modal.locator("select").nth(1).selectOption({ label: "COP Ten — S$300.00" });
+    await page.waitForTimeout(800);
+    await modal.getByLabel("Original start date").fill(origStart);
+    await modal.getByLabel(/Lessons remaining/).fill("4");
+    await tap(modal.getByRole("button", { name: "Bring in package", exact: true }), "Bring in package");
+    await page.waitForTimeout(2500);
+  };
+  const referredPkgs = () =>
+    sql(`SELECT count(*) FROM parent_packages pp JOIN parents p ON p.id = pp.parent_id
+          WHERE p.profile_id = 'c0a00000-0000-0000-0000-0000000000f2'`);
+
+  check("precondition: COP Referred's referral is pending, its discount unused", refState() === "pending||available", refState());
+  await bringIn("COP Referred");
+  m = await modal.innerText();
+  check("a referred family's bring-in is refused, inline, naming Void referral",
+    /This family joined with a referral code\. Void their referral on the Referrals page \(Void referral\)/.test(m), m.slice(0, 600));
+  check("...and nothing was brought in", referredPkgs() === "0");
+
+  await page.goto(`${ADMIN}/referrals`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(2000);
+  const voidBtn = page.locator("tr", { hasText: "COP Referred" }).getByRole("button", { name: "Void referral", exact: true });
+  check("the pending referral row offers Void referral", (await voidBtn.count()) === 1);
+  // §7.279 — launch() auto-accepts every dialog; answer this prompt explicitly instead.
+  page.removeAllListeners("dialog");
+  let promptText = "";
+  page.once("dialog", (d) => { promptText = d.message(); d.dismiss().catch(() => {}); });
+  await tap(voidBtn, "Void referral (dismiss)");
+  await page.waitForTimeout(1500);
+  check("the prompt names both consequences", /first-package discount/.test(promptText) && /cannot be undone/.test(promptText), promptText);
+  check("dismissing the prompt changes nothing", refState() === "pending||available", refState());
+  page.once("dialog", (d) => d.accept("Existing customer").catch(() => {}));
+  await tap(voidBtn, "Void referral (accept)");
+  await page.waitForTimeout(2500);
+  check("accepting voids the referral AND its unused discount, with the reason", refState() === "void|Existing customer|void", refState());
+  const rowText = await page.locator("tr", { hasText: "COP Referred" }).first().innerText();
+  check("the row reads Void · Existing customer, with no Void referral button left",
+    /Void · Existing customer/.test(rowText) && !/Void referral/.test(rowText), rowText);
+  page.on("dialog", (d) => d.accept().catch(() => {}));
+
+  await bringIn("COP Referred");
+  check("after the void, the same bring-in succeeds", referredPkgs() === "1", referredPkgs());
+  await page.screenshot({ path: `${SHOT}/cop-referred.png`, fullPage: true });
 } catch (e) {
   // §7.79 — a crash is a failed check, so it goes through the same tally.
   check(`the driver ran to completion — it crashed: ${e.message}`, false, String(e.stack ?? e).slice(0, 400));

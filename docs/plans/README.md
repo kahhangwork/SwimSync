@@ -17,7 +17,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 
 | Plan | Status | What it is |
 |---|---|---|
-| CARRIED_OVER_REFERRAL_BLOCK_PLAN.md | NOT STARTED (written 2026-11-18) | Refuse a bring-in for a family with a pending referral; a **Void referral** admin action as the exit |
+| CARRIED_OVER_REFERRAL_BLOCK_PLAN.md | DONE — 2026-11-19 (migration 20261118000400 + admin Void referral) | Refuse a bring-in for a family with a pending referral; a **Void referral** admin action as the exit |
 | CARRIED_OVER_PACKAGES_PLAN.md | DONE — live 2026-11-18 (§8.169, DEPLOYMENT #110) | Bring in a package bought before SwimSync — lessons remaining as of today, original start → expiry, S$0 revenue, refundable to value left (Little Orcas feedback #2) |
 | BILLING_ENGINE_SPEED.md | DONE — deployed 2026-11-17 (engine v40, DEPLOYMENT #106) | Measured the 30 s October run (≈300 ms/round trip, iad1 ↔ SG), batched engine reads, Resend rate cap, `billing_runs.duration_ms`; byte-identical proof |
 | ROLES_PERMISSIONS_PLAN.md | DONE (§8.131, deploy #58; P5 half — see BACKLOG) | Wave 1 lane 1 — owner-defined roles × 8 areas × None/View/Edit |

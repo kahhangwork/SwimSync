@@ -5,7 +5,8 @@
 // relationships), REWARDS (the queue; "expired" is computed here from
 // expires_at — RISK 14, no DEFINER write on load), and FAMILY CODES (disable a
 // leaked REF- code — RISK 15). Admin actions: Grant a goodwill reward, Void an
-// unused one (refused on a claimed package — RISK 6).
+// unused one (refused on a claimed package — RISK 6), Void a pending referral
+// (CARRIED_OVER_REFERRAL_BLOCK_PLAN — the exit from Bring in package's refusal).
 //
 // The discount is a PRICE concept: it changes what a family pays, never a
 // package's value (D14). Nothing here recomputes a price — the pay flow lives
@@ -44,7 +45,7 @@ export default function ReferralsPage() {
       )}
 
       {/* ── Referrals ────────────────────────────────────────────────── */}
-      <ReferralsSection referrals={r.referrals} />
+      <ReferralsSection referrals={r.referrals} busy={r.busy} onVoid={r.voidReferral} />
 
       {/* ── Rewards queue ────────────────────────────────────────────── */}
       <RewardsSection rewards={r.rewards} busy={r.busy} onVoid={r.voidReward} />

@@ -2285,7 +2285,10 @@ cash paid always equals value granted — nothing to reconcile.
   no reward and converts no referral; no purchase email is sent. If a lesson was already marked **today**, the usual
   *Draw from package / Keep as ad-hoc* question follows. A family's open offer for the same audience is cancelled
   (the form warns first). Refused: 0 or more than N lessons, a future original start, a package already expired, a
-  retired product, a family not at this business, and the same package brought in twice. The held row shows the
+  retired product, a family not at this business, the same package brought in twice, and *(implemented 2026-11-19)* a
+  family that joined with a friend's `REF-` code whose referral is still **pending** — an existing customer, not a
+  referral: the message sends the admin to **Referrals → Void referral** first. A family that only *referred* others
+  is not refused. This is the last check, so any other refusal is shown first. The held row shows the
   original start with *Brought in DD Mon · N left then*; the parent sees an ordinary package. **Refund** stays
   available once it is cancelled, capped at **the value left on the package** (not "what the family paid", which is
   S$0) — so a lesson already taught in SwimSync cannot be refunded. Backdating attendance before the marking floor
@@ -2423,7 +2426,10 @@ cash paid always equals value granted — nothing to reconcile.
   **referrer's** reward can **expire** (tenant-set days from earn date, or never); the friend's
   first-package discount does not. Configured on a dedicated **Referrals** admin page
   (enable/type/value/expiry, the referrals + rewards lists, and actions to **Grant** a goodwill
-  reward, **Void** an unused one — refused once the family has paid — and **Disable** a leaked
+  reward, **Void** an unused one — refused once the family has paid — **Void referral** on a pending referral
+  *(implemented 2026-11-19)* — it also voids that family's unused first-package discount (an unpaid offer returns to
+  full price), is refused if that discount sits on a package the family has already marked paid, and cannot be
+  undone; the parent sees the referral as not eligible, never the reason — and **Disable** a leaked
   code); the discount shows on the Packages page, the offer/pay page and the confirmation the
   admin ticks against the bank, all from **one** price source so the preview, the WhatsApp
   price and the pay-page headline always agree. A referral whose friend shares a **student,

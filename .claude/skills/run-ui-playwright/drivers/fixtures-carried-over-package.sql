@@ -7,6 +7,9 @@
 -- ONE business, "COP Swim", owner cop-owner@swimsync.test (tenant admin AND coach).
 --   Product "COP Ten" — shared, 10 × $30, 10 weeks.
 --   COP Parent — Ava Cop, in "COP Dolphins" (TODAY's weekday) from T−42. NO package: the driver brings one in.
+--   COP Referred — no child, no package; joined with COP Parent's REF- code: a PENDING referral + its unused
+--     referee_first reward. Bringing in their package is REFUSED until the admin voids the referral
+--     (docs/plans/CARRIED_OVER_REFERRAL_BLOCK_PLAN.md, 20261118000400). COP Parent is then a REFERRER — still allowed.
 --
 -- Dates: every one derived from app_today() (§7.94, §7.305). T−42 is an enrolment/package start only — no lesson
 -- before today is marked, so markable_floor never matters here.
@@ -24,6 +27,8 @@ DELETE FROM package_cancel_extensions  WHERE parent_package_id IN (SELECT id FRO
 DELETE FROM package_extension_events   WHERE parent_package_id IN (SELECT id FROM parent_packages WHERE tenant_id::text LIKE 'c0a00000-%');
 DELETE FROM lesson_sessions       WHERE class_id::text LIKE 'c0a00000-%';
 DELETE FROM student_class_enrolments WHERE student_id::text LIKE 'c0a00000-%';
+DELETE FROM referral_rewards      WHERE tenant_id::text LIKE 'c0a00000-%';
+DELETE FROM referrals             WHERE tenant_id::text LIKE 'c0a00000-%';
 DELETE FROM parent_packages       WHERE tenant_id::text LIKE 'c0a00000-%';
 UPDATE tenants SET owner_profile_id = NULL, default_package_product_id = NULL WHERE id::text LIKE 'c0a00000-%';
 DELETE FROM package_products      WHERE tenant_id::text LIKE 'c0a00000-%';
@@ -63,7 +68,8 @@ SELECT '00000000-0000-0000-0000-000000000000', u.id::uuid, 'authenticated', 'aut
   FROM (VALUES
     ('c0a00000-0000-0000-0000-0000000000a1', 'cop-owner@swimsync.test',
      '{"full_name":"COP Owner","role":"tenant_admin","is_coach":true,"tenant_id":"c0a00000-0000-0000-0000-000000000001"}'),
-    ('c0a00000-0000-0000-0000-0000000000f1', 'cop-parent@swimsync.test', '{"full_name":"COP Parent","role":"parent"}')
+    ('c0a00000-0000-0000-0000-0000000000f1', 'cop-parent@swimsync.test', '{"full_name":"COP Parent","role":"parent"}'),
+    ('c0a00000-0000-0000-0000-0000000000f2', 'cop-referred@swimsync.test', '{"full_name":"COP Referred","role":"parent"}')
   ) AS u(id, email, meta);
 UPDATE tenants SET owner_profile_id = 'c0a00000-0000-0000-0000-0000000000a1' WHERE id = 'c0a00000-0000-0000-0000-000000000001';
 
@@ -100,5 +106,14 @@ BEGIN
     RAISE EXCEPTION 'cop fixture: a package already exists';
   END IF;
 END $$;
+
+-- COP Referred joined with COP Parent's code → a PENDING referral + the unused first-package reward.
+INSERT INTO referrals (id, tenant_id, referrer_parent_id, referee_parent_id, code_used)
+SELECT 'c0a00000-0000-0000-0000-0000000004e1', 'c0a00000-0000-0000-0000-000000000001', r.id, e.id, 'REF-COPXX'
+  FROM parents r, parents e
+ WHERE r.profile_id = 'c0a00000-0000-0000-0000-0000000000f1' AND e.profile_id = 'c0a00000-0000-0000-0000-0000000000f2';
+INSERT INTO referral_rewards (tenant_id, parent_id, kind, referral_id)
+SELECT 'c0a00000-0000-0000-0000-000000000001', e.id, 'referee_first', 'c0a00000-0000-0000-0000-0000000004e1'
+  FROM parents e WHERE e.profile_id = 'c0a00000-0000-0000-0000-0000000000f2';
 
 COMMIT;

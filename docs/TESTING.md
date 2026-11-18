@@ -1824,6 +1824,21 @@ until a reset, so this caution stands.
 - **Flake to watch:** one unnamed admin vitest failure in 5 full runs on `d98cc46` + lane 2 (929 tests), not
   reproduced in 4 reruns (lane 2). If it recurs, capture the name before rerunning.
 
+### 2026-11-19 — a referred family cannot be brought in; Void referral (CARRIED_OVER_REFERRAL_BLOCK_PLAN)
+
+- **pgTAP** new `carried_over_referral_block.test.sql` (36): the bring-in refusal and that it is the LAST check
+  (expired / lessons / which-child answer first); converted / void / referrer-only families allowed; `void_referral`
+  authorization (parent, coach, packages:view staff, other business, anon), pending-only, voids the referral + its
+  unused referee_first reward together, price restore on an unpaid offer, refusal on a paid-claimed one, an
+  already-void reward skipped, referrer + manual rewards untouched, the audit row's tenant, no conversion afterwards.
+  Red on the pre-migration schema; mutations M1–M5 each red. `carried_over_packages.test.sql` 20–23 rewritten
+  (Fay: converted referral + manual reward; still 52; its M5 re-proven red).
+- **vitest** `referralRows.test.ts` (+1 `canVoidReferral`), new `ui/ReferralsSection.test.tsx` (3),
+  new `domain/useReferrals.voidReferral.test.ts` (3); five mutations each red.
+- **Driver** `verify-carried-over-package` +9 (20): a referred family refused inline → Void referral on `/referrals`
+  (prompt dismissed = nothing; accepted = referral + discount void) → bring-in succeeds. Fixture adds COP Referred +
+  a pending referral. `verify-referrals` (13) and `verify-money-admin` (44) re-run green.
+
 ### 2026-11-18 (later) — grep -q guard, spacing test, engine facades, calendar fill (§8.172)
 
 - **CI `repo-invariants`** runs `scripts/check-grep-q-pipefail.sh` (§7.339 promoted): every tracked `*.sh` setting
