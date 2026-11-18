@@ -1737,16 +1737,6 @@ then passed 8/8 alone and in the next run.
 worker resumed late shrinks the next gap. Either assert the spacing at the gate, or stamp `lastResendStart` at the
 send — the latter changes behaviour, so it needs a bench run (P2 dumps request counts, not timing).
 
-### A CI grep for `| grep -q` in pipefail scripts — **S** — _filed 2026-11-16 (§7.339 promotion)_
-Fail `repo-invariants` when a `.sh` file that sets `pipefail` pipes into `grep -q` (or `grep -qF`/`-qE`).
-
-**Why:** §7.339 has bitten twice — G1's first draft (2026-10-06) and `scripts/watch-deploy.sh`'s first draft
-(2026-11-16) — each time a MATCH reported as a miss, which a check reads as "not there" and passes or fails wrongly.
-The note did not stop the second; a grep that fires without anyone reading would.
-
-**Notes:** the safe forms are `grep -q PAT <(cmd)`, a here-string of a captured variable, or `grep -m1`. Scope it to
-`scripts/` and `.claude/skills/**/drivers/*.sh`; prove it red on a planted line before wiring it in (§7.25).
-
 ### `pressByText` should press a link itself, not its wrapper — **S** — _filed 2026-11-12 (§7.382)_
 `drivers/lib.mjs` `pressByText` dispatches on the matched leaf's `parentElement`. An expo-router `<Link>` IS the leaf
 (its text is its own), so the click lands on the wrapper and nothing navigates.

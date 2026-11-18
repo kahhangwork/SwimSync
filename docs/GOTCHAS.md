@@ -47,7 +47,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
 `supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` · §7.302 → `drivers/check-driver-dates.sh` + `scripts/check-sept.sh` + `sg_date_label.test.sql` · §7.303/§7.305 → `scripts/check-test-dates.sh` · §7.7 (functions) → `scripts/check-functions-sg-date.sh` · §7.7 (apps) → `scripts/check-apps-sg-date.sh` · raw clock reads → `scripts/check-migration-clock.sh` + the frozen census in `app_clock.test.sql` · driver/fixture clock reads → `drivers/check-driver-clock.sh` ·
-§7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic) · §7.350/§7.347 → G5 `scripts/check-db-types.sh` · §7.346 → `scripts/check-db-overrides.sh` · §7.348 → `scripts/check-runtime-identical.sh` (CI, per `types(…)` commit) · casts regrowing → G6 `scripts/check-db-any.sh`.
+§7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic) · §7.350/§7.347 → G5 `scripts/check-db-types.sh` · §7.346 → `scripts/check-db-overrides.sh` · §7.348 → `scripts/check-runtime-identical.sh` (CI, per `types(…)` commit) · casts regrowing → G6 `scripts/check-db-any.sh` · §7.339 → `scripts/check-grep-q-pipefail.sh`.
 
 ---
 
@@ -2855,6 +2855,8 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       reported a 2 MB bundle that DID carry the string as "not this build". Found only because the string had been
       grepped by hand minutes earlier. Fix: download into a variable, then grep a here-string. **Promotion filed** as a
       BACKLOG S-item (a CI grep for `| grep -q` in pipefail scripts) — bitten twice, the note alone has failed.
+    - **Promoted (2026-11-18):** `scripts/check-grep-q-pipefail.sh` in CI `repo-invariants` — every tracked `*.sh` that
+      sets pipefail. Its first run found two live instances (`check-visual-only.sh` (e), `block-git-stash.sh`), both fixed.
 
 340. **The session shell is zsh: `for x in $LIST` does NOT word-split, and `echo` eats backslash escapes.** A loop
     over a space-separated variable ran ONCE with the whole string as `x` (three times in one session — a census,

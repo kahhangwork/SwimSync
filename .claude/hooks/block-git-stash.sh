@@ -16,7 +16,7 @@ stripped="$(printf '%s' "$cmd" | perl -0777 -pe '
   s/"(?:[^"\\]|\\.)*"//g;                                             # double-quoted text
 ')"
 
-if printf '%s' "$stripped" | grep -Eq '(^|[;&|(])[[:space:]]*git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+stash([^[:alnum:]_-]|$)'; then
+if grep -Eq '(^|[;&|(])[[:space:]]*git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+stash([^[:alnum:]_-]|$)' <<<"$stripped"; then
   echo "Blocked: git stash — the stash stack is shared across every worktree (session-close rule). Use a WIP commit instead: git commit -m 'WIP: …'" >&2
   exit 2
 fi

@@ -87,6 +87,11 @@ jobs:
       - name: September reads "Sept" on every surface (G-Sept)
         run: scripts/check-sept.sh
 
+      # §7.339: `cmd | grep -q` under pipefail reports a MATCH as a miss (the producer
+      # takes SIGPIPE). Bitten twice after the gotcha was written; this fires unread.
+      - name: No '| grep -q' in a pipefail script
+        run: scripts/check-grep-q-pipefail.sh
+
       # Wave 8: both apps carry the SAME generated Database types (they share no
       # package). A one-sided edit or regen is a lie in one app.
       - name: Both apps' database.types.ts are byte-identical

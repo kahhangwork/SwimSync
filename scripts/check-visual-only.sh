@@ -93,7 +93,7 @@ done
 
 # (e) a Tailwind `content` change decides which files compile at all (§7.191).
 for t in SwimSyncApp/tailwind.config.js SwimSyncAdmin/tailwind.config.ts; do
-  if git diff -U0 "$BASE" "$HEAD" -- "$t" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' | grep -qE '\bcontent\b'; then
+  if git diff -U0 "$BASE" "$HEAD" -- "$t" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' | grep -E '\bcontent\b' >/dev/null; then
     add "(e) Tailwind content key changed: $t"
   fi
 done
