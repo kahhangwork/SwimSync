@@ -72,6 +72,12 @@ export type Purchase = {
   /** The one child's name — null for a shared package, or when RLS hides the
    *  embed (§7.344: the row still reads "One child"). */
   student_name: string | null;
+  /** A package bought BEFORE SwimSync and brought in (20261118000200): its
+   *  original start (expiry anchors on it) and the lessons left when it was
+   *  brought in. NULL = an ordinary sale. Paid outside SwimSync, so
+   *  amount_payable is 0 — refundCap() is the refund ceiling, never amount_payable. */
+  carried_over_start: string | null;
+  carried_over_lessons: number | null;
 };
 
 export type ParentOption = { id: string; name: string };

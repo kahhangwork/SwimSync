@@ -1101,6 +1101,23 @@ modifier in the system — changes `amount_payable`, never `total_value`. **LIVE
 (`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
 
+### A package activated after an advance-cancelled lesson gets no cancel extension — **S** — _filed 2026-11-18, found building carried-over packages_
+`holiday_reconcile_on_activation` picks up holidays already marked inside a new package's window, but nothing does
+the same for an **advance-cancelled** lesson (`lesson_sessions.cancelled_at`) already inside it: the cancel extension
+is applied only when the cancellation happens (`apply_cancel_reconcile`, from the `lesson_sessions` trigger). So a
+package sold — or brought in — with a cancelled lesson already ahead of it is not extended for that lesson.
+
+**Why:** pinned, not fixed — `carried_over_packages.test.sql` case 16 expects exactly this, and it is the same for an
+ordinary sale (pre-existing). Decide whether activation should reconcile cancels too; if so, mirror the holiday
+activation trigger and update that case.
+
+### Carried-over packages — the two accepted gaps — **S** — _filed 2026-11-18, follow-ups of PRD §7.16 "A package bought before SwimSync"_
+- **A pending referral where the family is the referee stays pending** — a bring-in converts no referral and mints no
+  referrer reward (D6); it converts on the family's next real purchase. Revisit if a business asks.
+- **`public-package/core.ts validUntilPreview` computes `start_date + weeks` in TypeScript.** A carried row's token is
+  never shared today (no offer, no email, no pay link for an active row); if any surface ever links one, anchor that
+  preview on `carried_over_start` first (an Edge Function deploy). Plan: `docs/plans/CARRIED_OVER_PACKAGES_PLAN.md` Step 4.
+
 ### Name the child in package emails — **S** — _filed 2026-10-11, follow-up of Single-child packages_
 The `package-emails` Edge Function (requested / offered / confirmed) names the family, never the child. For a
 one-child package the email should say whose it is ("5 lessons for Ava"), the way the app and admin now do.

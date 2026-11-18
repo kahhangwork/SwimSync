@@ -122,6 +122,8 @@ export function mapPurchases(
     student_id: p.student_id ?? null,
     // §7.344: a one-child package whose child RLS hides still reads "One child".
     student_name: p.student_id ? (p.students?.full_name ?? "One child") : null,
+    carried_over_start: p.carried_over_start ?? null,
+    carried_over_lessons: p.carried_over_lessons ?? null,
   }));
 }
 
@@ -185,17 +187,25 @@ export function refundsByPackage(rows: RefundRow[] | null): Map<string, LiveRefu
 
 export type RefundState = "none" | "can_record" | "recorded" | "recorded_readonly";
 
+/** The most that can be refunded — the SAME cap record_package_refund enforces.
+ *  A carried-over package was paid for before SwimSync (amount_payable 0), so its
+ *  cap is the value left NOW; every other package's is what the family paid.
+ *  `amount_payable` is a PRICE, never an eligibility test (a carried row is S$0). */
+export const refundCap = (p: Purchase): number =>
+  p.carried_over_start ? p.value_remaining : p.amount_payable;
+
 /** What the refund cell of a held row shows. Fails CLOSED: refunds that could
  *  not be loaded (refunds === null) show nothing, never a Record button that
  *  might double-refund. Only a CANCELLED package that was PAID (confirmed_at)
- *  and cost something can be refunded — the RPC refuses the rest anyway. */
+ *  with something left to refund (refundCap) qualifies — the RPC refuses the
+ *  rest anyway. */
 export function refundState(
   p: Purchase,
   refunds: Map<string, LiveRefund> | null,
   canEdit: boolean
 ): RefundState {
   if (refunds === null) return "none";
-  if (p.status !== "cancelled" || !p.confirmed_at || !(p.amount_payable > 0)) return "none";
+  if (p.status !== "cancelled" || !p.confirmed_at || !(refundCap(p) > 0)) return "none";
   if (refunds.has(p.id)) return canEdit ? "recorded" : "recorded_readonly";
   return canEdit ? "can_record" : "none";
 }

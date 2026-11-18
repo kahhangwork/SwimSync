@@ -49,6 +49,12 @@ export function useSale({
   const [saleChild, setSaleChild] = useState("");
   // A refusal the database explains (kind ↔ child, D11), shown in the modal.
   const [saleError, setSaleError] = useState<string | null>(null);
+  // Carried-over packages (CARRIED_OVER_PACKAGES_PLAN.md). ⚠ RISK 8: the ORIGINAL
+  // start lives in its own state, never saleStart — the suggest effect below
+  // rewrites saleStart whenever the product changes.
+  const [carried, setCarried] = useState(false);
+  const [carriedStart, setCarriedStart] = useState("");
+  const [carriedLessons, setCarriedLessons] = useState("");
   const product = products.find((p) => p.id === saleProduct);
   const saleChildren = childOptions.get(saleParent) ?? [];
   const needsChild = !!product?.single_child;
@@ -116,6 +122,54 @@ export function useSale({
     if (created?.id) onActivated?.(created.id, productName?.(soldProduct) ?? "The package");
   }
 
+  // Bring in a package bought before SwimSync. Lessons remaining are AS OF
+  // TODAY (D1): coverage starts today, so the backlog question that follows can
+  // only ever list a lesson already marked TODAY — exactly the one that would
+  // otherwise bill ad-hoc. No purchase email (D5; a direct sale sends none).
+  async function recordCarried() {
+    if (!saleParent || !saleProduct) return;
+    if (needsChild && !studentId) {
+      setSaleError("Choose which child this package is for.");
+      return;
+    }
+    const lessons = Number(carriedLessons);
+    if (!carriedStart) {
+      setSaleError("Choose the date the package originally started.");
+      return;
+    }
+    if (!Number.isInteger(lessons) || lessons < 1 || (product && lessons > product.lesson_count)) {
+      setSaleError(`Lessons remaining must be between 1 and ${product?.lesson_count ?? "the package size"}.`);
+      return;
+    }
+    setBusy(true);
+    setSaleError(null);
+    const { data: createdId, error: err } = await rpc.recordCarriedOverPackage({
+      p_parent: saleParent,
+      p_product: saleProduct,
+      p_original_start: carriedStart,
+      p_lessons_remaining: lessons,
+      // ⚠ RISK 7 — a shared product sends null, never the selected child.
+      p_student: studentId,
+    });
+    setBusy(false);
+    if (err) {
+      if (err.code === "23514") setSaleError(err.message);
+      else setError("Could not bring the package in.");
+      return;
+    }
+    const soldProduct = saleProduct;
+    setSaleModal(false);
+    setSaleParent("");
+    setSaleProduct("");
+    setSaleStart("");
+    setSaleChild("");
+    setCarried(false);
+    setCarriedStart("");
+    setCarriedLessons("");
+    reload();
+    if (createdId) onActivated?.(String(createdId), productName?.(soldProduct) ?? "The package");
+  }
+
   return {
     saleModal,
     setSaleModal,
@@ -132,6 +186,14 @@ export function useSale({
     needsChild,
     saleError,
     recordSale,
+    carried,
+    setCarried,
+    carriedStart,
+    setCarriedStart,
+    carriedLessons,
+    setCarriedLessons,
+    selectedProduct: product,
+    recordCarried,
   };
 }
 

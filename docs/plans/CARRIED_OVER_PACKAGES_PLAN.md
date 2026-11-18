@@ -1,6 +1,6 @@
 # Carried-over packages — bring in a package bought before SwimSync
 
-_Status: IN PROGRESS — Steps 0–2 done 2026-11-18 (migration `20261118000200` + DOWN, pgTAP 52 + mutations M1–M6 red, full suite 99/2239, Deno ×2 335). Planned + plan-reviewed 2026-11-18. Source: user feedback #2 from Little Orcas' admin, relayed 2026-11-18._
+_Status: IN PROGRESS — Steps 0–5 done 2026-11-18. Backend LIVE on prod (migration `20261118000200`, `8a3fa28`; md5 prod = local for all 11 functions; grants authenticated-only). Admin UI committed on `feat/carried-over-packages`, NOT on `main` — held by the HANDOVER §9 nightly gate. pgTAP 52 (M1–M6 red), full 99/2239, Deno ×2 335, vitest 1367 (+7, M1–M4 red), driver 11/11 ×2, packages-admin / single-child / accounting-packages drivers green. Planned + plan-reviewed 2026-11-18. Source: user feedback #2 from Little Orcas' admin, relayed 2026-11-18._
 
 ## 1. The problem
 
@@ -211,7 +211,10 @@ test was lost), and `app_clock`'s frozen census is unchanged. Then `supabase/fun
    `type _Check = Assert<Extends<Args, Rpc<"record_carried_over_package">["Args"]>>` — **Do NOT use
    `Rpc<…>['Args']` directly** (§7.345).
 3. `useSale` carried path: `err.code === "23514"` → `setSaleError(err.message)`, else generic (same as sale).
-   **Do NOT call `invokePackageEmail`** (D5). **Do NOT call `onActivated`** (D1).
+   **Do NOT call `invokePackageEmail`** (D5). ~~Do NOT call `onActivated`~~ — **REVISED at build (2026-11-18): it IS
+   called.** Coverage starts today, so the backlog preview can only list a lesson already marked TODAY (never an
+   earlier one, D1 holds by construction), and `offer()` is silent when there is none — reusing it is the RISK 5
+   notice, done by the existing dialog. The pre-submit count of earlier SwimSync lessons was dropped for static copy.
    ⚠ RISK 5 MITIGATION: after success, call `package_backlog_preview(newId)` (it can only return lessons dated
    today); if > 0 show a notice (Toast/inline, never `Alert.alert`): "N lesson(s) today were already marked before
    this package existed — use Check marked lessons to take them from it." And in the modal, before submit, show the

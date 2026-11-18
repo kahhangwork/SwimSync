@@ -65,6 +65,8 @@ function purchase(over: Partial<Purchase>): Purchase {
     children: "Mia, Max",
     student_id: null,
     student_name: null,
+    carried_over_start: null,
+    carried_over_lessons: null,
     ...over,
   };
 }

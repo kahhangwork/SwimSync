@@ -241,6 +241,7 @@ export default function PackagesPage() {
         parents={parents}
         activeProducts={activeProducts}
         busy={busy}
+        pending={pending}
       />
 
       <ConfirmPaymentModal

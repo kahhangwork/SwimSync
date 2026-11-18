@@ -2268,6 +2268,22 @@ cash paid always equals value granted — nothing to reconcile.
   27 Sep first — the package has 1 lesson left. (Ava · Dolphins) Nothing was saved."*; nothing in that save is
   kept, so they mark the named lesson first. Marking absent/cancelled is never blocked, and re-saving marks that
   are unchanged is never refused. The check **fails open**: if it cannot decide, the mark saves.
+- **A package bought before SwimSync can be brought in part-way through** *(implemented 2026-11-18 — user
+  feedback from Little Orcas; `docs/plans/CARRIED_OVER_PACKAGES_PLAN.md`)*. On *Record a sale* the admin ticks
+  **Existing package (bought before SwimSync)**, picks the family and a product, and enters the package's **Original
+  start date** and the **Lessons remaining (of N)** — counted **as of today**, after every lesson before today,
+  including any already marked in SwimSync. The button reads **Bring in package**. The package is active at once with
+  `remaining × rate` left; **it covers lessons from today on only** — nothing dated before today ever draws from it;
+  it **expires `original start + the product's weeks`** (add any extension already given with **Extend**). **Nothing
+  was paid here**: it records S$0, adds nothing to package revenue on Accounting, takes no referral discount, settles
+  no reward and converts no referral; no purchase email is sent. If a lesson was already marked **today**, the usual
+  *Draw from package / Keep as ad-hoc* question follows. A family's open offer for the same audience is cancelled
+  (the form warns first). Refused: 0 or more than N lessons, a future original start, a package already expired, a
+  retired product, a family not at this business, and the same package brought in twice. The held row shows the
+  original start with *Brought in DD Mon · N left then*; the parent sees an ordinary package. **Refund** stays
+  available once it is cancelled, capped at **the value left on the package** (not "what the family paid", which is
+  S$0) — so a lesson already taught in SwimSync cannot be refunded. Backdating attendance before the marking floor
+  (PRD §7.6) remains refused; this is the route for a business moving onto SwimSync mid-cycle.
 - **A package confirmed with a start date in the past asks about lessons already marked** *(implemented
   2026-10-06)*. After *Payment received* or *Record sale* succeeds, if the family already has un-invoiced lessons
   marked since the start date that this package could cover, a dialog lists them (with which package would pay

@@ -183,7 +183,18 @@ export function HeldTable({
                     )}
                   </Td>
                   {/* DISPLAY only (S9): the raw dates stay what `expired` and the sort read. */}
-                  <Td className="text-ink-muted">{p.start_date ? formatSgStamp(p.start_date, DMY) : "—"}</Td>
+                  <Td className="text-ink-muted">
+                    {/* A carried-over package shows its ORIGINAL start (expiry is
+                        counted from it); coverage began the day it was brought in. */}
+                    {p.carried_over_start
+                      ? formatSgStamp(p.carried_over_start, DMY)
+                      : p.start_date ? formatSgStamp(p.start_date, DMY) : "—"}
+                    {p.carried_over_start && (
+                      <span className="block text-label" data-testid="held-carried-note">
+                        Brought in {p.start_date ? formatSgStamp(p.start_date, DMY) : ""} · {p.carried_over_lessons} left then
+                      </span>
+                    )}
+                  </Td>
                   <Td className="text-ink-muted">
                     {p.expires_on ? formatSgStamp(p.expires_on, DMY) : "—"}
                     {expired && (

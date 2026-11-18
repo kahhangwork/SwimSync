@@ -6,6 +6,7 @@ import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { formatSgStamp, todayInSg, toSgDate } from "@/lib/lessonDates";
 import { money } from "../constants";
+import { refundCap } from "../domain/packageRows";
 import type { RefundForm } from "../domain/useRefund";
 
 const DMY: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
@@ -50,7 +51,8 @@ export function RefundModal({ form, busy }: { form: RefundForm; busy: boolean })
             className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
           />
           <p className="mt-1 text-label text-ink-muted" data-testid="refund-ceiling">
-            Up to {money(refunding?.amount_payable ?? 0)} — what the family paid.
+            Up to {money(refunding ? refundCap(refunding) : 0)} —{" "}
+            {refunding?.carried_over_start ? "the value left on the package." : "what the family paid."}
           </p>
         </div>
         <div>

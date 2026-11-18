@@ -109,6 +109,21 @@ type _CheckReassign = Assert<Extends<ReassignPackageChildArgs, Rpc<"reassign_pac
 export const reassignPackageChild = (args: ReassignPackageChildArgs) =>
   supabase.rpc("reassign_package_child", args);
 
+// Bring in a package bought BEFORE SwimSync (20261118000200). The RPC owns every
+// rule — coverage from today, expiry from the original start, S$0 paid, kind ↔
+// child — and its refusals (23514) are sentences for the admin.
+// p_student is REQUIRED (null = shared) so no caller forgets it (§7.345).
+export type RecordCarriedOverPackageArgs = {
+  p_parent: string;
+  p_product: string;
+  p_original_start: string;
+  p_lessons_remaining: number;
+  p_student: string | null;
+};
+type _CheckCarried = Assert<Extends<RecordCarriedOverPackageArgs, Rpc<"record_carried_over_package">["Args"]>>;
+export const recordCarriedOverPackage = (args: RecordCarriedOverPackageArgs) =>
+  supabase.rpc("record_carried_over_package", args);
+
 export const renewalCandidates = () => supabase.rpc("package_renewal_candidates");
 export type RenewalCandidateRow = DataOf<typeof renewalCandidates>[number];
 

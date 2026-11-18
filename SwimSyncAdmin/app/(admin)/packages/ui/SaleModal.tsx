@@ -4,7 +4,8 @@
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { money } from "../constants";
-import type { ParentOption, Product } from "../types";
+import { todayInSg } from "@/lib/lessonDates";
+import type { ParentOption, Product, Purchase } from "../types";
 import type { SaleForm } from "../domain/useSale";
 
 export function SaleModal({
@@ -12,11 +13,14 @@ export function SaleModal({
   parents,
   activeProducts,
   busy,
+  pending = [],
 }: {
   form: SaleForm;
   parents: ParentOption[];
   activeProducts: Product[];
   busy: boolean;
+  /** Pending purchases — to warn that a bring-in supersedes an open offer (RISK 12). */
+  pending?: Purchase[];
 }) {
   const {
     saleModal,
@@ -34,7 +38,27 @@ export function SaleModal({
     needsChild,
     saleError,
     recordSale,
+    carried,
+    setCarried,
+    carriedStart,
+    setCarriedStart,
+    carriedLessons,
+    setCarriedLessons,
+    selectedProduct,
+    recordCarried,
   } = form;
+
+  // RISK 12 — supersede_open_package_offer cancels the family's open offer for
+  // the same audience (the family, or this one child) when a package goes active.
+  const audience = needsChild ? saleChild || null : null;
+  const openOffer = pending.find(
+    (p) =>
+      p.parent_id === saleParent &&
+      p.offered_by &&
+      !p.paid_claimed_at &&
+      !p.superseded_by &&
+      (p.student_id ?? null) === audience
+  );
 
   return (
     <Modal
@@ -43,10 +67,26 @@ export function SaleModal({
       title="Record a sale"
     >
       <p className="mb-4 text-body text-ink-secondary">
-        For a purchase arranged outside the app. The package becomes active
-        immediately — record it only once the money has arrived.
+        {carried
+          ? "For a package the family bought before you started using SwimSync. Nothing is charged and it adds nothing to Revenue — the family already paid."
+          : "For a purchase arranged outside the app. The package becomes active immediately — record it only once the money has arrived."}
       </p>
       <div className="space-y-4">
+        <label className="flex items-start gap-2 text-body text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={carried}
+            onChange={(e) => setCarried(e.target.checked)}
+            className="mt-1"
+            data-testid="sale-carried-toggle"
+          />
+          <span>
+            <span className="font-medium">Existing package (bought before SwimSync)</span>
+            <span className="block text-label text-ink-muted">
+              Bring in a package a family is part-way through, with the lessons they have left.
+            </span>
+          </span>
+        </label>
         <div>
           <label className="mb-1 block text-body font-medium text-ink-secondary">
             Parent
@@ -82,6 +122,11 @@ export function SaleModal({
             ))}
           </select>
         </div>
+        {carried && (
+          <p className="-mt-2 text-label text-ink-muted">
+            Made a product just for this? Retire it afterwards so families can&rsquo;t buy it.
+          </p>
+        )}
         {/* Single-child packages (D7): which child a one-child package is for.
             With one active child here it is shown, not asked. */}
         {needsChild && saleParent && (
@@ -115,6 +160,54 @@ export function SaleModal({
             )}
           </div>
         )}
+        {carried ? (
+          <>
+            <div>
+              <label htmlFor="carried-start" className="mb-1 block text-body font-medium text-ink-secondary">
+                Original start date
+              </label>
+              <input
+                id="carried-start"
+                type="date"
+                value={carriedStart}
+                max={todayInSg()}
+                onChange={(e) => setCarriedStart(e.target.value)}
+                className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
+              />
+              <p className="mt-1 text-label text-ink-muted">
+                When the family&rsquo;s package began. It expires{" "}
+                {selectedProduct ? `${selectedProduct.validity_weeks} weeks` : "the package's validity"} after
+                this date — use Extend afterwards for any extension you already gave.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="carried-lessons" className="mb-1 block text-body font-medium text-ink-secondary">
+                Lessons remaining{selectedProduct ? ` (of ${selectedProduct.lesson_count})` : ""}
+              </label>
+              <input
+                id="carried-lessons"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={selectedProduct?.lesson_count}
+                value={carriedLessons}
+                onChange={(e) => setCarriedLessons(e.target.value)}
+                className="w-full rounded-control border border-border-strong px-3 py-2 text-body"
+              />
+              <p className="mt-1 text-label text-ink-muted" data-testid="carried-help">
+                Count what is left as of today, after every lesson before today — including any
+                already marked in SwimSync. Lessons before today never come off this package.
+              </p>
+            </div>
+            {openOffer && (
+              <p className="text-body text-status-warning-text" data-testid="carried-offer-warning">
+                This family has an open offer{openOffer.reference_number ? ` (${openOffer.reference_number})` : ""}.
+                Bringing this package in cancels it.
+              </p>
+            )}
+          </>
+        ) : (
+        <>
         <div>
           <label className="mb-1 block text-body font-medium text-ink-secondary">
             Start date
@@ -149,6 +242,8 @@ export function SaleModal({
             )}
           </div>
         )}
+        </>
+        )}
         {saleError && (
           <p className="text-body text-status-danger-text" role="alert">
             {saleError}
@@ -162,12 +257,21 @@ export function SaleModal({
           >
             Cancel
           </Button>
-          <Button
-            onClick={recordSale}
-            disabled={busy || !saleParent || !saleProduct || (needsChild && !saleChild)}
-          >
-            {busy ? "Saving…" : "Record sale"}
-          </Button>
+          {carried ? (
+            <Button
+              onClick={recordCarried}
+              disabled={busy || !saleParent || !saleProduct || (needsChild && !saleChild) || !carriedStart || !carriedLessons}
+            >
+              {busy ? "Saving…" : "Bring in package"}
+            </Button>
+          ) : (
+            <Button
+              onClick={recordSale}
+              disabled={busy || !saleParent || !saleProduct || (needsChild && !saleChild)}
+            >
+              {busy ? "Saving…" : "Record sale"}
+            </Button>
+          )}
         </div>
       </div>
     </Modal>
