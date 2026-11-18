@@ -1412,3 +1412,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     admin 273 s; LIVE — `/students` serves "Wrong parent? Unlink from this child"; CI green (`44228555181`). No edge
     function changed (types only). **Rollback:** an admin build without the calls FIRST, then
     `supabase/rollback/20261118000100_admin_edit_family_details_DOWN.sql`. Nightly not dispatched.
+
+110. **Deploy record (2026-11-18): carried-over packages — migration then admin; nightly gate BYPASSED (user).**
+    Repo checks run locally first; rollback rehearsed UP → DOWN → UP in one transaction (DOWN md5 = prod's original 10
+    bodies). `8a3fa28` → `main`, `supabase db push` applied `20261118000200`; 0 pending; prod md5 = local for all 11
+    functions; grant dump: `record_carried_over_package` EXECUTE to `authenticated` only. **Then** `6df68a7` → `main`
+    on the user's `/deploy bypass the nightly block` (HANDOVER §9's gate waived for this push only). LIVE —
+    `/packages` serves "Existing package (bought before SwimSync)"; CI green (`44258902786`). `--expect` must name a
+    page that loads the changed chunk (§7.398). No edge function changed. **Rollback:** an admin build without the
+    toggle FIRST, then `supabase/rollback/20261118000200_carried_over_packages_DOWN.sql` (refuses while a carried row
+    exists).

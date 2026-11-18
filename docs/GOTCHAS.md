@@ -41,7 +41,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379, 393 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388, 397 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383, 390 |
-| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389, 392 |
+| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389, 392, 398 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387 |
 | Source-scanning guards, shell | 230, 231, 233, 241, 247, 248, 302, 305, 309, 339, 340, 341, 348, 353, 354, 358, 359, 384, 394 |
 
@@ -3283,3 +3283,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     Read `locator('input').evaluateAll(els => els.map(e => e.value))` (`verify-contact-details.mjs` `modalValues`).
     Locate an input by its position or label, not `input[value=…]` — React does not keep the attribute in step
     with typing. (2026-11-18, §8.168.)
+
+398. **`watch-deploy.sh --expect <url>` greps only the scripts THAT page loads.** Next.js splits per route, so
+    `--expect https://admin.swimsync.sg/ '<string>'` reported FAIL for a string that lived in the `/packages` chunk —
+    the deploy was live. Point `--expect` at the route whose page renders the new string
+    (`https://admin.swimsync.sg/packages`). A FAIL from the root URL on a route-local change proves nothing.
+    (2026-11-18, §8.169, DEPLOYMENT #110.)

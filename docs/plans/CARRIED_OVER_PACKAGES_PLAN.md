@@ -1,6 +1,6 @@
 # Carried-over packages — bring in a package bought before SwimSync
 
-_Status: IN PROGRESS — Steps 0–5 done 2026-11-18. Backend LIVE on prod (migration `20261118000200`, `8a3fa28`; md5 prod = local for all 11 functions; grants authenticated-only). Admin UI committed on `feat/carried-over-packages`, NOT on `main` — held by the HANDOVER §9 nightly gate. pgTAP 52 (M1–M6 red), full 99/2239, Deno ×2 335, vitest 1367 (+7, M1–M4 red), driver 11/11 ×2, packages-admin / single-child / accounting-packages drivers green. Planned + plan-reviewed 2026-11-18. Source: user feedback #2 from Little Orcas' admin, relayed 2026-11-18._
+_Status: DONE — live 2026-11-18 (migration `20261118000200` / `8a3fa28`, admin `6df68a7`; DEPLOYMENT #110, HANDOVER §8.169). The admin UI shipped with the nightly gate bypassed on the user's word. pgTAP 52 (M1–M6 red), full 99/2239, Deno ×2 335, vitest 1367, driver 11/11 ×2. Source: user feedback #2 from Little Orcas' admin, relayed 2026-11-18._
 
 ## 1. The problem
 
@@ -326,11 +326,12 @@ Function-body dump from the review (27 functions, local DB, 2026-11-18) — reus
 
 ## 7. Known consequences (accepted)
 - Lessons the admin already marked in SwimSync before today stay as they are (ad-hoc lessons still bill at the
-  next run). The admin must count them when typing "remaining" (D1, user's call) — the modal now states the count (Step 3.3).
+  next run). The admin must count them when typing "remaining" (D1, user's call) — the modal says so in its helper copy (Step 3.3 — a pre-submit count was dropped: coverage starts today).
 - *Show lessons used* under-counts versus the counter (D4).
 - A wrong carry-over is fixed by cancel + re-bring-in (start dates are fixed once active, as today; the unique index
   counts ACTIVE rows only).
 - A pending referral where this family is the referee stays pending and converts on their next real purchase (D6).
+- The held table's *Starts* column shows the original start but sorts by `start_date` (low; left as is).
 - Bringing a package in cancels the family's open unpaid offer for the same audience (supersede; pinned in test 10;
   warned in the modal).
 

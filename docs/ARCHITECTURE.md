@@ -1096,6 +1096,23 @@ both workflows) with WIDENINGS applied. A dao exports its row types derived from
   re-derive a stored due date when Days to pay changes (D2); never refine `is_overdue` for Claimed (the tag decides);
   never use a column-level grant to protect `due_date` (§7.292) — the pin trigger is the guard.
 
+### 6ai. A carried-over package's COVERAGE start is not its VALIDITY anchor (2026-11-18)
+
+`20261118000200`, `docs/plans/CARRIED_OVER_PACKAGES_PLAN.md` (D1–D8, Q1, the user's).
+- A package bought before SwimSync is brought in by **`record_carried_over_package()`** only (an authenticated direct
+  insert that sets `carried_over_*` is refused). Its row: `start_date` = the day it was brought in (coverage — lessons
+  marked before it never draw), `carried_over_start` = the ORIGINAL start, `value_remaining` = lessons × rate,
+  `amount_payable` = 0 (so Accounting counts S$0 revenue).
+- **Every window END reads `COALESCE(carried_over_start, start_date)`; every window START reads `start_date`.**
+  The `cop_expiry` CHECK makes a missed END site raise, and `carried_over_packages.test.sql` test 12 lints every
+  function body for `package_effective_end(start_date…` / `start_date + validity_weeks…`.
+- The refund cap is `value_remaining` for a carried row, `amount_payable` otherwise (`refundCap()` in the admin, the
+  same branch in `record_package_refund`). No referral discount or reward is applied or settled by a carried row.
+- ⚠ **Prohibitions:** never anchor a START comparison on `carried_over_start` (pre-SwimSync lessons would draw); never
+  treat `amount_payable = 0` as "nothing to refund" or "free" without checking `carried_over_start`; never compute a
+  package's expiry in TypeScript or an Edge Function from `start_date` alone (`public-package/core.ts`
+  `validUntilPreview` is the one known site — BACKLOG *Carried-over packages — the two accepted gaps*).
+
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 
 `Alert.alert` has **no `react-native-web` implementation** — on the deployed web app

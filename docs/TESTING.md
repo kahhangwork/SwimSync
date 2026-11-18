@@ -1294,6 +1294,17 @@ functions dropped; 4 body mutations red (listed in the file). Admin vitest: `use
 (4), 4 mutations red. `verify-contact-details` (now 32) reads input VALUES (§7.397), edits Devi's phone, unlinks
 her from Xavier, and sets Wanda's DOB; it re-seeds all three at its top, so it re-runs green.
 
+### Carried-over packages (2026-11-18)
+
+**`supabase/tests/carried_over_packages.test.sql` (52).** `record_carried_over_package` row values (S$0 paid, value =
+lessons × rate, coverage today, expiry = original start + weeks) and audit; double-submit refused; a pre-today lesson
+does not draw, today's does; expiry anchored through holiday, Extend, cancel, covering-package and Change child; no
+referral discount/reward/settlement; an open offer superseded; refund cap = value left; Accounting revenue S$0; 16
+refusals; the census lint over every function body (test 12); grants. Mutations M1–M6 red. Admin vitest
+`domain/carriedOver.test.tsx` (7, mutations 1–4 red). Driver **`verify-carried-over-package`** (11; fixture prefix
+`cop`, `c0a00000-`): bring in via the modal, the held note, today's mark draws, the parent card reads as an ordinary
+package, cancel → refund up to the value left.
+
 ### A selected state reaches the DOM (2026-10-16)
 
 **`SwimSyncApp/lib/ariaState.drift.test.ts` (2 checks).** Scans `app/`, `features/`, `components/` source: every JSX

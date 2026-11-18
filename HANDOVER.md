@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-18 (latest) — **An admin can correct a linked family's details, live** (§8.168): a linked
-parent's name + phone, Unlink a wrong parent (refused once billed), a child's DOB — from user feedback. Next: Coach Kah
-Hang's **November** on engine v42 (early December), then read the nightly that covers `eb3e2f0`._
+_Last updated: 2026-11-18 (latest) — **An admin can bring in a package bought before SwimSync, live** (§8.169): lessons
+left as of today, expiry from the original start, S$0 revenue, refundable to the value left — Little Orcas feedback #2.
+Next: read the nightly that covers `eb3e2f0` + `6df68a7`; Coach Kah Hang's **November** on engine v42 (early December)._
 
-_Previously (§8.167, 2026-11-17 → 18) — Edge Functions typed + tiered, live (generate-invoices v42), byte-identical._
+_Previously (§8.168, 2026-11-18) — Admin corrects a linked family's details (name/phone, unlink, DOB), live._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.388** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.398** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -352,6 +352,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.169 (2026-11-18) — Bring in a package bought before SwimSync (carried-over packages); live
+
+**Shipped** (`8a3fa28` migration `20261118000200`, `6df68a7` admin; DEPLOYMENT #110; PRD §7.16; ARCHITECTURE §6ai).
+Little Orcas feedback #2: backdated attendance is refused, so existing packages could not be migrated mid-cycle. The
+user's calls: lessons remaining as of today (D1), expiry = original start + weeks (D2), refund up to the value left NOW
+(D3/Q1), the parent sees an ordinary package (D4). Record a sale → *Existing package*; plan-reviewed (13 risks inline).
+pgTAP 52 + vitest 7 (mutations red), full pgTAP 99/2239, Deno ×2, driver 11/11 ×2.
+
+- **Found:** `--expect` on the admin root misses a route chunk (§7.398). `supabase db reset` is refused by auto mode —
+  the rollback was rehearsed inside one transaction + ROLLBACK instead.
+- **Not done:** the app push **bypassed the nightly gate** on the user's word — the next nightly is the first to cover
+  `eb3e2f0` and `6df68a7`. Two accepted gaps → BACKLOG *Carried-over packages*; the held *Starts* sort (plan §7).
+  Little Orcas' admin not yet told. Nightly not dispatched.
+
 ## 8.168 (2026-11-18) — Admin corrects a linked family's details: parent name/phone, unlink, child DOB; live
 
 **Shipped** (`58cd53c`, `2719280`, `eb3e2f0`; DEPLOYMENT #109; PRD §7.19). User feedback: *"once a parent is linked to a
@@ -365,20 +379,6 @@ refused once that parent was billed for the child; a DOB action is added. Three 
   again (the arm is `'ParentTenant'`). G5 caught the 3 overrides copies before any push.
 - **Not done:** an admin cannot change a parent's EMAIL (user's call). The pending-claim lock is the editing business's
   only — accepted, recorded in the migration header. Nightly not dispatched.
-
-## 8.167 (2026-11-17 → 18) — Edge Functions: generated types, then tiers; live; proven byte-identical
-
-**Shipped** (`docs/plans/EDGE_FUNCTIONS_REFACTOR_PLAN.md`, plan-reviewed; DEPLOYMENT #107, #108). **Part A**: every
-function's client typed with the generated `Database` (a third copy in `supabase/functions/_shared/`, G5), G6 now covers
-the functions and reads **0**. **Part B**: generate-invoices, package-emails and credit-note-emails split into `dao/` +
-`domain/`; `generateForTenant` is composition; caller-JWT clients branded `CallerDb` (ARCHITECTURE §6). Tests live in
-each function's `test/` (TESTING §5). Gates per stage: query-chain census, tier fence (`tierBoundaries.test.ts`), suite
-×2, the bench vs v40 at 4 sizes incl. every Resend payload — all IDENTICAL; guard/seal mutants proven red; 5 drivers.
-
-- **Found:** G6 was red B2→B12a behind a gate that printed instead of exiting (§7.393); path-keyed tools misread moved
-  files (§7.394); a midnight-straddling bench pair (§7.395); §7.340 a third time. Follow-ups: BACKLOG *Foundations* ×3.
-- **Not done:** October not billed for Little Orcas / Epic Swim — owned by others, test data (user). A zero-write live
-  smoke on Coach Kah Hang's sealed October passed on v42. Nightly not dispatched.
 
 ## 9. Next steps (pick with the user)
 
@@ -422,8 +422,7 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-18:** scheduled run `44217003736` GREEN on `12729a0` — it covers `2833602` (the Edge refactor). **The
-next one must cover `eb3e2f0`**: `verify-contact-details` now edits, unlinks and sets a DOB (32/32 ×2 locally). A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-18:** scheduled run `44217003736` GREEN on `12729a0`. **The next one must cover `eb3e2f0` and `6df68a7`**: `verify-contact-details` (32) and the new `verify-carried-over-package` (11), both green ×2 locally; `6df68a7` shipped AHEAD of it (gate bypassed, user). A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -440,8 +439,10 @@ which mutate shared seed state — are in the same section.
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
    in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Read the next nightly** before the next APP unit merges — it must cover `eb3e2f0`. Never dispatch it unasked.
-   Tell the admin who sent the 2026-11-18 feedback that linked families can now be corrected (PRD §7.19).
+2. **Read the next nightly** — it must cover `eb3e2f0` and `6df68a7` (the latter shipped ahead of it). A red in
+   `verify-carried-over-package` or `packages-admin` → revert `6df68a7` (admin only; the migration is additive). Never
+   dispatch it unasked. Tell the admins who sent the 2026-11-18 feedback: linked families can be corrected (PRD §7.19),
+   and existing packages can be brought in from Record a sale → *Existing package* (PRD §7.16).
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
@@ -465,8 +466,8 @@ explained by one line in the commit message), its screen's `--only` drivers pass
 a P4 / Phase 4 step. At most three unverified landings in a row; **a red nightly freezes restyle landings**, and a red
 attributed to one is reverted (`git revert <sha>` → push) in the same session unless the fix is a one-line string.
 
-**No migration is HELD or in flight.** Latest applied is `20261111000100` (gender required), on prod, 0 pending
-(2026-11-12). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
+**No migration is HELD or in flight.** Latest applied is `20261118000200` (carried-over packages), on prod, 0 pending
+(2026-11-18). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
