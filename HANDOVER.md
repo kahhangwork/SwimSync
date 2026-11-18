@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-18 (latest) — **Credit notes can never be negative; package emails name the child, live**
-(§8.170). Both BACKLOG S-items, picked from a re-rank with the user (the Build order is exhausted). Nightly `44269745188` GREEN.
-Next: *Deleting a role has no confirmation step* (the user's #3); Coach Kah Hang's **November** in early December._
+_Last updated: 2026-11-18 (latest) — **Role delete asks first; five small admin/UI fixes live in one push** (§8.171).
+Row menus on Levels/Invoices/Packages/Platform, due-date trail, modal X named, Packages reads the stored balance, Register
+"e.g." hints. **Nightly gate skipped on the user's word** — read the next nightly first. Next: Coach Kah Hang's November._
 
-_Previously (§8.169, 2026-11-18) — An admin can bring in a package bought before SwimSync, live._
+_Previously (§8.170, 2026-11-18) — Credit notes can never be negative; package emails name the child, live._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.171 (2026-11-18) — Role delete asks first; five small admin/UI fixes in one push; live
+
+**Shipped** BACKLOG S-items, the user's picks: `b715ff7` (role delete confirm, DEPLOYMENT #113), then one push of 8
+commits `f99052d..ae4ba05` (DEPLOYMENT #114) — modal X "Dismiss", the due-date trail, Packages on the stored balance
+(ARCHITECTURE package rule, amended), one inline action per row on Levels/Invoices/Packages/Platform, Register "e.g."
+placeholders. PRD updated per commit; TESTING §5 "2026-11-18". Each unit: vitest proven red, its drivers green
+(Platform's four before AND after).
+
+- **Found:** §7.399 (sr-only header → page scrolls sideways), §7.400 (cell sub-line breaks exact `getByText`), §7.401
+  (actions in a closed menu make "busy" tests vacuous). A fixture round-trip failed once, passed 49/49 on rerun —
+  the failing fixture was not captured.
+- **Not done:** the nightly gate was **skipped on the user's word** — no nightly covered `b715ff7` before the push.
+  Two restyle leftovers stay in BACKLOG (Mark Attendance tab highlight — needs a plan; Calendar Week blank band — new).
+  Make-ups' RPC read left as is (no live/stored split there). CI for `ae4ba05` was pending at close.
+
 ## 8.170 (2026-11-18) — Credit notes can never be negative; package emails name the child; live
 
 **Shipped** two BACKLOG S-items the user picked from a top-3 re-rank (Build order exhausted; #3 = role-delete confirm).
@@ -363,20 +378,6 @@ inside a file read at the start of every session.
 
 - **Not done:** no real one-child package email observed since v11 — check the next confirm. Deno ×2 not run (the
   engine writes no credit notes). Nightly `44269745188` (covers §8.168–169) went GREEN at close.
-
-## 8.169 (2026-11-18) — Bring in a package bought before SwimSync (carried-over packages); live
-
-**Shipped** (`8a3fa28` migration `20261118000200`, `6df68a7` admin; DEPLOYMENT #110; PRD §7.16; ARCHITECTURE §6ai).
-Little Orcas feedback #2: backdated attendance is refused, so existing packages could not be migrated mid-cycle. The
-user's calls: lessons remaining as of today (D1), expiry = original start + weeks (D2), refund up to the value left NOW
-(D3/Q1), the parent sees an ordinary package (D4). Record a sale → *Existing package*; plan-reviewed (13 risks inline).
-pgTAP 52 + vitest 7 (mutations red), full pgTAP 99/2239, Deno ×2, driver 11/11 ×2.
-
-- **Found:** `--expect` on the admin root misses a route chunk (§7.398). `supabase db reset` is refused by auto mode —
-  the rollback was rehearsed inside one transaction + ROLLBACK instead.
-- **Not done:** the app push **bypassed the nightly gate** on the user's word — the next nightly is the first to cover
-  `eb3e2f0` and `6df68a7`. Two accepted gaps → BACKLOG *Carried-over packages*; the held *Starts* sort (plan §7).
-  Little Orcas' admin not yet told. Nightly dispatched on the user's word: run `44269745188` on `08c9180`.
 
 ## 9. Next steps (pick with the user)
 
@@ -420,7 +421,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-18:** run `44269745188` (user-dispatched, on `08c9180`) **GREEN** — it covers `eb3e2f0` and `6df68a7`, so the §8.169 gate bypass is settled and the next APP unit may merge. `aea616d`/`b475f8d` (§8.170) are DB / Edge Function only; the next scheduled run covers them. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-18:** run `44269745188` (on `08c9180`) **GREEN**. Since then `b715ff7` and `f99052d..ae4ba05`
+(§8.171) went to `main` with the gate **skipped on the user's word** — **the next scheduled nightly must be read before
+the next APP unit merges**; it is the first to cover all nine commits. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -437,13 +440,13 @@ which mutate shared seed state — are in the same section.
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
    in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Build *Deleting a role has no confirmation step*** (S, BACKLOG) — the user's #3 of 2026-11-18, unblocked: nightly
-   `44269745188` went GREEN. Runner-up *Show an invoice's due-date change history* (S). (Feedback admins told — user.)
+2. **Read the next nightly** — it covers §8.171's nine commits (gate skipped). A red names its driver; replay it
+   `--only`. The drivers touched are listed in TESTING §5 "2026-11-18".
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
-The UI restyle leftovers are DONE except the *not re-verified* list in that BACKLOG item (check before building).
-The next unbuilt items are BACKLOG's Build order; *Show an invoice's due-date change history* (S) is new.
+UI restyle leftovers: two open in that BACKLOG item (Mark Attendance tab highlight — needs a plan; Calendar Week blank
+band). The Build order is exhausted — pick from BACKLOG with the user, or run `/backlog-prioritisation`.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).

@@ -38,8 +38,8 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349, 391 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380, 386 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326, 395 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379, 393 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388, 397 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379, 393, 401 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388, 397, 399, 400 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383, 390 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389, 392, 398 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387 |
@@ -3289,3 +3289,20 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     the deploy was live. Point `--expect` at the route whose page renders the new string
     (`https://admin.swimsync.sg/packages`). A FAIL from the root URL on a route-local change proves nothing.
     (2026-11-18, §8.169, DEPLOYMENT #110.)
+
+399. **An `sr-only` label inside a table header escapes the table's scroll box.** `sr-only` is `position:absolute`;
+    in a `<th>` inside `<Table>`'s `overflow-x-auto` wrapper (no positioned ancestor) it is placed at its static spot
+    past the clip, and the WHOLE page scrolls sideways — Platform measured 1573 px wide at 1440 after a menu column got
+    `<Th><span className="sr-only">Actions</span></Th>`. Use a visible header (`<Th>Actions</Th>`, as Levels does).
+    Check `document.documentElement.scrollWidth === clientWidth` after adding a column. (2026-11-18, §8.171.)
+
+400. **Adding a second line to a table cell breaks a driver's exact `getByText` on the cell's value.** Playwright
+    matches the smallest element whose OWN text is the string; a `<Td>` reading `18 Dec` + a child `<div>moved from …`
+    no longer has `18 Dec` as an exact text anywhere, and `verify-invoice-overdue` failed on a date that was on
+    screen. Wrap the value in its own `<span>` when a cell gains a sub-line. (2026-11-18, §8.171.)
+
+401. **Moving buttons into a `RowMenu` makes a "for every button: disabled" test pass on nothing.** The menu's
+    items are not in the DOM until it opens, so `getAllByRole(…).forEach(expect disabled)` iterates over only the
+    buttons still inline — or none — and stays green. When an action moves into a menu, open the menu in the test
+    AND assert the count it loops over (`HeldTable` / `PendingPanel` "busy" tests; drivers use `rowActionCount`).
+    (2026-11-18, §8.171.)

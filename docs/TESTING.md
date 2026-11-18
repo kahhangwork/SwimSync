@@ -673,7 +673,8 @@ empty database — §7.62's lesson applied at the driver.
 > it red; `lib/attendanceRoster.test.ts` pins the two mechanisms separately;
 
 `verify-invoice-overdue.mjs` (+ `fixtures-invoice-overdue.sql` and its `-teardown.sql`;
-`docs/plans/OVERDUE_INVOICES_PLAN.md` Unit 5, 26 checks) drives due dates and Overdue end to end:
+`docs/plans/OVERDUE_INVOICES_PLAN.md` Unit 5, 28 checks — +2 on 2026-11-18: the moved row's "moved from … by …"
+trail, for the editor and a Billing: View admin) drives due dates and Overdue end to end:
 the admin's Due column and tag from the database's verdict — Overdue, **Claimed beats Overdue**, and
 a **due-today** invoice that is NOT overdue (the boundary at the UI layer) —, *Days to pay* saved
 through the real tenants PATCH and re-read after a reload, *Change due date* (row menu → modal →
@@ -1813,10 +1814,22 @@ until a reset, so this caution stands.
 - **vitest** `lib/permissions.test.ts`, `admins/domain/adminRoles.test.ts`, `roles/domain/rolesRows.test.ts`,
   `adminNav.test.ts` (role filtering, `areaForPath` fails closed, 26 pages), accounting page (role grants access;
   nothing fires while the role loads). Admin vitest 956.
-- **Driver `verify-roles.mjs`** (8, fixture `fixtures-roles.sql`) — the owner creates a role through the grid,
+- **Driver `verify-roles.mjs`** (12, fixture `fixtures-roles.sql`) — checks 9–12 (2026-11-18): deleting an unheld
+  role asks first, Cancel keeps it, confirming deletes it (red with the old direct delete). The owner creates a role through the grid,
   moves a co-admin onto it; their sidebar hides Invoices/Admins, a typed `/invoices` refuses in words, `/classes`
   shows "View only"; after an upgrade the page renders. Red with `RequiresTenant` question 4 disabled (7/8). It
   found §7.291. `verify-admins` (24) now expects the role refusal for a co-admin without Admins & roles;
   `verify-platform-admin-scope` pins 26 pages.
 - **Flake to watch:** one unnamed admin vitest failure in 5 full runs on `d98cc46` + lane 2 (929 tests), not
   reproduced in 4 reruns (lane 2). If it recurs, capture the name before rerunning.
+
+### 2026-11-18 — admin row menus, due-date trail, modal X (§8.171)
+
+- **vitest** new `components/Modal.test.tsx` (the X is named "Dismiss", one "close" match) and
+  `platform/ui/TenantsTable.test.tsx` (4: menu items act on THAT row, Unsuspend, Resend / Set owner inline); the
+  `InvoiceTable`, `HeldTable`, `PendingPanel` tests open the row menu, and every "busy locks" test asserts its count
+  (§7.401). `packageRows` gains `lessonsLeft` (cents; red on plain float division). Admin vitest 1374.
+- **Drivers** press menu items through `lib.mjs` `rowAction` / count with `rowActionCount`: `verify-levels`,
+  `-payment-collection`, `-packages-admin`, `-single-child-packages`, `-carried-over-package`,
+  `-tenant-suspension`, `-platform-controls`. Register's phone field is found by the substring `"9123 4567"`
+  (`-app-home-writes`, `-join-code`, `-parent-address`, `-tenant-branding`).

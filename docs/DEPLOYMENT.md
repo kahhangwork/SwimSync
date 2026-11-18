@@ -1436,3 +1436,11 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     holds `students!student_id(full_name)` and `forChildHtml`); boot probe POST `{}` → 400 "bad request". **Then**
     `b475f8d` → `main` (docs + function source; no app code). Vercel app 64 s, admin 251 s; CI green (`44298439607`). **Rollback:** a worktree at
     `aea616d` and `supabase functions deploy package-emails --workdir <it> --project-ref cdmjeyauhxcgulhbxmsb`.
+
+113. **Deploy record (2026-11-18): role delete asks first — `main` only.** `b715ff7` (admin + driver). Admin LIVE —
+    `/roles` serves "Delete the role"; CI green (`44301800313`). No backend. **Rollback:** revert `b715ff7`.
+
+114. **Deploy record (2026-11-18): five admin/UI fixes in one push — `main` only, nightly gate SKIPPED on the
+    user's word.** `f99052d..ae4ba05` (8 commits, app + admin, no backend; HANDOVER §9 gate waived — no nightly yet
+    covered `b715ff7`). Admin 188 s, app 230 s; LIVE — `admin…/invoices` serves "link copied", `swimsync.sg/` serves
+    "e.g. Blk 123 Clementi". **Rollback:** revert the range, newest first.

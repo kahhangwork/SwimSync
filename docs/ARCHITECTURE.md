@@ -97,6 +97,11 @@ the shape of the system changes:_
     a Deno test pins the RPC's prediction against the engine's settled result, and the
     grep gate is `grep -rn "value_remaining" SwimSyncApp/app SwimSyncAdmin/app`
     (stored-column display only; no arithmetic with attendance).
+    *(Superseded in part since Wave 6 / `20261013000100`: lessons draw AT MARKING, so the stored
+    `value_remaining` IS live and `package_live_balances()` returns it unchanged. The admin
+    Packages page reads the stored column and derives lessons left as floor(value ÷ rate) IN
+    CENTS — `lessonsLeft()`, `packages/domain/packageRows.ts`, 2026-11-18 — the RPC's own
+    formula, never arithmetic with attendance. Other callers still read the RPC.)*
   - **Instance terms are snapshotted from the product BY THE DB at request time**
     (lifecycle trigger, NOT SECURITY DEFINER — §7.38); product money terms are immutable
     by trigger (a price change is retire + new product); balances are CHECK-bounded

@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.169** | 2026-11-18 | Bring in a package bought before SwimSync (carried-over packages); live | PRD §7.16, ARCHITECTURE §6ai, §7.398 · DEPLOYMENT #110 |
 | **8.168** | 2026-11-18 | Admin corrects a linked family: parent name/phone, unlink, child DOB; live | PRD §7.19, §7.396, §7.397 · DEPLOYMENT #109 |
 | **8.167** | 2026-11-17 → 18 | Edge Functions typed from generated schema + tiered (dao/domain); v42 live, byte-identical | EDGE_FUNCTIONS_REFACTOR_PLAN, §7.393–§7.395 · DEPLOYMENT #107, #108 |
 | **8.166** | 2026-11-16 → 17 | Billing engine batched (v40), Vercel moved to `sin1`; byte-identical at 4 sizes | BILLING_ENGINE_SPEED, §7.391, §7.392 · DEPLOYMENT #106 |
