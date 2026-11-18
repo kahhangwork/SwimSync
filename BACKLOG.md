@@ -299,7 +299,7 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 8. ~~*UI/UX improvements*~~ — **shipped 2026-10-14** (UI restyle Phases 0–7; DESIGN.md adopted). What it left open:
    *UI restyle leftovers* (S each).
 9. ~~*Remove the legacy package matcher*~~ — **shipped 2026-10-13** (engine v36 + `20261013000100`; the D9 guard went
-   with it). Follow-up filed: *Simplify the admin's live-balance display* (S).
+   with it). Follow-up ~~*Simplify the admin's live-balance display*~~ shipped 2026-11-18.
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
 (low-balance nudge, automated reminders), Native builds → Push, Bulk WhatsApp, In-app payment gateway. (*Logo check*
@@ -1117,15 +1117,6 @@ activation trigger and update that case.
 - **`public-package/core.ts validUntilPreview` computes `start_date + weeks` in TypeScript.** A carried row's token is
   never shared today (no offer, no email, no pay link for an active row); if any surface ever links one, anchor that
   preview on `carried_over_start` first (an Edge Function deploy). Plan: `docs/plans/CARRIED_OVER_PACKAGES_PLAN.md` Step 4.
-
-### Simplify the admin's live-balance display — **S** — _filed 2026-10-13, follow-up of Remove the legacy package matcher_
-`package_live_balances()` now returns the stored balance as its "live" one (`20261013000100`), so the admin's
-`HeldTable` "pending draws" branch (`live_value_remaining !== value_remaining`) and the live/stored split in
-`packages/domain/packageRows.ts` and `makeups/domain/makeupRows.ts` can never differ.
-
-**Why:** dead UI branches read as a feature to the next person who touches the Packages page. **Notes:** read
-`value_remaining` directly and drop the RPC call where it was only used for the live figure; keep the RPC itself
-(contract: the RETURNS TABLE shape) until no bundle calls it, then drop it in its own migration.
 
 ### Large-month invoice emails: send them outside the Generate request — **M** — _filed 2026-11-17, follow-up of Billing engine speed_
 Today one Generate press creates every invoice (seconds) and then emails each parent **inside the same request**, at

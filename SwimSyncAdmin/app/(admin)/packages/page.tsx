@@ -14,9 +14,10 @@
 //   • Purchases — pending requests to confirm (the admin's proof-of-payment
 //     step, PRD §7.9's manual-verification model), plus every package held.
 //
-// Balances shown here are LIVE: package_live_balances() subtracts lessons
-// already attended but not yet invoiced. Do NOT recompute that in TS — the
-// RPC is the single derivation (PACKAGES_DESIGN.md ⚠ RISK 4).
+// Balances shown here are the STORED ones: every package lesson draws AT
+// MARKING (Wave 6), so value_remaining is already live — there is no pending
+// draw to simulate (package_live_balances() returns it unchanged since
+// 20261013000100). Lessons left = floor(value ÷ rate), lessonsLeft().
 
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";

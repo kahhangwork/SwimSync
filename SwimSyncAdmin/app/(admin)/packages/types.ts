@@ -39,9 +39,10 @@ export type Purchase = {
    *  none. The confirm/QR number the admin ticks against the bank (RISK 7). */
   amount_payable: number;
   discount_amount: number;
+  /** The stored balance — live, since every lesson draws at marking. */
   value_remaining: number;
-  live_value_remaining: number | null;
-  live_lessons_remaining: number | null;
+  /** floor(value_remaining ÷ rate_per_lesson) — lessonsLeft(). */
+  lessons_remaining: number;
   status: string;
   /** When the business confirmed payment (NULL = never paid — a request, or a
    *  declined one). Only a cancelled package WITH this can be refunded. */

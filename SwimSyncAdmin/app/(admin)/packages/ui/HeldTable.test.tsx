@@ -5,12 +5,10 @@ import { HeldTable } from "./HeldTable";
 import type { Purchase } from "../types";
 
 // HeldTable — "Who holds one". Each row is a package with money on it: the
-// admin reconciles by reference, reads the LIVE balance (attended-not-yet-
-// invoiced lessons already subtracted, flagged with *), and Extend/Cancel act on
-// that one package. Pinned:
+// admin reconciles by reference, reads the balance (stored = live, since every
+// lesson draws at marking), and Extend/Cancel act on that one package. Pinned:
 //   • rows show parent, children, package, reference and status;
-//   • the live balance is used for an active package and the * appears only
-//     when it differs from the invoiced balance;
+//   • an active package shows lessons left and its balance, one figure, no *;
 //   • an expired active package says so (todayInSg, §7.7);
 //   • Extend/Cancel exist ONLY on active rows and act on that row; busy locks them;
 //   • the three empty states are distinct (loading / nobody / no match) and the
@@ -22,8 +20,8 @@ import type { Purchase } from "../types";
 //      → RED: "Extend/Cancel only on an active package, and they act on that row"
 //   2. `onClick={() => openExtend(p)}` → `openExtend(visibleHeld[0])`
 //      → RED: "Extend/Cancel only on an active package, and they act on that row"
-//   3. `{p.live_lessons_remaining} lesson` → `{p.lesson_count} lesson`
-//      → RED: "an active package shows its LIVE balance …"
+//   3. `{p.lessons_remaining} lesson` → `{p.lesson_count} lesson`
+//      → RED: "an active package shows lessons left and its stored balance …"
 //   4. `p.expires_on < todayInSg()` → `p.expires_on > todayInSg()`
 //      → RED: "an active package past its expiry says expired; a future one does not"
 //   5. no-match branch `heldMatches.length === 0 ?` → `false ?`
@@ -45,9 +43,8 @@ function purchase(over: Partial<Purchase>): Purchase {
     total_value: 300,
     amount_payable: 300,
     discount_amount: 0,
-    value_remaining: 240,
-    live_value_remaining: 180,
-    live_lessons_remaining: 6,
+    value_remaining: 180,
+    lessons_remaining: 6,
     status: "active",
     confirmed_at: null,
     product_id: "prod1",
@@ -78,8 +75,7 @@ const BOB = purchase({
   reference_number: "PKG-2026-0002",
   status: "exhausted",
   value_remaining: 0,
-  live_value_remaining: null,
-  live_lessons_remaining: null,
+  lessons_remaining: 0,
   children: null,
   category_name: null,
 });
@@ -88,10 +84,8 @@ const CAROL = purchase({
   parent_name: "Carol Ng",
   reference_number: "PKG-2026-0003",
   expires_on: "2020-01-31",
-  // Live equals invoiced → no asterisk.
   value_remaining: 90,
-  live_value_remaining: 90,
-  live_lessons_remaining: 3,
+  lessons_remaining: 3,
   children: null,
   holiday_extension_days: 1,
   cancel_extension_days: 2,
@@ -139,33 +133,20 @@ describe("HeldTable", () => {
     expect(bob.getByText(/all classes/)).toBeTruthy();
   });
 
-  it("an active package shows its LIVE balance, flagged * when it differs from the invoiced one", () => {
+  it("an active package shows lessons left and its stored balance — one figure, no *", () => {
     setup();
     const alice = within(row("Alice Tan").getByTestId("live-remaining"));
     expect(alice.getByText(/6 lessons/)).toBeTruthy();
     expect(alice.getByText(/S\$180\.00/)).toBeTruthy();
-    expect(alice.getByTitle("Includes lessons attended but not yet invoiced")).toBeTruthy();
 
     const carol = within(row("Carol Ng").getByTestId("live-remaining"));
     expect(carol.getByText(/3 lessons/)).toBeTruthy();
-    expect(carol.queryByTitle("Includes lessons attended but not yet invoiced")).toBeNull();
+    expect(screen.queryByText("*")).toBeNull();
+    expect(screen.queryByText(/Remaining balances are live/)).toBeNull();
 
-    // Not active → the stored (invoiced) value, no live figure.
+    // Not active → the stored value only, no lessons figure.
     expect(row("Bob Lim").queryByTestId("live-remaining")).toBeNull();
     expect(row("Bob Lim").getByText("S$0.00")).toBeTruthy();
-  });
-
-  // Wave 6: once a business draws at marking, live = stored by construction
-  // (package_live_balances stops simulating), so no row carries a * — and the
-  // footnote explaining a * must not hang under a table that shows one figure.
-  it("the * footnote shows only when some row's live balance differs from the stored one", () => {
-    const FOOT = /Remaining balances are live/;
-    const { unmount } = setup(); // ALICE differs
-    expect(screen.getByText(FOOT)).toBeTruthy();
-    unmount();
-
-    setup({ held: [BOB, CAROL] }); // CAROL equal, BOB not active
-    expect(screen.queryByText(FOOT)).toBeNull();
   });
 
   it("an active package past its expiry says expired; a future one does not", () => {
@@ -270,8 +251,7 @@ describe("HeldTable refunds", () => {
     status: "cancelled",
     confirmed_at: "2026-09-16T05:46:00Z",
     amount_payable: 350,
-    live_value_remaining: null,
-    live_lessons_remaining: null,
+    lessons_remaining: 0,
   });
   const REFUND = { id: "r1", parent_package_id: "p9", amount: 120, refunded_on: "2026-09-20", note: "moved" };
 

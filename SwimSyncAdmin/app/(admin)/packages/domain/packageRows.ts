@@ -13,7 +13,6 @@ import type {
   PurchaseRow,
   RefundRow,
 } from "../dao/packages.repo";
-import type { LiveBalanceRow } from "../dao/packages.rpc";
 
 export function mapCategories(rows: CategoryRow[] | null): Category[] {
   return (rows ?? []).map((c) => ({
@@ -70,16 +69,17 @@ export function childOptionsByParent(rows: ChildRow[] | null): Map<string, Child
   return map;
 }
 
-// Live balances by package id — the RPC's number, never recomputed here.
-export function liveBalancesById(rows: LiveBalanceRow[] | null): Map<string, LiveBalanceRow> {
-  return new Map<string, LiveBalanceRow>(
-    (rows ?? []).map((r) => [r.parent_package_id, r])
-  );
+/** Whole lessons a balance still pays for: floor(value ÷ rate), as
+ *  package_live_balances() computes it in SQL. In CENTS, so a rate like 33.33
+ *  never floors 99.99 to 2 on a float remainder. 0 for a zero/missing rate. */
+export function lessonsLeft(valueRemaining: number, ratePerLesson: number): number {
+  const rate = Math.round(ratePerLesson * 100);
+  if (!(rate > 0)) return 0;
+  return Math.max(0, Math.floor(Math.round(valueRemaining * 100) / rate));
 }
 
 export function mapPurchases(
   rows: PurchaseRow[] | null,
-  liveById: Map<string, LiveBalanceRow>,
   childrenMap: Map<string, string[]>
 ): Purchase[] {
   return (rows ?? []).map((p) => ({
@@ -97,13 +97,7 @@ export function mapPurchases(
     amount_payable: Number(p.amount_payable),
     discount_amount: Number(p.discount_amount),
     value_remaining: Number(p.value_remaining),
-    // `!` ×2: guarded by the `liveById.has(p.id)` beside each.
-    live_value_remaining: liveById.has(p.id)
-      ? Number(liveById.get(p.id)!.live_value_remaining)
-      : null,
-    live_lessons_remaining: liveById.has(p.id)
-      ? Number(liveById.get(p.id)!.live_lessons_remaining)
-      : null,
+    lessons_remaining: lessonsLeft(Number(p.value_remaining), Number(p.rate_per_lesson)),
     status: p.status,
     confirmed_at: p.confirmed_at ?? null,
     product_id: p.product_id,

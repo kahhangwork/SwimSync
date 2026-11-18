@@ -16,8 +16,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 //      → RED: "loadRefunds reads live (non-reversed) refunds only"
 //   2. `amount_payable` deleted from loadPurchases' select
 //      → RED: "loadPurchases reads every money column, newest first, capped"
-//   3. `package_live_balances` → `package_balances` in liveBalances
-//      → RED: "liveBalances calls package_live_balances with no args"
 
 const { log } = vi.hoisted(() => ({ log: [] as unknown[][] }));
 
@@ -39,7 +37,7 @@ vi.mock("@/lib/supabase", () => {
 });
 
 import { loadProducts, loadPurchases, loadRefunds } from "./packages.repo";
-import { liveBalances, renewalCandidates } from "./packages.rpc";
+import { renewalCandidates } from "./packages.rpc";
 import { ROW_LIMIT } from "../constants";
 
 beforeEach(() => {
@@ -81,11 +79,6 @@ describe("packages money reads", () => {
       ["select", "id, parent_package_id, amount, refunded_on, note"],
       ["is", "reversed_at", null],
     ]);
-  });
-
-  it("liveBalances calls package_live_balances with no args", () => {
-    liveBalances();
-    expect(log).toEqual([["rpc", "package_live_balances"]]);
   });
 
   it("renewalCandidates calls package_renewal_candidates with no args", () => {

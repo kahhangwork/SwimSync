@@ -32,10 +32,6 @@ export async function myTenantId(): Promise<string | null> {
   return (data?.tenant_id as string | null) ?? null;
 }
 
-/** Live balances by package id — the RPC's number, never recomputed above. */
-export const liveBalances = () => supabase.rpc("package_live_balances");
-export type LiveBalanceRow = DataOf<typeof liveBalances>[number];
-
 // Pre-fill a start date from the smart default. ⚠ RISK 7: this is only a
 // suggestion — any failure falls back to today, never blocks the flow.
 // p_student_id: the one child of a one-child sale (their enrolments and the

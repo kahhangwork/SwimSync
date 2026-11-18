@@ -17,7 +17,6 @@ import {
   mapProducts,
   childrenByParent,
   childOptionsByParent,
-  liveBalancesById,
   refundsByPackage,
   mapPurchases,
   mapParents,
@@ -87,11 +86,10 @@ export function usePackageList() {
     }
 
     // RLS scopes every query here to the caller's own business.
-    const [catRes, prodRes, purRes, liveRes, ptRes, childRes, refRes] = await Promise.all([
+    const [catRes, prodRes, purRes, ptRes, childRes, refRes] = await Promise.all([
       repo.loadCategories(),
       repo.loadProducts(),
       repo.loadPurchases(),
-      rpc.liveBalances(),
       repo.loadParentOptions(),
       repo.loadChildren(),
       repo.loadRefunds(),
@@ -111,8 +109,7 @@ export function usePackageList() {
     setCategories(mapCategories(catRes.data));
     setProducts(mapProducts(prodRes.data));
     setCapped((purRes.data ?? []).length >= ROW_LIMIT);
-    const liveById = liveBalancesById(liveRes.data);
-    setPurchases(mapPurchases(purRes.data, liveById, childMap));
+    setPurchases(mapPurchases(purRes.data, childMap));
     setParents(mapParents(ptRes.data));
     if (refRes.error) console.error("package_refunds fetch failed", refRes.error);
     setRefunds(refRes.error ? null : refundsByPackage(refRes.data));

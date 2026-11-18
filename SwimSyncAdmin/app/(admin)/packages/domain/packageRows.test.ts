@@ -8,7 +8,7 @@ import {
   mapCategories,
   mapProducts,
   childrenByParent,
-  liveBalancesById,
+  lessonsLeft,
   mapPurchases,
   mapParents,
   pendingPurchases,
@@ -93,41 +93,49 @@ describe("mapPurchases", () => {
     requested_at: "2026-09-01",
   } as any; // partial row, numerics as strings: pins the fallbacks and Number()
 
-  it("takes live balances from the RPC map, null when absent, and joins children", () => {
-    const live = liveBalancesById([
-      { parent_package_id: "pp1", live_value_remaining: "200", live_lessons_remaining: "6" },
-    ] as any);
+  it("reads the stored balance, derives lessons left from it, and joins children", () => {
     const kids = childrenByParent([
       { parent_id: "p1", students: { id: "s1", full_name: "Ali", is_active: true } },
     ]);
     const [row] = mapPurchases(
       [{ ...base, parents: { profiles: { full_name: "Mum" } } }],
-      live,
       kids
     );
     expect(row.parent_name).toBe("Mum");
-    expect(row.live_value_remaining).toBe(200);
-    expect(row.live_lessons_remaining).toBe(6);
+    expect(row.value_remaining).toBe(350);
+    expect(row.lessons_remaining).toBe(lessonsLeft(350, Number(base.rate_per_lesson)));
     expect(row.children).toBe("Ali");
     expect(row.amount_payable).toBe(300);
   });
 
-  it("live_* are null when the package is not in the balances map", () => {
-    const [row] = mapPurchases([base], new Map(), new Map());
-    expect(row.live_value_remaining).toBeNull();
-    expect(row.live_lessons_remaining).toBeNull();
+  it("children is null when the parent has none", () => {
+    const [row] = mapPurchases([base], new Map());
     expect(row.children).toBeNull();
   });
 
   it("parent_name falls back email → 'Unknown'", () => {
     const [email] = mapPurchases(
       [{ ...base, parents: { profiles: { full_name: null, email: "a@b.co" } } }],
-      new Map(),
       new Map()
     );
     expect(email.parent_name).toBe("a@b.co");
-    const [unknown] = mapPurchases([{ ...base, parents: null }], new Map(), new Map());
+    const [unknown] = mapPurchases([{ ...base, parents: null }], new Map());
     expect(unknown.parent_name).toBe("Unknown");
+  });
+});
+
+describe("lessonsLeft", () => {
+  // floor(value ÷ rate), as package_live_balances() computes it in SQL — in
+  // cents, so a float remainder never loses a lesson.
+  it("floors whole lessons, and never loses one to a float remainder", () => {
+    expect(lessonsLeft(180, 30)).toBe(6);
+    expect(lessonsLeft(179.99, 30)).toBe(5);
+    expect(lessonsLeft(99.99, 33.33)).toBe(3);
+    expect(lessonsLeft(0.3, 0.1)).toBe(3);
+  });
+  it("is 0 for an empty balance or a zero rate", () => {
+    expect(lessonsLeft(0, 30)).toBe(0);
+    expect(lessonsLeft(100, 0)).toBe(0);
   });
 });
 

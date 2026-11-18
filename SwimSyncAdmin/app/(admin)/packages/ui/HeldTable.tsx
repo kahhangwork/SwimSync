@@ -16,14 +16,6 @@ import type { LiveRefund, Purchase } from "../types";
 
 const DMY: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
 
-/** The row's * — lessons attended but not yet invoiced. Never true once the
- *  business draws at marking (Wave 6: live = stored), which is what makes the
- *  table show one figure there. */
-const liveDiffers = (p: Purchase) =>
-  p.status === "active" &&
-  p.live_lessons_remaining !== null &&
-  p.live_value_remaining !== p.value_remaining;
-
 export function HeldTable({
   held,
   heldMatches,
@@ -68,7 +60,7 @@ export function HeldTable({
 }) {
   const heldSort = useTableSort<Purchase>({
     key: "parent_name",
-    accessors: { remaining: (p) => p.live_lessons_remaining },
+    accessors: { remaining: (p) => (p.status === "active" ? p.lessons_remaining : null) },
   });
   const visibleHeld = heldSort.apply(heldMatches);
 
@@ -155,26 +147,17 @@ export function HeldTable({
                     {p.reference_number ?? "—"}
                   </Td>
                   <Td>
-                    {p.status === "active" &&
-                    p.live_lessons_remaining !== null ? (
+                    {p.status === "active" ? (
                       <span
                         className="font-medium text-ink"
                         data-testid="live-remaining"
                       >
-                        {p.live_lessons_remaining} lesson
-                        {p.live_lessons_remaining === 1 ? "" : "s"}
+                        {p.lessons_remaining} lesson
+                        {p.lessons_remaining === 1 ? "" : "s"}
                         <span className="font-normal text-ink-muted">
                           {" "}
-                          · {money(p.live_value_remaining ?? 0)}
+                          · {money(p.value_remaining)}
                         </span>
-                        {liveDiffers(p) && (
-                          <span
-                            className="ml-1 font-normal text-ink-muted"
-                            title="Includes lessons attended but not yet invoiced"
-                          >
-                            *
-                          </span>
-                        )}
                       </span>
                     ) : (
                       <span className="text-ink-muted">
@@ -288,13 +271,6 @@ export function HeldTable({
             })}
           </Tbody>
         </Table>
-      )}
-      {visibleHeld.some(liveDiffers) && (
-        <p className="mt-2 text-label text-ink-muted">
-          * Remaining balances are live: lessons attended but not yet invoiced
-          are already subtracted. The money itself moves when the month is
-          billed.
-        </p>
       )}
       {refunds === null && (
         <p className="mt-1 text-label text-status-warning-text" data-testid="refunds-unavailable">
