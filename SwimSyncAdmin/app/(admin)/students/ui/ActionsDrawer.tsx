@@ -17,6 +17,7 @@ export type ActionsDrawerProps = {
   onContact: (s: StudentRow) => void;
   onRename: (s: StudentRow) => void;
   onGender: (s: StudentRow) => void;
+  onDob: (s: StudentRow) => void;
   onGrade: (s: StudentRow) => void;
   onInactive: (s: StudentRow) => void;
   onRemove: (s: StudentRow, cls: EnrolledClass) => void;
@@ -91,6 +92,12 @@ export function ActionsDrawer(p: ActionsDrawerProps) {
                 className="w-full rounded-control border border-border px-3 py-2 text-left text-body font-semibold text-ink-secondary hover:bg-ground"
               >
                 {drawerFor.gender === null ? "Set gender (not recorded)" : "Gender"}
+              </button>
+              <button
+                onClick={act(p.onDob)}
+                className="w-full rounded-control border border-border px-3 py-2 text-left text-body font-semibold text-ink-secondary hover:bg-ground"
+              >
+                {drawerFor.date_of_birth === null ? "Set date of birth (not recorded)" : "Date of birth"}
               </button>
               {/* The one-off correction. Whole classes are graded on the
                   Assessment tab; this is for the child who joined late or was

@@ -7,10 +7,12 @@ import { StudentToolbar } from "./ui/StudentToolbar";
 import { ListNotices } from "./ui/ListNotices";
 import { useRename } from "./domain/useRename";
 import { useGender } from "./domain/useGender";
+import { useDob } from "./domain/useDob";
 import { useAddClass } from "./domain/useAddClass";
 import { useStudentStatus } from "./domain/useStudentStatus";
 import { RenameModal } from "./ui/RenameModal";
 import { GenderModal } from "./ui/GenderModal";
+import { DobModal } from "./ui/DobModal";
 import { AddClassModal } from "./ui/AddClassModal";
 import { StatusChangeModal } from "./ui/StatusChangeModal";
 import { useMerge } from "./domain/useMerge";
@@ -54,6 +56,7 @@ export default function StudentsPage() {
   // load() so its write refetches the table exactly as the inline code did.
   const rename = useRename(load);
   const gender = useGender(load);
+  const dob = useDob(load);
   const addClass = useAddClass(load);
   const status = useStudentStatus(load);
   // Slice 2 — duplicate pairs are derived from the list on every render.
@@ -67,7 +70,7 @@ export default function StudentsPage() {
   // Slice 6 — the level ladder and the one-child grading modal.
   const grading = useGrading(load);
   // Slice 8 — the parent's contact details, and inviting a parent.
-  const contact = useContact();
+  const contact = useContact(load);
   const invite = useInvite(load);
   // Slice 7 — the Add-student form and its advisory duplicate check.
   const addStudent = useAddStudent(tenantId, load);
@@ -142,6 +145,7 @@ export default function StudentsPage() {
         onContact={contact.openContact}
         onRename={rename.openRename}
         onGender={gender.openGender}
+        onDob={dob.openDob}
         onGrade={(s) => void grading.openGrading(s)}
         onInactive={status.openInactive}
         onRemove={status.openRemove}
@@ -159,6 +163,8 @@ export default function StudentsPage() {
       <RenameModal rename={rename} />
 
       <GenderModal g={gender} />
+
+      <DobModal d={dob} />
 
       <InviteModal invite={invite} />
 

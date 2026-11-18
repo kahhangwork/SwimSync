@@ -2808,18 +2808,32 @@ The name is worth recording even though nothing computes with it: it answers *wh
 this is — a parent, a grandparent, the helper who brought them. It is also the only place
 that value can be set, since neither *Add a student* nor *Book a trial* asks for it.
 
-#### The family has an account — read-only
+#### The family has an account — name and phone editable *(implemented 2026-11-18)*
 
-Once a parent holds an account, their real details live on their own profile, which **they
-maintain themselves** in the app under *Profile → Contact Details*. The admin sees those,
-labelled as such, and is told where the family changes them. **Every** linked parent is
-shown, not one: a child has two parents, and *"use the mother's number, not the father's"*
-is the ordinary reason to open this screen.
+Once a parent holds an account, their real details live on their own profile. The admin sees
+**every** linked parent, not one: a child has two parents, and *"use the mother's number, not
+the father's"* is the ordinary reason to open this screen.
 
-They are not editable here on purpose. A second editable copy on the child's row would be a
-stale duplicate of the record that actually matters — the same fault that removed
-`students.age` and `classes.price_per_lesson`. It is also not the business's data to
-rewrite: a parent is global to SwimSync, not owned by one school.
+*Until 2026-11-18 this was read-only*, on the reasoning that the family maintains it in the
+app. A tenant admin reported the cost: *"once a parent is linked to a child, if key information
+is entered wrongly, we may need to delete the whole child record and recreate it."* So now:
+
+- **Name and phone are editable** per parent, and saving writes **the parent's own profile** —
+  never a second copy on the child's row (the stale-duplicate fault that removed `students.age`).
+  A parent is global to SwimSync, so the correction shows in **every business the family
+  belongs to**; the screen says so. Audited against the editing business.
+- **The email is NOT editable.** It is the parent's login; they change it in the app under
+  *Profile → Contact Details*, and the screen says where.
+- **Unlink a wrong parent** — *"Wrong parent? Unlink from this child"*, confirmed inline. Refused
+  once **that parent has been billed for that child** (an invoice line, or a package draw) — the
+  fix then is a credit note. A link made by an approved claim is undone exactly as *Undo this
+  link* on Parent Requests does it, reverting what the claim filled in. Unlinking the last parent
+  leaves the child unclaimed, and their lessons show as unclaimed when the month is billed.
+- **Locked under a pending claim** by that parent at this business, for the reason below.
+
+The **child's** details are all editable from the row's Actions too: *Rename*, *Gender*, and
+*Date of birth* *(implemented 2026-11-18 — refuses a future date and a name + DOB that would
+duplicate another active child; an emptied field clears it)*.
 
 #### A claim is pending — locked
 

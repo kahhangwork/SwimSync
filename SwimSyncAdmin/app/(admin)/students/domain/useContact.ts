@@ -6,27 +6,38 @@
 // three provisional_contact_* columns exist for the window BEFORE the adult
 // who brought the child has an account.
 //
-// ⚠ TWO MODES, AND THE CLAIMED ONE IS READ-ONLY BY DESIGN. Once a parent has
-// an account their real details live on `profiles`, which they maintain
-// themselves in the app ((parent)/profile/contact.tsx). Offering a second
-// editable copy here would be exactly the stale duplicate that `students.age`
-// and `classes.price_per_lesson` were removed for. It is also not ours to
-// write: parents are global, so profiles.tenant_id is NULL and
-// is_tenant_admin(NULL) is hard-false — the database refuses it either way.
+// ⚠ TWO MODES. Unclaimed: the three provisional_contact_* columns on the child.
+// Claimed: the parent's OWN `profiles` row — never a second copy on the child,
+// which would be the stale duplicate `students.age` was removed for.
+//
+// The claimed mode was READ-ONLY until 2026-11-18. User feedback: "once a parent
+// is linked to a child, if key information is entered wrongly, we may need to
+// delete the whole child record and recreate it." The user's decision: the admin
+// edits the parent's NAME + PHONE through set_parent_contact() — not the email,
+// which is the parent's login — and can UNLINK a wrong parent through
+// unlink_parent_from_student(), which refuses once that parent has been billed
+// for this child. A parent is global: the corrected name and phone show in every
+// business the family belongs to. Both RPCs are the boundary; nothing here writes
+// `profiles` or `parent_students` directly.
 
 import { useRef, useState } from "react";
 import { blankToNull } from "@/lib/sgPhone";
 import * as repo from "../dao/students.repo";
+import * as rpc from "../dao/students.rpc";
 import type { ContactParentRow, ContactSelectRow } from "../dao/students.repo";
 import type { StudentRow } from "../types";
 
 export type ContactParent = {
+  id: string;
   full_name: string | null;
   email: string | null;
   phone: string | null;
 };
 
-export function useContact() {
+/** The admin's in-progress edit of one linked parent, keyed by parents.id. */
+export type ParentEdit = { name: string; phone: string };
+
+export function useContact(reload: () => Promise<void>) {
   const [contactFor, setContactFor] = useState<StudentRow | null>(null);
   const [contactLoading, setContactLoading] = useState(false);
   const [contactClaimed, setContactClaimed] = useState(false);
@@ -38,6 +49,12 @@ export function useContact() {
   // an admin opens this. Taking [0] would answer with whichever row came back
   // first.
   const [contactParents, setContactParents] = useState<ContactParent[]>([]);
+  const [parentEdits, setParentEdits] = useState<Record<string, ParentEdit>>({});
+  // One parent at a time: the busy/error/confirm state belongs to the card it names.
+  const [parentBusy, setParentBusy] = useState<string | null>(null);
+  const [parentError, setParentError] = useState<{ id: string; message: string } | null>(null);
+  const [parentSaved, setParentSaved] = useState<string | null>(null);
+  const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null);
   const [pendingClaims, setPendingClaims] = useState(0);
   const [contactBusy, setContactBusy] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
@@ -57,6 +74,11 @@ export function useContact() {
     setContactClaimed(false);
     setContactError(null);
     setContactParents([]);
+    setParentEdits({});
+    setParentBusy(null);
+    setParentError(null);
+    setParentSaved(null);
+    setConfirmUnlink(null);
     setPendingClaims(0);
     setContactName("");
     setContactPhone("");
@@ -96,12 +118,15 @@ export function useContact() {
       // `any`, so the wrong nesting level typechecks and renders every field
       // blank (§7.28) — which reads as "this family gave us nothing" when they
       // gave us everything. The UI driver asserts the exact seeded strings.
-      setContactParents(
-        parents.map((p) => ({
-          full_name: p.profiles?.full_name ?? null,
-          email: p.profiles?.email ?? null,
-          phone: p.profiles?.phone ?? null,
-        }))
+      const shown = parents.map((p) => ({
+        id: p.id,
+        full_name: p.profiles?.full_name ?? null,
+        email: p.profiles?.email ?? null,
+        phone: p.profiles?.phone ?? null,
+      }));
+      setContactParents(shown);
+      setParentEdits(
+        Object.fromEntries(shown.map((p) => [p.id, { name: p.full_name ?? "", phone: p.phone ?? "" }]))
       );
       setContactLoading(false);
       return;
@@ -117,9 +142,9 @@ export function useContact() {
     // the phone underneath a pending claim leaves the Claims queue asserting
     // "their registered phone matches the contact number on this child" when it
     // no longer does, and the admin then approves a parent–child link on a
-    // justification that is silently false. Nothing else in the product can
-    // unlink a parent from a child except that flow's own undo (§7.47), so a
-    // wrong link is expensive. Resolve the claim first.
+    // justification that is silently false. A wrong link can be unlinked
+    // (unlinkParent) only until that parent is billed for the child, so it
+    // stays expensive. Resolve the claim first.
     const { count, error: claimError } = await repo.countPendingClaims(student.id);
 
     if (contactRequestFor.current !== student.id) return;
@@ -175,6 +200,54 @@ export function useContact() {
     setContactFor(null);
   }
 
+  function setParentField(parentId: string, field: keyof ParentEdit, value: string) {
+    setParentEdits((e) => ({ ...e, [parentId]: { ...e[parentId], [field]: value } }));
+    setParentSaved(null);
+  }
+
+  async function saveParent(parentId: string) {
+    const edit = parentEdits[parentId];
+    if (!edit) return;
+    if (edit.name.trim() === "") {
+      setParentError({ id: parentId, message: "Enter the parent's name." });
+      return;
+    }
+    setParentBusy(parentId);
+    setParentError(null);
+    setParentSaved(null);
+    const { error } = await rpc.setParentContact(parentId, edit.name.trim(), blankToNull(edit.phone));
+    setParentBusy(null);
+    if (error) {
+      // The RPC's refusals (a pending claim, a blank name) are written for the admin — surfaced verbatim.
+      setParentError({ id: parentId, message: error.message });
+      return;
+    }
+    setContactParents((ps) =>
+      ps.map((p) => (p.id === parentId ? { ...p, full_name: edit.name.trim(), phone: blankToNull(edit.phone) } : p))
+    );
+    setParentSaved(parentId);
+    // The Parent column shows this name, so the table is now stale.
+    await reload();
+  }
+
+  async function unlinkParent(parentId: string) {
+    const student = contactFor;
+    if (!student) return;
+    setParentBusy(parentId);
+    setParentError(null);
+    const { error } = await rpc.unlinkParentFromStudent(parentId, student.id);
+    setParentBusy(null);
+    setConfirmUnlink(null);
+    if (error) {
+      setParentError({ id: parentId, message: error.message });
+      return;
+    }
+    await reload();
+    // Re-read: with the last parent gone the child is unclaimed again, and the
+    // modal must switch to the editable provisional details — from a FRESH read.
+    await openContact(student);
+  }
+
   return {
     contactFor,
     contactLoading,
@@ -186,6 +259,15 @@ export function useContact() {
     contactEmail,
     setContactEmail,
     contactParents,
+    parentEdits,
+    setParentField,
+    parentBusy,
+    parentError,
+    parentSaved,
+    confirmUnlink,
+    setConfirmUnlink,
+    saveParent,
+    unlinkParent,
     pendingClaims,
     contactBusy,
     contactError,

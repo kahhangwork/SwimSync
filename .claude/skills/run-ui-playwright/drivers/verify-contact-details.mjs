@@ -11,8 +11,8 @@
 //   • a child with a PENDING claim is LOCKED. student_claims.match_reason is a
 //     snapshot, so editing the phone underneath a pending claim leaves the
 //     Claims queue asserting a reason that is no longer true — and the admin
-//     approves a parent–child link on it. Nothing but that flow's own undo can
-//     unlink them afterwards (§7.47).
+//     approves a parent–child link on it. Unlinking afterwards is refused
+//     once that parent has been billed for the child (20261118000100).
 //   • the claimed branch shows the parent's REAL details, asserted as exact
 //     strings. The join runs through an `any`-typed select where the wrong
 //     nesting level typechecks and renders blank (§7.28), and two sessions
@@ -53,6 +53,11 @@ const sql = (q) =>
   ).trim();
 
 const WANDA = "cd000000-0000-0000-0000-000000000011";
+const XAVIER = "cd000000-0000-0000-0000-000000000022";
+const DEVI_PROFILE = "cd000000-0000-0000-0000-0000000000c1";
+// innerText does not include an <input>'s value, and the claimed branch is a form since 2026-11-18.
+const modalValues = (page) =>
+  page.locator("div.relative.z-10 input").evaluateAll((els) => els.map((e) => e.value));
 
 // ⚠ THE DRIVER RESETS WHAT THE DRIVER EDITS. This run rewrites Wanda's three
 // fields, so a second run without re-applying the fixture would assert against
@@ -64,6 +69,11 @@ sql(`UPDATE students SET provisional_contact_name  = 'Old Contact Name',
       WHERE id = '${WANDA}'`);
 // …and her gender, which section 8b sets (a re-run must start from "not recorded").
 sql(`UPDATE students SET gender = NULL WHERE id = '${WANDA}'`);
+// …and what 5b, 5c and 8c change (20261118000100): Wanda's DOB, Devi's phone, and Devi's link to Xavier.
+sql(`UPDATE students SET date_of_birth = '2017-03-04' WHERE id = '${WANDA}'`);
+sql(`UPDATE profiles SET full_name = 'Devi Raman', phone = '8222 3333' WHERE id = '${DEVI_PROFILE}'`);
+sql(`INSERT INTO parent_students (parent_id, student_id)
+     SELECT p.id, '${XAVIER}' FROM parents p WHERE p.profile_id = '${DEVI_PROFILE}' ON CONFLICT DO NOTHING`);
 
 // The row whose "Contact details" button we want. Scoping by row keeps this
 // honest on a page that lists every child in the business.
@@ -183,46 +193,90 @@ check(
   `IS NULL returned '${isNull}' — '' here would differ from every row add_unclaimed_student made`
 );
 
-// ══ 5. CLAIMED + ENROLLED — read-only, showing the parent's own row ═══════
+// ══ 5. CLAIMED + ENROLLED — the parent's own row, name + phone editable ═══
+// Read-only until 2026-11-18. User feedback: "once a parent is linked to a child, if key information is entered
+// wrongly, we may need to delete the whole child record and recreate it." The user's decision: name + phone are
+// editable (set_parent_contact), the email is NOT (it is the login), and a wrong parent can be unlinked.
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
 await openContact(page, "Xavier Claimedkid");
 await page.screenshot({ path: shot("cd-02-claimed.png"), fullPage: true });
 text = await page.evaluate(() => document.body.innerText);
+let values = await modalValues(page);
 
 check(
   "a claimed child shows the parent's REAL details, exactly as stored",
-  text.includes("Priya Raman") &&
+  values.includes("Priya Raman") &&
     text.includes("cdparenta@swimsync.test") &&
-    text.includes("+65 8123 4567"),
+    values.includes("+65 8123 4567"),
   "asserted as exact strings: a blank field is what the any-typed join fails to"
 );
 check(
-  "…and offers no way to edit them",
-  (await page.locator('input[placeholder="9123 4567"]').count()) === 0 &&
-    (await page.getByRole("button", { name: /Save contact details/i }).count()) === 0
+  "…name and phone are editable per parent; the email (their login) is not",
+  (await page.getByRole("button", { name: "Save parent details" }).count()) === 2 &&
+    !values.includes("cdparenta@swimsync.test") &&
+    (await page.getByRole("button", { name: /Save contact details/i }).count()) === 0,
+  "an email edit would change the parent's login — the user kept it theirs"
 );
 check(
-  "…and says where the parent changes them",
-  /Profile\s*→\s*Contact Details/i.test(text),
-  "otherwise the admin has a read-only screen and no idea what to do about it"
+  "…and says the email is changed by the parent, in the app",
+  /Profile\s*→\s*Contact Details/i.test(text)
 );
 check(
   "BOTH of a child's parents are shown, not whichever row came back first",
-  text.includes("Priya Raman") &&
-    text.includes("Devi Raman") &&
-    text.includes("8222 3333") &&
+  values.includes("Priya Raman") &&
+    values.includes("Devi Raman") &&
+    values.includes("8222 3333") &&
     /Parent 1 of 2/.test(text),
   "'the mother's number rather than the father's' is the reason this screen exists"
+);
+
+// ══ 5b. Correct a linked parent's phone ═══════════════════════════════════
+// Which card is Devi's: two inputs per card (name, phone), in the order the join returned the parents.
+const deviCard = values.indexOf("Devi Raman") / 2;
+await page.locator("div.relative.z-10 input").nth(deviCard * 2 + 1).fill("8222 4444");
+await page.getByRole("button", { name: "Save parent details" }).nth(deviCard).click();
+await page.waitForTimeout(1500);
+check(
+  "a linked parent's phone is corrected on their own profile",
+  sql(`SELECT phone FROM profiles WHERE id = '${DEVI_PROFILE}'`) === "8222 4444" &&
+    sql(`SELECT phone FROM profiles WHERE id = 'cd000000-0000-0000-0000-0000000000a1'`) === "+65 8123 4567",
+  "Devi's Save must not touch Priya — each card saves its own parent"
+);
+check(
+  "…and the correction is audited against this business",
+  sql(`SELECT count(*) FROM audit_log WHERE action = 'parent_contact_corrected'
+        AND new_value->>'phone' = '8222 4444'
+        AND tenant_id = '70000000-0000-0000-0000-000000000001'`) !== "0"
+);
+
+// ══ 5c. Unlink a wrong parent ═════════════════════════════════════════════
+await page.getByRole("button", { name: /Wrong parent\? Unlink/ }).nth(deviCard).click();
+await page.waitForTimeout(300);
+await page.screenshot({ path: shot("cd-02b-unlink-confirm.png"), fullPage: true });
+await page.getByRole("button", { name: "Yes, unlink" }).click();
+await page.waitForTimeout(2000);
+values = await modalValues(page);
+check(
+  "Unlink removes THAT parent, and only that one",
+  sql(`SELECT count(*) FROM parent_students ps JOIN parents p ON p.id = ps.parent_id
+        WHERE ps.student_id = '${XAVIER}' AND p.profile_id = '${DEVI_PROFILE}'`) === "0" &&
+    sql(`SELECT count(*) FROM parent_students WHERE student_id = '${XAVIER}'`) === "1",
+  "the second card's button must not unlink the first card's parent"
+);
+check(
+  "…and the modal re-reads: one parent left",
+  values.includes("Priya Raman") && !values.includes("Devi Raman")
 );
 
 // ══ 6. CLAIMED, NO ENROLMENT — the RLS case ═══════════════════════════════
 await closeModal(page);
 await openContact(page, "Yolanda Noclass");
 text = await page.evaluate(() => document.body.innerText);
+values = await modalValues(page);
 check(
   "a claimed child with NO enrolment still shows her parent's details",
-  text.includes("Marcus Chen") && text.includes("9876 5432"),
+  values.includes("Marcus Chen") && values.includes("9876 5432"),
   "her parent has no other children, so nothing else could make them readable"
 );
 
@@ -333,6 +387,22 @@ await page.waitForTimeout(1500);
 check(
   "…and the chosen gender is stored",
   sql(`SELECT gender FROM students WHERE id = '${WANDA}'`) === "female"
+);
+
+// ══ 8c. Correct a child's date of birth (20261118000100) ═══════════════════
+// No admin screen could change a DOB after the child was added — one more reason to delete and recreate a child.
+await rowFor(page, "Wanda Unclaimed").getByRole("button", { name: /^Actions$/ }).click();
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: "Date of birth", exact: true }).click();
+await page.waitForTimeout(800);
+const dobInput = page.locator("div.relative.z-10 input[type=date]");
+check("the DOB modal opens on the recorded date", (await dobInput.inputValue()) === "2017-03-04");
+await dobInput.fill("2017-03-05");
+await page.getByRole("button", { name: "Save date of birth" }).click();
+await page.waitForTimeout(1500);
+check(
+  "…and the corrected DOB is stored",
+  sql(`SELECT date_of_birth FROM students WHERE id = '${WANDA}'`) === "2017-03-05"
 );
 
 // ══ 9. The same warning on the Trials booking form ════════════════════════

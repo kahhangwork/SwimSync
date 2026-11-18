@@ -803,7 +803,9 @@ plan, the risk review and the walked gate.
 The reasoning below is kept because two of its calls were **settled differently** than it
 proposed, and the differences are the design:
 
-- **A claimed child is READ-ONLY, not editable.** The item left this open. Settled: the
+- ~~**A claimed child is READ-ONLY, not editable.**~~ **Reversed 2026-11-18** (user feedback — a wrong
+  detail meant deleting the child): name + phone now edit the parent's own profile, the email
+  stays theirs, and a wrong link can be unlinked (PRD §7.19). The original call, kept: the
   admin sees every linked parent's own `profiles` row, and the family maintains it in the
   app. A second editable copy would be the stale duplicate `students.age` was removed for
   — and `is_tenant_admin(NULL)` refuses the write anyway, since a parent is global.

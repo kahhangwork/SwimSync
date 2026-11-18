@@ -1,7 +1,8 @@
 // Slice 8a — the parent contact details modal. Stage 8 of
 // docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md. Markup verbatim from page.tsx.
-// Two modes off ONE fresh read — see useContact. Editable while the child is
-// unclaimed, read-only once a parent holds the account.
+// Two modes off ONE fresh read — see useContact. Unclaimed: the details taken
+// when the child was added. Claimed: each linked parent's own name + phone
+// (editable, 2026-11-18), their email (read-only — it is their login), and Unlink.
 
 import Link from "next/link";
 import { Modal } from "@/components/Modal";
@@ -30,42 +31,100 @@ export function ContactModal({ contact: c }: { contact: ContactState }) {
       ) : c.contactClaimed ? (
         <div className="space-y-4">
           <p className="text-body text-ink-secondary">
-            This family has a SwimSync account, so these are their own
-            details. They keep them up to date in the app, under{" "}
+            This family has a SwimSync account. Correcting a name or phone here
+            updates the parent&apos;s own profile, so it shows everywhere they
+            use SwimSync. The email is their login — only they can change it,
+            in the app under{" "}
             <span className="font-medium text-ink-secondary">
               Profile → Contact Details
-            </span>{" "}
-            — ask them to change it there and it updates everywhere.
+            </span>
+            .
           </p>
-          {c.contactParents.map((parent, i) => (
-            <div key={i}>
-              {c.contactParents.length > 1 && (
-                <p className="mb-1 text-label font-semibold text-ink-muted">
-                  Parent {i + 1} of {c.contactParents.length}
-                </p>
-              )}
-              <dl className="divide-y divide-divider rounded-control border border-border">
-                {[
-                  ["Name", parent.full_name],
-                  ["Email", parent.email],
-                  ["Phone", parent.phone],
-                ].map(([label, value]) => (
-                  <div key={label} className="flex gap-3 px-3 py-2 text-body">
-                    <dt className="w-16 shrink-0 font-medium text-ink-muted">
-                      {label}
-                    </dt>
-                    <dd className="text-ink">
-                      {value || (
-                        <span className="text-ink-muted">
-                          Not provided — the parent can add it in the app
-                        </span>
-                      )}
-                    </dd>
+          {c.contactParents.map((parent, i) => {
+            const edit = c.parentEdits[parent.id] ?? { name: "", phone: "" };
+            const busy = c.parentBusy === parent.id;
+            const error = c.parentError?.id === parent.id ? c.parentError.message : null;
+            const confirming = c.confirmUnlink === parent.id;
+            return (
+              <div key={parent.id} className="space-y-3 rounded-control border border-border p-3">
+                {c.contactParents.length > 1 && (
+                  <p className="text-label font-semibold text-ink-muted">
+                    Parent {i + 1} of {c.contactParents.length}
+                  </p>
+                )}
+                <label className="block">
+                  <span className="text-label font-semibold text-ink-secondary">Name</span>
+                  <input
+                    value={edit.name}
+                    onChange={(e) => c.setParentField(parent.id, "name", e.target.value)}
+                    className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-label font-semibold text-ink-secondary">Phone</span>
+                  <input
+                    value={edit.phone}
+                    onChange={(e) => c.setParentField(parent.id, "phone", e.target.value)}
+                    placeholder="9123 4567"
+                    className="mt-1 w-full rounded-control border border-border-strong px-3 py-2 text-body"
+                  />
+                  <ContactHint check={checkSgPhone(edit.phone)} />
+                </label>
+                <div className="text-body">
+                  <span className="text-label font-semibold text-ink-secondary">Email (their login)</span>
+                  <p className="mt-1 text-ink">
+                    {parent.email || <span className="text-ink-muted">Not provided</span>}
+                  </p>
+                </div>
+
+                {error && (
+                  <p className="rounded-card border border-status-danger-border bg-status-danger-bg px-3 py-2 text-label text-status-danger-text">
+                    {error}
+                  </p>
+                )}
+                {c.parentSaved === parent.id && (
+                  <p className="text-label text-status-success-text">Saved.</p>
+                )}
+
+                <Button className="w-full" disabled={c.parentBusy !== null} onClick={() => c.saveParent(parent.id)}>
+                  {busy && !confirming ? "Saving…" : "Save parent details"}
+                </Button>
+
+                {/* ⚠ TWO STEPS, INLINE — never window.confirm. The server refuses
+                    once this parent has been billed for this child (invoice or
+                    package draw), so the worst a slip can do is an unbilled link,
+                    which the family can re-claim. */}
+                {confirming ? (
+                  <div className="space-y-2 rounded-card border border-status-warning-border bg-status-warning-bg px-3 py-2">
+                    <p className="text-label text-status-warning-text">
+                      Remove {parent.full_name || "this parent"} from{" "}
+                      {c.contactFor?.full_name}? They will no longer see this
+                      child or be invoiced for them.
+                      {c.contactParents.length === 1 &&
+                        " This child will have no parent until one is linked, so their lessons will show as unclaimed when you bill."}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" disabled={busy} onClick={() => c.setConfirmUnlink(null)}>
+                        Cancel
+                      </Button>
+                      <Button variant="danger" disabled={busy} onClick={() => c.unlinkParent(parent.id)}>
+                        {busy ? "Removing…" : "Yes, unlink"}
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </dl>
-            </div>
-          ))}
+                ) : (
+                  <button
+                    type="button"
+                    disabled={c.parentBusy !== null}
+                    onClick={() => c.setConfirmUnlink(parent.id)}
+                    className="w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-body font-semibold text-status-danger-text hover:bg-status-danger-bg disabled:text-ink-muted"
+                  >
+                    Wrong parent? Unlink from this child
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="space-y-4">

@@ -85,3 +85,19 @@ export const addUnclaimedStudent = (args: {
   // required key makes dropping it a compile error (§7.345).
   p_gender: Gender;
 }) => supabase.rpc("add_unclaimed_student", args);
+
+/** The admin sets or clears a child's date of birth (20261118000100) — operations/edit, tenant from the row, audited.
+ *  Never a raw `.update({ date_of_birth })`: the RPC refuses a future date, a (name, DOB) duplicate and a change under
+ *  a pending claim, with messages written for the admin. */
+export const setStudentDateOfBirth = (studentId: string, dob: string | null) =>
+  supabase.rpc("set_student_date_of_birth", { p_student_id: studentId, p_dob: dob });
+
+/** The admin corrects a LINKED parent's name + phone on their own profile (20261118000100). Not the email — that is
+ *  their login, and stays theirs. A parent is global, so the change shows in every business they belong to. */
+export const setParentContact = (parentId: string, fullName: string, phone: string | null) =>
+  supabase.rpc("set_parent_contact", { p_parent_id: parentId, p_full_name: fullName, p_phone: phone });
+
+/** Removes ONE parent↔child link (20261118000100). Refused once that parent was invoiced or drew a package for the
+ *  child; a claim-made link is undone through undo_student_claim. */
+export const unlinkParentFromStudent = (parentId: string, studentId: string) =>
+  supabase.rpc("unlink_parent_from_student", { p_parent_id: parentId, p_student_id: studentId });
