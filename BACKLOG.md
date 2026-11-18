@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-11-18 — three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
+_Last updated: 2026-11-18 — shipped and removed: *A credit note's amount has no positivity check* (as `>= 0`, `20261118000300`) and *Name the child in package emails* (`package-emails` v11). Earlier the same day: three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1118,11 +1118,6 @@ activation trigger and update that case.
   never shared today (no offer, no email, no pay link for an active row); if any surface ever links one, anchor that
   preview on `carried_over_start` first (an Edge Function deploy). Plan: `docs/plans/CARRIED_OVER_PACKAGES_PLAN.md` Step 4.
 
-### ~~Name the child in package emails~~ — **S** — **DONE 2026-11-18** (PRD §7.16)
-`package-emails` reads `students!student_id(full_name)`; a one-child package's requested / offered / confirmed email
-names the child in subject and body, a shared one is unchanged. Decided: the EMAIL may name the child (it goes to the
-parent's own inbox); `/package/[token]` stays child-free. Deployed with `supabase functions deploy package-emails`.
-
 ### Simplify the admin's live-balance display — **S** — _filed 2026-10-13, follow-up of Remove the legacy package matcher_
 `package_live_balances()` now returns the stored balance as its "live" one (`20261013000100`), so the admin's
 `HeldTable` "pending draws" branch (`live_value_remaining !== value_remaining`) and the live/stored split in
@@ -1702,13 +1697,6 @@ Close and the X — and strict mode fails. `verify-class-admin.mjs` presses a "C
 **Fix:** give the X a name that does not contain "close" — `aria-label="Dismiss"` — so both drivers still resolve one
 button (any name containing "Close", exact or not, collides with a footer Close). Run `--only package-draw-at-marking`
 and `--only class-admin`. Not visual-only.
-
-### ~~A credit note's amount has no positivity check~~ — **S** — **DONE 2026-11-18** (`20261118000300`)
-Shipped as **`CHECK (amount >= 0)`**, not the `> 0` this item proposed: a class can be priced at S$0, the engine bills
-that as a S$0 invoice item, and correcting the lesson makes `handle_attendance_update()` insert a S$0 note — `> 0` would
-have made that attendance edit fail. A S$0 note draws nothing (`apply_credit_to_invoice` skips a remainder ≤ 0).
-Pinned in `constraints.test.sql` 3a–3c; 3c goes red if anyone tightens it to `> 0` (proven 2026-11-18). Prod held 0
-credit notes when it shipped.
 
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.

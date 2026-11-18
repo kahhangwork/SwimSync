@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-18 (latest) — **An admin can bring in a package bought before SwimSync, live** (§8.169): lessons
-left as of today, expiry from the original start, S$0 revenue, refundable to the value left — Little Orcas feedback #2.
-Next: read the nightly that covers `eb3e2f0` + `6df68a7`; Coach Kah Hang's **November** on engine v42 (early December)._
+_Last updated: 2026-11-18 (latest) — **Credit notes can never be negative; package emails name the child, live**
+(§8.170). Both BACKLOG S-items, picked from a re-rank with the user (the Build order is exhausted). Nightly `44269745188` GREEN.
+Next: *Deleting a role has no confirmation step* (the user's #3); Coach Kah Hang's **November** in early December._
 
-_Previously (§8.168, 2026-11-18) — Admin corrects a linked family's details (name/phone, unlink, DOB), live._
+_Previously (§8.169, 2026-11-18) — An admin can bring in a package bought before SwimSync, live._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,18 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.170 (2026-11-18) — Credit notes can never be negative; package emails name the child; live
+
+**Shipped** two BACKLOG S-items the user picked from a top-3 re-rank (Build order exhausted; #3 = role-delete confirm).
+- **`aea616d`** — `CHECK (credit_notes.amount >= 0)`, migration `20261118000300` (DEPLOYMENT #111). **`>= 0`, not the
+  item's `> 0`:** a S$0 class bills a S$0 item and its correction inserts a S$0 note — `> 0` would fail that attendance
+  edit. Pinned by `constraints.test.sql` 3c (proven red under `> 0`); reasoning in the migration header.
+- **`b475f8d`** — `package-emails` v11: a one-child package's emails name the child (PRD §7.16; DEPLOYMENT #112).
+  The `/package/[token]` page stays child-free (the user's earlier rule); the email may name it (decided here).
+
+- **Not done:** no real one-child package email observed since v11 — check the next confirm. Deno ×2 not run (the
+  engine writes no credit notes). Nightly `44269745188` (covers §8.168–169) went GREEN at close.
+
 ## 8.169 (2026-11-18) — Bring in a package bought before SwimSync (carried-over packages); live
 
 **Shipped** (`8a3fa28` migration `20261118000200`, `6df68a7` admin; DEPLOYMENT #110; PRD §7.16; ARCHITECTURE §6ai).
@@ -365,20 +377,6 @@ pgTAP 52 + vitest 7 (mutations red), full pgTAP 99/2239, Deno ×2, driver 11/11 
 - **Not done:** the app push **bypassed the nightly gate** on the user's word — the next nightly is the first to cover
   `eb3e2f0` and `6df68a7`. Two accepted gaps → BACKLOG *Carried-over packages*; the held *Starts* sort (plan §7).
   Little Orcas' admin not yet told. Nightly dispatched on the user's word: run `44269745188` on `08c9180`.
-
-## 8.168 (2026-11-18) — Admin corrects a linked family's details: parent name/phone, unlink, child DOB; live
-
-**Shipped** (`58cd53c`, `2719280`, `eb3e2f0`; DEPLOYMENT #109; PRD §7.19). User feedback: *"once a parent is linked to a
-child, if key information is entered wrongly, we may need to delete the whole child record and recreate it."* The
-user's three decisions: name + phone (NOT email — it is the login) edit the parent's own global profile; Unlink is
-refused once that parent was billed for the child; a DOB action is added. Three audited RPCs (migration
-`20261118000100`), the Students contact modal now a form, a DOB modal. pgTAP 34 + vitest 9 (mutations red), driver
-32/32 ×2; full pgTAP 98 files green. The BACKLOG's 2026-07-26 "claimed child is read-only" call is marked reversed.
-
-- **Found:** the clock census counts `now()` in comments (§7.396); `innerText` misses input values (§7.397); §7.297 hit
-  again (the arm is `'ParentTenant'`). G5 caught the 3 overrides copies before any push.
-- **Not done:** an admin cannot change a parent's EMAIL (user's call). The pending-claim lock is the editing business's
-  only — accepted, recorded in the migration header. Nightly not dispatched.
 
 ## 9. Next steps (pick with the user)
 
@@ -422,7 +420,7 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-18:** scheduled run `44217003736` GREEN on `12729a0`. **Run `44269745188` (dispatched by the user, on `08c9180`) is the first to cover `eb3e2f0` and `6df68a7` — read its result first**: `verify-contact-details` (32) and the new `verify-carried-over-package` (11), both green ×2 locally; `6df68a7` shipped AHEAD of it (gate bypassed, user). A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-18:** run `44269745188` (user-dispatched, on `08c9180`) **GREEN** — it covers `eb3e2f0` and `6df68a7`, so the §8.169 gate bypass is settled and the next APP unit may merge. `aea616d`/`b475f8d` (§8.170) are DB / Edge Function only; the next scheduled run covers them. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -439,10 +437,8 @@ which mutate shared seed state — are in the same section.
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
    in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Read nightly run `44269745188`** — it covers `eb3e2f0` and `6df68a7` (the latter shipped ahead of it). A red in
-   `verify-carried-over-package` or `packages-admin` → revert `6df68a7` (admin only; the migration is additive). Never
-   dispatch it unasked. Tell the admins who sent the 2026-11-18 feedback: linked families can be corrected (PRD §7.19),
-   and existing packages can be brought in from Record a sale → *Existing package* (PRD §7.16).
+2. **Build *Deleting a role has no confirmation step*** (S, BACKLOG) — the user's #3 of 2026-11-18, unblocked: nightly
+   `44269745188` went GREEN. Runner-up *Show an invoice's due-date change history* (S). (Feedback admins told — user.)
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
@@ -466,7 +462,7 @@ explained by one line in the commit message), its screen's `--only` drivers pass
 a P4 / Phase 4 step. At most three unverified landings in a row; **a red nightly freezes restyle landings**, and a red
 attributed to one is reverted (`git revert <sha>` → push) in the same session unless the fix is a one-line string.
 
-**No migration is HELD or in flight.** Latest applied is `20261118000200` (carried-over packages), on prod, 0 pending
+**No migration is HELD or in flight.** Latest applied is `20261118000300` (credit-note amount check), on prod, 0 pending
 (2026-11-18). Wave 6's A/B rollbacks are VOID as written (banner in each) — the column they read is gone.
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 

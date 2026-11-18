@@ -1422,3 +1422,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     page that loads the changed chunk (§7.398). No edge function changed. **Rollback:** an admin build without the
     toggle FIRST, then `supabase/rollback/20261118000200_carried_over_packages_DOWN.sql` (refuses while a carried row
     exists).
+
+111. **Deploy record (2026-11-18): credit-note amount check — migration only.** Prod read first: 0 credit notes, 0 S$0
+    invoice items / class rates. Repo checks run locally; rollback rehearsed (DROP CONSTRAINT → the pre-change
+    `constraints.test.sql` green; re-ADD → the new one green). `aea616d` → `main`, then `supabase db push` applied
+    `20261118000300`; 0 pending; prod `credit_notes_amount_nonnegative` = `CHECK (amount >= 0)`, validated. No
+    privilege change (no grant dump). Vercel rebuilt both apps (unchanged code); CI green (`44284869923`).
+    **Rollback:** `ALTER TABLE public.credit_notes DROP CONSTRAINT credit_notes_amount_nonnegative;` (no DOWN file —
+    one statement, in the migration header).
+
+112. **Deploy record (2026-11-18): `package-emails` names the child — Edge Function, then `main`.**
+    `supabase functions deploy package-emails` → v10 → **v11**, `verify_jwt` true; **download-proven** (the v11 source
+    holds `students!student_id(full_name)` and `forChildHtml`); boot probe POST `{}` → 400 "bad request". **Then**
+    `b475f8d` → `main` (docs + function source; no app code). Vercel app 64 s, admin 251 s; CI green (`44298439607`). **Rollback:** a worktree at
+    `aea616d` and `supabase functions deploy package-emails --workdir <it> --project-ref cdmjeyauhxcgulhbxmsb`.
