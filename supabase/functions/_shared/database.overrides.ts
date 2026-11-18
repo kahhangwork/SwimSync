@@ -69,6 +69,10 @@ export const NULLABLE_RPC_ARGS = {
   // L14 `v_start DATE := COALESCE(p_starts_on, today_sg())`; L89/L149 pass it to
   // enrolment_start_at(), whose L11 `IF p_starts_on IS NULL … RETURN app_now()`.
   set_enrolment_start: ["p_starts_on"],
+  // L12 `v_phone := NULLIF(btrim(COALESCE(p_phone, '')), '')` — a NULL phone clears it (20261118000100).
+  set_parent_contact: ["p_phone"],
+  // L25 `IF p_dob IS NOT NULL AND …`; L50 writes it as is — NULL clears the DOB (20261118000100).
+  set_student_date_of_birth: ["p_dob"],
   // L10 `v_from DATE := COALESCE(p_effective_from, today_sg())` (a correction);
   // p_location_address is not read by the body at all (DEFAULT NULL).
   set_class_terms: ["p_effective_from", "p_location_address"],
