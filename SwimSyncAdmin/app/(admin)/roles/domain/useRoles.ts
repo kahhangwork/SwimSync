@@ -12,13 +12,18 @@ export function useRoles() {
   const { isOwner } = usePermissions();
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState<string | null>(null);
   // The grid being edited: an existing role's id, "new", or null (closed).
   const [editing, setEditing] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftGrid, setDraftGrid] = useState<Grid>({ ...NO_ACCESS });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // The role awaiting the Delete confirmation, or null (closed). Delete never
+  // fires from the "…" menu itself — DESIGN.md puts every destructive action
+  // behind a confirmation (BACKLOG "Deleting a role has no confirmation step").
+  const [deleteTarget, setDeleteTarget] = useState<RoleRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [{ data: r }, { data: p }, { data: h }] = await Promise.all([
@@ -70,16 +75,26 @@ export function useRoles() {
     load();
   }
 
-  async function remove(role: RoleRow) {
-    setPageError(null);
-    const { error } = await repo.deleteRole(role.id);
-    if (error) return setPageError(error.message);
+  function askRemove(role: RoleRow) {
+    setDeleteError(null);
+    setDeleteTarget(role);
+  }
+
+  async function confirmRemove() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const { error } = await repo.deleteRole(deleteTarget.id);
+    setDeleting(false);
+    if (error) return setDeleteError(error.message);
+    setDeleteTarget(null);
     load();
   }
 
   return {
-    roles, loading, pageError, canEdit: isOwner,
+    roles, loading, canEdit: isOwner,
     editing, setEditing, draftName, setDraftName, draftGrid, setDraftGrid,
-    saving, saveError, openNew, openEdit, save, remove,
+    saving, saveError, openNew, openEdit, save,
+    deleteTarget, setDeleteTarget, deleting, deleteError, askRemove, confirmRemove,
   };
 }

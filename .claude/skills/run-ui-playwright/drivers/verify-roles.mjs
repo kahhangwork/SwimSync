@@ -7,7 +7,8 @@
 // lacks, a typed URL gets "Your role doesn't include this page" rather than a
 // half-empty page, a view-only area says so, and a role change by the owner
 // shows up on the co-admin's next load. Plus the Roles page itself: the owner
-// creates a role through the 8 × 3 grid.
+// creates a role through the 8 × 3 grid, and deleting one goes through a
+// confirmation (checks 9–11).
 //
 // Setup/Prereqs:
 //   supabase start; admin panel on :3000 (or ADMIN_URL)
@@ -19,10 +20,12 @@
 //   rolesdesk@swimsync.test  pure co-admin, starts on "Co-admin (as before)"
 //
 // PROVEN RED: with RequiresTenant's question 4 removed, check 5 fails (the
-// page renders instead of refusing); with navFor ignoring the role, check 4.
+// page renders instead of refusing); with navFor ignoring the role, check 4;
+// with the "…" menu's Delete calling the RPC directly (no confirmation, the
+// pre-2026-11-18 page), check 9.
 
 import os from "node:os";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, rowAction } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => `${SHOT}/roles-${n}`;
@@ -103,6 +106,32 @@ check("after the upgrade, /invoices renders for the co-admin",
   !body.includes("Your role doesn") && body.includes("Invoices"), body.slice(0, 300));
 body = await visit("/classes");
 check("…and the View only notice is gone", !body.includes("View only — your role can"));
+
+// ── 8–11. Deleting a role asks first ────────────────────────────────────────
+// "Driver Viewer" is held by nobody now (check 7 moved the co-admin off it), so
+// its card offers Delete in the "…" menu.
+await freshLogin("coach@swimsync.test");
+await visit("/roles");
+const card = () => page.locator("div.rounded-card")
+  .filter({ has: page.getByRole("heading", { name: "Driver Viewer", exact: true }) });
+check("the unheld role's card is on the page", (await card().count()) === 1);
+
+await (await rowAction(card(), "Delete")).click();
+await page.waitForTimeout(1000);
+body = await page.evaluate(() => document.body.innerText);
+check("Delete opens a confirmation naming the role — nothing deleted yet",
+  body.includes("Delete the role Driver Viewer?") && (await card().count()) === 1, body.slice(0, 300));
+await page.screenshot({ path: shot("04-delete-confirm.png"), fullPage: true });
+
+await page.getByRole("button", { name: "Cancel", exact: true }).click();
+body = await visit("/roles");
+check("Cancel keeps the role", body.includes("Driver Viewer"));
+
+await (await rowAction(card(), "Delete")).click();
+await page.getByRole("button", { name: "Delete role", exact: true }).click();
+await page.waitForTimeout(2000);
+body = await visit("/roles");
+check("confirming deletes it", !body.includes("Driver Viewer"), body.slice(0, 300));
 
 await browser.close();
 const passed = results.filter(Boolean).length;

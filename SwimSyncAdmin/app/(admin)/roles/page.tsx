@@ -7,6 +7,7 @@ import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { useRoles } from "./domain/useRoles";
 import { STANDARD_BLURB } from "./domain/rolesRows";
 import { RoleGrid } from "./ui/RoleGrid";
+import { DeleteRoleModal } from "./ui/DeleteRoleModal";
 
 /**
  * Roles (ROLES_PERMISSIONS_PLAN.md §5.5): what each co-admin role may see and
@@ -27,9 +28,6 @@ export default function RolesPage() {
         action={p.canEdit ? <Button onClick={p.openNew}>New role</Button> : undefined}
       />
 
-      {p.pageError && (
-        <p className="mb-4 rounded-card bg-status-danger-bg px-3 py-2 text-body text-status-danger-text">{p.pageError}</p>
-      )}
       {!p.canEdit && !p.loading && (
         <p className="mb-4 text-body text-ink-muted">Only the business owner can change roles.</p>
       )}
@@ -55,7 +53,7 @@ export default function RolesPage() {
                     <Button size="sm" variant="outline" onClick={() => p.openEdit(role)}>Edit</Button>
                     <RowMenu>
                       {role.holders === 0 && (
-                        <RowMenuItem destructive onClick={() => p.remove(role)}>
+                        <RowMenuItem destructive onClick={() => p.askRemove(role)}>
                           Delete
                         </RowMenuItem>
                       )}
@@ -97,6 +95,14 @@ export default function RolesPage() {
           </div>
         </div>
       </Modal>
+
+      <DeleteRoleModal
+        role={p.deleteTarget}
+        onClose={() => p.setDeleteTarget(null)}
+        deleting={p.deleting}
+        deleteError={p.deleteError}
+        onConfirm={p.confirmRemove}
+      />
     </div>
   );
 }

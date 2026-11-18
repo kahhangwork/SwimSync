@@ -296,7 +296,7 @@ roles the owner may edit or delete: **Full admin** (everything), **Operations as
 **Co-admin (as before)** — every area except Accounting and Admins & roles, which is where
 every co-admin who existed before roles was placed, so nothing changed for them until the
 owner moves them. Only the **owner** creates, edits, renames or deletes roles, on the
-**Roles** page; a role somebody holds cannot be deleted. Inviting a co-admin requires
+**Roles** page; a role somebody holds cannot be deleted, and deleting one asks first (*"Delete the role …?"*, since 2026-11-18). Inviting a co-admin requires
 choosing a role (Front desk is preselected).
 
 **Admin management is itself an area**, so the owner can delegate it — with two rules the
@@ -3770,8 +3770,8 @@ The following section provides a screen-by-screen reference for each SwimSync us
 *(implemented 2026-10-14, UI restyle Phase 5 — every admin screen on the DESIGN.md tokens. What an admin can see
 differently: **a table row carries at most one inline action** (the one its state calls for); the rest sit in a row
 **"…" menu** on Credit notes, Classes, Parents, Coaches, Locations, Admins and Roles — destructive items in red, still
-behind their confirmations (Packages, Invoices, Levels and Platform keep several inline actions for now, and deleting a
-role has no confirmation — both in BACKLOG). **Lessons:** a past lesson still unmarked is tagged **Blocks billing**
+behind their confirmations (Packages, Invoices, Levels and Platform keep several inline actions for now — in BACKLOG;
+deleting a role gained its confirmation on 2026-11-18). **Lessons:** a past lesson still unmarked is tagged **Blocks billing**
 (red; today's reads *Not marked* / *Partly marked*, amber), and the week tab's count is the same number as the sidebar badge (both read
 `tenant_unmarked_lesson_count`). **Invoices:** billing settings moved to their own card at the foot of the page, and
 when the last Generate was refused the page says why beside the button — the button itself is disabled only while a

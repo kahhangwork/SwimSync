@@ -16,7 +16,13 @@ DELETE FROM audit_log
     OR actor_id  = 'ad200000-0000-0000-0000-00000000b001'
     OR entity_id IN (SELECT id FROM tenant_roles
                       WHERE tenant_id = '70000000-0000-0000-0000-000000000001'
-                        AND name = 'Driver Viewer');
+                        AND name = 'Driver Viewer')
+    -- The driver DELETES "Driver Viewer" (checks 8–11), so its role_created /
+    -- role_deleted rows point at a role that no longer exists — find them by
+    -- the name they recorded.
+    OR (entity_type = 'TenantRole'
+        AND tenant_id = '70000000-0000-0000-0000-000000000001'
+        AND 'Driver Viewer' IN (old_value->>'name', new_value->>'name'));
 
 DELETE FROM auth.users WHERE id = 'ad200000-0000-0000-0000-00000000b001';
 

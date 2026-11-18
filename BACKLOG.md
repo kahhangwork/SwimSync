@@ -1676,16 +1676,6 @@ cross-tenant handlers inside a visual change.
 `RowMenuItem destructive`); route each driver press through `lib.mjs` `rowAction` and each "no button any more" check
 through `rowActionCount` (so it counts inside the menu, never vacuously). Not visual-only.
 
-### Deleting a role has no confirmation step — **S** — _filed 2026-10-14_
-Admin → Roles → a role nobody holds → **Delete** calls `useRoles().remove(role)` at once: no confirmation, no undo.
-Found in UI restyle 5.25, which moved Delete from an inline red button into the card's "…" menu — the handler did not
-change.
-
-**Why:** DESIGN.md puts every destructive action behind a confirmation; a mis-click deletes a custom role an owner set up.
-
-**Fix:** a `Modal` confirm ("Delete the role <name>?") before `remove`, as Locations and Admins do. `verify-roles`
-does not delete a role today — add the press + confirm to it and prove it bites. Not visual-only.
-
 ### The admin Modal's close (X) button has no accessible name — **S** — _filed 2026-10-14_
 `SwimSyncAdmin/components/Modal.tsx` renders the title-bar close as an icon-only `<button>` with no `aria-label`, so a
 screen reader announces "button". Found in UI restyle 5.0 (shared chrome), left as it was on purpose.
