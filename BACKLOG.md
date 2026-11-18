@@ -1647,13 +1647,6 @@ day after), a stored due date, the red tag on every surface, and Change due date
 Schedule; Admin Calendar Week hiding Sunday at 1440px; more than one primary per section (Referrals, Packages,
 Platform, parent Buy-a-package); Register's phone/address placeholders without "e.g.".
 
-### Show an invoice's due-date change history — **S** — _filed 2026-11-12 (Overdue plan §5)_
-`change_invoice_due_date()` records every move in `invoice_due_date_changes` (who, when, old, new, reason; SELECT for
-Billing: View), but no screen reads it yet — the admin sees only the current date. A line under the Due cell ("moved
-from 6 Nov by Sam") or a row-menu *History* would do.
-
-**Why:** a moved date with no visible trail invites "who gave them more time?" — the answer exists and is unread.
-
 ### Admin tables still carrying several inline row actions — **S** — _filed 2026-10-14_
 UI restyle Phase 5 moved row actions into the shared "…" menu (`components/ui/RowMenu.tsx`, DESIGN.md → Tables: at
 most one inline action per row) on Credit notes, Classes, Parents, Coaches, Locations, Admins and Roles. Four screens

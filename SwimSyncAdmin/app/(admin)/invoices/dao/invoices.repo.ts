@@ -18,9 +18,11 @@ import type { SearchField } from "../types";
 type InvoiceSelected = DataOf<typeof fetchInvoices>[number];
 type InvoiceParent = NonNullable<InvoiceSelected["parents"]>;
 type InvoiceItem = InvoiceSelected["invoice_items"][number];
-export type InvoiceSelectRow = Omit<InvoiceSelected, "parents" | "invoice_items"> & {
+type InvoiceDueChange = InvoiceSelected["invoice_due_date_changes"][number];
+export type InvoiceSelectRow = Omit<InvoiceSelected, "parents" | "invoice_items" | "invoice_due_date_changes"> & {
   parents: RlsNullable<InvoiceParent, "profiles"> | null;
   invoice_items: RlsNullable<InvoiceItem, "students">[];
+  invoice_due_date_changes: RlsNullable<InvoiceDueChange, "profiles">[];
 };
 type UndeliveredSelected = DataOf<typeof fetchMayNotHaveArrived>[number];
 type UndeliveredParent = NonNullable<UndeliveredSelected["parents"]>;
@@ -151,6 +153,9 @@ export const fetchPendingDebits = (tenantId: string) =>
 // just the searched child, which would then misstate the WhatsApp reminder and
 // CSV (a financial communication). So the items embed stays plain and student
 // search runs client-side over the fetched set (bounded by the cap banner).
+// Every due-date move rides along (invoice_due_date_changes, SELECT for
+// Billing: View — the same area that reads the invoice), for the Due cell's
+// "moved from … by …" line. Rare and tiny: most invoices carry none.
 export const fetchInvoices = (term: string, searchField: SearchField) => {
   const parentEmbed =
     term !== "" && searchField === "parent"
@@ -160,7 +165,7 @@ export const fetchInvoices = (term: string, searchField: SearchField) => {
   let query = supabase
     .from("invoices")
     .select(
-      `id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, due_date, is_overdue, ${parentEmbed}, invoice_items(student_name, students(full_name))`
+      `id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, due_date, is_overdue, ${parentEmbed}, invoice_items(student_name, students(full_name)), invoice_due_date_changes(old_due_date, new_due_date, reason, changed_at, profiles(full_name))`
     )
     .order("generated_at", { ascending: false })
     .limit(ROW_LIMIT);

@@ -1608,7 +1608,9 @@ queue offers overdue invoices first). **An admin with Billing: Edit can move one
 invoice's due date LATER** (row menu → *Change due date*; at most a year further; an optional reason)
 through `change_invoice_due_date()` only — every change is recorded (who, when, old, new, reason)
 and the family is **not** messaged; the new date simply shows. A due date cannot be moved earlier,
-and a paid invoice's cannot be moved at all.
+and a paid invoice's cannot be moved at all. *(since 2026-11-18)* A moved invoice's Due cell says so
+underneath — *"moved from 20 Nov by Sam"*, with *"(moved 2×)"* when there were several — and hovering it lists
+every move with its date, who and the reason; anyone with Billing: View sees it.
 
 *(implemented)* **Everything in this section happens per business.** The engine runs one
 tenant at a time: it bills, gates, blocks and seals each independently. One school's

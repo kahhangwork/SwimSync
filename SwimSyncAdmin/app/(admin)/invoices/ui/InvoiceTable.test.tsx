@@ -71,6 +71,7 @@ function inv(over: Partial<InvoiceRow> = {}): InvoiceRow {
     paid_claimed_at: null,
     due_date: "2026-11-26",
     is_overdue: false,
+    due_date_changes: [],
     wa_number: "6591234567",
     raw_phone: "91234567",
     student_name_list: ["Ben Tan"],
@@ -278,6 +279,27 @@ describe("InvoiceTable", () => {
   it("the Due column shows the stored date, day and month", () => {
     setup({ visible: [inv({ due_date: "2026-12-03" })] });
     expect(screen.getByText("3 Dec")).toBeTruthy();
+  });
+
+  it("a moved due date names the move under it — every move on hover; an unmoved one adds nothing", () => {
+    setup({
+      visible: [
+        inv({
+          id: "moved",
+          due_date: "2026-12-10",
+          due_date_changes: [
+            { old_due_date: "2026-11-20", new_due_date: "2026-12-03", reason: "", changed_at: "2026-11-18T02:00:00Z", changed_by_name: "Sam Lee" },
+            { old_due_date: "2026-12-03", new_due_date: "2026-12-10", reason: "Away", changed_at: "2026-11-19T02:00:00Z", changed_by_name: null },
+          ],
+        }),
+        inv({ id: "plain", parent_name: "Carol" }),
+      ],
+    });
+    const trail = screen.getByText("moved from 3 Dec by an admin (moved 2×)");
+    expect(trail.getAttribute("title")).toBe(
+      "18/11/2026: 20 Nov → 3 Dec by Sam Lee\n19/11/2026: 3 Dec → 10 Dec by an admin — Away"
+    );
+    expect(within(bodyRows()[1]).queryByText(/moved from/)).toBeNull();
   });
 
   it("Change due date sits in the row menu, acts on THAT row, and only for billing edit", () => {

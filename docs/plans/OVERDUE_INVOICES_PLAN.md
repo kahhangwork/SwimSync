@@ -280,7 +280,7 @@ About 2–2.5 days:
 - Notifying the parent of a date change (D6).
 - Moving the Invoices table's existing inline actions.
 - An "Overdue" status filter.
-- A screen showing the due-date change history (the table is recorded and readable, not yet displayed).
+- ~~A screen showing the due-date change history~~ — shipped 2026-11-18: the Due cell's "moved from … by …" line, every move on hover.
 
 ## 6. Pre-commit gate
 

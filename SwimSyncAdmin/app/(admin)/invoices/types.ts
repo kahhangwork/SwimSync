@@ -28,11 +28,23 @@ export type InvoiceRow = {
   /** The database's verdict (is_overdue computed field, app_today()). Never
    *  derived here; the tag comes from lib/invoiceTag. */
   is_overdue: boolean;
+  /** Every change_invoice_due_date() move, OLDEST first — empty for most. */
+  due_date_changes: DueDateChange[];
   /** wa.me-ready "65XXXXXXXX", or null → the button reads "no number". */
   wa_number: string | null;
   /** What the parent actually typed — the queue's advisory when unusable. */
   raw_phone: string | null;
   student_name_list: string[];
+};
+
+/** One row of invoice_due_date_changes, as the Due cell shows it. */
+export type DueDateChange = {
+  old_due_date: string; // "YYYY-MM-DD"
+  new_due_date: string; // "YYYY-MM-DD"
+  reason: string;
+  changed_at: string; // timestamptz
+  /** Null when RLS hides the profile — read as "an admin". */
+  changed_by_name: string | null;
 };
 
 /** Mirrors GenerateResult.unclaimed_students in the billing engine. */

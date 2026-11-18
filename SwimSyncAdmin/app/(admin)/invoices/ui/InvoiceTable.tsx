@@ -17,7 +17,7 @@ import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { dayMonthLabel, invoiceTag } from "@/lib/invoiceTag";
 import { DMY, ROW_LIMIT } from "../constants";
 import type { InvoiceRow, SearchField } from "../types";
-import { formatBillingMonth } from "../domain/invoiceRows";
+import { dueDateTrail, formatBillingMonth } from "../domain/invoiceRows";
 
 export function InvoiceTable({
   loading,
@@ -119,7 +119,21 @@ export function InvoiceTable({
                   S${inv.net_amount.toFixed(2)}
                 </Td>
                 {/* A calendar DATE, not a moment — no timezone to pin. */}
-                <Td className="whitespace-nowrap tabular-nums">{dayMonthLabel(inv.due_date)}</Td>
+                <Td className="whitespace-nowrap tabular-nums">
+                  {/* Its own element, so the date stays an exact text match
+                      with the trail line beneath it. */}
+                  <span>{dayMonthLabel(inv.due_date)}</span>
+                  {/* The trail: who moved the date, from what (BACKLOG "Show an
+                      invoice's due-date change history"); every move on hover. */}
+                  {(() => {
+                    const trail = dueDateTrail(inv.due_date_changes);
+                    return trail ? (
+                      <div className="mt-0.5 text-label text-ink-muted" title={trail.history}>
+                        {trail.line}
+                      </div>
+                    ) : null;
+                  })()}
+                </Td>
                 <Td>
                   {/* Claimed is its own state, not a footnote under Outstanding
                       (DESIGN.md's Claimed Is Its Own State Rule). The stored

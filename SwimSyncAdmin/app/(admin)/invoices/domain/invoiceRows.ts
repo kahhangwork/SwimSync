@@ -4,7 +4,10 @@
 // pure helpers.
 
 import { toWaNumber } from "@/lib/waMessage";
-import type { InvoiceRow, SearchField } from "../types";
+import { dayMonthLabel } from "@/lib/invoiceTag";
+import { formatSgStamp } from "@/lib/lessonDates";
+import { DMY } from "../constants";
+import type { DueDateChange, InvoiceRow, SearchField } from "../types";
 import type { InvoiceSelectRow } from "../dao/invoices.repo";
 
 export function formatBillingMonth(ym: string): string {
@@ -43,10 +46,42 @@ export function mapInvoiceRow(inv: InvoiceSelectRow): InvoiceRow {
     paid_claimed_at: inv.paid_claimed_at ?? null,
     due_date: inv.due_date,
     is_overdue: inv.is_overdue === true,
+    due_date_changes: (inv.invoice_due_date_changes ?? [])
+      .map((c) => ({
+        old_due_date: c.old_due_date,
+        new_due_date: c.new_due_date,
+        reason: c.reason ?? "",
+        changed_at: c.changed_at,
+        changed_by_name: c.profiles?.full_name ?? null,
+      }))
+      .sort((a, b) => a.changed_at.localeCompare(b.changed_at)),
     wa_number: toWaNumber(inv.parents?.profiles?.phone ?? null),
     raw_phone: inv.parents?.profiles?.phone ?? null,
     student_name_list: nameList,
   };
+}
+
+/** The Due cell's trail (BACKLOG "Show an invoice's due-date change history"):
+ *  a line naming the LATEST move — "moved from 6 Nov by Sam", plus how many
+ *  moves when there were several — and the full history, one move per line,
+ *  for the cell's hover title. Null when the date was never moved. */
+export function dueDateTrail(
+  changes: DueDateChange[]
+): { line: string; history: string } | null {
+  if (changes.length === 0) return null;
+  const who = (c: DueDateChange) => c.changed_by_name || "an admin";
+  const last = changes[changes.length - 1];
+  const times = changes.length > 1 ? ` (moved ${changes.length}×)` : "";
+  const line = `moved from ${dayMonthLabel(last.old_due_date)} by ${who(last)}${times}`;
+  const history = changes
+    .map(
+      (c) =>
+        `${formatSgStamp(c.changed_at, DMY)}: ` +
+        `${dayMonthLabel(c.old_due_date)} → ${dayMonthLabel(c.new_due_date)} by ${who(c)}` +
+        (c.reason.trim() ? ` — ${c.reason.trim()}` : "")
+    )
+    .join("\n");
+  return { line, history };
 }
 
 // Parent search runs in the DB (past the cap). STUDENT search runs HERE, over

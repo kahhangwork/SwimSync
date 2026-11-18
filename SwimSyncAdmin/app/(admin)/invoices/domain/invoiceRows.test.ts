@@ -31,6 +31,7 @@ function row(overrides: Partial<InvoiceRow> = {}): InvoiceRow {
     paid_claimed_at: null,
     due_date: "2026-11-26",
     is_overdue: false,
+    due_date_changes: [],
     wa_number: "6591234567",
     raw_phone: "91234567",
     student_name_list: ["Bob"],

@@ -10,6 +10,8 @@
 //     it to billing — ⚠ RISK 4), and survives a reload.
 //   • Change due date: row menu → modal → change_invoice_due_date; the row
 //     re-reads as Outstanding after the refetch, the DB moved, one audit row.
+//   • The moved row names the move ("moved from … by …"), for the editor and
+//     for a billing-VIEW admin alike.
 //   • A billing-VIEW admin is offered no Change due date.
 //   • Dashboard: the Outstanding card counts overdue-and-not-claimed.
 //   • Parent Billing list and the sessionless public payment page show the due
@@ -92,6 +94,10 @@ try {
     (await tagIn(rowOf(page, 1), "Outstanding")) && !(await tagIn(rowOf(page, 1), "Overdue")));
   check("…and its Due cell shows the new date",
     (await rowOf(page, 1).getByText(label(newDue), { exact: true }).count()) === 1, label(newDue));
+  // The trail (BACKLOG "Show an invoice's due-date change history"): the embed
+  // of invoice_due_date_changes resolves, the mover's name comes through RLS.
+  const trail = `moved from ${label(oldDue)} by Overdue Driver Admin`;
+  check("…with the move named under it", (await rowOf(page, 1).getByText(trail, { exact: true }).count()) === 1, trail);
 
   // ── Dashboard: overdue and not claimed = c4 only now ───────────────────────
   await page.goto(`${ADMIN}/dashboard`, { waitUntil: "networkidle" });
@@ -105,6 +111,8 @@ try {
   await viewer.goto(`${ADMIN}/invoices`, { waitUntil: "networkidle" });
   await viewer.waitForTimeout(2500);
   check("viewer: the invoices load (c4 Overdue)", await tagIn(rowOf(viewer, 4), "Overdue"));
+  check("viewer: a billing-VIEW admin still reads the move on c1",
+    (await rowOf(viewer, 1).getByText(trail, { exact: true }).count()) === 1, trail);
   check("viewer: no Change due date on an outstanding row",
     (await rowActionCount(rowOf(viewer, 4), "Change due date")) === 0);
   await viewer.close();
