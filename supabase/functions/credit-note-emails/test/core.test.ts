@@ -36,7 +36,7 @@ import {
   monthEnded,
   newScenario,
   type Scenario,
-} from "../../generate-invoices/test-helpers.ts";
+} from "../../generate-invoices/test/helpers.ts";
 
 /**
  * Bill a month, then correct one invoiced lesson to absent so the trigger issues a

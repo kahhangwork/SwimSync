@@ -9,17 +9,19 @@ import {
   formatBillingMonth,
   formatSessionDate,
   money,
-  sendInvoiceEmail,
   type InvoiceEmailData,
   buildBlockedEmailHtml,
-  notifyGenerationBlocked,
   blockedNoticeRecipients,
-  shouldRetryTenantEmails,
   settleActionFor,
   outcomeForStatus,
   invoiceIdempotencyKey,
   type SendOutcome,
-} from "../email.ts";
+} from "../domain/emailTemplates.ts";
+import {
+  sendInvoiceEmail,
+  notifyGenerationBlocked,
+  shouldRetryTenantEmails,
+} from "../domain/emailDelivery.ts";
 
 const sample: InvoiceEmailData = {
   parentName: "Jane Tan",

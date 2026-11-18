@@ -12,7 +12,8 @@
 // Pure tests first (no database), then integration against the local stack.
 
 import { assert, assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { generateInvoices, type GenerateResult } from "../core.ts";
+import { generateInvoices } from "../core.ts";
+import { type GenerateResult } from "../types.ts";
 import {
   ERROR_MAX_CHARS,
   NON_ATTEMPT_STATUSES,

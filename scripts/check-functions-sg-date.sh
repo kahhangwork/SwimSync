@@ -7,7 +7,7 @@
 # behind SGT before 08:00. It shipped in the engine until 41d9676 (core.ts:699 —
 # earliest enrolment floored as a UTC day) after being written down as §7.7.
 #
-# THE RULE. In supabase/functions/**/*.ts (not tests, not test-helpers.ts), no
+# THE RULE. In supabase/functions/**/*.ts (not tests), no
 # code line may `slice(0, 10)` or `split("T")[0]` (any spacing, either quote).
 # Comments are stripped first.
 #
@@ -43,7 +43,7 @@ else
   FILES=()
   while IFS= read -r f; do FILES+=("$f"); done < <(
     find "$ROOT/supabase/functions" -name '*.ts' ! -name '*.test.ts' ! -name '*_test.ts' \
-      ! -name 'test-helpers.ts' ! -path '*/tests/*' | sort)
+      ! -path '*/tests/*' | sort)
 fi
 
 # Prints "LINE:FUNCTION:code" for every UTC-date slice in a TypeScript file.

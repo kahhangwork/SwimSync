@@ -2,7 +2,7 @@
 // Results and method: docs/plans/BILLING_ENGINE_SPEED.md. Local stack only; it seeds its
 // own tenant and tears it down. NOT part of test.sh — run it by hand (./bench/bench.sh).
 //
-//   ENGINE_DIR=<dir with core.ts/email.ts/runLog.ts>  engine under test (default: this one)
+//   ENGINE_DIR=<dir with core.ts, domain/emailDelivery.ts, runLog.ts>  engine under test (default: this one)
 //   SEED_ENGINE_DIR=<dir>   engine that bills the SEPTEMBER seed month. Pin it to ONE engine
 //                           for a before/after pair so the two seeds are identical.
 //   LATENCY_MS=300          added per Supabase request (300 ≈ the measured iad1 → SG cost)
@@ -13,6 +13,8 @@
 //   KEEP=1                  skip teardown (inspect the seeded tenant)
 //
 // An old engine to compare against:
+//   (only engines from B10 on, e846b8c, 2026-11-18: older ones have no domain/emailDelivery.ts — the
+//   email.ts facade that bridged them was deleted 2026-11-18, BACKLOG; accepted by the user.)
 //   git archive <sha> supabase/functions/generate-invoices | tar -x -C /tmp/old
 //   ENGINE_DIR=/tmp/old/supabase/functions/generate-invoices ...
 // Replays index.ts's orchestration (withDbNow → generateInvoices → recordRuns →
@@ -31,7 +33,7 @@ const PER_CLASS = Number(Deno.env.get("PER_CLASS") ?? 5);
 const OUT = Deno.env.get("OUT");
 
 const core = await import(`file://${ENGINE_DIR}/core.ts`);
-const email = await import(`file://${ENGINE_DIR}/email.ts`);
+const email = await import(`file://${ENGINE_DIR}/domain/emailDelivery.ts`);
 const runLog = await import(`file://${ENGINE_DIR}/runLog.ts`);
 const seedCore = await import(`file://${SEED_ENGINE_DIR}/core.ts`);
 

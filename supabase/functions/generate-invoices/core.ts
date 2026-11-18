@@ -45,20 +45,6 @@ import type {
   GenerateOptions,
   GenerateResult,
 } from "./types.ts";
-// Re-exported: index.ts, bench/run.ts and the tests import these from core.ts.
-export { BILLABLE } from "./constants.ts";
-export { readPaged } from "./dao/paging.ts";
-export type {
-  BlockingLesson,
-  CreatedInvoice,
-  CreatedInvoiceItem,
-  GenerateOptions,
-  GenerateResult,
-  RunTimings,
-  UnclaimedStudent,
-} from "./types.ts";
-
-
 
 /**
  * Generate invoices — for one tenant, or for every tenant independently.

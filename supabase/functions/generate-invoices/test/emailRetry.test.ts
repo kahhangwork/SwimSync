@@ -10,7 +10,7 @@ import {
   assertStringIncludes,
 } from "jsr:@std/assert@1";
 import { generateInvoices } from "../core.ts";
-import { emailCreatedInvoices, retryUnsentInvoiceEmails } from "../email.ts";
+import { emailCreatedInvoices, retryUnsentInvoiceEmails } from "../domain/emailDelivery.ts";
 import {
   newScenario,
   monthEnded,
@@ -25,7 +25,7 @@ import {
 // the month, a clock at which it is billable, and an enrolment date early
 // enough for the whole month's lessons to derive — as one inseparable fact.
 // Pass `now: s.now` to generateInvoices; never re-derive a date at the call
-// site. See test-helpers.ts for why (short version: `docs/GOTCHAS.md` §7.25).
+// site. See test/helpers.ts for why (short version: `docs/GOTCHAS.md` §7.25).
 
 // ── Invoice-email delivery tracking + retry (INVOICE_EMAIL_RETRY_PLAN.md) ────
 // A dropped invoice email self-heals: re-running generate-invoices for the same

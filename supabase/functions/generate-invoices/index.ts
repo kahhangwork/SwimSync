@@ -20,7 +20,8 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.110.2";
 import type { Database } from "../_shared/database.overrides.ts";
-import { generateInvoices, type GenerateOptions } from "./core.ts";
+import { generateInvoices } from "./core.ts";
+import type { GenerateOptions } from "./types.ts";
 import { recordRuns, toErrorRows, toRunRows } from "./runLog.ts";
 import { withDbNow } from "./clock.ts";
 import {
@@ -29,7 +30,7 @@ import {
   resendInvoiceEmail,
   retryUnsentInvoiceEmails,
   shouldRetryTenantEmails,
-} from "./email.ts";
+} from "./domain/emailDelivery.ts";
 
 /** One line per run in the Edge Function log — the timing record that also
  *  covers emails, which the run row cannot (it is written before them). */

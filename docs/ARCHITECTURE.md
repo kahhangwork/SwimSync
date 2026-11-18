@@ -41,8 +41,10 @@ the shape of the system changes:_
   service role bypasses RLS); `domain/` holds the logic and touches the network only
   through `dao/`; `generateForTenant` in `core.ts` is ~50 lines of composition (guards →
   phase-1 reads → tally → unclaimed → hard stop → drawn → phase 2 → seal), each guard
-  returning `{ stop } | { go }`. `core.ts`, `email.ts`, `runLog.ts` stay as re-export
-  facades (index.ts, the bench and the tests import them). package-emails and
+  returning `{ stop } | { go }`. The re-export facades `email.ts` and `test-helpers.ts`
+  were deleted 2026-11-18 — callers import `domain/emailDelivery.ts` / `emailTemplates.ts`
+  and `test/helpers.ts` directly, and `core.ts` exports only `generateInvoices` (fence 4
+  refuses an `./email.ts` import). package-emails and
   credit-note-emails have the same `dao/` + `domain/` split, and their caller-JWT
   client is a `CallerDb` brand (`_shared/clientBrands.ts`): authorisation calls take
   only it, so swapping in the service client does not compile. The fence is
@@ -749,7 +751,7 @@ the shape of the system changes:_
 | `supabase/functions/generate-invoices/core.ts` | `generateInvoices` + `generateForTenant` composition; re-exports the engine's types (logic in `domain/`, queries in `dao/`, 2026-11-18) |
 | `supabase/functions/generate-invoices/index.ts` | Thin HTTP handler (auth + client + call core) |
 | `supabase/functions/generate-invoices/speed.test.ts` · `bench/` | Pins on the engine's batched reads, paging and email rate gate (`speed.test.ts`, in `test.sh`). `bench/` is a MANUAL harness, not in CI: it seeds a month, models latency and compares two engines byte for byte — DB rows, and since 2026-11-17 every Resend payload (to, subject, html hash, idempotency key) and per-phase request counts (`docs/plans/BILLING_ENGINE_SPEED.md`, `EDGE_FUNCTIONS_REFACTOR_PLAN.md` P2). A before/after pair must run on one SGT date (§7.395). |
-| `supabase/functions/generate-invoices/email.ts` | Facade over `domain/emailTemplates.ts` (builders, pure) + `domain/emailDelivery.ts` (send, claim/settle, `resendGate`, `emailCreatedInvoices()`, §8c) |
+| `supabase/functions/generate-invoices/domain/emailTemplates.ts` + `domain/emailDelivery.ts` | Invoice email builders (pure) + delivery (send, claim/settle, `resendGate`, `emailCreatedInvoices()`, §8c). The `email.ts` facade over them was deleted 2026-11-18 |
 | `supabase/functions/public-package/` | The tokenised renewal-offer pay page's data source (core.ts + index.ts), the package mirror of `public-invoice`; `verify_jwt=false`, the 128-bit `public_token` is the access control. Refuses a SUSPENDED business (an offer is prepayment, unlike an invoice) — §8.60 |
 | `supabase/functions/credit-note-emails/domain/email.ts` | Credit-note email builders + the PURE deciders (`authorizeCreditNoteEmail`, `isSendableNote`, `canEmailForTenant`, `shouldResetClaim`) + Resend sender. Scalars only — a builder cannot be handed a `students` row, so a live name is unreachable (§7.155) |
 | `supabase/functions/credit-note-emails/domain/notes.ts` (+ `dao/`) | The DB-facing pipeline: candidate discovery (tenant-filtered), spent/sibling checks, `fetchTenantSuspended` (a COLUMN read, not the RPC — §7.172), the atomic claim, and the per-note claim→send→release loop. Split out of the handler **so a test can call it** |
@@ -844,7 +846,7 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/lib/coAdminInviteEmail.ts` (+ test) | Co-admin invite copy: "help manage", **no join-code custody paragraph** — that language belongs to the owner invite (`inviteEmail.ts`) |
 | `supabase/migrations/2026071900{2300,2400}` | `platform_tenant_overview()` + `platform_stranded_parents()`, then the derived-shape correction. SECURITY DEFINER, gated internally, REVOKEd from PUBLIC (§7.35) |
 | `.claude/skills/run-ui-playwright/drivers/verify-platform-admin-scope.mjs` | 32 checks: every refusal asserts the **absence of rows**, the tenant-admin half asserts each listed page renders its **content** — "no refusal" would also pass on a blank page — and the sidebar count is pinned (16 since Admins, 2026-08-06) |
-| `supabase/functions/generate-invoices/test-helpers.ts` → `monthEnded()` | The suite's clock seam. Supplies billing month + a clock at which it is billable + an early-enough enrolment as ONE fact, and **throws on a scenario expecting zero lessons** (§7.33) |
+| `supabase/functions/generate-invoices/test/helpers.ts` → `monthEnded()` | The suite's clock seam. Supplies billing month + a clock at which it is billable + an early-enough enrolment as ONE fact, and **throws on a scenario expecting zero lessons** (§7.33) |
 
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.
 

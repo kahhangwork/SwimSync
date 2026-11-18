@@ -125,8 +125,8 @@ the command is the fact and this sentence is the hint). If you add a suite, add 
 > **Layout since 2026-11-18 (EDGE_FUNCTIONS_REFACTOR_PLAN.md B13):** every Deno test lives in its
 > function's `test/` folder. `generate-invoices/core.test.ts` was split VERBATIM by subject into
 > `test/{billing, credit, createdEmails, multiClass, guards, seal, completeness, isolation, rates,
-> emailRetry, fixtureGuard}.test.ts`; `test-helpers.ts` is now `test/helpers.ts` (the old path
-> re-exports it). Below, a bare `core.test.ts` / `email.test.ts` means the file it was in before
+> emailRetry, fixtureGuard}.test.ts`; `test-helpers.ts` is now `test/helpers.ts` (the old
+> re-export path was deleted 2026-11-18). Below, a bare `core.test.ts` / `email.test.ts` means the file it was in before
 > the move. `test.sh` refuses to run if its list ≠ the test files on disk (P1), and
 > `supabase/functions/tierBoundaries.test.ts` is the tier fence.
 
@@ -158,7 +158,7 @@ once, and `credit_notes` is EMPTY locally so it would prove nothing. `requireNot
 named "vacuous fixture" error rather than passing on an empty set, and
 `scenarioWithCreditNote()` tears its own scenario down before rethrowing (**§7.174** — the
 version that did not cost 9 leaked tenants and a mystery `tenant_isolation` red)._
-**The clock is part of every fixture** — `monthEnded()` in `test-helpers.ts` supplies the
+**The clock is part of every fixture** — `monthEnded()` in `test/helpers.ts` supplies the
 billing month, an instant at which it is billable, and an early-enough enrolment as ONE fact,
 and `newScenario()` **throws** on a scenario expecting zero lessons (§7.33). The
 completed-month guard is pinned by five tests including the SGT boundary (23:59 on 31 Jul

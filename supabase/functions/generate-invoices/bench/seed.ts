@@ -1,5 +1,5 @@
 // Deterministic "realistic month" seed for timing + equivalence of generate-invoices.
-// Built on test-helpers' newScenario (own tenant, own teardown). Everything that
+// Built on test/helpers.ts' newScenario (own tenant, own teardown). Everything that
 // influences ordering is deterministic: parent ids are rewritten to fixed uuids
 // (phase 2 iterates parents sorted by id; invoice reference numbers follow it).
 //
@@ -17,7 +17,7 @@ import {
   newScenario,
   monthEnded,
   type Scenario,
-} from "../test-helpers.ts";
+} from "../test/helpers.ts";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 export const MONTH = "2026-10";

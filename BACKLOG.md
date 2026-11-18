@@ -1705,17 +1705,6 @@ there compiles clean and fails at runtime, the exact §7.76 lie Wave 8 removed e
 `T` from each dao function's builder (`Awaited<ReturnType<…>>`) rather than restating it. Keep `readPaged` /
 `readAllIn` byte-for-byte (§7.391) — the bench (`bench/`) proves it; type-only, so `types(edge)` + P3.
 
-### Delete generate-invoices' re-export facades — **S** — _filed 2026-11-18 (Edge refactor B14)_
-`core.ts`, `email.ts`, `runLog.ts` and `test-helpers.ts` are re-export facades over `domain/` / `dao/` / `test/`.
-
-**Why:** two paths to one module invite a second import path and, for `email.ts`, two module instances of
-`resendGate`'s state if anything ever imports the domain file by a different URL (fence 5 guards declarations,
-not instances).
-
-**Notes:** kept deliberately because `bench/run.ts` loads `${ENGINE_DIR}/core.ts|email.ts|runLog.ts` to compare
-an OLD engine against the new one — repoint the bench first (and accept it can no longer bench pre-refactor
-engines), then index.ts, then other functions' tests (`../generate-invoices/test-helpers.ts`).
-
 ### `pressByText` should press a link itself, not its wrapper — **S** — _filed 2026-11-12 (§7.382)_
 `drivers/lib.mjs` `pressByText` dispatches on the matched leaf's `parentElement`. An expo-router `<Link>` IS the leaf
 (its text is its own), so the click lands on the wrapper and nothing navigates.

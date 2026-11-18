@@ -17,7 +17,7 @@ import {
   resendInvoiceEmail,
   retryUnsentInvoiceEmails,
   settleInvoiceEmail,
-} from "../email.ts";
+} from "../domain/emailDelivery.ts";
 import { getInvoice, monthEnded, newScenario, type Scenario } from "./helpers.ts";
 
 type ResendCall = { body: Record<string, string>; key: string | undefined };

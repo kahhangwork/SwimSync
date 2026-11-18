@@ -13,7 +13,7 @@ import {
   assertEquals,
   assertNotEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { newScenario } from "../generate-invoices/test-helpers.ts";
+import { newScenario } from "../generate-invoices/test/helpers.ts";
 import {
   claimPackage,
   lookupPackage,

@@ -41,9 +41,11 @@ import { assertEquals } from "jsr:@std/assert@1";
 const ROOT = new URL(".", import.meta.url).pathname.replace(/\/$/, ""); // supabase/functions
 const SCOPE = ["generate-invoices", "package-emails", "credit-note-emails"];
 const FACADES: Record<string, string[]> = {
-  // Kept for the whole plan: index.ts, bench/run.ts and the tests import these
-  // names, and the bench must keep comparing old engines against new (plan §5).
-  "generate-invoices": ["./core.ts", "./runLog.ts", "./clock.ts", "./email.ts"],
+  // Not facades any more (the name stayed): the root modules index.ts may import.
+  // core.ts composes the tiers, runLog.ts and clock.ts are their own modules.
+  // The pure re-export files email.ts and test-helpers.ts were DELETED 2026-11-18
+  // (BACKLOG): import from domain/ or test/ — never re-add a second path.
+  "generate-invoices": ["./core.ts", "./runLog.ts", "./clock.ts"],
   "package-emails": [],
   "credit-note-emails": [],
 };
@@ -80,7 +82,7 @@ function walk(dir: string): string[] {
       // shared helpers there.
       if (e.name === "bench" || e.name === "node_modules" || e.name === "test") continue;
       out.push(...walk(p));
-    } else if (e.name.endsWith(".ts") && !e.name.endsWith(".test.ts") && e.name !== "test-helpers.ts") {
+    } else if (e.name.endsWith(".ts") && !e.name.endsWith(".test.ts")) {
       out.push(p);
     }
   }
