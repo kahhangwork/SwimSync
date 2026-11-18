@@ -236,6 +236,15 @@ git ls-remote origin refs/heads/main                 # must now print <sha>
   grace period, and has a deadline on every phase. **If you must watch something it
   does not cover, run the query once in the foreground first and make empty output
   exit the loop.**
+- **Any OTHER run, by id — a nightly, a later CI run, a re-run: `scripts/watch-run.sh
+  <id> [<id>…]`. Never an inline loop in a Monitor command.** Monitor commands run in
+  **zsh**, where `for id in $LIST` does not split (§7.340): on 2026-11-18 an inline
+  watcher passed two ids as one argument, its `|| echo query-failed` fallback read as
+  "still running", and it sat silent while both runs went green. The script is bash,
+  takes one id per argument (a space-joined string is refused as `BROKEN`), prints
+  `BROKEN` after 3 failed queries and `TIMEOUT` past `--deadline` (180 min). A nightly
+  (~2 h) outlives Monitor's 30-min cap — run it with **Bash `run_in_background`**
+  (one notification on exit).
 - **Migrations:** `supabase migration list --linked` remote filled, 0 pending (again,
   from the linked project, not memory).
 - **Engine/functions:** served-bundle grep.
@@ -257,7 +266,7 @@ left (a follow-up deploy, a manual step).
 - **"200 / green build, so it's live."** Grep the served bundle for a new string. → Step 4.
 - **A silent watcher.** A hand-rolled loop whose query matches nothing waits forever
   and says nothing, and one that waits for CI hides a deploy that finished long ago.
-  → Step 4, `scripts/watch-deploy.sh` under Monitor.
+  → Step 4, `scripts/watch-deploy.sh` under Monitor; a run by id → `scripts/watch-run.sh`.
 - **Privilege drift** local-vs-cloud: `anon` silently keeps EXECUTE on a new function
   on the cloud. → Step 3a grant dump.
 - **Rollback that was never run:** a committed DOWN with valid-looking SQL that

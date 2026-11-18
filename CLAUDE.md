@@ -135,7 +135,8 @@ touching an unfamiliar subsystem.
 
 **Shell (the session shell is zsh)**
 - **`$CMD` with spaces runs as ONE command name, and `for x in $LIST` does not split** — put multi-word commands in a
-  `bash` script or spell them out. (§7.340 — bitten twice.)
+  `bash` script or spell them out. **Monitor commands are zsh too** — watch a CI/nightly run with
+  `scripts/watch-run.sh <id>…`, never an inline loop. (§7.340 — bitten four times.)
 
 ## Conventions
 

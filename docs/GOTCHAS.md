@@ -2870,6 +2870,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       `$sz`, so `CLASSES="4 2"` and all four "sizes" ran the default seed and compared IDENTICAL. Caught only because
       every size reported the same 1 invoice. The CLAUDE.md line did not stop it in a scratch script: anything that
       loops goes in a `bash` file, written before it is run.
+    - **Hit again (2026-11-18, §8.171):** an inline **Monitor** watcher, `left="id1 id2"; for id in $left; do gh run
+      view $id … || echo query-failed` — zsh passed both ids as ONE argument, every query failed, the fallback read
+      as "still running", and it sat silent while both CI runs went green (the user asked why CI took so long).
+      **Promoted** to `scripts/watch-run.sh` (bash; one id per argv, a joined string refused as BROKEN; 3 failed
+      queries → BROKEN; a deadline) and named in `/deploy` Step 4 and `/commit-review` — Monitor commands are zsh too.
 
 341. **`name::text` carries collation `"C"` — `results_eq` against a literal `VALUES` raises "could not determine which
     collation to use".** Catalog columns (`pg_proc.proname`) are type `name`. Emit `proname::text COLLATE "default"`

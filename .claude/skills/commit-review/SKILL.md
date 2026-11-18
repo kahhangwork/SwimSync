@@ -108,6 +108,9 @@ Monitor  command: scripts/watch-deploy.sh <sha> --expect https://swimsync.sg/ '<
          timeout_ms: 1800000
 ```
 
+To watch any other run **by id** (the nightly, a later CI run) use **`scripts/watch-run.sh <id>…`** —
+never an inline loop: Monitor commands run in zsh, which does not split `$LIST` (§7.340). `/deploy` Step 4.
+
 Use the admin URL for an admin change, `--expect` twice for both, and drop
 `--expect` only when nothing deployed changed (it then says so). **Tell the user
 the moment the `DEPLOY`/`LIVE` lines arrive — they are the deploy; `CI` is a
