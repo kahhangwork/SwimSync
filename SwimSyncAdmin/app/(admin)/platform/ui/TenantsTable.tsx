@@ -82,7 +82,7 @@ export function TenantsTable({
               <Th sort={tenantSort} sortKey="last_attendance_date" firstDir="desc">Last attendance</Th>
               <Th sort={tenantSort} sortKey="sessions_this_month" firstDir="desc">Sessions this month</Th>
               <Th sort={tenantSort} sortKey="last_month_billing">Last month&apos;s billing</Th>
-              <Th><span className="sr-only">Actions</span></Th>
+              <Th>Actions</Th>
             </Thead>
             <Tbody>
               {tenants.length === 0 && !loadError && (
