@@ -29,7 +29,7 @@
 // real children's levels silently, recording nothing. Hence the prefix below:
 // cleanup is scoped to it, and foreign levels make this driver FAIL and say so
 // rather than tidy them away.
-import { launch, loginAdmin, loginExpo, tap, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, tap, rowAction, ADMIN, EXPO } from "./lib.mjs";
 
 // Every level this driver creates carries this prefix, and cleanup deletes
 // nothing else. Distinct from fixtures-levels-table.sql's 'LvlTbl '.
@@ -43,12 +43,13 @@ const check = (ok, label, detail = "") => {
   else { fail++; console.log("  FAIL", label, detail ? `\n        ${detail}` : ""); }
 };
 
-// Remove one level by label: the row's Remove button, then the confirm
-// dialog's. Both are called "Remove"; the dialog renders after the table, so
-// the last match is the dialog's.
+// Remove one level by label: the row's Remove (in its "…" menu since the
+// one-inline-action pass, so through rowAction), then the confirm dialog's.
+// Both are called "Remove"; the dialog renders after the table, so the last
+// match is the dialog's.
 async function removeLevel(page, label) {
   const row = page.getByRole("row").filter({ hasText: label });
-  await row.getByRole("button", { name: "Remove" }).first().click();
+  await (await rowAction(row.first(), "Remove")).click();
   await page.waitForTimeout(500);
   await page.getByRole("button", { name: /^Remov/ }).last().click();
   await page.waitForTimeout(1200);

@@ -24,7 +24,7 @@
 //   every run — it resets the invoice a previous run paid.
 
 import os from "node:os";
-import { ADMIN, EXPO, launch, loginAdmin, loginExpo, tap } from "./lib.mjs";
+import { ADMIN, EXPO, launch, loginAdmin, loginExpo, rowAction, tap } from "./lib.mjs";
 
 const TOKEN = "da100000c0ffee00da100000c0ffee00";
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
@@ -59,13 +59,15 @@ try {
     (await mobileField.inputValue()) === "91234567",
     await mobileField.inputValue());
 
-  // The WhatsApp button opens a popup — catch it rather than pressing Send.
-  // exact:true — role-name matching is SUBSTRING-based, and without it this
-  // clicks the "WhatsApp reminders" queue button above the table (§7.66's
-  // shape: short labels collide).
+  // WhatsApp opens a popup — catch it rather than pressing Send. It sits in the
+  // fixture row's "…" menu (one inline action per row — Mark Paid), so it is
+  // pressed through rowAction, scoped to THAT row: a page-wide match could hit
+  // the "WhatsApp reminders" queue button above the table (§7.66's shape).
+  const payRow = page.locator("tbody tr").filter({ hasText: "Pay Driver Parent" }).first();
+  const waItem = await rowAction(payRow, "WhatsApp");
   const [popup] = await Promise.all([
     context.waitForEvent("page"),
-    page.getByRole("button", { name: "WhatsApp", exact: true }).first().click(),
+    waItem.click(),
   ]);
   // The page EVENT fires before the popup has navigated anywhere — reading
   // url() immediately returns "" on a loaded machine and the number/link/ref

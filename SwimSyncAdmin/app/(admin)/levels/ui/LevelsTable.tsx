@@ -1,6 +1,7 @@
 import React from "react";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
 import { Button } from "@/components/Button";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import type { LevelsState } from "../domain/useLevels";
 
 export function LevelsTable(p: { l: LevelsState }) {
@@ -79,13 +80,18 @@ export function LevelsTable(p: { l: LevelsState }) {
                     </span>
                   </Td>
                   <Td>
-                    <div className="flex gap-2">
+                    {/* One inline action — Edit; Remove (destructive, behind
+                        its own confirmation) sits in the "…" menu (DESIGN.md →
+                        Tables). Same handlers. */}
+                    <div className="flex items-center gap-1.5">
                       <Button variant="outline" onClick={() => p.l.openEdit(l)}>
                         Edit
                       </Button>
-                      <Button variant="outline" onClick={() => { p.l.setRemoveError(null); p.l.setRemoving(l); }}>
-                        Remove
-                      </Button>
+                      <RowMenu>
+                        <RowMenuItem destructive onClick={() => { p.l.setRemoveError(null); p.l.setRemoving(l); }}>
+                          Remove
+                        </RowMenuItem>
+                      </RowMenu>
                     </div>
                   </Td>
                 </Tr>

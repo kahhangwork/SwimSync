@@ -37,13 +37,15 @@ import type { InvoiceRow } from "../types";
 //   8. `formatSgStamp(inv.reminded_at, DMY)}\n` (the stamp line) → viewer-local, as 6
 //      → RED under TZ=UTC: "the chat-opened stamp is the SGT date, on outstanding rows only"
 //   9. `onClick={() => onWhatsApp(inv)}` → `onClick={() => onWhatsApp(visible[0])}`
-//      → RED: "WhatsApp and Link act on THAT row"
+//      → RED: "WhatsApp and Copy link act on THAT row; only the copied row says so"
 //  10. `{loadError && (` → `{false && (`
 //      → RED: "a failed load says the list is incomplete, and hides the capped notice"
 //  11. `!loading && !loadError && capped` → `!loading && capped`
 //      → RED: "a failed load says the list is incomplete, and hides the capped notice"
 //  12. `{inv.wa_number ? (` → `{true ? (`
-//      → RED: "no usable number reads 'no number', never a WhatsApp button"
+//      → RED: "no usable number reads 'no number', never a pressable WhatsApp"
+//  13. `{copiedLink === inv.id && (` → `{copiedLink !== null && (` (row-menu pass, 2026-11-18)
+//      → RED: "WhatsApp and Copy link act on THAT row; only the copied row says so"
 //
 // NOTE the dev Mac runs at +08: proofs 6 and 8 cannot go red there. They were
 // recorded under TZ=UTC (mutate.sh forces it; CI runs in UTC too).
@@ -212,28 +214,44 @@ describe("InvoiceTable", () => {
     expect(within(never).queryByText(/chat opened/)).toBeNull();
   });
 
-  it("WhatsApp and Link act on THAT row", () => {
+  it("Mark Paid is the one inline action; WhatsApp and Copy link sit in the row menu", () => {
+    setup({ visible: [inv()] });
+    const row = bodyRows()[0];
+    expect(within(row).getByRole("button", { name: /Mark Paid/ })).toBeTruthy();
+    expect(within(row).queryByRole("button", { name: /WhatsApp/ })).toBeNull();
+    expect(within(row).queryByRole("button", { name: /Copy link/ })).toBeNull();
+    fireEvent.click(within(row).getByRole("button", { name: "More actions" }));
+    expect(within(row).getByRole("button", { name: /WhatsApp/ })).toBeTruthy();
+    expect(within(row).getByRole("button", { name: /Copy link/ })).toBeTruthy();
+  });
+
+  it("WhatsApp and Copy link act on THAT row; only the copied row says so", () => {
     const rows = [
       inv({ id: "inv-1", parent_name: "Alice Tan" }),
       inv({ id: "inv-2", parent_name: "Chen Wei" }),
     ];
     const props = setup({ visible: rows, copiedLink: "inv-2" });
-    const second = bodyRows()[1];
-    fireEvent.click(within(second).getByRole("button", { name: /WhatsApp/ }));
-    fireEvent.click(within(second).getByRole("button", { name: /Copied/ }));
+    const second = () => bodyRows()[1];
+    fireEvent.click(within(second()).getByRole("button", { name: "More actions" }));
+    fireEvent.click(within(second()).getByRole("button", { name: /WhatsApp/ }));
+    fireEvent.click(within(second()).getByRole("button", { name: "More actions" }));
+    fireEvent.click(within(second()).getByRole("button", { name: /Copy link/ }));
     expect(props.onWhatsApp).toHaveBeenCalledTimes(1);
     expect(props.onWhatsApp).toHaveBeenCalledWith(rows[1]);
     expect(props.onCopyLink).toHaveBeenCalledTimes(1);
     expect(props.onCopyLink).toHaveBeenCalledWith(rows[1]);
-    // Only the copied row says so.
-    expect(within(bodyRows()[0]).getByRole("button", { name: /Link/ }).textContent).toBe("Link");
+    expect(within(second()).getByText("link copied")).toBeTruthy();
+    expect(within(bodyRows()[0]).queryByText("link copied")).toBeNull();
   });
 
-  it("no usable number reads 'no number', never a WhatsApp button", () => {
-    setup({ visible: [inv({ wa_number: null })] });
+  it("no usable number reads 'no number', never a pressable WhatsApp", () => {
+    const props = setup({ visible: [inv({ wa_number: null })] });
     const row = bodyRows()[0];
-    expect(within(row).getByText("no number")).toBeTruthy();
-    expect(within(row).queryByRole("button", { name: /WhatsApp/ })).toBeNull();
+    fireEvent.click(within(row).getByRole("button", { name: "More actions" }));
+    const wa = within(row).getByRole("button", { name: /no number/ }) as HTMLButtonElement;
+    expect(wa.disabled).toBe(true);
+    fireEvent.click(wa);
+    expect(props.onWhatsApp).not.toHaveBeenCalled();
   });
 
   it("a failed load says the list is incomplete, and hides the capped notice", () => {
@@ -315,7 +333,8 @@ describe("InvoiceTable", () => {
     unmount();
 
     setup({ canChangeDue: false });
-    expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    expect(screen.queryByRole("button", { name: "Change due date" })).toBeNull();
   });
 
   it("a paid row offers no Change due date", () => {

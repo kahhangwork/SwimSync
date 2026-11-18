@@ -163,48 +163,51 @@ export function InvoiceTable({
                         <CheckCircle className="h-3.5 w-3.5" />
                         {markingPaid === inv.id ? "Saving…" : "Mark Paid"}
                       </Button>
-                      {/* Stays enabled after the stamp — opening a chat is
-                          not sending a message, so re-opening must always be
-                          possible. "No number" is a visible state, never a
-                          broken link. */}
-                      {inv.wa_number ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onWhatsApp(inv)}
-                          title={
-                            inv.reminded_at
-                              ? `Chat opened ${formatSgStamp(inv.reminded_at, DMY)}`
-                              : "Open a pre-filled WhatsApp chat"
-                          }
-                        >
-                          <MessageCircle className="h-3.5 w-3.5" />
-                          WhatsApp
-                        </Button>
-                      ) : (
-                        <span
-                          className="text-label text-ink-muted"
-                          title="This parent has no usable phone number"
-                        >
-                          no number
-                        </span>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        title="Copy the invoice's payment link"
-                        onClick={() => onCopyLink(inv)}
-                      >
-                        <LinkIcon className="h-3.5 w-3.5" />
-                        {copiedLink === inv.id ? "Copied" : "Link"}
-                      </Button>
+                      {/* One inline action — Mark Paid, the one a Due row's
+                          state calls for (DESIGN.md → Tables); the rest in the
+                          "…" menu. Same handlers. */}
                       <RowMenu>
+                        {/* Stays offered after the stamp — opening a chat is
+                            not sending a message, so re-opening must always
+                            be possible. "No number" is a visible state, never
+                            a broken link. */}
+                        {inv.wa_number ? (
+                          <RowMenuItem
+                            onClick={() => onWhatsApp(inv)}
+                            title={
+                              inv.reminded_at
+                                ? `Chat opened ${formatSgStamp(inv.reminded_at, DMY)}`
+                                : "Open a pre-filled WhatsApp chat"
+                            }
+                          >
+                            <span className="inline-flex items-center gap-1.5">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              WhatsApp
+                            </span>
+                          </RowMenuItem>
+                        ) : (
+                          <RowMenuItem disabled title="This parent has no usable phone number">
+                            WhatsApp — no number
+                          </RowMenuItem>
+                        )}
+                        <RowMenuItem title="Copy the invoice's payment link" onClick={() => onCopyLink(inv)}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <LinkIcon className="h-3.5 w-3.5" />
+                            Copy link
+                          </span>
+                        </RowMenuItem>
                         {canChangeDue && (
                           <RowMenuItem onClick={() => onChangeDue(inv)}>
                             Change due date
                           </RowMenuItem>
                         )}
                       </RowMenu>
+                    </div>
+                  )}
+                  {/* The menu closes on the press, so the copy confirms here. */}
+                  {copiedLink === inv.id && (
+                    <div className="text-label text-status-success-text mt-0.5" role="status">
+                      link copied
                     </div>
                   )}
                   {inv.status === "outstanding" && inv.reminded_at && (
