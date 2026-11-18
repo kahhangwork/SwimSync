@@ -2203,6 +2203,9 @@ isOneToOne: false
 "set_enrolment_start":
 { Args: { "p_class_id": string,"p_mode": string,"p_starts_on": string,"p_student_id": string }; Returns: Json
                            },
+"set_parent_contact":
+{ Args: { "p_full_name": string,"p_parent_id": string,"p_phone": string }; Returns: undefined
+                           },
 "set_parent_tenant_active":
 { Args: { "p_active": boolean,"p_parent_id": string,"p_student_ids"?: (string)[],"p_tenant_id": string }; Returns: undefined
                            },
@@ -2214,6 +2217,9 @@ isOneToOne: false
                            },
 "set_session_main_coach":
 { Args: { "p_coach_id": string,"p_session_id": string }; Returns: undefined
+                           },
+"set_student_date_of_birth":
+{ Args: { "p_dob": string,"p_student_id": string }; Returns: undefined
                            },
 "set_student_gender":
 { Args: { "p_gender": Database["public"]['Enums']["gender_type"],"p_student_id": string }; Returns: undefined
@@ -2260,6 +2266,9 @@ isOneToOne: false
                            },
 "undo_student_claim":
 { Args: { "p_claim_id": string }; Returns: undefined
+                           },
+"unlink_parent_from_student":
+{ Args: { "p_parent_id": string,"p_student_id": string }; Returns: undefined
                            },
 "unmark_day_holiday":
 { Args: { "p_date": string,"p_tenant": string }; Returns: number
