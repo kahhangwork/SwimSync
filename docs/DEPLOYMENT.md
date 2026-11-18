@@ -1444,3 +1444,10 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     user's word.** `f99052d..ae4ba05` (8 commits, app + admin, no backend; HANDOVER §9 gate waived — no nightly yet
     covered `b715ff7`). Admin 188 s, app 230 s; LIVE — `admin…/invoices` serves "link copied", `swimsync.sg/` serves
     "e.g. Blk 123 Clementi". **Rollback:** revert the range, newest first.
+
+115. **Deploy record (2026-11-18): Calendar columns fill the grid — `main` only, VISUAL-ONLY (D3).** `3aa6c56b`
+    (admin + driver; `check-visual-only` VISUAL-ONLY; `verify-admin-calendar` 22/22 on that tree), the 1st unverified
+    restyle landing since nightly `44316261362`'s base. Vercel success both apps; bundle NOT grepped (no unique
+    string — a flex value). CI `44321611448` green. Same day, no deploy needed: `2c497abb` (CI), `f6c16a33` (test),
+    `3662ed92` (engine import paths only, bench IDENTICAL — prod stays **v42** by `/deploy`'s no-behaviour rule).
+    **Rollback:** revert `3aa6c56b`.

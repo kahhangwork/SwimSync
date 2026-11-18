@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-18 (latest) — **Role delete asks first; five small admin/UI fixes live in one push** (§8.171).
-Row menus on Levels/Invoices/Packages/Platform, due-date trail, modal X named, Packages reads the stored balance, Register
-"e.g." hints. **Nightly gate skipped on the user's word** — read the next nightly first. Next: Coach Kah Hang's November._
+_Last updated: 2026-11-18 (latest) — **Four BACKLOG S-items shipped, one closed as not-doing** (§8.172): a CI guard for
+`| grep -q` under pipefail, the Resend spacing flake, the engine's re-export facades deleted (prod stays v42), Calendar
+columns fill the grid (VISUAL-ONLY). Next: read nightly `44316261362`, then the NEXT one; Coach Kah Hang's November._
 
-_Previously (§8.170, 2026-11-18) — Credit notes can never be negative; package emails name the child, live._
+_Previously (§8.171, 2026-11-18) — Role delete asks first; five small admin/UI fixes live in one push._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.172 (2026-11-18) — Four BACKLOG S-items shipped; one closed as deliberately not doing; live
+
+**Shipped** the user's picks 1–5 of a fresh BACKLOG list, one branch each: `2c497ab` (CI `check-grep-q-pipefail.sh`,
+§7.339 promoted — first run found two live instances, fixed), `f6c16a3` (spacing test asserts the gate's schedule),
+`3aa6c56` (Calendar Week/Day columns grow to fill, DEPLOYMENT #115, VISUAL-ONLY under D3), `3662ed9` (engine
+facades deleted; ARCHITECTURE §6 + file map). TESTING §5 "2026-11-18 (later)". Each proven red first; CI green ×4.
+
+- **Closed, not built:** *late activation after a cancel* — it was the 2026-08-21 snapshot rule (PRD advance-cancel,
+  `cancel_package_extension.test.sql` 16), filed as a "gap" the same morning. Caught only by reading that test before
+  writing the migration; my recommendation to the user had been "yes". → BACKLOG *Deliberately not doing*.
+- **Not deployed on purpose:** `generate-invoices` stays **v42** — `3662ed9` changes import paths only (bench
+  IDENTICAL), and `/deploy` says no behaviour change ⇒ no deploy; November bills on v42 as planned.
+- **Found:** a sibling session in the SAME checkout switched it to `main` mid-commit (`a7d3384`, `watch-run.sh` + a §7.340 hit-again, was theirs); no
+  loss — both commits stayed separate, mine rebased. Shared-checkout work is what `docs/WORKTREES.md` exists for.
+
 ## 8.171 (2026-11-18) — Role delete asks first; five small admin/UI fixes in one push; live
 
 **Shipped** BACKLOG S-items, the user's picks: `b715ff7` (role delete confirm, DEPLOYMENT #113), then one push of 8
@@ -366,18 +381,6 @@ placeholders. PRD updated per commit; TESTING §5 "2026-11-18". Each unit: vites
 - **Not done:** the nightly gate was **skipped on the user's word** — no nightly covered `b715ff7` before the push.
   Two restyle leftovers stay in BACKLOG (Mark Attendance tab highlight — needs a plan; Calendar Week blank band — new).
   Make-ups' RPC read left as is (no live/stored split there). CI for `ae4ba05` was pending at close.
-
-## 8.170 (2026-11-18) — Credit notes can never be negative; package emails name the child; live
-
-**Shipped** two BACKLOG S-items the user picked from a top-3 re-rank (Build order exhausted; #3 = role-delete confirm).
-- **`aea616d`** — `CHECK (credit_notes.amount >= 0)`, migration `20261118000300` (DEPLOYMENT #111). **`>= 0`, not the
-  item's `> 0`:** a S$0 class bills a S$0 item and its correction inserts a S$0 note — `> 0` would fail that attendance
-  edit. Pinned by `constraints.test.sql` 3c (proven red under `> 0`); reasoning in the migration header.
-- **`b475f8d`** — `package-emails` v11: a one-child package's emails name the child (PRD §7.16; DEPLOYMENT #112).
-  The `/package/[token]` page stays child-free (the user's earlier rule); the email may name it (decided here).
-
-- **Not done:** no real one-child package email observed since v11 — check the next confirm. Deno ×2 not run (the
-  engine writes no credit notes). Nightly `44269745188` (covers §8.168–169) went GREEN at close.
 
 ## 9. Next steps (pick with the user)
 
@@ -421,9 +424,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-18:** run `44269745188` (on `08c9180`) **GREEN**. Since then `b715ff7` and `f99052d..ae4ba05`
-(§8.171) went to `main` with the gate **skipped on the user's word** — **the next scheduled nightly must be read before
-the next APP unit merges**; it is the first to cover all nine commits. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-18 (late):** dispatched run `44316261362` (on `d5f987a`) was **in progress** at close — it is the
+first to cover §8.171's nine gate-skipped commits; **read it before the next APP unit merges**. It does NOT cover
+§8.172's `3aa6c56` (Calendar, landed VISUAL-ONLY under D3 — 1 of the 3 allowed) — the next nightly after it does. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -440,17 +443,18 @@ which mutate shared seed state — are in the same section.
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
    in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Read the next nightly** — it covers §8.171's nine commits (gate skipped). A red names its driver; replay it
-   `--only`. The drivers touched are listed in TESTING §5 "2026-11-18".
+2. **Read nightly `44316261362`** (§8.171's nine commits), then the next one (§8.172's Calendar). A red names its
+   driver; replay it `--only`. Drivers touched: TESTING §5 "2026-11-18" and "2026-11-18 (later)". Also unobserved
+   since `package-emails` v11 (§8.170): a real one-child package email naming the child — check the next confirm.
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
-UI restyle leftovers: two open in that BACKLOG item (Mark Attendance tab highlight — needs a plan; Calendar Week blank
-band). The Build order is exhausted — pick from BACKLOG with the user, or run `/backlog-prioritisation`.
+UI restyle leftovers: one open (Mark Attendance tab highlight — needs a plan). The Build order is exhausted — pick from BACKLOG with the user, or run `/backlog-prioritisation`.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).
-- **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
+- **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127) **and
+  that no test pins the opposite** — grep `supabase/tests` for its function first (§8.172: one "gap" was a decision).
 - **A new pgTAP file pins the clock** (copy a pinned header; G1 is required) and a date DECISION in SQL reads
   `app_now()`/`app_today()` (G2 + the frozen census). A UI fixture date still derives from the floor (§7.305).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the

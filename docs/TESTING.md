@@ -702,12 +702,13 @@ the converged RPC Mark Paid, and the public page's paid state. **The fixture res
 invoice on every load** — re-load before each run. Requires `supabase functions serve
 public-invoice` alongside both dev servers. What it deliberately does NOT prove: a real
 bank app accepting the QR (that is the manual release gate);
-`verify-admin-calendar.mjs` (+ `fixtures-admin-calendar.sql` / `-teardown.sql`, 21 checks) drives
+`verify-admin-calendar.mjs` (+ `fixtures-admin-calendar.sql` / `-teardown.sql`, 22 checks) drives
 the admin **Calendar**: two overlapping fixture classes land in two lanes, cards read `3/3 FULL` and
 `1+1/6` (enrolled + make-up guest / capacity), the substitute reads `(Sub)`, hover lists the roster
 with the MAKE-UP chip, click pins, Today/‹/› move the URL date, the time gutter stays at x=0 after a
 horizontal scroll, month/agenda render, the coach filter keeps the substitute's lesson, double-click
-lands on `/lessons/…` — and, read through psql, **the `lesson_sessions` count is unchanged after the
+lands on `/lessons/…`, the Week view at 1440px has no blank band right of Sunday (2026-11-18; red on the old
+fixed-width columns, band=50px) — and, read through psql, **the `lesson_sessions` count is unchanged after the
 whole run** (the calendar is read-only by construction; ADMIN_CALENDAR_PLAN RISK 4). Every URL-driven check (›, Today,
 day number, coach filter) WAITS for the URL / re-rendered grid rather than a fixed 400 ms (2026-09-24 — the
 fixed timers failed 5 checks with router fetches slowed 1.5 s).
@@ -1822,6 +1823,15 @@ until a reset, so this caution stands.
   `verify-platform-admin-scope` pins 26 pages.
 - **Flake to watch:** one unnamed admin vitest failure in 5 full runs on `d98cc46` + lane 2 (929 tests), not
   reproduced in 4 reruns (lane 2). If it recurs, capture the name before rerunning.
+
+### 2026-11-18 (later) — grep -q guard, spacing test, engine facades, calendar fill (§8.172)
+
+- **CI `repo-invariants`** runs `scripts/check-grep-q-pipefail.sh` (§7.339 promoted): every tracked `*.sh` setting
+  pipefail; self-tests its matcher each run; `# grep-q-ok: <why>` opts a line out. Red on the two live instances.
+- **Deno** `test/speed.test.ts` spacing test asserts the gate's SCHEDULE (send i ≥ t0 + (i−1)×spacing, 4 sends),
+  not the gap between fetch starts — red 3/3 with the gate disabled. `tierBoundaries.test.ts` fence 4 no longer
+  allows `./email.ts` (red on a re-added facade import). Suite 341/341 ×2. Bench IDENTICAL vs `7f3295d` at 4×2, 12×5.
+- **Driver** `verify-admin-calendar` +1 (22): the 1440px week fill.
 
 ### 2026-11-18 — admin row menus, due-date trail, modal X (§8.171)
 
