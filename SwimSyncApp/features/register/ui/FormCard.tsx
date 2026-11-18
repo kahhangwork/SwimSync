@@ -5,9 +5,10 @@
 //
 // UI restyle step 4.3 (DESIGN.md): a flat card, DESIGN.md inputs (white, Border
 // Strong, 6px, 44px, label above), "(optional)" in Ink Muted, the error in
-// Danger text, the shared Button. Every placeholder stays as written — the
-// drivers find the fields by them (Sarah Tan, you@email.com, 9123 4567, Blk 123,
-// 120123, SWIM-1234). What Create Account does is useRegister's, unchanged.
+// Danger text, the shared Button. The drivers find the fields by placeholder
+// (Sarah Tan, you@email.com, 9123 4567, Blk 123, 120123, SWIM-1234) — a
+// SUBSTRING match, so phone and address read "e.g. …" like Profile → Contact
+// (restyle leftover, 2026-11-18) and still resolve. What Create Account does is useRegister's, unchanged.
 import React from "react";
 import { View, Text, TextInput } from "react-native";
 import { router } from "expo-router";
@@ -70,7 +71,7 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
           <TextInput
             value={phone}
             onChangeText={setPhone}
-            placeholder="+65 9123 4567"
+            placeholder="e.g. 9123 4567"
             keyboardType="phone-pad"
             className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
             placeholderTextColor="#6b6b6b"
@@ -89,7 +90,7 @@ export function FormCard(p: Pick<Register, "emailSent" | "email" | "setEmail" | 
           <TextInput
             value={address}
             onChangeText={setAddress}
-            placeholder="Blk 123 Clementi Ave 3, #04-56"
+            placeholder="e.g. Blk 123 Clementi Ave 3, #04-56"
             className="min-h-11 border border-border-strong rounded-control px-3 text-body text-ink bg-surface"
             placeholderTextColor="#6b6b6b"
           />

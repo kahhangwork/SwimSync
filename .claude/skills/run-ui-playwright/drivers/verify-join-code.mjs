@@ -64,7 +64,7 @@ let joinCode = null;
     // LAST match — the register screen, pushed on top.
     await page.getByPlaceholder("Sarah Tan").last().fill("Join Test Parent");
     await page.getByPlaceholder("you@email.com").last().fill(EMAIL);
-    await page.getByPlaceholder("+65 9123 4567").last().fill("+65 91234567");
+    await page.getByPlaceholder("9123 4567").last().fill("+65 91234567");
     const pw = page.locator('input[type="password"]');
     const n = await pw.count();
     await pw.nth(n - 2).fill("password123"); // password

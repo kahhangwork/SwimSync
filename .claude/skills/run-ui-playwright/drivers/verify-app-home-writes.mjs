@@ -91,7 +91,7 @@ try {
     await page.getByPlaceholder("Sarah Tan").last().waitFor({ timeout: 30000 });
     await page.getByPlaceholder("Sarah Tan").last().fill("Home Register");
     await page.getByPlaceholder("you@email.com").last().fill(REGISTER);
-    await page.getByPlaceholder("+65 9123 4567").last().fill("90002222");
+    await page.getByPlaceholder("9123 4567").last().fill("90002222");
     await page.getByPlaceholder("SWIM-1234 or REF-ABCDE").last().fill("SWIM-TEST");
     const pw = page.locator('input[type="password"]');
     const n = await pw.count();

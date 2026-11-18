@@ -31,7 +31,7 @@ try {
   // .last(): the login screen stays mounted underneath, so its email
   // field also matches (SKILL.md gotcha 6).
   await page.getByPlaceholder("you@email.com").last().fill(EMAIL);
-  await page.getByPlaceholder("+65 9123 4567").fill("+65 9000 0000");
+  await page.getByPlaceholder("9123 4567").fill("+65 9000 0000");
   await page.getByPlaceholder("Blk 123 Clementi Ave 3, #04-56").fill("Blk 9 Test Road");
 
   // A 5-digit code must be refused BEFORE the account is created — otherwise
