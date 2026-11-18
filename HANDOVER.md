@@ -449,7 +449,7 @@ which mutate shared seed state — are in the same section.
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
-UI restyle leftovers: one open (Mark Attendance tab highlight — needs a plan). The Build order is exhausted — pick from BACKLOG with the user, or run `/backlog-prioritisation`.
+UI restyle leftovers: none open (the Mark Attendance tab highlight was closed as not-doing, 2026-11-18). The Build order is exhausted — pick from BACKLOG with the user, or run `/backlog-prioritisation`.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).

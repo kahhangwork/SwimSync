@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-11-18 (latest) — shipped and removed: *A CI grep for `| grep -q` in pipefail scripts*, *`speed.test.ts` spacing test can flake*, *Delete generate-invoices' re-export facades*, the Calendar Week blank band (UI restyle leftovers); *A package activated after an advance-cancelled lesson* moved to *Deliberately not doing* (the 2026-08-21 snapshot rule, user re-confirmed). Earlier (later) — shipped and removed: *Deleting a role has no confirmation step*, *The admin Modal's close (X) button has no accessible name*, *Show an invoice's due-date change history*, *Simplify the admin's live-balance display*, *Admin tables still carrying several inline row actions*; *UI restyle leftovers* re-verified (one still open, one new: Calendar Week's blank band). Earlier the same day, shipped and removed: *A credit note's amount has no positivity check* (as `>= 0`, `20261118000300`) and *Name the child in package emails* (`package-emails` v11). Earlier the same day: three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
+_Last updated: 2026-11-18 (latest) — *Mark Attendance highlights Classes when arrived from Schedule* moved to *Deliberately not doing* (user, after a local check), closing *UI restyle leftovers*. Earlier (latest) — shipped and removed: *A CI grep for `| grep -q` in pipefail scripts*, *`speed.test.ts` spacing test can flake*, *Delete generate-invoices' re-export facades*, the Calendar Week blank band (UI restyle leftovers); *A package activated after an advance-cancelled lesson* moved to *Deliberately not doing* (the 2026-08-21 snapshot rule, user re-confirmed). Earlier (later) — shipped and removed: *Deleting a role has no confirmation step*, *The admin Modal's close (X) button has no accessible name*, *Show an invoice's due-date change history*, *Simplify the admin's live-balance display*, *Admin tables still carrying several inline row actions*; *UI restyle leftovers* re-verified (one still open, one new: Calendar Week's blank band). Earlier the same day, shipped and removed: *A credit note's amount has no positivity check* (as `>= 0`, `20261118000300`) and *Name the child in package emails* (`package-emails` v11). Earlier the same day: three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -296,8 +296,8 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 
 7. ~~*Single-child packages*~~ — **shipped 2026-10-11** (PRD §7.16, `docs/plans/SINGLE_CHILD_PACKAGES_PLAN.md`; the
    user added D11 — one kind per family — during the build). Follow-up ~~*Name the child in package emails*~~ shipped 2026-11-18.
-8. ~~*UI/UX improvements*~~ — **shipped 2026-10-14** (UI restyle Phases 0–7; DESIGN.md adopted). What it left open:
-   *UI restyle leftovers* (S each).
+8. ~~*UI/UX improvements*~~ — **shipped 2026-10-14** (UI restyle Phases 0–7; DESIGN.md adopted). What it left open,
+   *UI restyle leftovers*, is all closed (2026-11-18).
 9. ~~*Remove the legacy package matcher*~~ — **shipped 2026-10-13** (engine v36 + `20261013000100`; the D9 guard went
    with it). Follow-up ~~*Simplify the admin's live-balance display*~~ shipped 2026-11-18.
 
@@ -1608,7 +1608,7 @@ roles. Do it before the co-admin hire if the owner builds such a role.
 
 ## Platform and reach
 
-### UI restyle leftovers — **S each** — _filed 2026-10-14 (UI restyle 7.3)_
+### ~~UI restyle leftovers~~ — **S each** — _filed 2026-10-14 (UI restyle 7.3)_ — **ALL CLOSED 2026-11-18**
 What the restyle (Wave 9 item 8, `docs/plans/UI_RESTYLE_PLAN.md`, DESIGN.md now *adopted*) left open. Each is one screen
 or one shared component; fix whenever the screen is touched, or as its own S. The full audit history (81 screens,
 2026-10-11; ranked S1–S10 and fold-ins) is `git show 0cf4c11:BACKLOG.md`.
@@ -1629,11 +1629,8 @@ day after), a stored due date, the red tag on every surface, and Change due date
 Packages, Platform and the parent's Buy a package (resolved — Request & pay is secondary); Register's phone and address
 placeholders now read "e.g. …" like Profile → Contact (**fixed**).
 
-**Still open:**
-- **Mark Attendance highlights Classes when arrived from Schedule** — by construction: the attendance screen lives in
-  the Classes tab's Stack (`app/(coach)/_layout.tsx`, §7.65) and Schedule pushes into it. Not an S restyle fix: it
-  means a second attendance route under Schedule (or a custom tab highlight), against the tab-stack behaviour three
-  earlier attempts broke silently. Needs its own plan + `verify-coach-*` driver run.
+**Nothing still open.** *Closed 2026-11-18:* *Mark Attendance highlights Classes when arrived from Schedule* →
+*Deliberately not doing* (the highlight is correct; every exit returns to where the coach came in).
 
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
@@ -1915,6 +1912,7 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
+| **Mark Attendance highlighting Schedule when opened from Schedule** (a second attendance route under Schedule, or lifting attendance above the tabs) | Refused 2026-11-18 with the user, after checking it on the local app. The attendance screen and the roster belong to a class, so the **Classes** highlight is the honest reading. Every exit returns to where the coach came in: a past/today lesson from Schedule → attendance → Schedule; a future lesson from Schedule → roster → Schedule; roster → Mark Attendance → roster (`exitHref.ts`, `DaySection.tsx`). A second route would also need a second copy of the Classes tab-press unwind (§7.80, three approaches silently did nothing). **Revisit if** a coach is actually confused by the highlight. |
 | **Extending a package activated AFTER an advance-cancelled lesson** (mirroring the holiday late-buyer trigger) | Refused 2026-11-18 with the user, re-confirming the 2026-08-21 snapshot rule (PRD, advance-cancel: *"they never paid for that week"*). Filed earlier the same day as a gap found building carried-over packages; on inspection it is the documented decision, pinned by `cancel_package_extension.test.sql` 16 and `carried_over_packages.test.sql` 16. Holidays DO extend a late buyer (`holiday_reconcile_on_activation`) — the asymmetry is deliberate. **Revisit only if** a business asks for late buyers to be extended for cancels; the shape is an AFTER trigger on `parent_packages` calling `apply_cancel_reconcile` per cancelled lesson in the window. |
 | **Vendoring the Edge Functions' Deno dependencies** (`"vendor": true`, committed) to get CI to zero downloads | Weighed 2026-11-12 (§8.163). `npm:` imports + the `setup-deno` cache already remove the changing-bytes flake and skip downloads on most runs; what is left is a rare bad download on a cache miss, cleared by a re-run (§7.385). Vendoring would put MBs of third-party code in git, and whether `supabase functions deploy` accepts a vendored folder is unverified. **Revisit if** a cache-miss integrity red recurs often enough to cost real time. |
 | **A per-child make-up for a child in every class of their kind** | Refused 2026-09-27 with the user: no child is enrolled in every group class of their kind, so the gap (nowhere to guest them, `book_makeup()` rightly refusing the own-class silent void) never arises. Workarounds stand: mark the miss non-billable, or a whole-class extra lesson. **Never "fix" it by relaxing the own-class refusal** (pinned by `multi_class.test.sql`). **Revisit if** a child really is enrolled in every class of a kind; the design sketch is in the struck item. |
