@@ -131,6 +131,27 @@ try {
   const weekCards = await page.getByTestId("lesson-card").count();
   check("week view renders the fixture lessons", weekCards >= 2, `${weekCards} cards`);
 
+  // ── Week view at 1440px fills the grid: no blank band on the right ─────────
+  // The seven columns once stopped ~180px short of the grid's right edge (BACKLOG
+  // UI restyle leftovers, 2026-11-18). Measured against the scroller's CONTENT box
+  // (clientWidth excludes a scrollbar), only when the week fits without scrolling.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(300);
+  const fill = await page.getByTestId("time-grid-scroll").evaluate((el) => {
+    const cols = el.querySelectorAll('[data-testid="day-column"]');
+    const last = cols[cols.length - 1]?.getBoundingClientRect();
+    const innerRight = el.getBoundingClientRect().left + el.clientLeft + el.clientWidth;
+    return { n: cols.length, fits: el.scrollWidth <= el.clientWidth, band: last ? Math.round(innerRight - last.right) : null };
+  });
+  if (!fill.fits) console.log("  (precondition) the week overflows at 1440px — no band is possible, the check below is vacuous");
+  check(
+    "week view at 1440px: the day columns reach the grid's right edge",
+    fill.n === 7 && fill.band !== null && Math.abs(fill.band) <= 1,
+    `${fill.n} columns, band=${fill.band}px, fits=${fill.fits}`
+  );
+  await page.screenshot({ path: shot("admin-calendar-week-1440.png") });
+  await page.setViewportSize({ width: 1280, height: 900 });
+
   // ── Month view: chips + day number → day view ─────────────────────────────
   await page.goto(`${ADMIN}/calendar?view=month&date=${today}`, { waitUntil: "networkidle" });
   await page.getByTestId("lesson-chip").first().waitFor({ timeout: 15000 });

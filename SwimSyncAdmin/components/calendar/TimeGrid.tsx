@@ -32,6 +32,15 @@ function fmtAxis(min: number): string {
   return `${hh}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
+/** A day column's flex: never narrower than its computed width (lanes × laneMinPx),
+ *  and growing to share any room left over, so a week that fits the screen fills
+ *  it instead of leaving a blank band on the right (BACKLOG UI restyle leftovers,
+ *  2026-11-18). Header and body rows use the same flex over the same total width,
+ *  so their columns stay aligned. */
+function dayFlex(width: number): React.CSSProperties {
+  return { flex: `1 0 ${width}px` };
+}
+
 /**
  * The day / week grid. The scroll container scrolls BOTH ways; the time gutter
  * is `sticky left-0` and the day header `sticky top-0`, so many concurrent
@@ -96,10 +105,10 @@ export function TimeGrid({
               <div
                 key={c.date}
                 className={cn(
-                  "shrink-0 border-r border-border px-2 py-2 text-label",
+                  "border-r border-border px-2 py-2 text-label",
                   isToday && "bg-status-info-bg"
                 )}
-                style={{ width: c.width }}
+                style={dayFlex(c.width)}
               >
                 <button
                   type="button"
@@ -151,8 +160,8 @@ export function TimeGrid({
               key={c.date}
               data-testid="day-column"
               data-date={c.date}
-              className={cn("relative shrink-0 border-r border-border", c.date === today && "bg-status-info-bg")}
-              style={{ width: c.width }}
+              className={cn("relative border-r border-border", c.date === today && "bg-status-info-bg")}
+              style={dayFlex(c.width)}
             >
               {/* Row lines */}
               {Array.from({ length: rows }, (_, i) => (
@@ -168,7 +177,8 @@ export function TimeGrid({
               {/* Cards */}
               {c.dayLessons.map((l) => {
                 const p = c.lanes.get(l.key) ?? { lane: 0, lanes: 1 };
-                const laneWidth = c.width / p.lanes;
+                // Percent, not px: the column may grow past c.width (dayFlex).
+                const lanePct = 100 / p.lanes;
                 const top = ((l.startMin - axis.startMin) / 30) * ROW_PX;
                 const height = Math.max(ROW_PX * 0.9, ((l.endMin - l.startMin) / 30) * ROW_PX - 2);
                 return (
@@ -183,8 +193,8 @@ export function TimeGrid({
                     style={{
                       top,
                       height,
-                      left: p.lane * laneWidth + 2,
-                      width: laneWidth - 4,
+                      left: `calc(${p.lane * lanePct}% + 2px)`,
+                      width: `calc(${lanePct}% - 4px)`,
                     }}
                   />
                 );

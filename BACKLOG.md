@@ -1634,6 +1634,7 @@ or one shared component; fix whenever the screen is touched, or as its own S. Th
 day after), a stored due date, the red tag on every surface, and Change due date (PRD → invoice generation;
 `docs/plans/OVERDUE_INVOICES_PLAN.md`).
 
+*Shipped 2026-11-18:* Calendar Week (and Day) columns grow to fill the grid — no blank band at 1440px (`verify-admin-calendar`).
 *Re-verified 2026-11-18:* Calendar Week shows Sunday at 1440px (resolved); one primary per section on Referrals,
 Packages, Platform and the parent's Buy a package (resolved — Request & pay is secondary); Register's phone and address
 placeholders now read "e.g. …" like Profile → Contact (**fixed**).
@@ -1643,8 +1644,6 @@ placeholders now read "e.g. …" like Profile → Contact (**fixed**).
   the Classes tab's Stack (`app/(coach)/_layout.tsx`, §7.65) and Schedule pushes into it. Not an S restyle fix: it
   means a second attendance route under Schedule (or a custom tab highlight), against the tab-stack behaviour three
   earlier attempts broke silently. Needs its own plan + `verify-coach-*` driver run.
-- **Admin Calendar Week leaves a blank band on the right at 1440px** (found re-verifying 2026-11-18) — the seven day
-  columns stop ~180px short of the grid's right edge; the band carries no header or lines.
 
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
