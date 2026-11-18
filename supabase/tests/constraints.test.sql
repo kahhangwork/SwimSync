@@ -1,11 +1,12 @@
 -- pgTAP: key data-integrity guarantees the billing logic relies on.
 -- One invoice per parent per month, one active enrolment per student,
--- positive-only credit applications, and immutable credit notes.
+-- positive-only credit applications, never-negative credit notes (S$0 allowed —
+-- see 3c), and immutable credit notes.
 
 BEGIN;
 SELECT set_config('swimsync.now', '2026-09-15 10:00+08', true);
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(8);
+SELECT plan(12);
 SELECT is(app_today(), '2026-09-15'::date, 'clock pinned');
 
 -- Multi-tenancy scaffolding: coaches and students now require a tenant. This
@@ -134,6 +135,61 @@ SELECT throws_ok($$
   INSERT INTO credit_applications (credit_note_id, invoice_id, amount)
   VALUES ('0c000000-0000-0000-0000-000000000001','e0000000-0000-0000-0000-000000000002', 0)
 $$, '23514', NULL, 'credit_applications.amount must be > 0');
+
+-- ── 3a/3b. A credit note can never be NEGATIVE (20261118000300) ──────────────
+-- A credit note is money the business owes the family; a negative one would be
+-- subtracted from credit_balance and print as `−S$-5.00` while every screen calls
+-- it a credit. The exact message pins THIS constraint, not credit_notes_status_check.
+-- Its own invoice item (f…05): credit_notes_invoice_item_id_key allows one note per
+-- item, and reusing f…02 would make the unique key — not this check — refuse it.
+INSERT INTO lesson_sessions (id, class_id, session_date, status)
+VALUES ('d0000000-0000-0000-0000-000000000005','b0000000-0000-0000-0000-000000000002','2026-01-17','completed');
+INSERT INTO invoice_items (id, invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
+VALUES ('f0000000-0000-0000-0000-000000000005','e0000000-0000-0000-0000-000000000002',
+        'c0000000-0000-0000-0000-000000000002','d0000000-0000-0000-0000-000000000005','present',30,'Con Class','2026-01-17');
+
+SELECT throws_ok($$
+  INSERT INTO credit_notes (tenant_id, reference_number, parent_id, student_id, invoice_id, invoice_item_id,
+    lesson_session_id, amount, original_status, corrected_status, status)
+  SELECT '99999999-0000-0000-0000-000000000001', 'CN-TEST-NEG', p.id,
+         'c0000000-0000-0000-0000-000000000002','e0000000-0000-0000-0000-000000000002',
+         'f0000000-0000-0000-0000-000000000005','d0000000-0000-0000-0000-000000000005',
+         -5,'present','absent','available'
+  FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000d2'
+$$, '23514', 'new row for relation "credit_notes" violates check constraint "credit_notes_amount_nonnegative"',
+   'a credit note cannot be issued for a negative amount');
+
+SELECT throws_ok($$
+  UPDATE credit_notes SET amount = -0.01 WHERE id = '0c000000-0000-0000-0000-000000000001'
+$$, '23514', 'new row for relation "credit_notes" violates check constraint "credit_notes_amount_nonnegative"',
+   'an existing credit note cannot be changed to a negative amount');
+
+-- ── 3c. …but correcting a S$0 lesson still WORKS (why the check is >= 0) ─────
+-- A class can be priced at S$0 (class_rates CHECK >= 0), so the engine can bill a
+-- S$0 invoice item, and correcting that lesson makes handle_attendance_update()
+-- INSERT a S$0 note. A `> 0` check would raise 23514 inside the trigger and the
+-- coach's attendance edit would fail. This is the case that goes red if the
+-- constraint is ever "tightened" without first teaching the trigger to skip S$0.
+INSERT INTO lesson_sessions (id, class_id, session_date, status)
+VALUES ('d0000000-0000-0000-0000-000000000004','b0000000-0000-0000-0000-000000000002','2026-01-10','completed');
+
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('d0000000-0000-0000-0000-000000000004','c0000000-0000-0000-0000-000000000002','present',
+        'a0000000-0000-0000-0000-0000000000c2');
+
+INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
+VALUES ('e0000000-0000-0000-0000-000000000002','c0000000-0000-0000-0000-000000000002',
+        'd0000000-0000-0000-0000-000000000004','present',0,'Con Class','2026-01-10');
+
+SELECT lives_ok($$
+  UPDATE attendance SET status = 'absent', edit_reason = 'free lesson corrected'
+   WHERE lesson_session_id = 'd0000000-0000-0000-0000-000000000004'
+     AND student_id = 'c0000000-0000-0000-0000-000000000002'
+$$, 'correcting a billed S$0 lesson is not blocked by the credit-note amount check');
+
+SELECT is(
+  (SELECT amount FROM credit_notes WHERE lesson_session_id = 'd0000000-0000-0000-0000-000000000004'),
+  0.00::numeric, 'the S$0 correction issues a S$0 credit note');
 
 -- ── 4. Credit notes are immutable to app roles ───────────────────────────────
 -- The guarantee is unchanged; what enforces it got stronger, and the OBSERVABLE

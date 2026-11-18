@@ -1710,21 +1710,12 @@ Close and the X — and strict mode fails. `verify-class-admin.mjs` presses a "C
 button (any name containing "Close", exact or not, collides with a footer Close). Run `--only package-draw-at-marking`
 and `--only class-admin`. Not visual-only.
 
-### A credit note's amount has no positivity check — **S** — _filed 2026-10-13_
-`credit_notes.amount` is `NUMERIC(10,2) NOT NULL` with **no `CHECK (amount > 0)`** (`20260309000100_initial_schema.sql`).
-Its writers are the correction triggers, which copy a billed lesson's amount, so a negative row should not occur — but
-nothing enforces it. Since UI restyle 3.2 / 3.9 the parent app prints a credit as a reduction, `−S${amount}`, so a
-negative row would read `−S$-5.00`; the engine's FIFO draw (`apply_credit_to_invoice`) would treat it as a debit.
-
-**Why:** a credit note is money the business owes the family; a negative one would silently ADD to an invoice while
-every screen calls it a credit. Cheap to rule out now, expensive to unpick after a billing run.
-
-**Checked 2026-10-13:** prod holds **0 credit notes** (0 non-positive) — the check cannot conflict with existing data.
-
-**Notes:** re-run `SELECT count(*) FROM credit_notes WHERE amount <= 0` on prod just before the migration (`scripts/prod-query-ro.sh`, run by the
-RELATIVE path — an absolute path misses the allow rule). If 0: a migration adding `CHECK (amount > 0)` (expand-only,
-pgTAP a refused insert; `credit_applications.amount` already has the same check — `20260711000100`). If not 0: stop
-and ask — those rows are real money. Do NOT "fix" it in the UI with `Math.abs`; that would hide the bad row.
+### ~~A credit note's amount has no positivity check~~ — **S** — **DONE 2026-11-18** (`20261118000300`)
+Shipped as **`CHECK (amount >= 0)`**, not the `> 0` this item proposed: a class can be priced at S$0, the engine bills
+that as a S$0 invoice item, and correcting the lesson makes `handle_attendance_update()` insert a S$0 note — `> 0` would
+have made that attendance edit fail. A S$0 note draws nothing (`apply_credit_to_invoice` skips a remainder ≤ 0).
+Pinned in `constraints.test.sql` 3a–3c; 3c goes red if anyone tightens it to `> 0` (proven 2026-11-18). Prod held 0
+credit notes when it shipped.
 
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
