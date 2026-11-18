@@ -364,7 +364,7 @@ pgTAP 52 + vitest 7 (mutations red), full pgTAP 99/2239, Deno ×2, driver 11/11 
   the rollback was rehearsed inside one transaction + ROLLBACK instead.
 - **Not done:** the app push **bypassed the nightly gate** on the user's word — the next nightly is the first to cover
   `eb3e2f0` and `6df68a7`. Two accepted gaps → BACKLOG *Carried-over packages*; the held *Starts* sort (plan §7).
-  Little Orcas' admin not yet told. Nightly not dispatched.
+  Little Orcas' admin not yet told. Nightly dispatched on the user's word: run `44269745188` on `08c9180`.
 
 ## 8.168 (2026-11-18) — Admin corrects a linked family's details: parent name/phone, unlink, child DOB; live
 
@@ -422,7 +422,7 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-18:** scheduled run `44217003736` GREEN on `12729a0`. **The next one must cover `eb3e2f0` and `6df68a7`**: `verify-contact-details` (32) and the new `verify-carried-over-package` (11), both green ×2 locally; `6df68a7` shipped AHEAD of it (gate bypassed, user). A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-18:** scheduled run `44217003736` GREEN on `12729a0`. **Run `44269745188` (dispatched by the user, on `08c9180`) is the first to cover `eb3e2f0` and `6df68a7` — read its result first**: `verify-contact-details` (32) and the new `verify-carried-over-package` (11), both green ×2 locally; `6df68a7` shipped AHEAD of it (gate bypassed, user). A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -439,7 +439,7 @@ which mutate shared seed state — are in the same section.
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
    in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Read the next nightly** — it must cover `eb3e2f0` and `6df68a7` (the latter shipped ahead of it). A red in
+2. **Read nightly run `44269745188`** — it covers `eb3e2f0` and `6df68a7` (the latter shipped ahead of it). A red in
    `verify-carried-over-package` or `packages-admin` → revert `6df68a7` (admin only; the migration is additive). Never
    dispatch it unasked. Tell the admins who sent the 2026-11-18 feedback: linked families can be corrected (PRD §7.19),
    and existing packages can be brought in from Record a sale → *Existing package* (PRD §7.16).
