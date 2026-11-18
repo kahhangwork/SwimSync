@@ -1101,16 +1101,6 @@ modifier in the system — changes `amount_payable`, never `total_value`. **LIVE
 (`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
 
-### A package activated after an advance-cancelled lesson gets no cancel extension — **S** — _filed 2026-11-18, found building carried-over packages_
-`holiday_reconcile_on_activation` picks up holidays already marked inside a new package's window, but nothing does
-the same for an **advance-cancelled** lesson (`lesson_sessions.cancelled_at`) already inside it: the cancel extension
-is applied only when the cancellation happens (`apply_cancel_reconcile`, from the `lesson_sessions` trigger). So a
-package sold — or brought in — with a cancelled lesson already ahead of it is not extended for that lesson.
-
-**Why:** pinned, not fixed — `carried_over_packages.test.sql` case 16 expects exactly this, and it is the same for an
-ordinary sale (pre-existing). Decide whether activation should reconcile cancels too; if so, mirror the holiday
-activation trigger and update that case.
-
 ### Carried-over packages — the two accepted gaps — **S** — _filed 2026-11-18, follow-ups of PRD §7.16 "A package bought before SwimSync"_
 - **A pending referral where the family is the referee stays pending** — a bring-in converts no referral and mints no
   referrer reward (D6); it converts on the family's next real purchase. Revisit if a business asks.
@@ -1936,6 +1926,7 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
+| **Extending a package activated AFTER an advance-cancelled lesson** (mirroring the holiday late-buyer trigger) | Refused 2026-11-18 with the user, re-confirming the 2026-08-21 snapshot rule (PRD, advance-cancel: *"they never paid for that week"*). Filed earlier the same day as a gap found building carried-over packages; on inspection it is the documented decision, pinned by `cancel_package_extension.test.sql` 16 and `carried_over_packages.test.sql` 16. Holidays DO extend a late buyer (`holiday_reconcile_on_activation`) — the asymmetry is deliberate. **Revisit only if** a business asks for late buyers to be extended for cancels; the shape is an AFTER trigger on `parent_packages` calling `apply_cancel_reconcile` per cancelled lesson in the window. |
 | **Vendoring the Edge Functions' Deno dependencies** (`"vendor": true`, committed) to get CI to zero downloads | Weighed 2026-11-12 (§8.163). `npm:` imports + the `setup-deno` cache already remove the changing-bytes flake and skip downloads on most runs; what is left is a rare bad download on a cache miss, cleared by a re-run (§7.385). Vendoring would put MBs of third-party code in git, and whether `supabase functions deploy` accepts a vendored folder is unverified. **Revisit if** a cache-miss integrity red recurs often enough to cost real time. |
 | **A per-child make-up for a child in every class of their kind** | Refused 2026-09-27 with the user: no child is enrolled in every group class of their kind, so the gap (nowhere to guest them, `book_makeup()` rightly refusing the own-class silent void) never arises. Workarounds stand: mark the miss non-billable, or a whole-class extra lesson. **Never "fix" it by relaxing the own-class refusal** (pinned by `multi_class.test.sql`). **Revisit if** a child really is enrolled in every class of a kind; the design sketch is in the struck item. |
 | **A different-coach private make-up** | Refused 2026-09-27 with the user: no requester. A private make-up stays an extra lesson of the child's own class (same coach). **Revisit if** a private coach's cover is actually requested; the struck item names the two shapes (a one-off class, or a per-lesson coach override). |
