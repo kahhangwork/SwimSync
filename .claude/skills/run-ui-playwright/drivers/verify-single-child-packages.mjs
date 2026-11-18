@@ -22,7 +22,7 @@
 //   node .claude/skills/run-ui-playwright/drivers/verify-single-child-packages.mjs
 
 import os from "node:os";
-import { launch, loginExpo, loginAdmin, tap, ADMIN, todaySg, addDaysIso, sql } from "./lib.mjs";
+import { launch, loginExpo, loginAdmin, tap, rowAction, ADMIN, todaySg, addDaysIso, sql } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const AVA = "a5c00000-0000-0000-0000-0000000005a0";
@@ -107,7 +107,7 @@ try {
 
   // Change child on Ava's USED package → the RPC's refusal, inline (RISK 10).
   const avaRow = page.locator("tr", { hasText: "Ava Scp only" });
-  await tap(avaRow.getByRole("button", { name: "Change child", exact: true }), "Change child (Ava)");
+  await tap(await rowAction(avaRow, "Change child"), "Change child (Ava)"); // in the row's "…" menu
   const modal = page.locator("div.fixed.inset-0");
   await modal.locator("select").selectOption({ label: "Ben Scp" });
   await tap(modal.getByRole("button", { name: "Change child", exact: true }), "confirm Change child");

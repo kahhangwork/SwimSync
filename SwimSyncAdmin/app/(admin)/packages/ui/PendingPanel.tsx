@@ -8,6 +8,7 @@
 
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { Tag } from "@/components/ui/Tag";
 import { formatSgStamp } from "@/lib/lessonDates";
 import { DMY, money } from "../constants";
@@ -117,25 +118,25 @@ export function PendingPanel({
                 {formatSgStamp(p.requested_at, DMY)}
               </Td>
               <Td>
-                <div className="flex gap-2">
-                  {/* Per-row buttons are secondary — a primary per ROW would
-                      be many per section (DESIGN.md: one per section). */}
+                <div className="flex items-center gap-1.5">
+                  {/* One inline action — Payment received, the one a request
+                      calls for; Change child and Decline (destructive, behind
+                      its confirm) in the "…" menu (DESIGN.md → Tables). Per-row
+                      buttons stay secondary — a primary per ROW would be many
+                      per section (DESIGN.md: one per section). */}
                   <Button variant="outline" size="sm" onClick={() => setConfirming(p)} disabled={busy}>
                     Payment received
                   </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setCancelling(p)}
-                    disabled={busy}
-                  >
-                    Decline
-                  </Button>
-                  {canEdit && openChangeChild && p.student_id && (
-                    <Button variant="ghost" size="sm" onClick={() => openChangeChild(p)} disabled={busy}>
-                      Change child
-                    </Button>
-                  )}
+                  <RowMenu>
+                    {canEdit && openChangeChild && p.student_id && (
+                      <RowMenuItem onClick={() => openChangeChild(p)} disabled={busy}>
+                        Change child
+                      </RowMenuItem>
+                    )}
+                    <RowMenuItem destructive onClick={() => setCancelling(p)} disabled={busy}>
+                      Decline
+                    </RowMenuItem>
+                  </RowMenu>
                 </div>
               </Td>
             </Tr>

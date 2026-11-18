@@ -118,6 +118,11 @@ function setup(over: Partial<Props> = {}) {
 }
 
 const row = (name: string) => within(screen.getByText(name).closest("tr")!);
+/** Open a row's "…" menu (its items render inside the row) and return the row. */
+const menu = (name: string) => {
+  fireEvent.click(row(name).getByRole("button", { name: "More actions" }));
+  return row(name);
+};
 
 describe("HeldTable", () => {
   it("rows show parent, children, package, reference and status", () => {
@@ -163,7 +168,9 @@ describe("HeldTable", () => {
     expect(row("Bob Lim").queryAllByRole("button")).toHaveLength(0);
     fireEvent.click(row("Carol Ng").getByRole("button", { name: "Extend" }));
     expect(props.openExtend).toHaveBeenCalledWith(CAROL);
-    fireEvent.click(row("Alice Tan").getByRole("button", { name: "Cancel" }));
+    // Extend is the row's one inline action; Cancel sits in the "…" menu.
+    expect(row("Alice Tan").queryByRole("button", { name: "Cancel" })).toBeNull();
+    fireEvent.click(menu("Alice Tan").getByRole("button", { name: "Cancel" }));
     expect(props.setCancelling).toHaveBeenCalledWith(ALICE);
     expect(props.openExtend).toHaveBeenCalledTimes(1);
     expect(props.setCancelling).toHaveBeenCalledTimes(1);
@@ -175,19 +182,20 @@ describe("HeldTable", () => {
     const { props, unmount } = setup();
     const CHECK = { name: "Check marked lessons" };
     expect(row("Bob Lim").queryByRole("button", CHECK)).toBeNull();
-    fireEvent.click(row("Carol Ng").getByRole("button", CHECK));
+    fireEvent.click(menu("Carol Ng").getByRole("button", CHECK));
     expect(props.checkBacklog).toHaveBeenCalledWith(CAROL);
     expect(props.checkBacklog).toHaveBeenCalledTimes(1);
     unmount();
 
     setup({ canEdit: false });
-    expect(screen.queryByRole("button", CHECK)).toBeNull();
+    // Cancel keeps the menu there; Check is not in it.
+    expect(menu("Carol Ng").queryByRole("button", CHECK)).toBeNull();
   });
 
   it("a check in flight says so on its row and locks every row's Check", () => {
     const { props } = setup({ checking: ALICE.id });
-    expect(row("Alice Tan").getByRole("button", { name: "Checking…" })).toBeTruthy();
-    const carol = row("Carol Ng").getByRole("button", { name: "Check marked lessons" });
+    expect(menu("Alice Tan").getByRole("button", { name: "Checking…" })).toBeTruthy();
+    const carol = menu("Carol Ng").getByRole("button", { name: "Check marked lessons" });
     expect((carol as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(carol);
     expect(props.checkBacklog).not.toHaveBeenCalled();
@@ -195,7 +203,11 @@ describe("HeldTable", () => {
 
   it("busy locks Extend and Cancel", () => {
     const { props } = setup({ busy: true });
-    for (const b of screen.getAllByRole("button", { name: /^(Extend|Cancel)$/ })) {
+    menu("Alice Tan");
+    menu("Carol Ng");
+    const locked = screen.getAllByRole("button", { name: /^(Extend|Cancel)$/ });
+    expect(locked).toHaveLength(4); // never vacuous: 2 Extend inline + 2 Cancel in the menus
+    for (const b of locked) {
       expect((b as HTMLButtonElement).disabled).toBe(true);
       fireEvent.click(b);
     }
@@ -262,19 +274,21 @@ describe("HeldTable refunds", () => {
     expect(props.openRefund).toHaveBeenCalledWith(CANCELLED);
   });
 
-  it("a recorded refund shows its amount and SGT date, with Reverse", () => {
+  it("a recorded refund shows its amount and SGT date, with Reverse refund in the menu", () => {
     const { props } = setup({ held: [CANCELLED], refunds: new Map([["p9", REFUND]]) });
     const dan = row("Dan Koh");
     expect(dan.getByTestId("refund-recorded").textContent).toContain("Refunded S$120.00 on 20 Sept 2026");
     expect(dan.queryByText("Record refund")).toBeNull();
-    fireEvent.click(dan.getByText("Reverse"));
+    expect(dan.queryByRole("button", { name: "Reverse refund" })).toBeNull();
+    fireEvent.click(menu("Dan Koh").getByRole("button", { name: "Reverse refund" }));
     expect(props.openReverse).toHaveBeenCalledWith(CANCELLED, REFUND);
   });
 
   it("a view-only admin sees the refund but no Record or Reverse", () => {
     setup({ held: [CANCELLED], canEdit: false, refunds: new Map([["p9", REFUND]]) });
     expect(row("Dan Koh").getByTestId("refund-recorded")).toBeTruthy();
-    expect(screen.queryByText("Reverse")).toBeNull();
+    expect(screen.queryByText(/Reverse/)).toBeNull();
+    expect(row("Dan Koh").queryByRole("button", { name: "More actions" })).toBeNull();
     setup({ held: [purchase({ ...CANCELLED, id: "p10", parent_name: "Eve Ong" })], canEdit: false });
     expect(row("Eve Ong").queryByText("Record refund")).toBeNull();
   });

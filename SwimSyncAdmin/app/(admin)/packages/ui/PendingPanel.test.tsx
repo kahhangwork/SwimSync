@@ -146,6 +146,9 @@ describe("PendingPanel", () => {
     const { props } = setup();
     fireEvent.click(row("Alice Tan").getByRole("button", { name: "Payment received" }));
     expect(props.setConfirming).toHaveBeenCalledWith(ALICE);
+    // Payment received is the row's one inline action; Decline is in the menu.
+    expect(row("Bob Lim").queryByRole("button", { name: "Decline" })).toBeNull();
+    fireEvent.click(row("Bob Lim").getByRole("button", { name: "More actions" }));
     fireEvent.click(row("Bob Lim").getByRole("button", { name: "Decline" }));
     expect(props.setCancelling).toHaveBeenCalledWith(BOB);
     expect(props.setConfirming).toHaveBeenCalledTimes(1);
@@ -154,7 +157,10 @@ describe("PendingPanel", () => {
 
   it("busy disables every action", () => {
     const { props } = setup({ busy: true });
-    for (const b of screen.getAllByRole("button", { name: /Payment received|Decline/ })) {
+    for (const m of screen.getAllByRole("button", { name: "More actions" })) fireEvent.click(m);
+    const all = screen.getAllByRole("button", { name: /Payment received|Decline/ });
+    expect(all.length).toBeGreaterThanOrEqual(4); // never vacuous: both rows, both actions
+    for (const b of all) {
       expect((b as HTMLButtonElement).disabled).toBe(true);
       fireEvent.click(b);
     }

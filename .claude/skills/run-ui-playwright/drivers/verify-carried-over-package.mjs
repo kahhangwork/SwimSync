@@ -19,7 +19,7 @@
 //   node .claude/skills/run-ui-playwright/drivers/verify-carried-over-package.mjs
 
 import os from "node:os";
-import { launch, loginExpo, loginAdmin, tap, ADMIN, todaySg, addDaysIso, sql } from "./lib.mjs";
+import { launch, loginExpo, loginAdmin, tap, rowAction, ADMIN, todaySg, addDaysIso, sql } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const TENANT = "c0a00000-0000-0000-0000-000000000001";
@@ -103,7 +103,7 @@ try {
   await loginAdmin(page, "cop-owner@swimsync.test");
   await page.goto(`${ADMIN}/packages`, { waitUntil: "networkidle" });
   await page.waitForTimeout(2000);
-  await tap(page.locator("tr", { hasText: "COP Parent" }).first().getByRole("button", { name: "Cancel", exact: true }), "Cancel (row)");
+  await tap(await rowAction(page.locator("tr", { hasText: "COP Parent" }).first(), "Cancel"), "Cancel (row)"); // in the "…" menu
   await tap(modal.getByRole("button", { name: "Cancel package", exact: true }), "Cancel package");
   await page.waitForTimeout(2500);
   const refundBtn = page.locator("tr", { hasText: "COP Parent" }).first().getByRole("button", { name: "Record refund", exact: true });

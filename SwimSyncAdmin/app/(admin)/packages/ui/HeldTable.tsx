@@ -8,6 +8,7 @@
 
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatSgStamp, todayInSg } from "@/lib/lessonDates";
 import { ROW_LIMIT, money } from "../constants";
@@ -218,53 +219,58 @@ export function HeldTable({
                       canEdit={canEdit}
                       busy={busy}
                       openRefund={openRefund}
-                      openReverse={openReverse}
                     />
-                    {/* Change child (D4): the RPC decides "unused" — shown for
-                        every one-child package that is not cancelled. */}
-                    {canEdit && openChangeChild && p.student_id && p.status !== "cancelled" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openChangeChild(p)}
-                        disabled={busy}
-                      >
-                        Change child
-                      </Button>
-                    )}
-                    {p.status === "active" && (
-                      <div className="flex items-center gap-1">
+                    {/* One inline action per row (DESIGN.md → Tables): Extend on
+                        an active package, Record refund on a cancelled paid one
+                        (RefundCell); everything else in the "…" menu — Check
+                        marked lessons, Change child, Reverse a refund, and
+                        Cancel (destructive, behind its confirm). Same handlers. */}
+                    <div className="flex items-center gap-1.5">
+                      {p.status === "active" && (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => openExtend(p)}
                           disabled={busy}
                         >
                           Extend
                         </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => setCancelling(p)}
-                          disabled={busy}
-                        >
-                          Cancel
-                        </Button>
+                      )}
+                      <RowMenu>
                         {/* The backdated-draw question again (Wave 6 D5 is
                             asked once, at activation). Draw needs
-                            packages:edit, so the button does too. */}
-                        {canEdit && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                            packages:edit, so the item does too. */}
+                        {p.status === "active" && canEdit && (
+                          <RowMenuItem
                             onClick={() => checkBacklog(p)}
                             disabled={busy || checking !== null}
                           >
                             {checking === p.id ? "Checking…" : "Check marked lessons"}
-                          </Button>
+                          </RowMenuItem>
                         )}
-                      </div>
-                    )}
+                        {/* Change child (D4): the RPC decides "unused" — offered
+                            for every one-child package that is not cancelled. */}
+                        {canEdit && openChangeChild && p.student_id && p.status !== "cancelled" && (
+                          <RowMenuItem onClick={() => openChangeChild(p)} disabled={busy}>
+                            Change child
+                          </RowMenuItem>
+                        )}
+                        {refundState(p, refunds, canEdit) === "recorded" && (
+                          <RowMenuItem
+                            destructive
+                            onClick={() => openReverse(p, refunds!.get(p.id)!)}
+                            disabled={busy}
+                          >
+                            Reverse refund
+                          </RowMenuItem>
+                        )}
+                        {p.status === "active" && (
+                          <RowMenuItem destructive onClick={() => setCancelling(p)} disabled={busy}>
+                            Cancel
+                          </RowMenuItem>
+                        )}
+                      </RowMenu>
+                    </div>
                   </Td>
                 </Tr>
               );
@@ -289,14 +295,12 @@ function RefundCell({
   canEdit,
   busy,
   openRefund,
-  openReverse,
 }: {
   p: Purchase;
   refunds: Map<string, LiveRefund> | null;
   canEdit: boolean;
   busy: boolean;
   openRefund: (p: Purchase) => void;
-  openReverse: (p: Purchase, r: LiveRefund) => void;
 }) {
   const state = refundState(p, refunds, canEdit);
   if (state === "none") return null;
@@ -313,11 +317,6 @@ function RefundCell({
       <span className="text-label text-ink-secondary" title={r.note ?? undefined}>
         Refunded {money(r.amount)} on {formatSgStamp(r.refunded_on, DMY)}
       </span>
-      {state === "recorded" && (
-        <Button variant="ghost" size="sm" onClick={() => openReverse(p, r)} disabled={busy}>
-          Reverse
-        </Button>
-      )}
     </div>
   );
 }

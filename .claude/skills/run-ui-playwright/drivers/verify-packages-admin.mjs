@@ -52,7 +52,7 @@
 // literal, so proof 2's arrival was grepped as `status: "pending"` in the served chunk instead.)
 
 import { execFileSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN, EXPO, sgLabel } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN, EXPO, sgLabel, rowAction, rowActionCount } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API = "http://127.0.0.1:54321";
@@ -265,7 +265,7 @@ try {
 
   // ══ 5. Cancel an ACTIVE package (Alder) ════════════════════════════════════
   check("PRECONDITION: Alder's package is active", sql(statusQ(PKG_ALDER)) === "active", sql(statusQ(PKG_ALDER)));
-  await alderRow.getByRole("button", { name: "Cancel", exact: true }).click();
+  await (await rowAction(alderRow, "Cancel")).click(); // in the "…" menu (one inline action per row)
   const cxModal = modal(page);
   const cxText = flat(await cxModal.innerText({ timeout: 8000 }).catch(() => "(no modal)"));
   check("Cancel on an ACTIVE package asks \"Cancel this package?\" and names what remains (S$300.00)",
@@ -276,7 +276,7 @@ try {
   await page.waitForTimeout(800);
   check("Keep it closes the dialog and cancels nothing (DB still active)",
     keptClosed && sql(statusQ(PKG_ALDER)) === "active", `closed ${keptClosed} · ${sql(statusQ(PKG_ALDER))}`);
-  await alderRow.getByRole("button", { name: "Cancel", exact: true }).click();
+  await (await rowAction(alderRow, "Cancel")).click(); // in the "…" menu (one inline action per row)
   await modal(page).getByRole("button", { name: "Cancel package" }).click();
   const cancelled = await dbUntil(statusQ(PKG_ALDER), (v) => v === "cancelled");
   check("⚠ Cancel package moves the ACTIVE package to cancelled (with cancelled_at)",
@@ -285,13 +285,13 @@ try {
   const alderGone = await alderRow.getByRole("button", { name: "Extend", exact: true })
     .waitFor({ state: "detached", timeout: 8000 }).then(() => true).catch(() => false);
   check("the row now reads Cancelled with no Extend / Cancel",
-    alderGone && /Cancelled/.test(await alderRow.innerText()), flat(await alderRow.innerText().catch(() => "")).slice(0, 160));
+    alderGone && /Cancelled/.test(await alderRow.innerText()) && (await rowActionCount(alderRow, "Cancel")) === 0, flat(await alderRow.innerText().catch(() => "")).slice(0, 160));
   check("…and Cedar's sale is untouched (still active)", sql(cedarQ).startsWith("active|"), sql(cedarQ));
 
   // ══ 6. Decline a PENDING request (Birch) ═══════════════════════════════════
   check("PRECONDITION: Birch's request is pending", sql(statusQ(PKG_REQUEST)) === "pending", sql(statusQ(PKG_REQUEST)));
   const reqRow = awaiting().locator("tr", { hasText: REF_REQUEST });
-  await reqRow.getByRole("button", { name: "Decline", exact: true }).click();
+  await (await rowAction(reqRow, "Decline")).click(); // in the "…" menu
   const dcText = flat(await modal(page).innerText({ timeout: 8000 }).catch(() => "(no modal)"));
   check("Decline on a PENDING request asks \"Decline this request?\" — nothing was charged",
     /Decline this request\?/.test(dcText) && /The request is withdrawn\. Nothing was charged\./.test(dcText),
@@ -302,7 +302,7 @@ try {
   await page.waitForTimeout(800);
   check("Keep it declines nothing (DB still pending)",
     dcClosed && sql(statusQ(PKG_REQUEST)) === "pending", `closed ${dcClosed} · ${sql(statusQ(PKG_REQUEST))}`);
-  await reqRow.getByRole("button", { name: "Decline", exact: true }).click();
+  await (await rowAction(reqRow, "Decline")).click(); // in the "…" menu
   await modal(page).getByRole("button", { name: "Decline", exact: true }).click();
   const declined = await dbUntil(statusQ(PKG_REQUEST), (v) => v === "cancelled");
   check("Decline moves the PENDING request to cancelled", declined === "cancelled", declined);
@@ -358,17 +358,17 @@ try {
     refRow === `120.00|true|Driver refund|${OWNER}`, refRow);
   const recorded = alderHeld.getByTestId("refund-recorded");
   const recText = await recorded.innerText({ timeout: 8000 }).catch(() => "");
-  check("the row now reads \"Refunded S$120.00 on …\" with Reverse, and no Record refund",
+  check("the row now reads \"Refunded S$120.00 on …\" with Reverse refund (in its menu), and no Record refund",
     /Refunded S\$120\.00 on /.test(recText) &&
-      (await alderHeld.getByRole("button", { name: "Reverse" }).count()) === 1 &&
+      (await rowActionCount(alderHeld, "Reverse refund")) === 1 &&
       (await alderHeld.getByRole("button", { name: "Record refund" }).count()) === 0,
     flat(recText));
 
-  await alderHeld.getByRole("button", { name: "Reverse" }).click();
+  await (await rowAction(alderHeld, "Reverse refund")).click();
   await modal(page).getByRole("button", { name: "Keep it" }).click();
   await page.waitForTimeout(800);
   check("Reverse → Keep it reverses nothing (still one live refund)", sql(liveRefQ) === "1", sql(liveRefQ));
-  await alderHeld.getByRole("button", { name: "Reverse" }).click();
+  await (await rowAction(alderHeld, "Reverse refund")).click();
   await modal(page).getByRole("button", { name: "Reverse refund" }).click();
   const liveAfter = await dbUntil(liveRefQ, (v) => v === "0");
   await alderHeld.getByRole("button", { name: "Record refund" }).waitFor({ timeout: 8000 }).catch(() => {});
