@@ -34,7 +34,13 @@ export function Modal({ title, open, onClose, children, size = "md" }: Props) {
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-3">
           <h2 className="text-headline font-semibold text-ink">{title}</h2>
+          {/* Named "Dismiss", never "Close": drivers press a footer Close via
+              getByRole("button", { name: "Close" }) — a case-insensitive
+              SUBSTRING match — so any name containing "close" would make that
+              find two buttons and fail strict mode. */}
           <button
+            type="button"
+            aria-label="Dismiss"
             onClick={onClose}
             className="rounded-control p-1.5 text-ink-muted hover:bg-selected hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >

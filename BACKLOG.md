@@ -1676,18 +1676,6 @@ cross-tenant handlers inside a visual change.
 `RowMenuItem destructive`); route each driver press through `lib.mjs` `rowAction` and each "no button any more" check
 through `rowActionCount` (so it counts inside the menu, never vacuously). Not visual-only.
 
-### The admin Modal's close (X) button has no accessible name — **S** — _filed 2026-10-14_
-`SwimSyncAdmin/components/Modal.tsx` renders the title-bar close as an icon-only `<button>` with no `aria-label`, so a
-screen reader announces "button". Found in UI restyle 5.0 (shared chrome), left as it was on purpose.
-
-**Why not fixed in 5.0:** naming it "Close" makes `verify-package-draw-at-marking.mjs:199`
-(`getByRole("button", { name: "Close" })` — a case-insensitive SUBSTRING match) find two buttons — the modal's own
-Close and the X — and strict mode fails. `verify-class-admin.mjs` presses a "Close" button the same way.
-
-**Fix:** give the X a name that does not contain "close" — `aria-label="Dismiss"` — so both drivers still resolve one
-button (any name containing "Close", exact or not, collides with a footer Close). Run `--only package-draw-at-marking`
-and `--only class-admin`. Not visual-only.
-
 ### Native store builds (iOS / Android) — **M** `[handover]`
 EAS builds → Android APK / iOS TestFlight → the stores.
 
