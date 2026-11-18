@@ -2285,6 +2285,9 @@ isOneToOne: false
 "void_credit_note":
 { Args: { "p_note_id": string,"p_reason": string }; Returns: undefined
                            },
+"void_referral":
+{ Args: { "p_reason": string,"p_referral_id": string }; Returns: undefined
+                           },
 "void_referral_reward":
 { Args: { "p_reason": string,"p_reward_id": string }; Returns: undefined
                            },

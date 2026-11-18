@@ -7,7 +7,8 @@
 --   (3) every expiry recompute — holiday, cancel, Extend, activation, Change child — anchors on the ORIGINAL start;
 --       the nominal holiday window ends at original + weeks and starts at today (the START side is unchanged);
 --   (4) refund cap = value left NOW (Q1); S$0 package revenue on Accounting (D3);
---   (5) no referral discount, no reward settled, no referral converted (D6); an open offer is superseded (RISK 12);
+--   (5) no referral discount, no reward settled, no referrer reward minted (D6; a PENDING referral is refused since
+--       20261118000400); an open offer is superseded (RISK 12);
 --   (6) refusals: bounds, dates, roles, tenant, kind, direct table writes, the double-submit index (D8);
 --   (7) the census lint — no function recomputes expiry from start_date alone (§6, permanent); grants (§7.87).
 --
@@ -129,13 +130,16 @@ CREATE OR REPLACE FUNCTION pg_temp.apps(p_date DATE, p_student UUID) RETURNS INT
 
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA pg_temp TO authenticated;
 
--- Referral state for Fay (d6): referee of a PENDING referral from Ben's parent, and holds an AVAILABLE reward.
-INSERT INTO referrals (id, tenant_id, referrer_parent_id, referee_parent_id, code_used, status)
+-- Referral state for Fay (d6): referee of a CONVERTED referral from Ben's parent, and holds an AVAILABLE manual reward.
+-- (Was a PENDING referral + its referee_first reward until 20261118000400, which REFUSES a bring-in for a family with
+-- a pending referral — pinned in carried_over_referral_block.test.sql. 20–23 still prove D6 for the rewards a
+-- brought-in family CAN hold: no discount taken, the reward untouched, no referrer reward minted.)
+INSERT INTO referrals (id, tenant_id, referrer_parent_id, referee_parent_id, code_used, status, converted_at)
 VALUES ('c0900000-0000-0000-0000-000000000001','c0000000-0000-0000-0000-0000000000a0',
-        pg_temp.id('P2'), pg_temp.id('P6'), 'REF-COTEST', 'pending');
+        pg_temp.id('P2'), pg_temp.id('P6'), 'REF-COTEST', 'converted', '2026-10-01 10:00+08');
 INSERT INTO referral_rewards (id, tenant_id, parent_id, kind, referral_id, status)
 VALUES ('c0910000-0000-0000-0000-000000000001','c0000000-0000-0000-0000-0000000000a0', pg_temp.id('P6'),
-        'referee_first', 'c0900000-0000-0000-0000-000000000001', 'available');
+        'manual', NULL, 'available');
 
 -- Eli (d5) was on holiday TODAY and LAST WEEK before his package is brought in (activation test, 8).
 SELECT pg_temp.mark('2026-11-18', 'c0300000-0000-0000-0000-000000000006', 'holiday');
@@ -235,7 +239,7 @@ SELECT is((SELECT student_id || '/' || expires_on || '/' || value_remaining FROM
   'c0300000-0000-0000-0000-000000000004/2026-12-23/240.00',
   '19: ...expiry = original + 70 + the 2026-11-25 cancel (Cal is enrolled), never today + 70; balance 8 × 30');
 
--- ══ 20–23. Referral: no discount, reward untouched, referral not converted (D6) ═══════════════════════════════
+-- ══ 20–23. Referral: no discount, reward untouched, no referrer reward minted (D6) ═══════════════════════════════
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.as_user('c0100000-0000-0000-0000-0000000000a1');
 SELECT lives_ok($$ SELECT record_carried_over_package(pg_temp.id('P6'), 'c0600000-0000-0000-0000-000000000001',
@@ -249,7 +253,7 @@ SELECT is((SELECT status FROM referral_rewards WHERE id = 'c0910000-0000-0000-00
   'available', '22: the family''s reward is still available for a real purchase');
 SELECT is((SELECT r.status || '/' || (SELECT count(*) FROM referral_rewards WHERE tenant_id = 'c0000000-0000-0000-0000-0000000000a0')
              FROM referrals r WHERE r.id = 'c0900000-0000-0000-0000-000000000001'),
-  'pending/1', '23: the referral stays pending and no referrer reward is minted');
+  'converted/1', '23: the converted referral is unchanged and no referrer reward is minted');
 
 -- ══ 24–25. A normal sale + an open offer; the bring-in supersedes the offer (RISK 12) ═════════════════════════
 INSERT INTO parent_packages (tenant_id, parent_id, product_id, status, start_date)
