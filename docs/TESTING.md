@@ -1283,6 +1283,17 @@ add no student and no claim; the admin check sits AFTER the permission gates (a 
 10); a gender given still works; `students.gender` stays nullable. Red on the old bodies (probes 2–8, rollback
 applied in-transaction); mutation — the gender `IF` moved above the gates → red 10 only.
 
+### Admins correct a linked family's details (2026-11-18)
+
+**`supabase/tests/admin_edit_family_details.test.sql` (34).** `set_parent_contact` (name + phone on the profile, email
+untouched, own business's families only, locked under a pending claim, audited under `'ParentTenant'`);
+`unlink_parent_from_student` (refused once invoiced OR package-drawn for that pair, a claim-made link routed through
+`undo_student_claim` — claim declined, filled DOB reverted); `set_student_date_of_birth` (future, duplicate, pending
+claim refused; audited). Each refuses another business's admin, a view-only role, a coach, a parent. Red with the
+functions dropped; 4 body mutations red (listed in the file). Admin vitest: `useContact.test.ts` (5), `useDob.test.ts`
+(4), 4 mutations red. `verify-contact-details` (now 32) reads input VALUES (§7.397), edits Devi's phone, unlinks
+her from Xavier, and sets Wanda's DOB; it re-seeds all three at its top, so it re-runs green.
+
 ### A selected state reaches the DOM (2026-10-16)
 
 **`SwimSyncApp/lib/ariaState.drift.test.ts` (2 checks).** Scans `app/`, `features/`, `components/` source: every JSX

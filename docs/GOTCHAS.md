@@ -32,14 +32,14 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 | Area | Items |
 |---|---|
-| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338, 355, 356, 357, 360, 374 |
+| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315, 337, 338, 355, 356, 357, 360, 374, 396 |
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318, 328, 342, 349 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293, 342 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314, 344, 345, 346, 348, 349, 391 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214, 335, 336, 345, 347, 350, 361, 380, 386 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319, 323, 324, 325, 326, 395 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321, 329, 330, 333, 338, 358, 369, 373, 379, 393 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322, 360, 362, 365, 374, 375, 376, 377, 379, 381, 382, 388, 397 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312, 331, 363, 364, 366, 367, 368, 372, 378, 383, 390 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271, 354, 363, 368, 385, 389, 392 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316, 332, 334, 343, 347, 351, 352, 355, 356, 370, 371, 387 |
@@ -2524,6 +2524,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     RPC.** A new audited entity type needs its arm in the SAME migration, plus a pgTAP asserting the audit row's
     `tenant_id`. Never dodge the raise by auditing under `'Tenant'` or passing a tenant — both lose the link to the
     entity. Definer-side sibling of §7.192. (`PACKAGE_REVENUE_REFUNDS_PLAN.md`, §8.132.)
+    - **Hit again (2026-11-18, §8.168):** `set_parent_contact` audited under a new `'Parent'` type and raised. The
+      correct arm already existed: **`'ParentTenant'`** — entity_id is the parent, the RPC supplies the tenant
+      (a parent spans businesses, so it is not derivable). That is the one sanctioned "passing a tenant" case. The
+      raise IS the check (any pgTAP that calls the RPC goes red), so no further promotion is needed.
 
 298. **`accounting_summary` used to repeat its revenue expression inside `RETURN QUERY`'s `net` CASE** — a new
     revenue component added to one copy only gives a silently wrong Net. Every component now flows through ONE
@@ -3269,3 +3273,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     every Resend payload with no code change. Normalise `due_date` to check (every row matched), then rerun on one
     date; `bench4.sh`-style loops should rerun a pair whose date changed. (2026-11-18, §8.167.)
 
+396. **The frozen clock census counts `now()` in a function's COMMENTS.** It regex-scans `pg_proc.prosrc`, which
+    keeps comments, so `-- app_today(), never now()` inside a body changes the count and turns `app_clock.test.sql`
+    red exactly like a real raw clock read. Word a comment without the token ("never the raw clock"). Also: a write
+    stamp in an RPC (`updated_at = …`) uses `app_now()`, not `now()`, or it joins the census. (2026-11-18, §8.168.)
+
+397. **`innerText` does not include an `<input>`'s value.** A driver that asserted a read-only `<dl>` with
+    `body.innerText.includes(…)` fails the moment that screen becomes a form, though every value is on screen.
+    Read `locator('input').evaluateAll(els => els.map(e => e.value))` (`verify-contact-details.mjs` `modalValues`).
+    Locate an input by its position or label, not `input[value=…]` — React does not keep the attribute in step
+    with typing. (2026-11-18, §8.168.)

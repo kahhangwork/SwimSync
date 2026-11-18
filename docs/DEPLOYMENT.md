@@ -1403,3 +1403,12 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `public-*` not redeployed (their import graph is unchanged since Part A). **Download-proven:** the v42 source
     holds all 8 `dao/` and 12 `domain/` files. **Rollback:** a worktree at `ff70ac0` and `supabase functions deploy
     <fn> --workdir <it> --project-ref cdmjeyauhxcgulhbxmsb`. Nightly not dispatched.
+
+109. **Deploy record (2026-11-18): admin corrects a linked family's details — migration then admin.** CI's repo
+    checks run locally first (G5 caught the overrides copies, fixed in `eb3e2f0` before any push); rollback
+    rehearsed (DOWN → 0 functions, claims + gender suites green; UP → new file green). `58cd53c` → `main`, then
+    `supabase db push` applied `20261118000100`; `migration list --linked` 0 pending; remote grant dump: each of the
+    3 functions REVOKEd from PUBLIC, GRANTed to `authenticated` only. **Then** `eb3e2f0` → `main`: Vercel app 126 s,
+    admin 273 s; LIVE — `/students` serves "Wrong parent? Unlink from this child"; CI green (`44228555181`). No edge
+    function changed (types only). **Rollback:** an admin build without the calls FIRST, then
+    `supabase/rollback/20261118000100_admin_edit_family_details_DOWN.sql`. Nightly not dispatched.

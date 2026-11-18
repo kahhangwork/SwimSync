@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.166** | 2026-11-16 → 17 | Billing engine batched (v40), Vercel moved to `sin1`; byte-identical at 4 sizes | BILLING_ENGINE_SPEED, §7.391, §7.392 · DEPLOYMENT #106 |
 | **8.165** | 2026-11-16 | 11-14 nightly red was a product race (coach QR upload); fixed, live; `watch-deploy.sh` | §7.389, §7.390 · DEPLOYMENT #105 |
 | **8.164** | 2026-11-12 | Invoice due dates + Overdue live: migration, public-invoice v3, engine v39, both apps | OVERDUE_INVOICES_PLAN, §7.386, DEPLOYMENT #104 |
 | **8.163** | 2026-11-12 | CI CDN flakes fixed: Edge Functions on `npm:` supabase-js, Deno cache, `deno check` on every `index.ts` | §7.385, DEPLOYMENT #103 |

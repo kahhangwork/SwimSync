@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-18 (latest) — **The Edge Functions are typed and tiered, live** (§8.167): generate-invoices v42,
-package-emails v10, credit-note-emails v9, public-* v4/v5 — every query in `dao/`, logic in `domain/`, output proven
-byte-identical. Little Orcas + Epic Swim are not ours to bill. Next: Coach Kah Hang's **November** (first live run)._
+_Last updated: 2026-11-18 (latest) — **An admin can correct a linked family's details, live** (§8.168): a linked
+parent's name + phone, Unlink a wrong parent (refused once billed), a child's DOB — from user feedback. Next: Coach Kah
+Hang's **November** on engine v42 (early December), then read the nightly that covers `eb3e2f0`._
 
-_Previously (§8.166, 2026-11-17) — Billing engine batched (v40), Vercel in `sin1`; October modelled 39.6 s → 5.8 s._
+_Previously (§8.167, 2026-11-17 → 18) — Edge Functions typed + tiered, live (generate-invoices v42), byte-identical._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -132,7 +132,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Creating a business in-app | UI + backend, LIVE 2026-07-21 | PRD §4.4 · §8.9 |
 | A child can exist before their parent | pgTAP + Deno + driver, LIVE | PRD §7.17 · §8.10 |
 | A parent can claim the child their coach already added | pgTAP + vitest + driver, LIVE | PRD §7.18 · §8.12 |
-| A parent's contact details can be corrected | vitest + driver, LIVE | PRD §7.19 · §8.14 |
+| A family's details can be corrected — unclaimed child's contact; LINKED parent's name + phone, Unlink, child DOB (2026-11-18) | pgTAP 34 + vitest + driver, LIVE | PRD §7.19 · §8.14, §8.168 |
 | The attendance window is a DB rule; a mid-month joiner no longer blocks a month | pgTAP, LIVE | PRD §7.5 · §8.15 |
 | A month billed LATE can no longer be permanently unbillable (`markable_floor`) | pgTAP 18, LIVE | PRD §7.6 · §8.32 |
 | The coach's landing tab is a WEEK, not a day | jest 308 + 19-check driver, LIVE | PRD §14.2, §7.5 · §8.34 |
@@ -352,6 +352,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.168 (2026-11-18) — Admin corrects a linked family's details: parent name/phone, unlink, child DOB; live
+
+**Shipped** (`58cd53c`, `2719280`, `eb3e2f0`; DEPLOYMENT #109; PRD §7.19). User feedback: *"once a parent is linked to a
+child, if key information is entered wrongly, we may need to delete the whole child record and recreate it."* The
+user's three decisions: name + phone (NOT email — it is the login) edit the parent's own global profile; Unlink is
+refused once that parent was billed for the child; a DOB action is added. Three audited RPCs (migration
+`20261118000100`), the Students contact modal now a form, a DOB modal. pgTAP 34 + vitest 9 (mutations red), driver
+32/32 ×2; full pgTAP 98 files green. The BACKLOG's 2026-07-26 "claimed child is read-only" call is marked reversed.
+
+- **Found:** the clock census counts `now()` in comments (§7.396); `innerText` misses input values (§7.397); §7.297 hit
+  again (the arm is `'ParentTenant'`). G5 caught the 3 overrides copies before any push.
+- **Not done:** an admin cannot change a parent's EMAIL (user's call). The pending-claim lock is the editing business's
+  only — accepted, recorded in the migration header. Nightly not dispatched.
+
 ## 8.167 (2026-11-17 → 18) — Edge Functions: generated types, then tiers; live; proven byte-identical
 
 **Shipped** (`docs/plans/EDGE_FUNCTIONS_REFACTOR_PLAN.md`, plan-reviewed; DEPLOYMENT #107, #108). **Part A**: every
@@ -365,19 +379,6 @@ each function's `test/` (TESTING §5). Gates per stage: query-chain census, tier
   files (§7.394); a midnight-straddling bench pair (§7.395); §7.340 a third time. Follow-ups: BACKLOG *Foundations* ×3.
 - **Not done:** October not billed for Little Orcas / Epic Swim — owned by others, test data (user). A zero-write live
   smoke on Coach Kah Hang's sealed October passed on v42. Nightly not dispatched.
-
-## 8.166 (2026-11-16 → 17) — Billing engine: measured, batched, proven byte-identical, deployed
-
-**Shipped** (`0b09b09`, `47996d2`; DEPLOYMENT #106; `docs/plans/BILLING_ENGINE_SPEED.md`). First measured: October's
-30 s was round trips × ~300 ms, because Vercel ran in `iad1` (§7.392). The user moved both projects to `sin1`. The
-engine now reads one query per table per tenant-month (chunked `.in()`, keyset paging, §7.391). Emails run 5 at a time,
-gated to `RESEND_MAX_PER_SECOND` (default 2). `billing_runs.duration_ms` and `run_timings_ms` record each run.
-Byte-identical against `main` at 4 seed sizes plus 9 more runs. Deno 320 ×2, pgTAP green.
-
-- **Found:** prod is on Resend Free (100/day) and Supabase Free (150 s per request). Emails, not billing, now bound a
-  big month → runbook *A big month* + BACKLOG *Large-month invoice emails* (M).
-- **Not done:** no live `duration_ms` yet (Coach Kah Hang's October ran on v39). The Supabase functions refactor stays
-  a separate job. Nightly not dispatched.
 
 ## 9. Next steps (pick with the user)
 
@@ -421,9 +422,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-18:** latest scheduled run `44003140474` GREEN on `78902ee`. **The next one must cover `2833602`** (the
-Edge refactor, §8.167) — its drivers money-admin, unmarked-lessons, package-renewal, referrals and coach-marking passed
-locally against the served functions. The last red, `43533390943` (11-14), was a product race fixed in `a3d2fd6`. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-18:** scheduled run `44217003736` GREEN on `12729a0` — it covers `2833602` (the Edge refactor). **The
+next one must cover `eb3e2f0`**: `verify-contact-details` now edits, unlinks and sets a DOB (32/32 ×2 locally). A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -440,7 +440,8 @@ which mutate shared seed state — are in the same section.
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
    in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Read the next nightly** before the next APP unit merges — it must cover `2833602`. Never dispatch it unasked.
+2. **Read the next nightly** before the next APP unit merges — it must cover `eb3e2f0`. Never dispatch it unasked.
+   Tell the admin who sent the 2026-11-18 feedback that linked families can now be corrected (PRD §7.19).
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
