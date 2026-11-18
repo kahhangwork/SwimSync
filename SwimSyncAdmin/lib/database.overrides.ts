@@ -64,6 +64,9 @@ export const NULLABLE_RPC_ARGS = {
   // L16 `IF NOT has_admin_area(p_tenant_id, …)` refuses a NULL tenant; L8
   // normalize_phone(NULL) is NULL; L56 `NOT (p_dob IS NOT NULL AND …)`.
   find_roster_duplicates: ["p_tenant_id", "p_phone", "p_dob"],
+  // L60 inserts p_student as is: NULL = a shared package; the lifecycle trigger then
+  // refuses a NULL for a one-child product (20261118000200, read 2026-11-18).
+  record_carried_over_package: ["p_student"],
   // L11 `v_note TEXT := NULLIF(btrim(p_note), '')`.
   record_package_refund: ["p_note"],
   // L14 `v_start DATE := COALESCE(p_starts_on, today_sg())`; L89/L149 pass it to
@@ -96,7 +99,7 @@ export const TRIGGER_FILLED_COLUMNS = {
   // derive_package_product_validity L8–9: `ELSIF NEW.validity_months IS NULL AND
   // NEW.validity_weeks IS NOT NULL THEN NEW.validity_months := …` (the form sends weeks).
   package_products: ["validity_months"],
-  // enforce_parent_package_lifecycle L19/L30 (every INSERT: tenant and price from the
+  // enforce_parent_package_lifecycle L26/L37 (every INSERT: tenant and price from the
   // product); assign_parent_package_reference L23 `NEW.reference_number := next_package_ref(…)`.
   parent_packages: ["tenant_id", "amount_payable", "reference_number"],
   // set_invoice_due_date L8–9 `IF NEW.due_date IS NULL THEN NEW.due_date :=
