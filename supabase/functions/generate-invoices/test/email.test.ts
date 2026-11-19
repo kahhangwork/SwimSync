@@ -19,6 +19,7 @@ import {
 } from "../domain/emailTemplates.ts";
 import {
   sendInvoiceEmail,
+  invoiceEmailsEnabled,
   notifyGenerationBlocked,
   shouldRetryTenantEmails,
 } from "../domain/emailDelivery.ts";
@@ -377,6 +378,27 @@ Deno.test("a business logo renders as an image, and its URL is escaped", () => {
   assertStringIncludes(html, "<img src=");
   assert(!html.includes('?a="b'), "logo URL must be escaped, not raw");
   assert(!html.includes('Evil "Swim"'), "business name must be escaped");
+});
+
+// ── The INVOICE_EMAILS off switch (2026-11-19) ──────────────────────────────
+// Only the word "off" disables; unset or a typo keeps emails ON, so a mistyped
+// secret can never silently stop billing emails.
+
+Deno.test("invoiceEmailsEnabled: unset keeps invoice emails ON (today's behaviour)", () => {
+  assertEquals(invoiceEmailsEnabled(undefined), true);
+  assertEquals(invoiceEmailsEnabled(""), true);
+});
+
+Deno.test("invoiceEmailsEnabled: 'off' (any case, padded) turns them OFF", () => {
+  assertEquals(invoiceEmailsEnabled("off"), false);
+  assertEquals(invoiceEmailsEnabled("OFF"), false);
+  assertEquals(invoiceEmailsEnabled(" off\n"), false);
+});
+
+Deno.test("invoiceEmailsEnabled: any other value — incl. a typo — keeps them ON", () => {
+  for (const v of ["on", "of", "0", "false", "disabled", "offf"]) {
+    assertEquals(invoiceEmailsEnabled(v), true, v);
+  }
 });
 
 // ── Retry-eligibility predicate (⚠ RISK 3) ─────────────────────────────────

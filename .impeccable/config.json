@@ -8,6 +8,15 @@
         "value": "geist",
         "createdAt": "2026-10-12T08:14:35.955Z",
         "reason": "User's decision 2026-10-11: docs/plans/UI_RESTYLE_PLAN.md §2 D1/D5 and DESIGN.md fix Geist as the only font"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          "supabase/functions/generate-invoices/test/email.test.ts"
+        ],
+        "createdAt": "2026-11-19T08:29:07.074Z",
+        "reason": "Claude: L474-475 is a pre-existing test regex (/font-family:([^;\"]+)/) that asserts email HTML, not a styled font"
       }
     ]
   }

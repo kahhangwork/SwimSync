@@ -360,6 +360,18 @@ export async function emailCreatedInvoices(
   return { emailsSent };
 }
 
+// The project-wide off switch for invoice emails on a Generate run (2026-11-19:
+// the user judged them low value — parents act on WhatsApp, not email). Read
+// from the INVOICE_EMAILS secret: ONLY the word "off" disables, so an unset or
+// mistyped value leaves today's behaviour — a typo can never silence billing
+// emails. Gates BOTH passes (created + retry); the admin's single-invoice
+// Resend button, package / credit-note emails and the blocked-generation alert
+// are deliberately untouched. An invoice made while off stays UNSENT, so the
+// first Generate press for its month after switching back on emails it.
+export function invoiceEmailsEnabled(raw: string | undefined): boolean {
+  return raw?.trim().toLowerCase() !== "off";
+}
+
 // Whether the retry pass should run for a per-tenant generation result.
 // ⚠ RISK 3 (INVOICE_EMAIL_RETRY_PLAN.md): never email on behalf of a SUSPENDED
 // tenant, and skip an AUTO-DISABLED tenant on an AUTOMATIC run (a manual run for

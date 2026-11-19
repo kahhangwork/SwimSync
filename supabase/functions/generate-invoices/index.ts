@@ -26,6 +26,7 @@ import { recordRuns, toErrorRows, toRunRows } from "./runLog.ts";
 import { withDbNow } from "./clock.ts";
 import {
   emailCreatedInvoices,
+  invoiceEmailsEnabled,
   notifyGenerationBlocked,
   resendInvoiceEmail,
   retryUnsentInvoiceEmails,
@@ -153,6 +154,22 @@ Deno.serve(async (req: Request) => {
         return json({ ...result, emails_sent: 0, blocked_alerts_sent: alerts, run_timings_ms: timings });
       }
       blockedAlerts = alerts;
+    }
+
+    // INVOICE_EMAILS=off skips BOTH email passes below (invoiceEmailsEnabled).
+    // Nothing is claimed, so every invoice stays UNSENT until switched back on.
+    if (!invoiceEmailsEnabled(Deno.env.get("INVOICE_EMAILS"))) {
+      console.log("[generate-invoices] invoice emails OFF (INVOICE_EMAILS=off) — none sent or retried");
+      const timings = { generate: generateMs, emails: 0, retry: 0, total: ms(t0) };
+      logTimings(result, timings);
+      return json({
+        ...result,
+        emails_sent: 0,
+        emails_retried: 0,
+        invoice_emails: "off",
+        blocked_alerts_sent: blockedAlerts,
+        run_timings_ms: timings,
+      });
     }
 
     // Email each newly-created invoice (best-effort, after generation has

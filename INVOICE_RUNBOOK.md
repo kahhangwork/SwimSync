@@ -204,8 +204,17 @@ still unsent.
 4. **Ignore Billing months → "may not have arrived" unless it lists something.** That list shows only emails whose
    result is unknown after 24 hours. Use its **Resend** button for those.
 
-Fixing this properly (sends in the background, plus an unsent count on the card) is in `BACKLOG.md` →
-*Large-month invoice emails*.
+Fixing this properly was dropped (`BACKLOG.md` → *Deliberately not doing* → *Large-month invoice emails*).
+
+### Invoice emails switched off *(2026-11-19)*
+
+`supabase secrets set INVOICE_EMAILS=off` stops **invoice** emails on Generate (both the new-invoice send and the
+retry pass); `supabase secrets unset INVOICE_EMAILS` restores them. No deploy either way; check with
+`supabase secrets list`. Invoices are still created — parents see them in the app; chase with the WhatsApp queue.
+Package, credit-note and unmarked-lesson emails keep sending (PRD §7.7).
+
+⚠ **Before switching back on:** every invoice made while off is still *unsent*, and the next Generate press for its
+month emails it — a stale bill for a month already paid. Count first with the SQL in step 3 above.
 
 ---
 

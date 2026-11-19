@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-11-19 (latest) — shipped and removed: *Type the engine's batched reads from their selects* (`33a007b`, rows inferred from each `.select()`); *Deeper component-render tests* struck under *Later* (shipped 2026-10-05, the line was stale). Earlier, 2026-11-19 (later) — shipped and removed: *`pressByText` should press a link itself, not its wrapper* (§7.382, presses an `<a>` leaf itself). Earlier, 2026-11-19 — shipped and removed: *Carried-over packages — a referred family cannot be brought in* (20261118000400 + Void referral; PRD §7.16). Earlier, 2026-11-18 (latest) — *Carried-over packages*: the public-page expiry gap fixed; the referral gap re-scoped (refuse + Void referral, user). Earlier (latest) — *Mark Attendance highlights Classes when arrived from Schedule* moved to *Deliberately not doing* (user, after a local check), closing *UI restyle leftovers*. Earlier (latest) — shipped and removed: *A CI grep for `| grep -q` in pipefail scripts*, *`speed.test.ts` spacing test can flake*, *Delete generate-invoices' re-export facades*, the Calendar Week blank band (UI restyle leftovers); *A package activated after an advance-cancelled lesson* moved to *Deliberately not doing* (the 2026-08-21 snapshot rule, user re-confirmed). Earlier (later) — shipped and removed: *Deleting a role has no confirmation step*, *The admin Modal's close (X) button has no accessible name*, *Show an invoice's due-date change history*, *Simplify the admin's live-balance display*, *Admin tables still carrying several inline row actions*; *UI restyle leftovers* re-verified (one still open, one new: Calendar Week's blank band). Earlier the same day, shipped and removed: *A credit note's amount has no positivity check* (as `>= 0`, `20261118000300`) and *Name the child in package emails* (`package-emails` v11). Earlier the same day: three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
+_Last updated: 2026-11-19 (latest) — *Large-month invoice emails* moved to *Deliberately not doing* (user: parents don't read email; an `INVOICE_EMAILS=off` switch shipped instead). Earlier, 2026-11-19 — shipped and removed: *Type the engine's batched reads from their selects* (`33a007b`, rows inferred from each `.select()`); *Deeper component-render tests* struck under *Later* (shipped 2026-10-05, the line was stale). Earlier, 2026-11-19 (later) — shipped and removed: *`pressByText` should press a link itself, not its wrapper* (§7.382, presses an `<a>` leaf itself). Earlier, 2026-11-19 — shipped and removed: *Carried-over packages — a referred family cannot be brought in* (20261118000400 + Void referral; PRD §7.16). Earlier, 2026-11-18 (latest) — *Carried-over packages*: the public-page expiry gap fixed; the referral gap re-scoped (refuse + Void referral, user). Earlier (latest) — *Mark Attendance highlights Classes when arrived from Schedule* moved to *Deliberately not doing* (user, after a local check), closing *UI restyle leftovers*. Earlier (latest) — shipped and removed: *A CI grep for `| grep -q` in pipefail scripts*, *`speed.test.ts` spacing test can flake*, *Delete generate-invoices' re-export facades*, the Calendar Week blank band (UI restyle leftovers); *A package activated after an advance-cancelled lesson* moved to *Deliberately not doing* (the 2026-08-21 snapshot rule, user re-confirmed). Earlier (later) — shipped and removed: *Deleting a role has no confirmation step*, *The admin Modal's close (X) button has no accessible name*, *Show an invoice's due-date change history*, *Simplify the admin's live-balance display*, *Admin tables still carrying several inline row actions*; *UI restyle leftovers* re-verified (one still open, one new: Calendar Week's blank band). Earlier the same day, shipped and removed: *A credit note's amount has no positivity check* (as `>= 0`, `20261118000300`) and *Name the child in package emails* (`package-emails` v11). Earlier the same day: three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1099,44 +1099,6 @@ modifier in the system — changes `amount_payable`, never `total_value`. **LIVE
 (`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
 
-### Large-month invoice emails: send them outside the Generate request — **M** — _filed 2026-11-17, follow-up of Billing engine speed_
-Today one Generate press creates every invoice (seconds) and then emails each parent **inside the same request**, at
-`RESEND_MAX_PER_SECOND` (default 2/s). Move the emails out of that request, so the press returns as soon as the
-invoices exist and the sends drain separately. While doing it, show the admin how many of a month's emails are
-still unsent.
-
-**Why:** at hundreds of invoices the email step, not billing, decides whether a press succeeds. Three ceilings apply,
-and each one is reached before the engine itself slows:
-- **Supabase Free cuts a request at 150 s** (idle timeout and wall clock). At 2/s that is about 280 emails per press.
-  Past it the admin sees an error although every invoice was created.
-- **Resend Free sends 100 a day** (Usage page, 2026-11-17). Every send past that is refused with a 429, and the
-  refused sends still pass through the 2/s gate, so they also use up the 150 s.
-- **The admin cannot see unsent emails.** The Billing months card lists only MAY_HAVE_SENT. An email the engine
-  released after a refusal is UNSENT, appears nowhere in the UI, and goes out only when someone presses Generate
-  again. Prod has no cron (pg_cron is not installed, DEPLOYMENT #104), and the engine's rule
-  `shouldRetryTenantEmails` skips an `auto_disabled` tenant on a cron run anyway.
-
-Nothing is lost or doubled today; `INVOICE_RUNBOOK.md` → *A big month* is the manual workaround. This item exists
-to stop that workaround from being needed.
-
-**Notes:**
-- **Do not change claim → send → settle, or the Idempotency-Key reuse** (CRASH_SAFE_EMAIL_CLAIM_PLAN). Both are
-  why a killed press is already safe: at most 5 in-flight claims are stranded for their 15-minute lease, and the
-  next run retries them under the same key.
-- **Options, cheapest first:**
-  1. **Stop early (S).** End the email loop on Resend's first daily-quota 429 instead of gating every remaining
-     send. Read the error `name` from the body, as `outcomeForStatus` already does for 409.
-  2. **Background sends (M).** Return the response after generation and run the emails under
-     `EdgeRuntime.waitUntil`. This does not escape the wall-clock limit, so it needs option 3 behind it.
-  3. **Scheduled drain (M).** A pg_cron call to the existing retry path for every tenant with UNSENT rows, including
-     `auto_disabled` tenants. That changes `shouldRetryTenantEmails`'s rule: decide it explicitly, and note that
-     pg_cron is not installed on prod (DEPLOYMENT #104).
-- **"N not yet emailed" on the Billing months card (S on its own).** The admin's existing reads cover it: count
-  `invoice_email_sent_at IS NULL` for the month.
-- **The rate gate works per isolate** (plan §7). Fold any rate change into this item rather than a separate one.
-- `billing_runs.duration_ms` measures generation only, by design. Emails are timed in `run_timings_ms` and the
-  `[generate-invoices] timings` log line.
-
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
 the admin sending a renewal offer.
@@ -1881,6 +1843,7 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
+| **Large-month invoice emails** (send them outside the Generate request: stop at Resend's daily-quota 429, background sends, a scheduled drain, an "N not yet emailed" count) | Dropped 2026-11-19 by the user: *"I think the sending of the email is low value. I don't think my parents even check their email"* — WhatsApp reminders and push (after *Native store builds*) are worth more. Instead a project-wide off switch shipped: the `INVOICE_EMAILS=off` Edge secret skips both invoice-email passes on Generate (PRD §7.7, `INVOICE_RUNBOOK.md`). Nothing was ever lost or doubled; the runbook's *A big month* is still the manual path. **Revisit if** invoice emails are switched back on for a business with ~100+ invoices a month; the filed design (three ceilings, options cheapest-first, *do not change claim → send → settle*) is in git history of this file before 2026-11-19. |
 | **Mark Attendance highlighting Schedule when opened from Schedule** (a second attendance route under Schedule, or lifting attendance above the tabs) | Refused 2026-11-18 with the user, after checking it on the local app. The attendance screen and the roster belong to a class, so the **Classes** highlight is the honest reading. Every exit returns to where the coach came in: a past/today lesson from Schedule → attendance → Schedule; a future lesson from Schedule → roster → Schedule; roster → Mark Attendance → roster (`exitHref.ts`, `DaySection.tsx`). A second route would also need a second copy of the Classes tab-press unwind (§7.80, three approaches silently did nothing). **Revisit if** a coach is actually confused by the highlight. |
 | **Extending a package activated AFTER an advance-cancelled lesson** (mirroring the holiday late-buyer trigger) | Refused 2026-11-18 with the user, re-confirming the 2026-08-21 snapshot rule (PRD, advance-cancel: *"they never paid for that week"*). Filed earlier the same day as a gap found building carried-over packages; on inspection it is the documented decision, pinned by `cancel_package_extension.test.sql` 16 and `carried_over_packages.test.sql` 16. Holidays DO extend a late buyer (`holiday_reconcile_on_activation`) — the asymmetry is deliberate. **Revisit only if** a business asks for late buyers to be extended for cancels; the shape is an AFTER trigger on `parent_packages` calling `apply_cancel_reconcile` per cancelled lesson in the window. |
 | **Vendoring the Edge Functions' Deno dependencies** (`"vendor": true`, committed) to get CI to zero downloads | Weighed 2026-11-12 (§8.163). `npm:` imports + the `setup-deno` cache already remove the changing-bytes flake and skip downloads on most runs; what is left is a rare bad download on a cache miss, cleared by a re-run (§7.385). Vendoring would put MBs of third-party code in git, and whether `supabase functions deploy` accepts a vendored folder is unverified. **Revisit if** a cache-miss integrity red recurs often enough to cost real time. |

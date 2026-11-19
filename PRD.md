@@ -1720,6 +1720,14 @@ a per-invoice **Resend** (Billing: Edit). A human resend reuses the email's one 
 choosing to risk one duplicate. The same claim now also covers each invoice's first send, so two overlapping
 runs cannot email a parent twice.
 
+*(implemented 2026-11-19 — off switch)* Invoice emails on a Generate run can be **switched off project-wide** with
+the Edge Function secret **`INVOICE_EMAILS=off`** (`supabase secrets set …`; no deploy). Only the word `off`
+disables — unset or any other value sends as before. Off skips **both** the new-invoice send and the retry pass;
+invoices are still created and parents see them in the app. **Not affected:** the admin's per-invoice Resend,
+package emails, credit-note emails and the unmarked-lesson alert to coaches. An invoice created while off stays
+*unsent*, so the first Generate press for its month after switching back on emails it. (Why: the user judged
+invoice email low value — parents act on WhatsApp.)
+
 ### 7.8 Credit Note Management
 
 SwimSync shall support credit notes for post-invoice attendance corrections.
