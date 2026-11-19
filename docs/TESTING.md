@@ -564,8 +564,8 @@ render assertion on such a screen was green, then red, with no change. No conten
 opens** (seven admin pages and most small app screens on the 2026-09-12 map), and the once-per-batch
 gate of the feature-tier lite track. `smoke-app` reuses `fixtures-payment-collection.sql`; the admin
 one runs on bare seed. **One content check, added 2026-10-14 (UI restyle 4.6):** the bad-token `/package` page
-offers *Sign in to SwimSync* and it opens `/login` (a Playwright click — the link is an `<a>` whose text is its
-own, so `pressByText` would dispatch on the wrapper). **And (2026-11-11):** Profile → *Add Child Profile* → *+ Add another coach or
+offers *Sign in to SwimSync* and it opens `/login` (a Playwright click on the link; `pressByText` also presses an
+`<a>` leaf itself since 2026-11-19, §7.382). **And (2026-11-11):** Profile → *Add Child Profile* → *+ Add another coach or
 school* asserts the URL stays in the Profile stack AND the selected tab is Profile (`[role="tab"][aria-selected]`;
 innerText carries icon glyphs first, so compare the last line). They replaced `smoke-admin-screens.mjs` (four routes, no exit code — it
 could not fail, so it never ran in the nightly). First run found one product wart on

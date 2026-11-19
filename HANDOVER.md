@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-19 (latest) — **Referred families can't be brought in; Void referral; `public-package` v5**
-(§8.173): migration `20261118000400` + admin live; Mark Attendance highlight closed as not-doing. Nightly gate SKIPPED
-on the user's word — read tonight's nightly first. Next: Coach Kah Hang's November._
+_Last updated: 2026-11-19 (later) — **`pressByText` presses an `<a>` leaf itself** (§8.174, §7.382), driver-only, CI
+green. Tonight's nightly `44435022695` (on `aa67d64`) is **GREEN** — the §9 gate is clear. Next: Coach Kah Hang's
+November (early December)._
 
-_Previously (§8.172, 2026-11-18) — Four BACKLOG S-items shipped (grep -q guard, spacing test, facades, Calendar fill)._
+_Previously (§8.173, 2026-11-19) — Referred families can't be brought in; Void referral; `public-package` v5._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,14 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.174 (2026-11-19) — `pressByText` presses a link itself; BACKLOG item 3 of a fresh list; live
+
+**Shipped** `3f99ae7`: `pressByText`/`pressByTextMatch` dispatch on the leaf when it IS an `<a>`, else its parent as
+before (§7.382, now marked fixed). Proven red→green on `/package/<bad token>`; `verify-smoke-app` 85/85; CI green.
+
+- **Departed from the BACKLOG note:** not `closest("a")` (it re-targets Pressables nested in a link), and **no full
+  sweep** — the narrower change only adds the anchor's navigation; reasoning in §7.382. The user may still ask for one.
+
 ## 8.173 (2026-11-18 → 19) — Referred families can't be brought in; Void referral; `public-package` v5; live
 
 **Shipped** the user's picks from a fresh BACKLOG list: `73a9448` (Mark Attendance tab highlight → *Deliberately not
@@ -363,21 +371,6 @@ DEPLOYMENT #116), and the plan-reviewed `CARRIED_OVER_REFERRAL_BLOCK_PLAN` → `
   action as the exit; a brought-in family can still refer. **Skipped:** the §9 nightly gate, on the user's word.
 - **Found:** /plan-review caught a missing `'referral'` audit arm (§7.297 hit again) and carried tests 20–23 pinning
   the opposite. New: §7.402 (irreversible exit ⇒ last check), §7.403 (`throws_ok` atomicity), §7.404 (`db query -f`).
-
-## 8.172 (2026-11-18) — Four BACKLOG S-items shipped; one closed as deliberately not doing; live
-
-**Shipped** the user's picks 1–5 of a fresh BACKLOG list, one branch each: `2c497ab` (CI `check-grep-q-pipefail.sh`,
-§7.339 promoted — first run found two live instances, fixed), `f6c16a3` (spacing test asserts the gate's schedule),
-`3aa6c56` (Calendar Week/Day columns grow to fill, DEPLOYMENT #115, VISUAL-ONLY under D3), `3662ed9` (engine
-facades deleted; ARCHITECTURE §6 + file map). TESTING §5 "2026-11-18 (later)". Each proven red first; CI green ×4.
-
-- **Closed, not built:** *late activation after a cancel* — it was the 2026-08-21 snapshot rule (PRD advance-cancel,
-  `cancel_package_extension.test.sql` 16), filed as a "gap" the same morning. Caught only by reading that test before
-  writing the migration; my recommendation to the user had been "yes". → BACKLOG *Deliberately not doing*.
-- **Not deployed on purpose:** `generate-invoices` stays **v42** — `3662ed9` changes import paths only (bench
-  IDENTICAL), and `/deploy` says no behaviour change ⇒ no deploy; November bills on v42 as planned.
-- **Found:** a sibling session in the SAME checkout switched it to `main` mid-commit (`a7d3384`, `watch-run.sh` + a §7.340 hit-again, was theirs); no
-  loss — both commits stayed separate, mine rebased. Shared-checkout work is what `docs/WORKTREES.md` exists for.
 
 ## 9. Next steps (pick with the user)
 
@@ -421,9 +414,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-19:** `44316261362` (on `d5f987a`, §8.171's nine commits) is **green**. Nothing since is covered:
-`3aa6c56` (Calendar, VISUAL-ONLY under D3) and `b053cf5`/`bb2af88` (§8.173, gate skipped on the user's word) — **read
-tonight's scheduled run before the next APP unit merges**. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-19:** `44435022695` (scheduled, on `aa67d64`) is **green** — it covers `3aa6c56` (Calendar) and
+`b053cf5`/`bb2af88` (§8.173), so **the gate is clear**. Since then only `3f99ae7` (driver helper, §8.174 — no gate
+needed) has landed. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -440,10 +433,8 @@ which mutate shared seed state — are in the same section.
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
    in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
-2. **Read tonight's nightly** — the first to cover `3aa6c56` (Calendar) and `bb2af88` (Void referral), both landed
-   with the gate skipped on the user's word (`44316261362`, §8.171's, was green). A red names its driver; replay it
-   `--only` (TESTING §5 "2026-11-19"). Also unobserved since `package-emails` v11 (§8.170): a real one-child package
-   email naming the child — check the next confirm.
+2. **Unobserved since `package-emails` v11 (§8.170):** a real one-child package email naming the child — check the
+   next confirm. (Tonight's nightly `44435022695` is green, so the gate on `3aa6c56`/`bb2af88` is closed.)
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked
    extend or refund; act on the reply (`manual_extension_days`, or the in-app refund, PRD §7.16).
 
