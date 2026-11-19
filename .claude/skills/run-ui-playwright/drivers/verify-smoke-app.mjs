@@ -258,8 +258,8 @@ try {
   await visit(page, "/package/00000000000000000000000000000000", "Package not found",
     { authed: false, expectedFailure: /^404 \/functions\/v1\/public-package\?token=0000/ });
   // A bad link is no longer a dead end (UI restyle 4.5/4.6): it offers Sign in.
-  // A Playwright click, not pressByText — the link is an <a> whose text is its
-  // own, so pressByText would dispatch on the wrapper and miss.
+  // A Playwright click on the link (what a user does). pressByText also works
+  // here since 2026-11-19 — it presses an <a> leaf itself (§7.382).
   {
     const way = page.getByText("Sign in to SwimSync", { exact: true });
     const offered = (await way.count()) === 1;

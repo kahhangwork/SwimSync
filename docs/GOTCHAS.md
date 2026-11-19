@@ -3187,8 +3187,14 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     synthetic click lands on its container: "pressed", nothing navigates, and the URL check fails as if the route
     were broken. For a link, click the role — `page.getByRole("link", { name }).click()` — which is also what a user
     does. **Second time:** `verify-smoke-app`'s bad-token link hit it on 2026-10-14 and the lesson stayed in
-    `docs/TESTING.md` §5 only; `verify-app-money` C3 re-found it 2026-11-11. Promotion (make `pressByText` click
-    `el.closest("a")` when there is one) is filed in `BACKLOG.md` — it changes every driver, so it needs a sweep.
+    `docs/TESTING.md` §5 only; `verify-app-money` C3 re-found it 2026-11-11. **FIXED IN THE HELPER 2026-11-19:**
+    `pressByText`/`pressByTextMatch` now dispatch on the leaf itself when it IS an `<a>`, else on its parent as before
+    — proven red→green on `/package/<bad token>`'s *Sign in to SwimSync*. Deliberately NOT `closest("a")`: that would
+    re-target every Pressable nested inside a link and skip its own pointer events. No sweep was run: events fired on
+    the anchor still bubble to the old target (only an anchor handler calling `stopPropagation` could differ), and on
+    2026-11-19 no driver pressed an anchor leaf through the helper — the app's three `<Link>`s were role-clicked
+    only; `verify-smoke-app` 85/85 on the change. The two
+    `getByRole("link")` call sites stay — a role click is what a user does.
 
 383. **An in-app push to a signed-in route while signed OUT is redirected nowhere.** `app/_layout.tsx` routes on
     launch and on auth events only, so a public page (`/package/…`, `/invoice/…`) that links into `/(parent)/…` drops

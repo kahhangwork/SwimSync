@@ -192,7 +192,7 @@ try {
       check("C2: no I've paid button after the reload", (await out.page.getByText("I've paid", { exact: true }).count()) === 0);
       // C3. "Prefer a different package?" is no dead end (BACKLOG *UI restyle leftovers*, closed
       // 2026-11-11): signed OUT, its link reaches Sign In.
-      // A real click on the LINK role: pressByText presses the text's PARENT, and this <a> is the leaf itself.
+      // A real click on the LINK role (what a user does); pressByText handles an <a> leaf too since 2026-11-19 (§7.382).
       check("C3 (logged out): the different-package link is offered",
         await out.page.getByRole("link", { name: "Sign in to choose another in Billing → Packages" }).click({ timeout: 10000 }).then(() => true, () => false));
       await out.page.waitForURL(/\/login/, { timeout: 20000 }).catch(() => {});

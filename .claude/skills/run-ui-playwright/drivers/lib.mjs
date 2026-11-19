@@ -392,7 +392,13 @@ export async function pressByText(page, label, index = 0, { includeHidden = fals
       );
       const el = hits[index];
       if (!el) return false;
-      const target = el.parentElement;
+      // ⚠ A LINK IS ITS OWN LEAF (§7.382). An expo-router / Next <Link> renders
+      // an <a> whose text is its own, so its parent is OUTSIDE the anchor and a
+      // click dispatched there never reaches it — nothing navigates, and the run
+      // reads as a broken route. Press the anchor itself. NOT `closest("a")`:
+      // a Pressable nested inside a link must still receive its own pointer
+      // events, and dispatching on the ancestor anchor would skip them.
+      const target = el.tagName === "A" ? el : el.parentElement;
       const opts = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0 };
       target.dispatchEvent(new PointerEvent("pointerdown", opts));
       target.dispatchEvent(new PointerEvent("pointerup", opts));
@@ -437,7 +443,7 @@ export async function pressByTextMatch(page, pattern, { includeHidden = false } 
           (includeHidden || visible(e))
       );
       if (hits.length !== 1) return { ok: false, n: hits.length };
-      const target = hits[0].parentElement;
+      const target = hits[0].tagName === "A" ? hits[0] : hits[0].parentElement; // §7.382, see pressByText
       const opts = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0 };
       target.dispatchEvent(new PointerEvent("pointerdown", opts));
       target.dispatchEvent(new PointerEvent("pointerup", opts));
