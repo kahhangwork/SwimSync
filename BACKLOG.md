@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-11-19 (later) — shipped and removed: *`pressByText` should press a link itself, not its wrapper* (§7.382, presses an `<a>` leaf itself). Earlier, 2026-11-19 — shipped and removed: *Carried-over packages — a referred family cannot be brought in* (20261118000400 + Void referral; PRD §7.16). Earlier, 2026-11-18 (latest) — *Carried-over packages*: the public-page expiry gap fixed; the referral gap re-scoped (refuse + Void referral, user). Earlier (latest) — *Mark Attendance highlights Classes when arrived from Schedule* moved to *Deliberately not doing* (user, after a local check), closing *UI restyle leftovers*. Earlier (latest) — shipped and removed: *A CI grep for `| grep -q` in pipefail scripts*, *`speed.test.ts` spacing test can flake*, *Delete generate-invoices' re-export facades*, the Calendar Week blank band (UI restyle leftovers); *A package activated after an advance-cancelled lesson* moved to *Deliberately not doing* (the 2026-08-21 snapshot rule, user re-confirmed). Earlier (later) — shipped and removed: *Deleting a role has no confirmation step*, *The admin Modal's close (X) button has no accessible name*, *Show an invoice's due-date change history*, *Simplify the admin's live-balance display*, *Admin tables still carrying several inline row actions*; *UI restyle leftovers* re-verified (one still open, one new: Calendar Week's blank band). Earlier the same day, shipped and removed: *A credit note's amount has no positivity check* (as `>= 0`, `20261118000300`) and *Name the child in package emails* (`package-emails` v11). Earlier the same day: three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
+_Last updated: 2026-11-19 (latest) — shipped and removed: *Type the engine's batched reads from their selects* (`33a007b`, rows inferred from each `.select()`); *Deeper component-render tests* struck under *Later* (shipped 2026-10-05, the line was stale). Earlier, 2026-11-19 (later) — shipped and removed: *`pressByText` should press a link itself, not its wrapper* (§7.382, presses an `<a>` leaf itself). Earlier, 2026-11-19 — shipped and removed: *Carried-over packages — a referred family cannot be brought in* (20261118000400 + Void referral; PRD §7.16). Earlier, 2026-11-18 (latest) — *Carried-over packages*: the public-page expiry gap fixed; the referral gap re-scoped (refuse + Void referral, user). Earlier (latest) — *Mark Attendance highlights Classes when arrived from Schedule* moved to *Deliberately not doing* (user, after a local check), closing *UI restyle leftovers*. Earlier (latest) — shipped and removed: *A CI grep for `| grep -q` in pipefail scripts*, *`speed.test.ts` spacing test can flake*, *Delete generate-invoices' re-export facades*, the Calendar Week blank band (UI restyle leftovers); *A package activated after an advance-cancelled lesson* moved to *Deliberately not doing* (the 2026-08-21 snapshot rule, user re-confirmed). Earlier (later) — shipped and removed: *Deleting a role has no confirmation step*, *The admin Modal's close (X) button has no accessible name*, *Show an invoice's due-date change history*, *Simplify the admin's live-balance display*, *Admin tables still carrying several inline row actions*; *UI restyle leftovers* re-verified (one still open, one new: Calendar Week's blank band). Earlier the same day, shipped and removed: *A credit note's amount has no positivity check* (as `>= 0`, `20261118000300`) and *Name the child in package emails* (`package-emails` v11). Earlier the same day: three Edge-refactor follow-ups filed under Foundations (typed batched reads, delete the engine facades, the spacing flake). Earlier: 2026-11-17 — *Large-month invoice emails: send them outside the Generate request* (M) filed (Billing engine speed follow-up). Earlier: 2026-11-16 — *A CI grep for `| grep -q` in pipefail scripts* (S) filed (§7.339, bitten twice); 2026-11-12 — **Overdue shipped** (due dates, the Overdue tag, Change due date, Days to pay; `20261112000100`); *Show an invoice's due-date change history* (S) filed._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -658,9 +658,7 @@ Deliberately not doing 2026-08-16.)*
 **Two items are deliberately LAST, and get cheaper by waiting:**
 
 - ~~**Generate real Supabase `Database` types**~~ — shipped 2026-10-06 (§8.141).
-- **Deeper component-render tests** (M) — they pinned screens the feature-tier refactor was about
-  to rewrite. *(That refactor finished 2026-09-24 in both apps, so this reason no longer holds — it
-  now waits on value, not on a redesign.)*
+- ~~**Deeper component-render tests**~~ — shipped 2026-10-05 (§8.137; see *Build order of 2026-09-27* item 5).
 
 ~~**Shared `lessonDates.ts` package (M)**~~ — moved to *Deliberately not doing* 2026-09-27 (revisit if workspaces
 arrive for another reason).
@@ -1683,17 +1681,6 @@ real tenant asks — that is the one honest reason, and nobody has.
 
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
-
-### Type the engine's batched reads from their selects — **S/M** — _filed 2026-11-18 (Edge refactor Part A)_
-`readPaged<T>` / `readAllIn<T>` rows are typed by a hand-written `T` (`SessionRow` … `BalanceRow` in
-`generate-invoices/types.ts`) that the caller asserts; the generated `Database` types never check them.
-
-**Why:** these are phase 1's reads — every line on every invoice comes through them. A renamed or retyped column
-there compiles clean and fails at runtime, the exact §7.76 lie Wave 8 removed everywhere else.
-
-**Notes:** `CountedQuery` is now a structural type (no `any`, G6 0), so the plumbing is the only obstacle: infer
-`T` from each dao function's builder (`Awaited<ReturnType<…>>`) rather than restating it. Keep `readPaged` /
-`readAllIn` byte-for-byte (§7.391) — the bench (`bench/`) proves it; type-only, so `types(edge)` + P3.
 
 ### ~~Pinned roundtrip over a whole week, in CI~~ — **S** — **DONE 2026-10-10** (CI `backend-tests`, TESTING §5, §7.304 *Promoted*)
 Run `check-fixture-roundtrip.sh --now` at noon SGT on seven consecutive past days (one of each weekday), not only at

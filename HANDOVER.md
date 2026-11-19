@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-19 (later) — **`pressByText` presses an `<a>` leaf itself** (§8.174, §7.382), driver-only, CI
-green. Tonight's nightly `44435022695` (on `aa67d64`) is **GREEN** — the §9 gate is clear. Next: Coach Kah Hang's
-November (early December)._
+_Last updated: 2026-11-19 (latest) — **The engine's batched reads are typed from their `.select()`** (§8.175,
+`33a007b`), type-only, emitted JS identical. Nightly `44435022695` is green; the §9 gate is clear. Next: Coach Kah
+Hang's November (early December)._
 
-_Previously (§8.173, 2026-11-19) — Referred families can't be brought in; Void referral; `public-package` v5._
+_Previously (§8.174, 2026-11-19) — `pressByText` presses an `<a>` leaf itself (§7.382); driver-only._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,15 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.175 (2026-11-19) — The engine's batched reads are typed from their selects; BACKLOG item, type-only; CI green
+
+**Shipped** `33a007b`: `CountedQuery<R>` is generic, so `readPaged` / `readAllIn` infer each row from the supabase-js
+builder; the seven hand-written row types are deleted. Proven red first: on `main`, `status`→`statuz` in
+`readAttendanceIn` passed `deno check`; now 12 errors (dropping `cancelled_at`: 2). Suite 342/342 ×2.
+
+- **No Edge Function deploy, deliberately:** tsc emit of all four files is identical to `9459bcc`, so live v42 runs
+  the same JS. Reasoning + resolution: `EDGE_FUNCTIONS_REFACTOR_PLAN.md` §9, `db-any-ok` census. BACKLOG item removed.
+
 ## 8.174 (2026-11-19) — `pressByText` presses a link itself; BACKLOG item 3 of a fresh list; live
 
 **Shipped** `3f99ae7`: `pressByText`/`pressByTextMatch` dispatch on the leaf when it IS an `<a>`, else its parent as
@@ -359,18 +368,6 @@ before (§7.382, now marked fixed). Proven red→green on `/package/<bad token>`
 
 - **Departed from the BACKLOG note:** not `closest("a")` (it re-targets Pressables nested in a link), and **no full
   sweep** — the narrower change only adds the anchor's navigation; reasoning in §7.382. The user may still ask for one.
-
-## 8.173 (2026-11-18 → 19) — Referred families can't be brought in; Void referral; `public-package` v5; live
-
-**Shipped** the user's picks from a fresh BACKLOG list: `73a9448` (Mark Attendance tab highlight → *Deliberately not
-doing*, after a local check showed every exit returns where the coach came in), `5613a40` (`public-package` v5 —
-DEPLOYMENT #116), and the plan-reviewed `CARRIED_OVER_REFERRAL_BLOCK_PLAN` → `b053cf5` (migration `20261118000400`)
-+ `bb2af88` (admin **Void referral**) — DEPLOYMENT #117, PRD §7.16, TESTING §5 "2026-11-19". Each proven red first.
-
-- **Decisions (user):** refuse the bring-in rather than auto-void (*"a lot of bugs could happen"*); a Void referral
-  action as the exit; a brought-in family can still refer. **Skipped:** the §9 nightly gate, on the user's word.
-- **Found:** /plan-review caught a missing `'referral'` audit arm (§7.297 hit again) and carried tests 20–23 pinning
-  the opposite. New: §7.402 (irreversible exit ⇒ last check), §7.403 (`throws_ok` atomicity), §7.404 (`db query -f`).
 
 ## 9. Next steps (pick with the user)
 
@@ -415,8 +412,8 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-11-19:** `44435022695` (scheduled, on `aa67d64`) is **green** — it covers `3aa6c56` (Calendar) and
-`b053cf5`/`bb2af88` (§8.173), so **the gate is clear**. Since then only `3f99ae7` (driver helper, §8.174 — no gate
-needed) has landed. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+`b053cf5`/`bb2af88` (§8.173), so **the gate is clear**. Since then only `3f99ae7` (driver helper, §8.174) and
+`33a007b` (engine types, emit-identical, §8.175) have landed — neither needs the gate. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).

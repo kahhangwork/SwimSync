@@ -589,6 +589,10 @@ billed lessons, seal or recipients (§1), and fixed after Part B ships. BLOCKERs
   B2 keeps byte-for-byte. **Consequence, accepted:** rows read through `readPaged<T>` are typed by the hand-written
   `T`, not inferred from their select — the generated types do not check those reads (the engine's phase-1 batch).
   A later item could type `T` from each select; not in this plan.
+  **Resolved 2026-11-19 (`33a007b`, §8.175):** `CountedQuery<R>` is generic and `T` is inferred from each builder, so
+  every batched read's row is the generated type of its `.select()`; the hand-written `SessionRow` … `BalanceRow` are
+  deleted. Type-only — tsc emit of the four touched files is identical to the prior commit, so the B2 "byte-for-byte"
+  property holds for what runs (the *source text* of `readPaged`'s signature did change: `CountedQuery<T>`).
 
 ## 10. Pre-commit gate
 

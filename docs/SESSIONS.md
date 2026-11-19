@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.173** | 2026-11-18 → 19 | Referred families can't be brought in; Void referral; `public-package` v5; live | PRD §7.16 · §7.402–§7.404 · DEPLOYMENT #116–117 |
 | **8.172** | 2026-11-18 | Four BACKLOG S-items (grep -q CI guard, spacing test, Calendar fill, facades); one closed as not-doing; live | BACKLOG *Deliberately not doing* · DEPLOYMENT #115 |
 | **8.171** | 2026-11-18 | Role delete asks first; five small admin/UI fixes in one push; live | PRD (per commit) · §7.399–§7.401 · DEPLOYMENT #113–114 |
 | **8.170** | 2026-11-18 | Credit notes can never be negative (`>= 0`); package emails name the child; live | PRD §7.16 · `constraints.test.sql` 3c · DEPLOYMENT #111–112 |
