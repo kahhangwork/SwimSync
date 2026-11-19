@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-19 (latest) — **The engine's batched reads are typed from their `.select()`** (§8.175,
-`33a007b`), type-only, emitted JS identical. Nightly `44435022695` is green; the §9 gate is clear. Next: Coach Kah
-Hang's November (early December)._
+_Last updated: 2026-11-19 (latest) — **Invoice emails are switched OFF on prod** (§8.176, `b83aae9`, engine v43,
+`INVOICE_EMAILS=off`): the user judged email low value; WhatsApp is the reminder channel. Next: Coach Kah Hang's
+November (early December) — the first run with no invoice emails._
 
-_Previously (§8.174, 2026-11-19) — `pressByText` presses an `<a>` leaf itself (§7.382); driver-only._
+_Previously (§8.175, 2026-11-19) — the engine's batched reads are typed from their `.select()`; type-only._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,16 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.176 (2026-11-19) — `INVOICE_EMAILS=off` switches off invoice emails on Generate; live, and set on prod
+
+**Shipped** `b83aae9`: the user dropped *Large-month invoice emails* (*"I don't think my parents even check their
+email"*) for a project-wide off switch instead; behaviour in PRD §7.7, operation in `INVOICE_RUNBOOK.md`. Tests proven
+red first; suite 345/345 ×2; local serve showed `invoice_emails: "off"` vs unset. Engine v42 → v43 (DEPLOYMENT #118);
+the user set the secret, digest-verified.
+
+- **Not built, deliberately:** a per-business switch (needs a migration + toggle; Little Orcas / Epic Swim lose
+  invoice emails too — accepted). WhatsApp bulk sends stay parked: *"the queue is fine for now"* (BACKLOG).
+
 ## 8.175 (2026-11-19) — The engine's batched reads are typed from their selects; BACKLOG item, type-only; CI green
 
 **Shipped** `33a007b`: `CountedQuery<R>` is generic, so `readPaged` / `readAllIn` infer each row from the supabase-js
@@ -360,14 +370,6 @@ builder; the seven hand-written row types are deleted. Proven red first: on `mai
 
 - **No Edge Function deploy, deliberately:** tsc emit of all four files is identical to `9459bcc`, so live v42 runs
   the same JS. Reasoning + resolution: `EDGE_FUNCTIONS_REFACTOR_PLAN.md` §9, `db-any-ok` census. BACKLOG item removed.
-
-## 8.174 (2026-11-19) — `pressByText` presses a link itself; BACKLOG item 3 of a fresh list; live
-
-**Shipped** `3f99ae7`: `pressByText`/`pressByTextMatch` dispatch on the leaf when it IS an `<a>`, else its parent as
-before (§7.382, now marked fixed). Proven red→green on `/package/<bad token>`; `verify-smoke-app` 85/85; CI green.
-
-- **Departed from the BACKLOG note:** not `closest("a")` (it re-targets Pressables nested in a link), and **no full
-  sweep** — the narrower change only adds the anchor's navigation; reasoning in §7.382. The user may still ask for one.
 
 ## 9. Next steps (pick with the user)
 
@@ -428,8 +430,9 @@ which mutate shared seed state — are in the same section.
 1. **Bill Coach Kah Hang's November on engine v42** (early December, `INVOICE_RUNBOOK.md`) — the refactored engine's
    first real run. BEFORE pressing Generate, run the O2 prediction (`EDGE_FUNCTIONS_REFACTOR_PLAN.md` §6 — per parent,
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
-   (the first live one; v40 modelled it under ~1 s). Still untried live: a *Days to pay* save, and **"Please pay by"**
-   in a received email (`OVERDUE_INVOICES_PLAN.md` §3 step 4).
+   (the first live one; v40 modelled it under ~1 s). **No invoice emails go out** (`INVOICE_EMAILS=off`, §8.176):
+   expect "invoice emails OFF" in the Edge log, and chase with Invoices → WhatsApp reminders. Still untried live: a
+   *Days to pay* save (the email's "Please pay by" is moot while emails are off).
 2. **Unobserved since `package-emails` v11 (§8.170):** a real one-child package email naming the child — check the
    next confirm. (Tonight's nightly `44435022695` is green, so the gate on `3aa6c56`/`bb2af88` is closed.)
 3. **Open: PKG-2026-0002** (Ang, shared, expired 2026-10-04, S$350 / 10 lessons left) — the owner has been asked

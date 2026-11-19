@@ -1465,3 +1465,9 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     referral?". CI `44348346933` green. **HANDOVER §9 nightly gate SKIPPED on the user's word** — no nightly covers
     `3aa6c56`/`bb2af88` yet. **Rollback:** revert `bb2af88b` first (apps), then
     `supabase/rollback/20261118000400_carried_over_referral_block_DOWN.sql` via psql (rehearsed).
+118. **Deploy record (2026-11-19): `INVOICE_EMAILS=off` — invoice emails switched off on prod.** No migration.
+    `generate-invoices` **v42 → v43**; the downloaded source carries `invoiceEmailsEnabled` and the log line "invoice
+    emails OFF". Then `b83aae92` (docs only) → `main`; both Vercel builds green. The user ran
+    `supabase secrets set INVOICE_EMAILS=off`. **Verify a secret's VALUE without reading it:** `secrets list` prints
+    sha256(value) — `printf off | shasum -a 256` matched (`b4dc66dd…`). Undo: `supabase secrets unset INVOICE_EMAILS`,
+    after the runbook's unsent count (PRD §7.7, `INVOICE_RUNBOOK.md`).

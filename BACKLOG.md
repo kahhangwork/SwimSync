@@ -301,6 +301,9 @@ effort — ~~*Pin the clock for UI drivers*~~ **shipped 2026-10-10** (§8.144, `
 9. ~~*Remove the legacy package matcher*~~ — **shipped 2026-10-13** (engine v36 + `20261013000100`; the D9 guard went
    with it). Follow-up ~~*Simplify the admin's live-balance display*~~ shipped 2026-11-18.
 
+**Priority among the parked (user, 2026-11-19):** WhatsApp and, once native builds exist, push outrank email — invoice
+emails are switched off (`INVOICE_EMAILS=off`); the wa.me queue is enough for now.
+
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
 (low-balance nudge, automated reminders), Native builds → Push, Bulk WhatsApp, In-app payment gateway. (*Logo check*
 — done 2026-10-11, IPOS clear on the new mark.)
@@ -1366,7 +1369,8 @@ user judged plausibly acceptable. The cost is friction, not money: a dedicated p
 number NOT registered on the consumer/Business app, Meta business setup, pre-approved
 message template, and unverified accounts cap at 250 business-initiated conversations
 per 24h (sufficient here; full verification lifts it). Sequence strictly after the
-wa.me queue ships and only if a real tenant asks.
+wa.me queue ships and only if a real tenant asks. **2026-11-19, user:** with invoice emails switched off, WhatsApp
+is now the reminder channel — but *"the queue is fine for now"*, so this stays parked.
 
 ### Push notifications — **M** `[MVP-excluded]`
 Native push to parents and coaches.
