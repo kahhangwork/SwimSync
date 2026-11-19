@@ -31,18 +31,23 @@ import { IN_CHUNK, PAGE } from "../constants.ts";
 
 // A supabase-js select built with { count: "exact" }, as readPaged uses it: keyset
 // `.gt()`, then `.order()`, then `.limit()`, awaited for { data, error, count }. Typed
-// STRUCTURALLY so every table's builder fits without an `any` (rows are still typed
-// by readPaged<T>, which the caller asserts). Type-only: replaces `CountedQuery = any`.
-type PageResult = { data: unknown[] | null; error: { message: string } | null; count: number | null };
-type CountedQuery = {
-  gt(column: string, value: string): CountedQuery;
-  order(column: string): { limit(count: number): PromiseLike<PageResult> };
+// STRUCTURALLY so every table's builder fits without an `any`, and GENERIC in its row:
+// readPaged / readAllIn infer T from the builder, so a row's type is whatever the
+// generated Database types say its `.select()` string returns — a misspelled or dropped
+// column is a `deno check` error, not an `undefined` at billing time (§7.76). Don't pass
+// T by hand: it is still checked (the builder must fit CountedQuery<T>, so T cannot name
+// a column the select lacks), but it only restates — and can narrow — what inference
+// already knows. Type-only — the emitted JS is unchanged.
+type PageResult<R> = { data: R[] | null; error: { message: string } | null; count: number | null };
+type CountedQuery<R> = {
+  gt(column: string, value: string): CountedQuery<R>;
+  order(column: string): { limit(count: number): PromiseLike<PageResult<R>> };
 };
 
 /** Every row of a counted query, keyset-paged by `orderKey` — a column that
  *  is unique within the query AND selected (the next page starts after it). */
 export async function readPaged<T>(
-  build: () => CountedQuery,
+  build: () => CountedQuery<T>,
   orderKey: string,
   what: string,
   /** Rows per request. Tests only — production uses PAGE. */
@@ -73,7 +78,7 @@ export async function readPaged<T>(
 /** Every row matching an .in() over `ids`, chunked and paged. Empty ids → no request. */
 export async function readAllIn<T>(
   ids: readonly string[],
-  build: (chunk: string[]) => CountedQuery,
+  build: (chunk: string[]) => CountedQuery<T>,
   what: string
 ): Promise<T[]> {
   const unique = [...new Set(ids)];

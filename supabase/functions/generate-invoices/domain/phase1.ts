@@ -78,7 +78,7 @@ export async function readPhase1(
   // used to fetch. Same filters, same columns; the class_id filter became an
   // .in() over this tenant's classes, which is still the isolation (RLS does
   // not apply to service_role).
-  // (Row types: types.ts — SessionRow … StudentNameRow.)
+  // (Row types: inferred from each read's .select() — dao/paging.ts, CountedQuery.)
 
   const classIds = (classes ?? []).map((c) => c.id as string);
   const [allSessions, allBookings, allEnrolments] = await Promise.all([

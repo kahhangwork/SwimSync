@@ -14,15 +14,6 @@
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.2";
 import type { Database } from "../../_shared/database.overrides.ts";
-import type {
-  AttendanceRow,
-  BalanceRow,
-  BookingRow,
-  EnrolmentRow,
-  ParentStudentRow,
-  SessionRow,
-  StudentNameRow,
-} from "../types.ts";
 import { readAllIn, readPaged } from "./paging.ts";
 
 type Db = SupabaseClient<Database>;
@@ -93,7 +84,7 @@ export function readTrialRates(supabase: Db, tenantId: string) {
 }
 
 export function readSessionsIn(supabase: Db, classIds: string[], monthStart: string, monthEnd: string) {
-  return readAllIn<SessionRow>(
+  return readAllIn(
       classIds,
       (ids) =>
         supabase
@@ -107,7 +98,7 @@ export function readSessionsIn(supabase: Db, classIds: string[], monthStart: str
 }
 
 export function readBookingsIn(supabase: Db, classIds: string[], monthStart: string, monthEnd: string) {
-  return readAllIn<BookingRow>(
+  return readAllIn(
       classIds,
       (ids) =>
         supabase
@@ -122,7 +113,7 @@ export function readBookingsIn(supabase: Db, classIds: string[], monthStart: str
 }
 
 export function readEnrolmentsIn(supabase: Db, classIds: string[]) {
-  return readAllIn<EnrolmentRow>(
+  return readAllIn(
       classIds,
       (ids) =>
         supabase
@@ -134,7 +125,7 @@ export function readEnrolmentsIn(supabase: Db, classIds: string[]) {
 }
 
 export function readAttendanceIn(supabase: Db, sessionIds: string[]) {
-  return readAllIn<AttendanceRow>(
+  return readAllIn(
       sessionIds,
       (ids) =>
         supabase
@@ -146,7 +137,7 @@ export function readAttendanceIn(supabase: Db, sessionIds: string[]) {
 }
 
 export function readParentStudentsIn(supabase: Db, studentIds: string[]) {
-  return readAllIn<ParentStudentRow>(
+  return readAllIn(
       studentIds,
       (ids) =>
         supabase
@@ -158,7 +149,7 @@ export function readParentStudentsIn(supabase: Db, studentIds: string[]) {
 }
 
 export function readStudentNamesIn(supabase: Db, studentIds: string[]) {
-  return readAllIn<StudentNameRow>(
+  return readAllIn(
       studentIds,
       (ids) =>
         supabase.from("students").select("id, full_name", { count: "exact" }).in("id", ids),
@@ -193,7 +184,7 @@ export function readDrawnChunk(supabase: Db, itemSessionIds: string[], i: number
 
 // ── Phase 2 ─────────────────────────────────────────────────────────────────
 export function readExistingInvoices(supabase: Db, tenantId: string, billingMonth: string) {
-  return readPaged<{ id: string; parent_id: string }>(
+  return readPaged(
           () =>
             supabase
               .from("invoices")
@@ -206,7 +197,7 @@ export function readExistingInvoices(supabase: Db, tenantId: string, billingMont
 }
 
 export function readBalances(supabase: Db, tenantId: string) {
-  return readPaged<BalanceRow>(
+  return readPaged(
           () =>
             supabase
               .from("parent_tenant_balances")
