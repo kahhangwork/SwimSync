@@ -71,6 +71,12 @@ async function rowShowsDeactivated(email, want) {
   ).catch(() => {});
 }
 
+/** Same reason as rowShowsDeactivated, for the Delete modal: wait (≤30 s) until the
+ *  page text satisfies `done` rather than a fixed 3 s. A miss falls through. */
+async function bodySettles(done) {
+  await page.waitForFunction(done, null, { timeout: 30000 }).catch(() => {});
+}
+
 // ── 1. The owner's view ─────────────────────────────────────────────────────
 await freshLogin("coach@swimsync.test");
 await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
@@ -184,7 +190,7 @@ check("the modal says the audit trail refuses the delete, not that it is purged"
 
 await page.getByPlaceholder("DELETE").fill("DELETE");
 await confirmBtn.click();
-await page.waitForTimeout(3000);
+await bodySettles(() => !document.body.innerText.includes("admindelete@swimsync.test"));
 body = await page.evaluate(() => document.body.innerText);
 check("the deleted admin is gone from the roster",
   !body.includes("admindelete@swimsync.test"));
@@ -208,7 +214,7 @@ await (await rowAction(row("adminhistory@swimsync.test"), "Delete")).click();
 await page.waitForTimeout(800);
 await page.getByPlaceholder("DELETE").fill("DELETE");
 await page.getByText("Delete account", { exact: true }).click();
-await page.waitForTimeout(3000);
+await bodySettles(() => document.body.innerText.includes("history recorded against their account"));
 
 body = await page.evaluate(() => document.body.innerText);
 // The RISK 11 wording: a sentence, not "audit_log.actor_id". The owner reads
