@@ -55,6 +55,22 @@ async function loginSticks(email) {
 
 const row = (email) => page.locator("tr", { hasText: email });
 
+/** Wait (≤30 s) for a Deactivate/Reactivate to SHOW in the row, instead of a fixed
+ *  timer. On a cold dev server the API route's first compile outlasts 3 s; the next
+ *  step then navigated away, aborting the request, and the deactivate never landed
+ *  (nightly 45325262634 — §7.108's shape on an API route). A miss falls through so
+ *  the check below reports what it saw. */
+async function rowShowsDeactivated(email, want) {
+  await page.waitForFunction(
+    ([e, w]) => {
+      const tr = [...document.querySelectorAll("tr")].find((r) => r.innerText.includes(e));
+      return !!tr && tr.innerText.includes("deactivated") === w;
+    },
+    [email, want],
+    { timeout: 30000 }
+  ).catch(() => {});
+}
+
 // ── 1. The owner's view ─────────────────────────────────────────────────────
 await freshLogin("coach@swimsync.test");
 await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
@@ -98,7 +114,7 @@ check("resend re-issues the link", body.includes("could not be sent"));
 
 // ── 4. Deactivate a PURE admin: pill flips AND the login is banned ──────────
 await (await rowAction(row("adminpure@swimsync.test"), "Deactivate")).click();
-await page.waitForTimeout(3000);
+await rowShowsDeactivated("adminpure@swimsync.test", true);
 check("deactivated pure admin's row says so",
   (await row("adminpure@swimsync.test").innerText()).includes("deactivated"));
 await page.screenshot({ path: shot("03-deactivated.png"), fullPage: true });
@@ -111,7 +127,7 @@ await freshLogin("coach@swimsync.test");
 await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
 await row("adminpure@swimsync.test").getByText("Reactivate").click();
-await page.waitForTimeout(3000);
+await rowShowsDeactivated("adminpure@swimsync.test", false);
 check("reactivated admin is no longer marked deactivated",
   !(await row("adminpure@swimsync.test").innerText()).includes("deactivated"));
 
@@ -137,7 +153,7 @@ await freshLogin("coach@swimsync.test");
 await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
 await (await rowAction(row("admincoach@swimsync.test"), "Deactivate")).click();
-await page.waitForTimeout(3000);
+await rowShowsDeactivated("admincoach@swimsync.test", true);
 
 check("a deactivated COACH-admin can still log in (never banned — coaching survives)",
   await loginSticks("admincoach@swimsync.test"));

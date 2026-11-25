@@ -134,16 +134,24 @@ try {
   // ── Week view at 1440px fills the grid: no blank band on the right ─────────
   // The seven columns once stopped ~180px short of the grid's right edge (BACKLOG
   // UI restyle leftovers, 2026-11-18). Measured against the scroller's CONTENT box
-  // (clientWidth excludes a scrollbar), only when the week fits without scrolling.
+  // (clientWidth excludes a scrollbar).
+  // A day with 3+ concurrent lessons widens past the viewport BY DESIGN (lanes keep a
+  // minimum width; the grid scrolls both ways, PRD). On a SATURDAY the seed's
+  // "Saturday Beginners" joins the two fixture classes on "today" → 3 lanes → the week
+  // overflows, and measuring at scrollLeft 0 read band=-78 and failed every Saturday
+  // (nightly 44846098512). So an overflowing week is measured scrolled fully right:
+  // the last column must then end exactly at the grid's right edge.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(300);
   const fill = await page.getByTestId("time-grid-scroll").evaluate((el) => {
+    const fits = el.scrollWidth <= el.clientWidth;
+    if (!fits) el.scrollLeft = el.scrollWidth;
     const cols = el.querySelectorAll('[data-testid="day-column"]');
     const last = cols[cols.length - 1]?.getBoundingClientRect();
     const innerRight = el.getBoundingClientRect().left + el.clientLeft + el.clientWidth;
-    return { n: cols.length, fits: el.scrollWidth <= el.clientWidth, band: last ? Math.round(innerRight - last.right) : null };
+    return { n: cols.length, fits, band: last ? Math.round(innerRight - last.right) : null };
   });
-  if (!fill.fits) console.log("  (precondition) the week overflows at 1440px — no band is possible, the check below is vacuous");
+  if (!fill.fits) console.log("  (the week overflows at 1440px — measured scrolled fully right)");
   check(
     "week view at 1440px: the day columns reach the grid's right edge",
     fill.n === 7 && fill.band !== null && Math.abs(fill.band) <= 1,
