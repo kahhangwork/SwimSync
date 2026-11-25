@@ -708,7 +708,8 @@ the admin **Calendar**: two overlapping fixture classes land in two lanes, cards
 with the MAKE-UP chip, click pins, Today/‹/› move the URL date, the time gutter stays at x=0 after a
 horizontal scroll, month/agenda render, the coach filter keeps the substitute's lesson, double-click
 lands on `/lessons/…`, the Week view at 1440px has no blank band right of Sunday (2026-11-18; red on the old
-fixed-width columns, band=50px) — and, read through psql, **the `lesson_sessions` count is unchanged after the
+fixed-width columns, band=50px; an overflowing week — every Saturday, 3 lanes — is measured scrolled fully right,
+§7.304) — and, read through psql, **the `lesson_sessions` count is unchanged after the
 whole run** (the calendar is read-only by construction; ADMIN_CALENDAR_PLAN RISK 4). Every URL-driven check (›, Today,
 day number, coach filter) WAITS for the URL / re-rendered grid rather than a fixed 400 ms (2026-09-24 — the
 fixed timers failed 5 checks with router fetches slowed 1.5 s).

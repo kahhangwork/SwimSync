@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-11-19 (latest) — **Invoice emails are switched OFF on prod** (§8.176, `b83aae9`, engine v43,
-`INVOICE_EMAILS=off`): the user judged email low value; WhatsApp is the reminder channel. Next: Coach Kah Hang's
-November (early December) — the first run with no invoice emails._
+_Last updated: 2026-11-26 (latest) — **Two nightly reds were driver bugs, both fixed** (§8.177, `0296e88` + `e4c53c7`):
+`admin-calendar` failed every Saturday, `admins` slept through a cold API route. Next: Coach Kah Hang's November
+(early December) on engine v43 — the first run with no invoice emails._
 
-_Previously (§8.175, 2026-11-19) — the engine's batched reads are typed from their `.select()`; type-only._
+_Previously (§8.176, 2026-11-19) — invoice emails switched OFF on prod (`INVOICE_EMAILS=off`, engine v43)._
 
 _**One `_Previously_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -352,6 +352,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.177 (2026-11-25 → 26) — Two nightly reds traced to driver bugs, not the product; both drivers fixed; CI green
+
+**Found:** reds `44846098512` (11-21) and `45325262634` (11-24), both on `d9b0ceb`, which was green four other nights.
+`admin-calendar` failed **every Saturday** — the §7.304 seed-class collision on a layout assertion; `admins` slept 3 s
+after Deactivate on a cold API route — §7.228. Screenshots settled both (§7.228's first rule).
+
+**Shipped** `0296e88` + `e4c53c7` (driver-only, CI green): an overflowing week is measured scrolled right; all five
+admins row actions wait for the outcome. Calendar proven red→green at `--now '2026-11-21T10:00+08:00'`; admins 24/24
+on a freshly restarted (cold) admin server.
+
+- **Not done, deliberately:** the other 28 click-then-sleep sites — filed as a BACKLOG S-item with a CI grep (the
+  §7.228 promotion). No nightly dispatched; the next scheduled one, and Saturday 11-28's, are the live proof.
+
 ## 8.176 (2026-11-19) — `INVOICE_EMAILS=off` switches off invoice emails on Generate; live, and set on prod
 
 **Shipped** `b83aae9`: the user dropped *Large-month invoice emails* (*"I don't think my parents even check their
@@ -361,15 +374,6 @@ the user set the secret, digest-verified.
 
 - **Not built, deliberately:** a per-business switch (needs a migration + toggle; Little Orcas / Epic Swim lose
   invoice emails too — accepted). WhatsApp bulk sends stay parked: *"the queue is fine for now"* (BACKLOG).
-
-## 8.175 (2026-11-19) — The engine's batched reads are typed from their selects; BACKLOG item, type-only; CI green
-
-**Shipped** `33a007b`: `CountedQuery<R>` is generic, so `readPaged` / `readAllIn` infer each row from the supabase-js
-builder; the seven hand-written row types are deleted. Proven red first: on `main`, `status`→`statuz` in
-`readAttendanceIn` passed `deno check`; now 12 errors (dropping `cancelled_at`: 2). Suite 342/342 ×2.
-
-- **No Edge Function deploy, deliberately:** tsc emit of all four files is identical to `9459bcc`, so live v42 runs
-  the same JS. Reasoning + resolution: `EDGE_FUNCTIONS_REFACTOR_PLAN.md` §9, `db-any-ok` census. BACKLOG item removed.
 
 ## 9. Next steps (pick with the user)
 
@@ -390,7 +394,7 @@ Everything below is the monthly loop from here on:
 2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) and **Little Orcas September is SEALED**
    (2026-10-12, 0 invoices — all package-funded or settled). **October: Coach Kah Hang BILLED + SEALED** (2026-11-16, 7 invoices, on v39).
    **Little Orcas and Epic Swim are NOT ours to bill** — test data, owned by other people; their admins generate. The
-   next real run is **Coach Kah Hang's November** (early December), the first on engine v42 — see THE NEXT BUILD.
+   next real run is **Coach Kah Hang's November** (early December), the first on engine v43 — see THE NEXT BUILD.
    **Invoices → Billing months is the scoreboard**: every open month, why, and its last runs.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
    > apart from students**, so the head-count finally agrees with the number of marks the
@@ -413,9 +417,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-11-19:** `44435022695` (scheduled, on `aa67d64`) is **green** — it covers `3aa6c56` (Calendar) and
-`b053cf5`/`bb2af88` (§8.173), so **the gate is clear**. Since then only `3f99ae7` (driver helper, §8.174) and
-`33a007b` (engine types, emit-identical, §8.175) have landed — neither needs the gate. A red names its driver: replay it `--only`; each unit reverts on its own. If it
+**State on 2026-11-26:** `45537025043` (11-25, on `d9b0ceb`) is **green**; the reds of 11-21 and 11-24 were driver bugs,
+fixed in `0296e88`/`e4c53c7` (§8.177, driver-only — no product change awaits the gate). **Watch the 11-28 (Saturday)
+run**: it is the first live proof of the calendar fix. A red names its driver: replay it `--only`; each unit reverts on its own. If it
 fails with `edge runtime never came up`, read `functions.log` in the artifact (TESTING §5).
 A red that reads "stale clock pin" / "preflight failed" is the §8.144 tooling, not the product.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -427,7 +431,7 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — Wave 9 (BACKLOG Build order)
 
-1. **Bill Coach Kah Hang's November on engine v42** (early December, `INVOICE_RUNBOOK.md`) — the refactored engine's
+1. **Bill Coach Kah Hang's November on engine v43** (early December, `INVOICE_RUNBOOK.md`) — the refactored engine's
    first real run. BEFORE pressing Generate, run the O2 prediction (`EDGE_FUNCTIONS_REFACTOR_PLAN.md` §6 — per parent,
    billable attendance minus live package draws); AFTER, reconcile it per parent and read `billing_runs.duration_ms`
    (the first live one; v40 modelled it under ~1 s). **No invoice emails go out** (`INVOICE_EMAILS=off`, §8.176):

@@ -2041,6 +2041,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     must be UNSET) and a loud skip: **a shrinking denominator is not a signal anyone reads.**
     ⚠ **When auditing for the dead-attribute shape:** `grep -o 'getAttribute("data-[a-z-]*"' drivers/*.mjs`,
     then grep the app for each name (`data-status` in `verify-admin-lesson-detail` is real). (2026-08-30.)
+    - **Hit again (2026-11-24, §8.177):** `verify-admins` slept 3 s after Deactivate; the cold `/api/deactivate-admin`
+      outlasted it, the next step's `goto` aborted the request, and the deactivate NEVER LANDED (row still busy in
+      `admins-03-deactivated.png`) — nightly `45325262634`. Fixed `0296e88` + `e4c53c7` (all five row actions wait for
+      the outcome). The note did not stop it: 28 click-then-sleep (≥2 s) sites remain in 10 drivers.
+      **Promotion → BACKLOG** *A CI grep for click-then-sleep in UI drivers*.
 
 229. **`toSgDate()` THROWS on a malformed value ON PURPOSE — display and logic need DIFFERENT helpers, and
     "hardening" the shared one is how a loud crash becomes a silently wrong answer.** Its 34 call sites are mostly
@@ -2620,6 +2625,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - **Promoted (2026-10-10):** CI's `backend-tests` now runs the pinned roundtrip at noon SGT on 2026-10-03 … 09.
       Proven against the pre-`3d8adb0` fixture: red on 10-03 (Sat), green on 10-04/05. A new weekday-dependent fixture is red on its own
       push (TESTING §5).
+    - **Hit again (2026-11-21, §8.177) — on a driver ASSERTION, which the roundtrip cannot see:** `verify-admin-calendar`'s
+      1440px week-fill check failed EVERY SATURDAY: the seed class joins the two fixture classes on today → 3 lanes →
+      the week overflows by design (PRD: lanes keep a min width, the grid scrolls) and band read −78 at scrollLeft 0.
+      Reproduced with `run-all-drivers.sh --only admin-calendar --now '2026-11-21T10:00+08:00'`; fixed `0296e88`
+      (overflow is measured scrolled fully right). **A driver that asserts LAYOUT over today's lessons: replay it on a
+      pinned Saturday before trusting it** — no automatic check; a 7-day pinned UI replay costs too much for one
+      assertion class.
 
 305. **A literal test date the floor has not passed now fails CI — `scripts/check-test-dates.sh`.** Scans pgTAP +
     UI fixtures for quoted `'YYYY-MM-DD'` / `'YYYY-MM'` at or after the floor (1st of last month, SGT); each must be
